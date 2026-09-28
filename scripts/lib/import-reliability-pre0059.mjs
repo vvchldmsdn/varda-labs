@@ -14,7 +14,9 @@ const compile = source => ts.transpileModule(source, {
 }).outputText;
 
 /** Frozen, unmodified deployment sources. Only the actual database transport is
- * replaced; every reused calculation dependency must match the old runtime hash. */
+ * replaced. The full original dependency closure is now pinned as source files,
+ * so current calculation changes cannot contaminate the old-app rehearsal.
+ * Any future shared dependency must still match the old runtime hash. */
 export async function importPre0059(ports) {
   const registry = `__cairnCompatibility${randomUUID().replaceAll('-', '')}`;
   globalThis[registry] = ports;

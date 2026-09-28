@@ -128,11 +128,13 @@ it("connects group membership SQL and tenant RLS to the same native writer, snap
   for (let i = 0; i < 3; i++) { await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "KRW"); await f.service.drainTwelveDataService(f.config); }
   const evidence = await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "USD", { collect: false });
   const usd = f.engine.buildTrackedCurrencyPortfolio(evidence), krw = f.engine.buildTrackedCurrencyPortfolio({ ...evidence, reporting: "KRW" });
-  assert.equal(usd.history[0].total, "300"); assert.equal(usd.current.total, "320");
-  assert.equal(usd.movement.attribution.assetTradeFlow, "-5"); assert.equal(usd.movement.attribution.investmentChange, "25");
-  assert.ok(Math.abs(usd.performanceReturn.totalReturn - 25 / (300 - 5 / 26)) < 1e-12);
-  assert.equal(krw.history[0].total, "420000"); assert.equal(krw.current.total, "403200");
-  assert.equal(krw.movement.attribution.investmentChange, "-10500");
+  assert.equal(usd.current.total, "320"); assert.equal(krw.current.total, "403200");
+  // This fixture saved an intraday capture with a previous-day provider quote,
+  // not a completed daily cutoff. Keep its stored value but never promote it.
+  for (const report of [usd,krw]) {
+    assert.deepEqual(report.history, []); assert.equal(report.movement,null);
+    assert.equal(report.performanceReturn,null);
+  }
   const again = await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "USD", { collect: false });
   assert.equal(f.engine.buildTrackedCurrencyPortfolio(again).current.total, "320");
   assert.equal((await f.writer.readNativeLedger(tenant)).entries.filter(row => row.operationId === dividend.operationId).length, 1);
@@ -143,7 +145,7 @@ it("connects group membership SQL and tenant RLS to the same native writer, snap
   assert.equal(f.engine.buildTrackedCurrencyPortfolio(future).current.total, "50");
 });
 
-it("runs native mutation through actual dashboard DAL, provider SQL evidence, snapshots and subsequent performance", async t => {
+it("runs native mutation through actual dashboard DAL and preserves intraday captures without inventing daily performance", async t => {
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 10, 22) });
   const f = await fixture(), tenant = { ownerUserId: owner };
   const first = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW");
@@ -189,11 +191,11 @@ it("runs native mutation through actual dashboard DAL, provider SQL evidence, sn
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const next = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: false });
   const nextKrw = f.engine.buildTrackedCurrencyPortfolio(next), nextUsd = f.engine.buildTrackedCurrencyPortfolio({ ...next, reporting: "USD" });
-  assert.equal(nextUsd.current.total, "1160"); assert.equal(nextUsd.history[0].total, "1050");
-  assert.equal(nextUsd.movement.attribution.assetTradeFlow, "100"); assert.equal(nextUsd.movement.attribution.investmentChange, "10");
-  assert.equal(nextUsd.performanceReturn.status, "ready"); assert.ok(Math.abs(nextUsd.performanceReturn.totalReturn - 10 / (1050 + 100 / 26)) < 1e-12);
-  assert.equal(nextKrw.current.total, "1740000"); assert.equal(nextKrw.history[0].total, "1470000", "stored spot FX remains evidence of the original capture");
-  assert.equal(nextKrw.performanceReturn.status, "ready");
+  assert.equal(nextUsd.current.total, "1160"); assert.equal(nextKrw.current.total, "1740000");
+  for (const report of [nextUsd,nextKrw]) {
+    assert.deepEqual(report.history, []); assert.equal(report.movement,null);
+    assert.equal(report.performanceReturn,null,"an intraday capture is not a daily return baseline");
+  }
   assert.deepEqual((await f.pg.query("select native_evidence from daily_portfolio_snapshots where account_id=$1", [account])).rows[0].native_evidence, saved, "subsequent reads never rewrite original snapshots");
 });
 
@@ -375,6 +377,6 @@ it("holds an owner action ahead of its price and never automatically books provi
   assert.equal((await f.writer.writeNativeMutation(tenant, dividend)).status, "existing");
   const paid = f.engine.buildTrackedCurrencyPortfolio(await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false }));
   assert.equal(paid.current.total, "1054");
-  assert.equal(paid.performanceReturn.status, "ready");
-  assert.ok(Math.abs(paid.performanceReturn.totalReturn - 4 / 1050) < 1e-12, "recorded cash dividend enters performance once on a raw-price series");
+  assert.equal(paid.performanceReturn,null,"cash dividend is recorded once, but an intraday capture cannot establish a daily return");
+  assert.equal((await f.writer.readNativeLedger(tenant,account)).entries.filter(row=>row.operationId===dividend.operationId).length,1);
 });

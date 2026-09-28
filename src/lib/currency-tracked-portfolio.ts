@@ -8,9 +8,10 @@ export const TRACKED_CURRENCY_VERSION = "owned_native_valuation_v1";
 export type TrackedNativePosition = {
   id: string; ownerId: string; name: string;
   accountId?: string; kind?: "holding" | "cash"; costLots?: readonly NativeCostLot[] | null; ticker?: string | null; market?: string;
-  /** Only admitted, native, raw price evidence. at is the price observation, not fetch time. */
+  /** Admitted raw native evidence. Valuation at, price observation, collection,
+   * and official close session remain separate fields. */
   observation: ValuationObservation | null;
-  evidenceReason?: "corporate_actions_pending" | "corporate_actions_provisional" | "corporate_actions_conflict" | "corporate_action_ledger_mismatch" | "corporate_action_price_pending";
+  evidenceReason?: "corporate_actions_pending" | "corporate_actions_provisional" | "corporate_actions_conflict" | "corporate_action_ledger_mismatch" | "corporate_action_price_pending" | "price_observation_conflict";
   unsupportedReason?: "manual_gold" | "cash_not_observed" | "fractional_value_not_dated" | "unsupported_instrument";
   cost?: { amount: string; currency: Currency; at: string; source: string } | null;
 };
@@ -50,7 +51,9 @@ type Issue = { code: string; positionId?: string; at?: string };
 type ValuedFrame = {
   boundary?: "before"; at: string; total: string | null; verifiedSubtotal: string; complete: boolean;
   coverage: { positions: number; valued: number; scopeComplete: boolean; excludedPositions: number; excludedWeightPct: number | null };
-  positions: { id: string; name: string; value: string | null; cost: string | null; weightPct: number | null; priceObservedAt: string | null; reason: string | null }[];
+  positions: { id: string; name: string; value: string | null; cost: string | null; weightPct: number | null;
+    priceObservedAt: string | null; priceFetchedAt: string | null; priceReferenceDate: string | null;
+    priceTimestampBasis: ValuationObservation["timestampBasis"] | null; reason: string | null }[];
   issues: Issue[];
 };
 type Attribution = { price: string; exchange: string; assetTradeFlow: string; investmentChange: string; valuationChange: string; otherCashReturn: string; positions: { id: string; name: string; price: string; exchange: string; change: string }[] };
@@ -80,9 +83,13 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
     for (const row of frame.positions) { if (!row.id || seen.has(row.id)) duplicates.add(row.id); seen.add(row.id); }
     const exactValues = new Map<string, Decimal>();
     const positions = frame.positions.map(row => {
-      const priceObservedAt = row.observation?.priceObservedAt ?? row.observation?.at ?? null;
-      const base = { id: row.id, name: row.name, value: null as string | null, cost: null as string | null, weightPct: null as number | null, priceObservedAt, reason: null as string | null };
-      const priceAt = Date.parse(priceObservedAt ?? "");
+      const priceTimestampBasis = row.observation?.timestampBasis ?? null;
+      const priceObservedAt = priceTimestampBasis === "collection" || priceTimestampBasis === "daily_close" ? null : row.observation?.priceObservedAt ?? null;
+      const base = { id: row.id, name: row.name, value: null as string | null, cost: null as string | null, weightPct: null as number | null,
+        priceObservedAt, priceFetchedAt: row.observation?.priceFetchedAt ?? null, priceReferenceDate: row.observation?.priceReferenceDate ?? null, priceTimestampBasis, reason: null as string | null };
+      // Keep the valuation-time admission contract separate from the display:
+      // a recorded frame time is not an invented exchange observation time.
+      const priceAt = Date.parse(row.observation?.priceObservedAt ?? row.observation?.at ?? "");
       let reason = issues.some(issue => issue.code === "invalid_frame") ? "invalid_frame" : duplicates.has(row.id) ? "duplicate_position" : row.unsupportedReason ?? row.evidenceReason ?? (!row.observation ? "native_price_evidence_missing" : !Number.isFinite(priceAt) || priceAt > at ? "invalid_price_time" : at - priceAt > evidence.maxPriceAgeMs ? "price_stale" : null);
       if (!reason && row.observation && !row.observation.source.trim()) reason = "native_price_evidence_missing";
       if (!reason && row.observation) {

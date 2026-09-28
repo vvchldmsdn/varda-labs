@@ -6,6 +6,7 @@ import { isProviderCollectionDeferred } from "@/lib/market-data/collection-polic
 
 import {
   buildCronMarketCyclePlan,
+  resolveCronCutoffPreparation,
   CRON_MARKET_CYCLE_LIMITS,
   type CronCloseSyncGroup,
   type CronMarketCyclePlan,
@@ -71,6 +72,7 @@ export type CronMarketCycleRunResult = {
   ok: boolean;
   status:
     | "completed"
+    | "prepared"
     | "no_action"
     | "blocked"
     | "failed"
@@ -82,6 +84,7 @@ export type CronMarketCycleRunResult = {
   secretsIncluded: false;
   runId: string | null;
   snapshotDate: string;
+  phase?: "pre_cutoff";
   fx: {
     status: "written" | "skipped" | "not_attempted" | "failed";
     rateDate: string | null;
@@ -110,6 +113,8 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
   // 300 seconds; stop adding waits at 180 seconds to leave time for snapshots.
   const closeRetryDeadline = performance.now() + 180_000;
   const now = options.now ?? new Date();
+  const preparation = resolveCronCutoffPreparation(now);
+  if (preparation) return runCutoffPreparation({ ...options, now, ...preparation });
   const snapshotDate = resolveSnapshotCycle(now).snapshotDate;
   const claim = await claimCronMarketCycleRun({
     snapshotDate,
@@ -165,6 +170,54 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
     try { await finishRun(result,result.status==="failed" ? "failed" : result.ok ? "completed" : "blocked"); }
     catch { return {...result,ok:false,status:"failed",blockers:[...result.blockers,"run_finalization_failed"]}; }
   }
+  return result;
+}
+
+async function runCutoffPreparation({ now, snapshotDate, remainingMs, cronScheduleUtc }: {
+  now: Date; snapshotDate: string; remainingMs: number; cronScheduleUtc?: string | null;
+}): Promise<CronMarketCycleRunResult> {
+  const deadline = performance.now() + remainingMs;
+  const claim = await claimCronMarketCycleRun({ snapshotDate, startedAt: now,
+    cronScheduleUtc: cronScheduleUtc ?? null, phase: "pre_cutoff" });
+  if (claim.outcome !== "claimed") return emptyResult({ phase: "pre_cutoff",
+    ok: claim.outcome === "already_attempted" && claim.status === "completed",
+    status: claim.outcome, runId: claim.runId, snapshotDate, blockers: [claim.outcome] });
+  let result = emptyResult({ phase: "pre_cutoff", ok: false, status: "blocked", runId: claim.runId, snapshotDate });
+  try {
+    result = await withKisCollectionLeaseWait(async () => {
+      const blockers: string[] = [];
+      let fx = result.fx;
+      let liveSync = result.liveSync;
+      // Waiting for another worker must not turn a post-cutoff receipt into
+      // evidence for the earlier boundary. Writers also enforce receipt time.
+      if (performance.now() >= deadline) return { ...result, blockers: ["cutoff_preparation_window_elapsed"] };
+      try {
+        const refreshed = await runUsdKrwFxRefreshJob({ dryRun: false, acceptExistingVardaRow: true });
+        fx = refreshed.status === "written" || refreshed.status === "skipped"
+          ? { status: refreshed.status, rateDate: refreshed.candidate.rateDate, source: refreshed.candidate.source }
+          : { status: "failed", rateDate: null, source: null };
+      } catch { fx = { status: "failed", rateDate: null, source: null }; }
+      if (fx.status === "failed") blockers.push("cutoff_fx_collection_incomplete");
+      if (performance.now() >= deadline) blockers.push("cutoff_preparation_window_elapsed");
+      else if (!getKisProviderPolicy().configured) blockers.push("kis_provider_not_configured");
+      else {
+        try { liveSync = await syncLiveQuotes(createKisMarketDataProvider()); }
+        catch { liveSync = { ...emptyLiveSyncSummary(), status: "failed" }; }
+        if (liveSync.status !== "completed") blockers.push("cutoff_price_collection_incomplete");
+        if (performance.now() >= deadline) blockers.push("cutoff_preparation_window_elapsed");
+      }
+      return { ...result, fx, liveSync, ok: blockers.length === 0,
+        status: blockers.length === 0 ? "prepared" as const : "blocked" as const,
+        blockers: [...new Set(blockers)] };
+    });
+  } catch (error) {
+    result = { ...result, status: error instanceof KisRefreshLeaseBusyError ? "blocked" : "failed",
+      blockers: [error instanceof KisRefreshLeaseBusyError ? "kis_provider_refresh_busy" : "unexpected_cutoff_preparation_error"] };
+  }
+  // Preparation never enters either snapshot writer or a provider fallback.
+  // Its separate mode leaves the ordinary 07:00 attempt/lease history intact.
+  try { await finishRun(result, result.status === "failed" ? "failed" : result.ok ? "completed" : "blocked"); }
+  catch { return { ...result, ok: false, status: "failed", blockers: [...result.blockers, "run_finalization_failed"] }; }
   return result;
 }
 
@@ -572,17 +625,18 @@ async function finishRun(
   error: string | null = null,
 ) {
   if (!result.runId) return;
+  const preparation = result.phase === "pre_cutoff";
   await finishCronMarketCycleRun({
     runId: result.runId,
     status,
     finishedAt: new Date(),
-    requestedCount: result.snapshot.targetCount + (result.nativeSnapshot && "targetCount" in result.nativeSnapshot ? result.nativeSnapshot.targetCount : result.nativeSnapshot?.status==="failed" ? 1 : 0),
-    successCount: result.snapshot.writtenCount + (result.nativeSnapshot && "targetCount" in result.nativeSnapshot ? result.nativeSnapshot.targetCount-result.nativeSnapshot.failedCount-result.nativeSnapshot.blockedCount : 0),
-    failedCount: result.snapshot.failedCount + (result.nativeSnapshot?.status === "failed" ? 1 : result.nativeSnapshot?.failedCount ?? 0),
-    skippedCount: result.snapshot.blockedCount + (result.nativeSnapshot && "blockedCount" in result.nativeSnapshot ? result.nativeSnapshot.blockedCount : 0),
+    requestedCount: preparation ? result.liveSync.requestedCount + Number(result.fx.status !== "not_attempted") : result.snapshot.targetCount + (result.nativeSnapshot && "targetCount" in result.nativeSnapshot ? result.nativeSnapshot.targetCount : result.nativeSnapshot?.status==="failed" ? 1 : 0),
+    successCount: preparation ? result.liveSync.successCount + Number(["written", "skipped"].includes(result.fx.status)) : result.snapshot.writtenCount + (result.nativeSnapshot && "targetCount" in result.nativeSnapshot ? result.nativeSnapshot.targetCount-result.nativeSnapshot.failedCount-result.nativeSnapshot.blockedCount : 0),
+    failedCount: preparation ? result.liveSync.failedCount + Number(result.liveSync.status === "failed") + Number(result.fx.status === "failed") : result.snapshot.failedCount + (result.nativeSnapshot?.status === "failed" ? 1 : result.nativeSnapshot?.failedCount ?? 0),
+    skippedCount: preparation ? result.liveSync.skippedCount : result.snapshot.blockedCount + (result.nativeSnapshot && "blockedCount" in result.nativeSnapshot ? result.nativeSnapshot.blockedCount : 0),
     metadata: {
       snapshotDate: result.snapshotDate,
-      phase: status,
+      phase: result.phase ?? status,
       outcome: result.status,
       fx: result.fx,
       factorSync: result.factorSync,
@@ -609,6 +663,7 @@ function emptyResult(
     secretsIncluded: false,
     runId: overrides.runId ?? null,
     snapshotDate: overrides.snapshotDate,
+    ...(overrides.phase ? { phase: overrides.phase } : {}),
     fx: overrides.fx ?? {
       status: "not_attempted",
       rateDate: null,

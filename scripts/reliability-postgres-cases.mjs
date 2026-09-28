@@ -40,7 +40,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   assert.equal((await write({operationId:randomUUID(),accountId:account,expectedSequence:0,event:{type:'sell',at:'2026-08-03T00:00:00Z',assetId:asset,currency:'USD',quantity:'3',settlement:{currency:'USD',amount:'330'},fee:{currency:'USD',amount:'0'},tax:{currency:'USD',amount:'0'}}})).status,'created');seq=1;
   assert.equal((await read()).accounts[0].state.cash.USD,'1330');
  });
- const originalSnapshot={version:1,sequence:1,frame:{at:'2026-08-03T22:00:00.000Z',boundary:'before',positions:[{id:asset,ownerId:owner,accountId:account,kind:'holding',name:'Synthetic unit',ticker:'UNIT',market:'us',observation:{quantity:'7',price:'100',currency:'USD',at:'2026-08-03T22:00:00.000Z',priceObservedAt:'2026-08-03T20:00:00.000Z',priceFetchedAt:'2026-08-03T20:00:00.000Z',basis:'raw',source:'kis'}}],scopeComplete:true,source:'native_ledger_cutoff_v2'},fx:[]};
+ const originalSnapshot={version:1,sequence:1,frame:{at:'2026-08-03T22:00:00.000Z',boundary:'before',positions:[{id:asset,ownerId:owner,accountId:account,kind:'holding',name:'Synthetic unit',ticker:'UNIT',market:'us',observation:{quantity:'7',price:'100',currency:'USD',at:'2026-08-03T22:00:00.000Z',priceObservedAt:'2026-08-03T21:59:00.000Z',priceFetchedAt:'2026-08-03T21:59:00.000Z',timestampBasis:'collection',priceKind:'live',basis:'raw',source:'kis'}}],scopeComplete:true,source:'native_ledger_cutoff_v2'},fx:[]};
  await fixtureWrite("insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,native_evidence) values($1,$2,'reliability','2026-08-04','native_ledger_cutoff_v2',$3)",[owner,account,originalSnapshot]);
  const missing={operationId:randomUUID(),accountId:account,expectedSequence:seq,event:{type:'buy',at:'2026-08-02T00:00:00Z',assetId:asset,currency:'USD',quantity:'2',settlement:{currency:'USD',amount:'200'},fee:{currency:'USD',amount:'0'},tax:{currency:'USD',amount:'0'}},history:{reason:'Missing synthetic trade',notInOpening:true}};
  await admin.query("select set_trade_reliability_mode('compatible','Synthetic reliability rehearsal')");
@@ -108,7 +108,9 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   assert.equal(results.filter(r=>r.status==='created').length,1);assert.equal(results.filter(r=>r.status==='conflict'||r.reason==='conflict').length,1);
   seq=(await read()).accounts[0].state.sequence;
  });
- const base=(at)=>({ownerId:owner,reporting:'USD',asOf:at,current:{at,source:'synthetic_observation',scopeComplete:true,positions:[{id:asset,ownerId:owner,accountId:account,kind:'holding',name:'Synthetic unit',ticker:'UNIT',market:'us',observation:{quantity:'999',price:'100',currency:'USD',at:'2026-08-02T20:00:00.000Z',priceObservedAt:'2026-08-02T20:00:00.000Z',priceFetchedAt:'2026-08-02T20:00:00.000Z',basis:'raw',source:'synthetic'}}]},history:[],trades:null,fx:[],maxFxAgeMs:86400000,maxPriceAgeMs:86400000});
+ // These writer/replay tests use explicit, synthetic pre-cutoff receipts. A
+ // permissive max-age no longer admits a two-hour-old live observation.
+ const base=(at,snapshotDate='2026-08-03')=>{const receipt=new Date(`${snapshotDate}T06:59:00+09:00`).toISOString();return {ownerId:owner,reporting:'USD',asOf:at,current:{at,source:'synthetic_observation',scopeComplete:true,positions:[{id:asset,ownerId:owner,accountId:account,kind:'holding',name:'Synthetic unit',ticker:'UNIT',market:'us',observation:{quantity:'999',price:'100',currency:'USD',at:receipt,priceObservedAt:receipt,priceFetchedAt:receipt,timestampBasis:'collection',priceKind:'live',basis:'raw',source:'synthetic'}}]},history:[],trades:null,fx:[],maxFxAgeMs:86400000,maxPriceAgeMs:86400000};};
  await check('cutoff-delay-independent-and-no-current-quantity-backdate',async()=>{
   const state=await read();
   const early=cutoff.buildNativeCutoffEvidence(base('2026-08-02T22:00:00.000Z'),state,'2026-08-03','2026-08-02T22:00:00.000Z');
@@ -123,7 +125,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   await fixtureWrite("update daily_snapshot_work set lease_until=clock_timestamp()-interval '1 second' where id=$1",[a.id]);
   const b=await work.claimSnapshotWork('native','2026-08-05');assert.equal(b.id,a.id);assert.equal(b.generation,a.generation+1);
   await assert.rejects(work.snapshotFence.run(a,()=>mutation.runPortfolioMutation(owner,'select 1',[])),/snapshot_worker_expired/);
-  const evidence=cutoff.buildNativeCutoffEvidence({...base('2026-08-05T01:00:00Z'),maxPriceAgeMs:10*86400000},await ledger.readNativeLedger(context,a.accountId),a.snapshotDate,'2026-08-05T01:00:00Z');
+  const evidence=cutoff.buildNativeCutoffEvidence(base('2026-08-05T01:00:00Z',a.snapshotDate),await ledger.readNativeLedger(context,a.accountId),a.snapshotDate,'2026-08-05T01:00:00Z');
   const count=(await admin.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n;
   await assert.rejects(work.snapshotFence.run(a,()=>snapshots.saveNativeCutoffSnapshots(context,evidence,a.snapshotDate,'2026-08-05T01:00:00Z')),/snapshot_worker_expired/);
   assert.equal((await admin.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n,count);
@@ -155,7 +157,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   const execute=async item=>{
    calls.push(item.id);if(first){first=false;failedId=item.id;throw new Error('synthetic transient transport error');}
    const data=await ledger.readNativeLedger(context,item.accountId);
-   const evidence=cutoff.buildNativeCutoffEvidence({...base('2026-08-05T01:00:00Z'),maxPriceAgeMs:10*86400000},data,item.snapshotDate,'2026-08-05T01:00:00Z');
+   const evidence=cutoff.buildNativeCutoffEvidence(base('2026-08-05T01:00:00Z',item.snapshotDate),data,item.snapshotDate,'2026-08-05T01:00:00Z');
    const saved=await snapshots.saveNativeCutoffSnapshots(context,evidence,item.snapshotDate,'2026-08-05T01:00:00Z');
    assert.equal(saved.status,'ready');return {status:'completed'};
   };
@@ -175,7 +177,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   await fixtureWrite("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price,created_at,updated_at) values($1,$2,$3,'legacy-test','Synthetic legacy unit','999999','korea','KRW','stock',10,100,'2026-08-01','2026-08-01')",[h,owner,a]);
   await fixtureWrite("insert into asset_price_snapshots(ticker,market,currency,date,close_price,source,fetched_at) values('999999','korea','KRW','2026-08-04',100,'kis','2026-08-04T21:00:00Z')");
   await fixtureWrite("insert into live_price_quotes(ticker,market,currency,price,source,provider,quote_type,status,price_as_of,fetched_at) values('999999','korea','KRW',110,'kis','kis','live','ok','2026-08-04T21:59:59Z','2026-08-04T21:59:59Z')");
-  await fixtureWrite("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values('2026-08-04',1400,'synthetic','ok','2026-08-04T21:00:00Z','2026-08-04T21:00:00Z','spot')");
+  await fixtureWrite("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values('2026-08-04',1400,'synthetic','ok','2026-08-04T21:59:00Z','2026-08-04T21:59:00Z','spot')");
   const result=await legacyJob.runDailySnapshotJob({durable:true,dryRun:false,snapshotDate:'2026-08-05'});
   assert.equal(result.failedCount,0);assert.equal(result.writtenCount,1);assert.equal(result.blockedCount,2,'older days lack contemporaneous quotes');
   const stored=(await admin.query('select id,total_market_value::text,updated_at from daily_portfolio_snapshots where account_id=$1',[a])).rows;
@@ -198,7 +200,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
  });
  await check('historical-revision-fences-already-read-cron-evidence',async()=>{
   const state=await read();
-  const evidence=cutoff.buildNativeCutoffEvidence({...base('2026-08-05T01:00:00Z'),maxPriceAgeMs:10*86400000},state,'2026-08-05','2026-08-05T01:00:00Z');
+  const evidence=cutoff.buildNativeCutoffEvidence(base('2026-08-05T01:00:00Z','2026-08-05'),state,'2026-08-05','2026-08-05T01:00:00Z');
   const original=(await admin.query('select native_data from event_ledger_entries where canonical_owner_user_id=$1 and account_id=$2 order by native_sequence',[owner,account])).rows;
   const added=await write({...missing,operationId:randomUUID(),expectedSequence:state.accounts[0].state.sequence,event:{...missing.event,at:'2026-08-02T12:00:00Z',quantity:'1',settlement:{currency:'USD',amount:'100'}}});
   assert.equal(added.status,'created');
@@ -216,4 +218,34 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
  await runReliabilityLimitCases({admin,worker,tenant,report,connection});
  const {runCompatibilityCases}=await import('./reliability-compatibility-cases.mjs');
  await runCompatibilityCases({admin,worker,tenant,report,connection});
+ await check('historical-idempotent-race-between-preflight-and-replay-reads',async()=>{
+  const o=randomUUID(),a=randomUUID(),h=randomUUID(),scope={ownerUserId:o,role:'user'};
+  await fixtureWrite("insert into app_users(id,status,role) values($1,'active','user')",[o]);
+  await fixtureWrite("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'race','Synthetic idempotency','brokerage','USD')",[a,o]);
+  await fixtureWrite("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price) values($1,$2,$3,'race','Synthetic race','RACE','us','USD','stock',10,100)",[h,o,a]);
+  const mutate=request=>ledger.writeNativeMutation(scope,request);
+  assert.equal((await mutate({operationId:randomUUID(),accountId:a,expectedSequence:null,opening:{at:'2026-08-01T00:00:00Z',cash:{KRW:'0',USD:'1000'},positions:[{assetId:h,currency:'USD',quantity:'10',costLots:null}]}})).status,'created');
+  assert.equal((await mutate({operationId:randomUUID(),accountId:a,expectedSequence:0,event:{type:'sell',at:'2026-08-03T00:00:00Z',assetId:h,currency:'USD',quantity:'3',settlement:{currency:'USD',amount:'330'},fee:{currency:'USD',amount:'0'},tax:{currency:'USD',amount:'0'}}})).status,'created');
+  const request={operationId:randomUUID(),accountId:a,expectedSequence:1,event:{type:'buy',at:'2026-08-02T00:00:00Z',assetId:h,currency:'USD',quantity:'2',settlement:{currency:'USD',amount:'200'},fee:{currency:'USD',amount:'0'},tax:{currency:'USD',amount:'0'}},history:{reason:'Synthetic missing trade',notInOpening:true}};
+  const transaction=tenantSql.transaction;let intercept=true;
+  tenantSql.transaction=async(build,options)=>{
+   const commands=build({query:(text,parameters=[])=>({text,parameters})});
+   if(intercept&&commands.some(row=>row.text.includes('from effective_native_ledger_entries'))) {
+    intercept=false;assert.equal((await mutate(request)).status,'created');
+   }
+   return transaction(tx=>commands.map(row=>tx.query(row.text,row.parameters)),options);
+  };
+  try {assert.deepEqual(await mutate(request),{status:'existing'});}
+  finally {tenantSql.transaction=transaction;}
+  assert.equal(intercept,false,'the second real writer committed between the two reads');
+  assert.equal((await mutate({...request,event:{...request.event,quantity:'3'}})).status,'conflict');
+  const value=await ledger.readNativeLedger(scope,a);
+  assert.equal(value.accounts[0].state.positions[0].quantity,'9');assert.equal(value.accounts[0].state.cash.USD,'1130');
+  assert.equal((await admin.query('select count(*)::int n from native_ledger_revisions where account_id=$1',[a])).rows[0].n,1);
+  assert.equal((await admin.query('select count(*)::int n from event_ledger_entries where native_operation_id=$1',[request.operationId])).rows[0].n,1);
+ });
+ // Introduce the new cutoff-only owner after the legacy durable discovery
+ // scenarios so their historical backlog remains the independently fixed one.
+ const {runCutoffObservationCases}=await import('./cutoff-observation-postgres-cases.mjs');
+ await runCutoffObservationCases({admin,worker,tenant,report});
 }

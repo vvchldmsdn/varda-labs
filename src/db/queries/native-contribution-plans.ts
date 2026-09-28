@@ -25,15 +25,15 @@ export async function saveNativeContributionPlan(tenant: TenantContext, request:
     tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
     tx.query("select set_config('lock_timeout','3000',true),set_config('statement_timeout','5000',true)"),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`varda.portfolio_mutation.v1:${tenant.ownerUserId}`]),
-    tx.query(SAVE_SQL, [tenant.ownerUserId, request.id, request.scopeKey, request.reportingCurrency, JSON.stringify(request), document, JSON.stringify(planned.document.basis.nativeSequences)]),
+    tx.query(SAVE_SQL, [tenant.ownerUserId, request.id, request.scopeKey, request.reportingCurrency, JSON.stringify(request), document, JSON.stringify(planned.document.basis.nativeSequences),context.status==='ready'&&context.evidenceVersion?JSON.stringify(context.policy):null]),
   ], { isolationLevel: "ReadCommitted" });
   const status = rows[0]?.status;
   if (!["created", "existing", "conflict", "limit", "inactive"].includes(status)) throw new Error("native_plan_save_unavailable");
   const plan = status === "created" || status === "existing" ? (await listNativeContributionPlans(tenant, undefined, request.id))[0] : undefined;
-  return { status: status as "created" | "existing" | "conflict" | "limit" | "inactive", ...(plan ? { plan } : {}) };
+  return { status: status as "created" | "existing" | "conflict" | "limit" | "inactive", basisChanged:!!request.previewEvidenceVersion && context.status==='ready' && request.previewEvidenceVersion!==context.evidenceVersion, ...(plan ? { plan } : {}) };
 }
 function equalRequest(a: NativeContributionRequest, b: NativeContributionRequest) {
-  return a.id === b.id && a.scopeKey === b.scopeKey && a.reportingCurrency === b.reportingCurrency && a.useAvailableCash === b.useAvailableCash && a.newMoney.amount === b.newMoney.amount && a.newMoney.currency === b.newMoney.currency;
+  return a.id === b.id && a.scopeKey === b.scopeKey && a.reportingCurrency === b.reportingCurrency && a.useAvailableCash === b.useAvailableCash && a.newMoney.amount === b.newMoney.amount && a.newMoney.currency === b.newMoney.currency && a.previewEvidenceVersion===b.previewEvidenceVersion;
 }
 export async function deleteNativeContributionPlan(tenant: TenantContext, id: string) {
   if (!isNativeContributionPlanId(id)) throw new Error("native_plan_invalid_id");
@@ -49,7 +49,13 @@ const SAVE_SQL = `with existing as materialized (
  select request_json from native_contribution_plans where owner_user_id=$1::uuid and id=$2::uuid
 ), unchanged as materialized (
  select not exists(select 1 from jsonb_each_text($7::jsonb) expected where not exists (
-   select 1 from accounts a where a.id=expected.key::uuid and a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state->>'sequence'=expected.value)) as ok
+   select 1 from accounts a where a.id=expected.key::uuid and a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state->>'sequence'=expected.value))
+   and ($8::jsonb is null or (select count(*)=1 from portfolio_target_policy_revisions p where p.lifecycle_status='approved'
+     and p.scope_kind=case when $3='all' then 'all' when $3 like 'account:%' then 'account' else 'portfolio_group' end
+     and p.scope_account_id is not distinct from case when $3 like 'account:%' then split_part($3,':',2)::uuid else null end
+     and p.scope_portfolio_group_id is not distinct from case when $3 like 'portfolio:%' then split_part($3,':',2)::uuid else null end
+     and p.approval_revision=($8::jsonb->>'revision')::integer and p.universe_hash=$8::jsonb->>'universeHash' and p.vector_hash=$8::jsonb->>'vectorHash'
+     and p.policy_version=$8::jsonb->>'version')) as ok
 ), inserted as (
  insert into native_contribution_plans(owner_user_id,id,scope_key,reporting_currency,request_json,document_json)
  select $1::uuid,$2::uuid,$3,$4,$5::jsonb,$6::jsonb where investment_plan_tenant_active() and (select ok from unchanged) and not exists(select 1 from existing)

@@ -45,7 +45,12 @@ export function convertMoney(amount: string | number | Decimal, from: Currency, 
   if (!factor.ok) return factor;
   try { return { ok: true, value: Decimal.from(amount).mul(factor.value) }; } catch { return { ok: false, reason: "invalid_value" }; }
 }
-export type ValuationObservation = { quantity: string; price: string; currency: Currency; at: string; priceObservedAt?: string; priceFetchedAt?: string; basis: "raw"; source: string };
+export type ValuationObservation = { quantity: string; price: string; currency: Currency; at: string; priceObservedAt?: string; priceFetchedAt?: string; basis: "raw"; source: string;
+  priceKind?: "live" | "realtime" | "delayed" | "close";
+  /** A dated official close is a session observation, not an invented tick time. */
+  priceReferenceDate?: string;
+  timestampBasis?: "collection" | "provider" | "daily_close";
+};
 export function valuePosition(row: ValuationObservation, reporting: Currency, fx: readonly FxEvidence[], maxAgeMs: number): CurrencyResult<Decimal> {
   if (row.basis !== "raw") return { ok: false, reason: "price_basis_mismatch" };
   try {

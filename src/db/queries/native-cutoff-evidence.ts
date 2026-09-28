@@ -10,6 +10,15 @@ import type { FxEvidence } from "@/lib/currency-valuation";
 import { getTwelveDataServerConfig, resolveTwelveDataTarget, readTwelveDataEvidence, readTwelveDataSplitRisk } from "@/lib/market-data/twelve-data-service";
 import { Decimal } from "@/lib/money";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
+import { readSnapshotCutoffObservations } from "./snapshot-cutoff-observations";
+import { closeCalendarReferenceDateForAsset } from "@/lib/snapshots/market-calendar";
+import { isNativeCutoffObservation, hasConflictingLatestSnapshotPrices } from "@/lib/snapshots/cutoff-valuation";
+
+type CutoffAssetRow = {
+  id: string; name: string; ticker: string | null; market: string; currency: "KRW" | "USD";
+  quantity: string; price: string | null; source: string | null; observedAt: string | null;
+  fetchedAt: string | null; status: string | null; quoteType: string | null;
+};
 
 /** Read stored, admitted observations only, including now-archived holdings.
  * No provider call and no timestamp reconstructed from a bare price date. */
@@ -17,7 +26,7 @@ export async function readNativeCutoffEvidence(tenant: TenantContext, accountId:
   const [ledger,observations]=await Promise.all([readNativeLedger(tenant,accountId),readNativeSnapshotObservations(tenant,accountId)]);
   if (!ledger.accounts.length || ledger.accounts.length !== 1 || ledger.accounts[0].id !== accountId) return null;
   const at = buildCycleForSnapshotDate(snapshotDate, new Date(capturedAt)).cycleEndAt.toISOString();
-  const [[, assets], rates] = await Promise.all([
+  const [[, assetRows], rates, retained] = await Promise.all([
     getTenantSqlClient().transaction(tx => [
       tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
       tx.query(`select id,name,ticker,market,currency,quantity::text,current_price::text as price,price_source as source,
@@ -28,24 +37,40 @@ export async function readNativeCutoffEvidence(tenant: TenantContext, accountId:
     sqlClient.query(`select usdkrw::text as rate,observed_at::text as "observedAt",fetched_at::text as "fetchedAt",source,rate_kind as kind
       from fx_rates where not is_sample and status='ok' and source is not null and observed_at<=$1::timestamptz and fetched_at<=$1::timestamptz and observed_at<=fetched_at and rate_kind in ('spot','daily_reference')
       order by observed_at desc limit 30`, [at]),
+    readSnapshotCutoffObservations(snapshotDate),
   ]);
+  const assets = assetRows as CutoffAssetRow[];
   if (assets.length > 200) return null;
-  const quotes = assets.length ? await sqlClient.query(`select distinct on(upper(q.ticker),q.market,q.currency) q.ticker,q.market,q.currency,q.price::text,q.source,q.price_as_of::text as "observedAt",q.fetched_at::text as "fetchedAt",q.status,q.quote_type as "quoteType"
+  const cachedQuotes = assets.length ? await sqlClient.query(`select distinct on(upper(q.ticker),q.market,q.currency) q.ticker,q.market,q.currency,q.price::text,q.source,q.price_as_of::text as "observedAt",q.fetched_at::text as "fetchedAt",q.status,q.quote_type as "quoteType"
     from live_price_quotes q join jsonb_to_recordset($1::jsonb) as a(ticker text,market text,currency text)
       on upper(q.ticker)=upper(a.ticker) and q.market=a.market and q.currency=a.currency
-    where q.provider='kis' and q.source like 'kis%' and q.status='ok' and q.quote_type in ('live','close')
+    where q.provider='kis' and q.source like 'kis%' and q.status='ok' and q.quote_type in ('live','realtime','delayed','close')
       and q.price_as_of<=$2::timestamptz and q.price_as_of<=q.fetched_at and q.fetched_at<=$2::timestamptz
     order by upper(q.ticker),q.market,q.currency,q.price_as_of desc`, [JSON.stringify(assets.map(row => ({ ticker: row.ticker, market: row.market, currency: row.currency }))), at]) : [];
-  const rows = assets.map(asset => {
-    const quote = quotes.find(row => row.ticker.toUpperCase() === asset.ticker?.toUpperCase() && row.market === asset.market && row.currency === asset.currency);
-    return quote ? { ...asset, ...quote } : asset;
+  const closes = assets.length ? await sqlClient.query(`select q.ticker,q.market,q.currency,q.close_price::text as price,q.source,q.date::text as "referenceDate",q.fetched_at::text as "fetchedAt"
+    from asset_price_snapshots q join jsonb_to_recordset($1::jsonb) as a(ticker text,market text,currency text,"expectedDate" date)
+      on upper(q.ticker)=upper(a.ticker) and q.market=a.market and q.currency=a.currency and q.date=a."expectedDate"
+    where not q.is_sample and q.source like 'kis%' and q.close_price>0 and q.fetched_at<=$2::timestamptz
+      and q.provider_symbol is not null and q.provider_exchange is not null`, [JSON.stringify(assets.filter(row=>['us','korea'].includes(row.market)).map(row=>({...row,expectedDate:closeCalendarReferenceDateForAsset(row,snapshotDate)}))), capturedAt]) : [];
+  const quotes = [...cachedQuotes,...retained.quotes.map(row=>({...row,observedAt:row.priceAsOf}))];
+  const positions: TrackedNativePosition[] = assets.map(asset => {
+    const same = (row: {ticker?: unknown;market?:unknown;currency?:unknown}) => typeof row.ticker==='string' && row.ticker.toUpperCase()===asset.ticker?.toUpperCase() && row.market===asset.market && row.currency===asset.currency;
+    const candidates = [...quotes.filter(same),asset].flatMap(row=> row.source?.startsWith('kis') && row.status==='ok' && ['live','realtime','delayed','close'].includes(row.quoteType) && ['USD','KRW'].includes(row.currency) && row.observedAt && row.fetchedAt ? [{
+      quantity:asset.quantity,price:String(row.price),currency:row.currency as 'USD'|'KRW',at,
+      priceObservedAt:new Date(row.observedAt).toISOString(),priceFetchedAt:new Date(row.fetchedAt).toISOString(),
+      source:row.source,basis:'raw' as const,priceKind:row.quoteType as 'live'|'close',timestampBasis:'collection' as const,
+    }] : []);
+    candidates.sort((a,b)=>Number(a.priceKind==='close')-Number(b.priceKind==='close')||Date.parse(b.priceObservedAt)-Date.parse(a.priceObservedAt));
+    const eligible = candidates.filter(observation=>isNativeCutoffObservation({instrument:asset,observation,snapshotDate,cycleEndAt:new Date(at),capturedAt:new Date(capturedAt)}));
+    const conflict = hasConflictingLatestSnapshotPrices(eligible.map(row=>({price:row.price,referenceAt:row.priceObservedAt})));
+    const live = conflict ? null : eligible[0];
+    const close = closes.filter(same).sort((a,b)=>Date.parse(b.fetchedAt)-Date.parse(a.fetchedAt))[0];
+    return {id:asset.id,name:asset.name,ticker:asset.ticker,market:asset.market,accountId,ownerId:tenant.ownerUserId,
+      ...(conflict && !close ? {evidenceReason:"price_observation_conflict" as const} : {}),
+      observation: live ?? (close ? {quantity:asset.quantity,price:String(close.price),currency:asset.currency,at,priceFetchedAt:new Date(close.fetchedAt).toISOString(),priceKind:'close' as const,priceReferenceDate:close.referenceDate,timestampBasis:'daily_close' as const,source:close.source,basis:'raw' as const} : null)};
   });
-  const positions: TrackedNativePosition[] = rows.map(row => ({ id: row.id, name: row.name, ticker: row.ticker, market: row.market, accountId, ownerId: tenant.ownerUserId,
-    observation: row.source?.startsWith("kis") && row.status === "ok" && ["live", "close"].includes(row.quoteType) && ["USD", "KRW"].includes(row.currency)
-      && Date.parse(row.observedAt) <= Date.parse(row.fetchedAt) && Date.parse(row.fetchedAt) <= Date.parse(at) && Number(row.price) > 0
-      ? { quantity: row.quantity, price: row.price, currency: row.currency, at, priceObservedAt: new Date(row.observedAt).toISOString(), priceFetchedAt: new Date(row.fetchedAt).toISOString(), source: row.source, basis: "raw" } : null }));
   const base: TrackedPortfolioEvidence = { ownerId: tenant.ownerUserId, reporting: "USD", asOf: capturedAt, current: { at, source: "stored_kis_evidence", scopeComplete: false, positions }, history: [], trades: null,
-    fx: rates.map(row => ({ ...row, observedAt: new Date(row.observedAt).toISOString(), fetchedAt: new Date(row.fetchedAt).toISOString(), base: "USD", quote: "KRW" })) as FxEvidence[], maxFxAgeMs: 3 * 86400000, maxPriceAgeMs: 10 * 86400000 };
+    fx: [...rates,...retained.fxRows.map(row=>({...row,rate:String(row.usdKrw),kind:row.rateKind}))].map(row => ({ ...row, observedAt: new Date(row.observedAt).toISOString(), fetchedAt: new Date(row.fetchedAt).toISOString(), base: "USD", quote: "KRW" })) as FxEvidence[], maxFxAgeMs: 3 * 86400000, maxPriceAgeMs: 10 * 86400000 };
   const config = getTwelveDataServerConfig();
   if (config?.provider.audience === "member_display") {
     const cachedFx = await readTwelveDataEvidence({ kind: "fx", asOf: at, knownAt: at, freshnessBasis: "cutoff" }, config).catch(() => null);

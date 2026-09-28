@@ -4,10 +4,17 @@ import { describe, it } from "node:test";
 
 import {
   buildCronMarketCyclePlan,
+  resolveCronCutoffPreparation,
   CRON_MARKET_CYCLE_LIMITS,
 } from "../src/lib/cron-market-cycle.ts";
 
 describe("Cron market-cycle controller", () => {
+  it("keeps the preparation window separate from the 07:00 write cycle", () => {
+    assert.equal(resolveCronCutoffPreparation(new Date("2026-09-09T21:44:59.999Z")), null);
+    assert.equal(resolveCronCutoffPreparation(new Date("2026-09-09T21:45:00Z")).snapshotDate, "2026-09-10");
+    assert.equal(resolveCronCutoffPreparation(new Date("2026-09-09T21:59:59.999Z")).remainingMs, 1);
+    assert.equal(resolveCronCutoffPreparation(new Date("2026-09-09T22:00:00Z")), null);
+  });
   it("deduplicates owner-scoped close batches before one shared KIS sync", () => {
     const snapshotJob = job({
       targets: [

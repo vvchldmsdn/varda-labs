@@ -36,7 +36,7 @@ export async function migrationManifest(root = ROOT) {
   const journal = JSON.parse(await readFile(path.join(root, 'drizzle/meta/_journal.json'), 'utf8'));
   assert.equal(journal.dialect, 'postgresql');
   assert.deepEqual(journal.entries.slice(48,54).map(entry => entry.tag), RC_TAGS, 'RC migration range changed; review this runner');
-  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability'], 'Review any migration after execution admission');
+  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability','0060_snapshot_cutoff_observations'], 'Review any migration after execution admission');
   const seen = new Set();
   let previousTime = -1;
   return Promise.all(journal.entries.map(async (entry, position) => {
@@ -186,9 +186,11 @@ async function executeLocal(options, manifest) {
       report.cases.push({ name: 'release-batch-error-rolls-back-ddl', status: 'PASS' });
     } finally { await rollback.query('ROLLBACK'); rollback.release(); }
     if(options.reliability) {
-      await applyBatch(release.slice(0,-1));
+      const upgradeIndex=release.findIndex(row=>row.tag.startsWith('0059_'));
+      assert.ok(upgradeIndex>=0);
+      await applyBatch(release.slice(0,upgradeIndex));
       await verifyLegacy(admin,before);
-      const latest=release.at(-1), check=await admin.connect();
+      const latest=release[upgradeIndex], check=await admin.connect();
       try {
         await check.query('BEGIN');await check.query(latest.sql);
         await assert.rejects(check.query('SELECT 1/0'),e=>e.code==='22012');await check.query('ROLLBACK');
@@ -197,6 +199,22 @@ async function executeLocal(options, manifest) {
       } finally {await check.query('ROLLBACK');check.release();}
       await applyBatch([latest]);
       report.cases.push({name:'0058-to-0059-upgrade-and-ddl-rollback',status:'PASS'});
+      let verifyCutoffUpgrade;
+      if(options.cutoffOnly) {
+        const {prepareCutoffUpgradeAudit}=await import('./cutoff-upgrade-audit.mjs');
+        verifyCutoffUpgrade=await prepareCutoffUpgradeAudit(admin);
+        const cutoffMigration=release[upgradeIndex+1];assert.equal(cutoffMigration.tag,'0060_snapshot_cutoff_observations');
+        const rollback=await admin.connect();
+        try {
+          await rollback.query('BEGIN');await rollback.query(cutoffMigration.sql);
+          await assert.rejects(rollback.query('SELECT 1/0'),e=>e.code==='22012');await rollback.query('ROLLBACK');
+          assert.equal((await rollback.query("select to_regclass('public.snapshot_cutoff_price_observations') name")).rows[0].name,null);
+          assert.equal((await rollback.query("select to_regclass('public.snapshot_cutoff_fx_observations') name")).rows[0].name,null);
+        }finally{await rollback.query('ROLLBACK');rollback.release();}
+        await verifyCutoffUpgrade();report.cases.push({name:'0060-failed-upgrade-rolls-back-ddl-and-preserves-0059-data',status:'PASS'});
+      }
+      await applyBatch(release.slice(upgradeIndex+1));
+      if(verifyCutoffUpgrade) {await verifyCutoffUpgrade();report.cases.push({name:'0059-to-0060-upgrade-preserves-ledger-revision-tombstone-completed-snapshot-and-guard-functions',status:'PASS'});}
     } else await applyBatch(release);
     await verifyLegacy(admin, before);
     report.cases.push({ name: 'legacy-rows-preserved', status: 'PASS' });
@@ -206,6 +224,7 @@ async function executeLocal(options, manifest) {
       GRANT EXECUTE ON FUNCTION apply_native_portfolio_mutation(uuid,uuid,jsonb,jsonb) TO rc_writer;`);
     await admin.query('GRANT EXECUTE ON FUNCTION assert_daily_snapshot_fence(uuid,integer) TO rc_writer');
     await admin.query('GRANT EXECUTE ON FUNCTION assert_trade_reliability_write(boolean) TO rc_writer; REVOKE ALL ON trade_reliability_runtime FROM rc_writer');
+    await admin.query('GRANT EXECUTE ON FUNCTION snapshot_cutoff_receipt_date(timestamptz),record_snapshot_cutoff_fx(text,date,numeric,timestamptz,text,timestamptz) TO rc_writer');
     worker = new Pool({ ...connection, user: 'rc_writer' });
     tenant = new Pool({ ...connection, user: 'varda_tenant_app' });
     if (options.sharedExecution) {
@@ -217,6 +236,9 @@ async function executeLocal(options, manifest) {
     } else if(options.browserOutput) {
       const {runBrowserCases}=await import('./reliability-browser-cases.mjs');
       await runBrowserCases({admin,worker,tenant,report,output:options.browserOutput});
+    } else if(options.cutoffOnly) {
+      const {runCutoffObservationCases}=await import('./cutoff-observation-postgres-cases.mjs');
+      await runCutoffObservationCases({admin,worker,tenant,report});
     } else if(options.reliability) {
       const {runReliabilityCases}=await import('./reliability-postgres-cases.mjs');
       await runReliabilityCases({admin,worker,tenant,report,connection,environment});
@@ -230,7 +252,9 @@ async function executeLocal(options, manifest) {
   } finally {
     await Promise.allSettled([admin?.end(), worker?.end(), tenant?.end()]);
     if (startupAttempted) {
-      try { await nativeCommand(command('pg_ctl'), ['-D', dataDirectory, '-w', '-t', '30', 'stop', '-m', 'fast'], environment); report.clusterStopped = true; }
+      // A full compatibility matrix creates many relation files. On Windows the
+      // final fsync can exceed 30s; wait for the exact cluster's orderly stop.
+      try { await nativeCommand(command('pg_ctl'), ['-D', dataDirectory, '-w', '-t', '60', 'stop', '-m', 'fast'], environment); report.clusterStopped = true; }
       catch { report.clusterStopped = false; report.status = 'FAIL'; }
     }
     try { await unlink(passwordFile); } catch { /* Already removed, or initdb never started. */ }
@@ -258,6 +282,11 @@ export async function rehearseReliability(args) {
   const options=parseOptions(args),manifest=await migrationManifest();
   if(!options.execute) return {status:'BLOCKED',reason:'real_postgresql_not_executed'};
   return executeLocal({...options,reliability:true},manifest);
+}
+export async function rehearseCutoffObservations(args) {
+  const options=parseOptions(args),manifest=await migrationManifest();
+  if(!options.execute) return {status:'BLOCKED',reason:'real_postgresql_not_executed'};
+  return executeLocal({...options,reliability:true,cutoffOnly:true},manifest);
 }
 export async function rehearseReliabilityBrowser(args,output) {
   const options=parseOptions(args),manifest=await migrationManifest();

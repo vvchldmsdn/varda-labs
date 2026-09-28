@@ -103,14 +103,14 @@ describe("market calendar", () => {
     );
   });
 
-  it("treats USD-denominated assets as US-listed for close coverage", () => {
+  it("uses the declared market rather than quote currency for close coverage", () => {
     const asset = { market: "korea", currency: "USD" };
 
-    assert.equal(isUsdListedAsset(asset), true);
-    assert.equal(closeMarketKeyForAsset(asset), "us");
+    assert.equal(isUsdListedAsset(asset), false);
+    assert.equal(closeMarketKeyForAsset(asset), "korea");
     assert.equal(
       closeCalendarReferenceDateForAsset(asset, "2026-07-05"),
-      "2026-07-02",
+      "2026-07-03",
     );
   });
 });

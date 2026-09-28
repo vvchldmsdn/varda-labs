@@ -5,6 +5,7 @@ import { selectSnapshotCutoffFx } from "../src/lib/snapshots/cutoff-fx.ts";
 const cutoff = new Date("2026-09-09T22:00:00Z");
 const row = (overrides = {}) => ({
   rateDate: "2026-09-09", usdKrw: "1337.5", isSample: false, status: "ok",
+  observedAt: "2026-09-09T13:24:05Z", rateKind: "daily_reference",
   fetchedAt: "2026-09-09T13:24:05Z", ...overrides,
 });
 

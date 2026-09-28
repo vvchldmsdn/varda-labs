@@ -3,6 +3,57 @@ import { describe, it } from "node:test";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
 
 describe("Daily market cycle cutoff recovery", () => {
+  it("a request arriving after 07:00 is daily recovery, never reported as pre-cutoff preparation", async () => {
+    const f = await fixture();
+    const result = await f.run({ now: new Date("2026-09-09T22:01:00Z"), cronScheduleUtc: "55 21 * * *" });
+    assert.equal(result.phase, undefined);assert.equal(result.snapshotDate,"2026-09-10");
+    assert.notEqual(result.status,"prepared");assert.equal(f.claims[0].phase,undefined);
+    assert.ok(f.events.indexOf("snapshot")<f.events.indexOf("live"));
+  });
+  it("preparation price success cannot hide missing FX and never completes daily work", async () => {
+    const f=await fixture({fxError:true});const result=await f.run({now:new Date("2026-09-09T21:55:00Z")});
+    assert.equal(result.status,"blocked");assert.equal(result.liveSync.status,"completed");
+    assert.ok(result.blockers.includes("cutoff_fx_collection_incomplete"));
+    assert.ok(!f.events.some(e=>e.includes("snapshot")));
+  });
+  it("partial symbol collection retains partial counts without claiming full preparation", async () => {
+    const f=await fixture({liveResult:{requestedCount:2,successCount:1,failedCount:1}});
+    const result=await f.run({now:new Date("2026-09-09T21:55:00Z")});
+    assert.equal(result.status,"blocked");assert.equal(result.liveSync.successCount,1);assert.equal(result.liveSync.failedCount,1);
+    assert.ok(!f.events.some(e=>e.includes("snapshot")));
+  });
+  it("prepares the upcoming cutoff even when the previous daily cycle is complete", async () => {
+    const f = await fixture({ alreadyCompleted: true });
+    const result = await f.run({ now: new Date("2026-09-09T21:55:00Z") });
+    assert.equal(result.phase, "pre_cutoff");
+    assert.equal(result.status, "prepared");
+    assert.equal(result.snapshotDate, "2026-09-10");
+    assert.deepEqual(f.events, ["claim", "collection-lease", "fx", "live", "finish:completed"]);
+    assert.equal(f.claims[0].phase, "pre_cutoff");
+    assert.equal(result.snapshot.targetCount, 0);
+    assert.equal(result.nativeSnapshot, undefined);
+    assert.equal(f.finished[0].metadata.phase, "pre_cutoff");
+    assert.equal(f.finished[0].requestedCount, 2);
+    assert.equal(f.finished[0].successCount, 2);
+  });
+  it("reports partial preparation without attempting snapshot writes", async () => {
+    const f = await fixture({ liveError: true });
+    const result = await f.run({ now: new Date("2026-09-09T21:55:00Z") });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.fx.status, "written");
+    assert.equal(result.liveSync.status, "failed");
+    assert.ok(result.blockers.includes("cutoff_price_collection_incomplete"));
+    assert.ok(!f.events.some(event => event.includes("snapshot")));
+  });
+  it("does not collect for an expired preparation window after waiting for the lease", async () => {
+    const f = await fixture({ leaseDelayMs: 70_000 });
+    const result = await f.run({ now: new Date("2026-09-09T21:59:00Z") });
+    assert.equal(result.status, "blocked");
+    assert.ok(result.blockers.includes("cutoff_preparation_window_elapsed"));
+    assert.ok(!f.events.includes("fx"));
+    assert.ok(!f.events.includes("live"));
+    assert.ok(!f.events.includes("preflight"));
+  });
   it("completes native-only work instead of reporting no action",async()=>{
     const f=await fixture({noLegacyTargets:true,nativeResult:{status:"completed",targetCount:1,created:1,failedCount:0,blockedCount:0}});
     const result=await f.run();assert.equal(result.ok,true);assert.equal(result.status,"completed");
@@ -247,7 +298,7 @@ function deferred(code, retryAfterSeconds) {
 }
 
 async function fixture({ noLegacyTargets=false, nativeResult={ status: "completed", targetCount: 0, created: 0, failedCount:0, blockedCount:0 }, missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false, closeErrors = [], multipleCloseGroups = false, leaseDelayMs = 0, planningDelayMs = 0, sleepOvershootMs = 0 } = {}) {
-  const events = [], finished = [];
+  const events = [], finished = [], claims = [];
   const closeMarkets = [], failures = [...closeErrors];
   let elapsedMs = 0, completedCloseGroups = 0;
   const closeGroups = [{ market: "korea", expectedCloseDate: "2026-09-09", tickers: ["069500"] },
@@ -269,7 +320,8 @@ async function fixture({ noLegacyTargets=false, nativeResult={ status: "complete
       async claimCronMarketCycleRun(input) {
         assert.equal(input.snapshotDate, "2026-09-10");
         events.push("claim");
-        return alreadyCompleted ? { outcome: "already_attempted", runId: "run", status: "completed" } : { outcome: "claimed", runId: "run" };
+        claims.push(input);
+        return alreadyCompleted && input.phase !== "pre_cutoff" ? { outcome: "already_attempted", runId: "run", status: "completed" } : { outcome: "claimed", runId: "run" };
       },
       async finishCronMarketCycleRun(input) { events.push(`finish:${input.status}`); finished.push(input); },
     },
@@ -314,5 +366,5 @@ async function fixture({ noLegacyTargets=false, nativeResult={ status: "complete
       };
     } },
   });
-  return { events, finished, closeMarkets, snapshotFx: () => snapshotFx, currentFx: () => currentFx, run: () => runner.runCronMarketCycle({ now }) };
+  return { events, finished, claims, closeMarkets, snapshotFx: () => snapshotFx, currentFx: () => currentFx, run: options => runner.runCronMarketCycle({ now, ...options }) };
 }

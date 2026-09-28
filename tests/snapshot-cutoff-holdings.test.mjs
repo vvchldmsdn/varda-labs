@@ -66,7 +66,7 @@ describe("daily snapshot cutoff admission through actual server code", () => {
     const preflight = await f.run({ dryRun: true });
     assert.equal(preflight.freshClose.missingCount, 1);
     assert.equal(preflight.writeReady, false);
-    await assert.rejects(f.run(), error => error.code === "missing_fresh_closes");
+    await assert.rejects(f.run(), error => error.code === "missing_cutoff_price_evidence");
     assert.equal(f.writes.length, 0);
   });
 });
@@ -88,7 +88,7 @@ async function snapshotFixture(t, { changed, archived = false, events = [], samp
     isSample: sampleClose, source: "kis", fetchedAt: now }));
   const rowsByTable = {
     accounts, assets: holdings,
-    fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1337.5", source: "test", status: "ok", isSample: false, fetchedAt: "2026-09-09T13:24:00Z" }],
+    fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1337.5", source: "test", status: "ok", isSample: false, fetchedAt: "2026-09-09T13:24:00Z", observedAt: "2026-09-09T13:24:00Z", rateKind: "daily_reference" }],
     asset_price_snapshots: priceRows,
     event_ledger_entries: events.map((event, index) => ({ ...holding(), id: `event-${index}`, account: "acct0",
       accountId: "account-0", eventType: "manual_adjustment", eventDate: "2026-09-09", assetId: "open", ...event })),
@@ -125,7 +125,7 @@ async function snapshotFixture(t, { changed, archived = false, events = [], samp
     };
     return query;
   };
-  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "@/db/client": { sqlClient: { transaction: async build => build({query:()=>[]}) }, db: {
+  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => ({ quotes: [], fxRows: [] }) }, "@/db/client": { sqlClient: { transaction: async build => build({query:()=>[]}) }, db: {
     select: selection, selectDistinct: selection,
     insert: table => ({ values: rows => { writes.push({ table: getTableName(table), rows: Array.isArray(rows) ? rows : [rows] }); return {toSQL:()=>({sql:"select 1",params:[]})}; } }),
     batch: async () => [],

@@ -236,7 +236,13 @@ export const TRADE_DAILY_RELIABILITY_TABLE_POLICIES = Object.freeze([
   userOwned("daily_snapshot_work", TRANSITIONAL_OWNER_COLUMN),
 ]);
 
+export const SNAPSHOT_CUTOFF_TABLE_POLICIES = Object.freeze([
+  sharedReference("snapshot_cutoff_price_observations"),
+  sharedReference("snapshot_cutoff_fx_observations"),
+]);
+
 export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...SNAPSHOT_CUTOFF_TABLE_POLICIES,
   ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES,
   ...BROKER_RECOVERY_TABLE_POLICIES,
   ...SIMULATION_EXECUTION_TABLE_POLICIES,
@@ -245,6 +251,11 @@ export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  const cutoffTables=SNAPSHOT_CUTOFF_TABLE_POLICIES.map(({table})=>table);
+  if(cutoffTables.some(table=>publicTableSet.has(table))) {
+    if(!cutoffTables.every(table=>publicTableSet.has(table)) || !["live_price_quotes","fx_rates"].every(table=>publicTableSet.has(table))) throw new Error("cutoff observations require both archives and shared caches");
+    return Object.freeze([...cutoffTables.map(sharedReference),...resolveTenantTablePolicies(publicTableNames.filter(table=>!cutoffTables.includes(table)))]);
+  }
   if (TRADE_DAILY_RELIABILITY_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
     if (!TRADE_DAILY_RELIABILITY_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
       throw new Error("trade daily reliability tables must be expanded atomically");

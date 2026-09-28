@@ -1,5 +1,6 @@
 import "server-only";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
+import { readSnapshotCutoffObservations } from "@/db/queries/snapshot-cutoff-observations";
 
 import {
   and,
@@ -132,7 +133,7 @@ export type DailySnapshotRunResult = {
   freshClose: FreshCloseSummary;
   closeSyncPlan: CloseSyncPlan;
   cutoffValuation: CutoffValuationSummary;
-  realizedReturn: RealizedReturnRunSummary;
+  realizedReturn: RealizedReturnRunSummary | null;
   plannedWrites: PlannedSnapshotWrites;
   results: Record<string, AccountSnapshotPlan | AllAccountSnapshotPlan>;
   warnings: string[];
@@ -156,10 +157,15 @@ export type SnapshotCycle = {
 };
 
 type ResolvedFxRate = {
-  usdKrw: number;
+  usdKrw: number | null;
   referenceDate: string | null;
   source: string;
   status: string | null;
+  observedAt: string | null;
+  fetchedAt: string | null;
+  rateKind: string | null;
+  referenceAt?: string | null;
+  timestampBasis?: "collection" | "provider";
 };
 
 type RealizedReturnRunSummary = {
@@ -341,7 +347,7 @@ type AccountSnapshotPlan = {
   missingCostRealizedSellEventCount: number;
   totalPnl: number | null;
   totalReturnPct: number | null;
-  usdKrw: number;
+  usdKrw: number | null;
   blockers: string[];
 };
 
@@ -395,6 +401,11 @@ type PriceSelection = {
   expectedCloseDate: string | null;
   basis: "cutoff_live" | "close" | "manual_current";
   fromCloseSnapshot: boolean;
+  observedAt?: string | null;
+  fetchedAt?: string | null;
+  quoteType?: string | null;
+  referenceAt?: string | null;
+  timestampBasis?: "collection" | "provider" | "manual_input";
 };
 
 type AccountComputed = {
@@ -501,6 +512,10 @@ export async function runDailySnapshot(
   const cycle = buildCycleForSnapshotDate(snapshotDate, options.now ?? new Date());
   const ownerUserId = options.tenantContext.ownerUserId;
   const context = await loadAccountContext(snapshotDate, ownerUserId);
+  if (!provenance.insertOnly) {
+    const completed = await readCompletedDailyResult({ context, cycle, provenance, requestedAccount, dryRun });
+    if (completed) return completed;
+  }
   const allAssetRows = await db
     .select({
       ...getTableColumns(assets),
@@ -556,8 +571,10 @@ export async function runDailySnapshot(
   const selectedAssets = openInvestmentAssets.filter((asset) =>
     targetAccounts.includes(asset.account),
   );
+  const retainedObservations = provenance.insertOnly ? null : await readSnapshotCutoffObservations(snapshotDate);
   const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate,
-    provenance.insertOnly ? null : cycle.cycleEndAt);
+    provenance.insertOnly ? null : cycle.cycleEndAt, retainedObservations?.fxRows ?? [],
+    selectedAssets.some(asset => normalizeCurrencyCode(asset.currency) !== "KRW"));
   const unsupportedCurrencyAssets = selectedAssets.filter(
     (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
   );
@@ -573,7 +590,7 @@ export async function runDailySnapshot(
       { snapshotDate, eventIds: changedEventsAfterCutoff }, 409,
     );
   }
-  const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw, {
+  const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw ?? 0, {
     asOfDate: snapshotDate,
   });
   const realizedReturn = buildRealizedReturnRunSummary(
@@ -590,6 +607,7 @@ export async function runDailySnapshot(
     capturedAt: cycle.capturedAt,
     cycleEndAt: cycle.cycleEndAt,
     useCutoffValuation: !provenance.insertOnly,
+    retainedQuotes: retainedObservations?.quotes ?? [],
   });
   const freshClose = summarizeFreshClose(selectedAssets, closeContext, snapshotDate);
   const cutoffValuation = summarizeCutoffValuation({
@@ -602,16 +620,18 @@ export async function runDailySnapshot(
     snapshotDate,
     selectedAssets,
     freshClose,
+    cutoffValuation: provenance.insertOnly ? null : cutoffValuation,
   });
   const warnings = buildWarnings({
     selectedAssets,
     freshClose,
+    cutoffValuation: provenance.insertOnly ? null : cutoffValuation,
     fx,
     unsupportedCurrencyAssets,
   });
   const plannedWrites = emptyPlannedWrites();
 
-  if (!dryRun && freshClose.missing.length > 0) {
+  if (!dryRun && provenance.insertOnly && freshClose.missing.length > 0) {
     throw new DailySnapshotRequestError(
       "missing_fresh_closes",
       "Fresh close prices are required before writing a daily snapshot",
@@ -701,7 +721,9 @@ export async function runDailySnapshot(
       (asset) =>
         `unsupported_currency:${normalizeTicker(asset.ticker) ?? asset.name}:${normalizeCurrencyCode(asset.currency)}`,
     ),
-    ...freshClose.missing.map((asset) => `missing_close:${asset.ticker}`),
+    ...(provenance.insertOnly
+      ? freshClose.missing.map((asset) => `missing_close:${asset.ticker}`)
+      : cutoffValuation.missing.map((asset) => `missing_cutoff_price_evidence:${asset.ticker}`)),
     ...closeContext.manualCarryMissing.map(
       (asset) => `missing_manual_carry:${asset.account}:${asset.assetName}`,
     ),
@@ -764,6 +786,62 @@ export async function runDailySnapshot(
     writePolicy: publicWritePolicy(provenance),
   };
 }
+
+/** Completed daily values are authoritative even after the live cache expires
+ * or holdings change. Only the same owned account/cutoff is reused here. */
+async function readCompletedDailyResult({ context, cycle, provenance, requestedAccount, dryRun }: {
+  context: AccountContext; cycle: InternalCycle; provenance: SnapshotProvenance; requestedAccount: SnapshotAccount; dryRun: boolean;
+}): Promise<DailySnapshotRunResult | null> {
+  const codes = requestedAccount === ALL_SNAPSHOT_ACCOUNTS ? [...context.activeAccountCodes] : [requestedAccount];
+  if (!codes.length || codes.some(code => !context.accountRowsByCode.has(code))) return null;
+  const [portfolios, positions] = await Promise.all([
+    db.select().from(dailyPortfolioSnapshots).where(and(eq(dailyPortfolioSnapshots.canonicalOwnerUserId, context.ownerUserId), eq(dailyPortfolioSnapshots.snapshotDate, cycle.snapshotDate))),
+    db.select().from(dailyPositionSnapshots).where(and(eq(dailyPositionSnapshots.canonicalOwnerUserId, context.ownerUserId), eq(dailyPositionSnapshots.snapshotDate, cycle.snapshotDate))),
+  ]);
+  const results: DailySnapshotRunResult["results"] = {};
+  const used: PositionRow[] = [];
+  const selected: PortfolioRow[] = [];
+  for (const code of codes) {
+    const accountId = context.accountRowsByCode.get(code);
+    const candidates = portfolios.filter(row => row.canonicalOwnerUserId === context.ownerUserId && row.account === code && row.accountId === accountId && row.snapshotDate === cycle.snapshotDate && isCompletedDailyPortfolio(row, cycle.cycleEndAt));
+    if (candidates.length !== 1) return null;
+    const row = candidates[0];
+    const holdings = positions.filter(p => p.canonicalOwnerUserId === context.ownerUserId && p.account === code && p.accountId === accountId && p.snapshotDate === cycle.snapshotDate && isVardaGeneratedRow(p) && !p.isSample && sameCutoff(p.cycleEndAt, cycle.cycleEndAt));
+    if (holdings.length !== row.numAssets || new Set(holdings.map(positionKey)).size !== holdings.length) return null;
+    selected.push(row); used.push(...holdings);
+    results[code] = publicAccountPlan({ ...emptyAccountPlan(code), ...frozenPortfolioTotals(row), reason: "completed_cutoff_preserved", positionCount: holdings.length,
+      positionActions: { insert: 0, update: 0, skip: holdings.length, blocked: 0 }, usdKrw: toNumber(row.usdKrw),
+      openCostKrw: sumComplete(holdings, p => toNumber(p.costKrw)), unrealizedPnlKrw: sumComplete(holdings, p => toNumber(p.pnlKrw)),
+      realizedPnlKrw: descriptionNumber(row.description, "realized_pnl_krw"), realizedCostBasisKrw: descriptionNumber(row.description, "realized_cost_basis_krw"),
+      realizedSellEventCount: descriptionNumber(row.description, "realized_sell_events") ?? 0,
+    });
+  }
+  if (requestedAccount === ALL_SNAPSHOT_ACCOUNTS) {
+    const all = portfolios.filter(row => row.canonicalOwnerUserId === context.ownerUserId && row.account === "all" && row.snapshotDate === cycle.snapshotDate && isCompletedDailyPortfolio(row, cycle.cycleEndAt));
+    if (all.length !== 1 || all[0].numAssets !== used.length) return null;
+    results.all = { ...results[codes[0]], ...frozenPortfolioTotals(all[0]), account: "all", accountsAggregated: codes.length, portfolioAction: "skip", blockers: [] };
+  }
+  const first = selected[0];
+  const observedCount = used.filter(row => row.priceBasis === "cutoff_live").length;
+  return {
+    ok: true, dryRun, writeReady: true, snapshotDate: cycle.snapshotDate, requestedAccount, accounts: codes,
+    cycle: { snapshotDate: cycle.snapshotDate, capturedAt: isoTimestamp(first.capturedAt) ?? cycle.capturedAt.toISOString(), cycleStartAt: cycle.cycleStartAt.toISOString(), cycleEndAt: cycle.cycleEndAt.toISOString() },
+    fx: { usdKrw: toNumber(first.usdKrw), referenceDate: used[0]?.fxReferenceDate ?? null, source: "stored_daily_snapshot", status: "stored",
+      observedAt: descriptionValue(used[0]?.description, "fx_observed_at"), fetchedAt: descriptionValue(used[0]?.description, "fx_fetched_at"), rateKind: descriptionValue(used[0]?.description, "fx_rate_kind") },
+    closeReferences: [], freshClose: { requiredCount: 0, satisfiedCount: 0, missingCount: 0, rowsUsedCount: 0, closeReferences: [], coverage: [], missing: [] },
+    closeSyncPlan: { snapshotDate: cycle.snapshotDate, canProceedToSnapshotWrite: true, requiredCount: 0, coveredCount: 0, missingCount: 0, staleCount: 0, manualCurrentNotSyncableCount: 0, markets: [], manualCurrentNotSyncable: [], suggestedKisBatches: [] },
+    cutoffValuation: { policy: "pre_cutoff_kis_quote_else_exact_official_close", maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60000, requiredCount: used.length, observedCount, fallbackCount: used.length - observedCount, missing: [] },
+    // No current-ledger calculation is substituted for the frozen record.
+    realizedReturn: null, plannedWrites: { dailyPortfolioSnapshots: { insert: 0, update: 0, skip: selected.length, blocked: 0 }, dailyPositionSnapshots: { insert: 0, update: 0, skip: used.length, blocked: 0 } },
+    results, warnings: ["completed_cutoff_preserved"], writePolicy: publicWritePolicy(provenance),
+  };
+}
+
+function descriptionValue(description: string | null | undefined, key: string) {
+  const value = description?.split("; ").find(part => part.startsWith(`${key}=`))?.slice(key.length + 1);
+  return value && value !== "unknown" ? value : null;
+}
+function descriptionNumber(description: string | null, key: string) { return toNumber(descriptionValue(description, key)); }
 
 function buildSnapshotProvenance({
   snapshotDate,
@@ -860,6 +938,21 @@ function buildAccountPlan({
     existingPositionsByKey.set(positionKey(row), row);
   }
 
+  // Re-reading live evidence must never revalue a completed daily record. This
+  // check also applies to direct/admin writers, not only durable-job retries.
+  if (blockers.length === 0 && existingPortfolio && isCompletedDailyPortfolio(existingPortfolio, computed.positions[0]?.cycleEndAt) &&
+      existingPositionsByKey.size === existingPortfolio.numAssets &&
+      [...existingPositionsByKey.values()].every(row => sameCutoff(row.cycleEndAt, existingPortfolio.cycleEndAt))) {
+    const frozenPositions = [...existingPositionsByKey.values()];
+    return {
+      ...computed, account: computed.account, status: "skipped", reason: "completed_cutoff_preserved",
+      ...frozenPortfolioTotals(existingPortfolio), positionCount: frozenPositions.length,
+      portfolioAction: "skip", positionActions: { insert: 0, update: 0, skip: frozenPositions.length, blocked: 0 },
+      usdKrw: toNumber(existingPortfolio.usdKrw) ?? toNumber(existingPortfolio.fxRate) ?? fx.usdKrw,
+      blockers: [], portfolio: existingPortfolio, positions: frozenPositions, existingPortfolio, existingPositionsByKey,
+    };
+  }
+
   const positionActions =
     blockers.length > 0
       ? { insert: 0, update: 0, skip: 0, blocked: computed.positions.length }
@@ -894,6 +987,24 @@ function buildAccountPlan({
     positions: computed.positions,
     existingPortfolio,
     existingPositionsByKey,
+  };
+}
+
+function sameCutoff(left: Date | string | null | undefined, right: Date | string | null | undefined) {
+  const a = left == null ? NaN : new Date(left).getTime();
+  const b = right == null ? NaN : new Date(right).getTime();
+  return Number.isFinite(a) && a === b;
+}
+
+function isCompletedDailyPortfolio(row: PortfolioRow, cutoff: Date | string | null | undefined) {
+  return isVardaGeneratedRow(row) && !row.isSample && (row.numAssets ?? 0) > 0 &&
+    row.description?.includes("snapshot_status=complete") === true && sameCutoff(row.cycleEndAt, cutoff);
+}
+
+function frozenPortfolioTotals(row: PortfolioRow) {
+  return {
+    totalMarketValue: toNumber(row.totalMarketValue) ?? 0,
+    totalCost: toNumber(row.totalCost), totalPnl: toNumber(row.totalPnl), totalReturnPct: toNumber(row.totalReturnPct),
   };
 }
 
@@ -1018,23 +1129,26 @@ function buildAllAccountPlan({
           base44UpdatedAt: null,
         }
       : null;
+  const preserveCompleted = existingPortfolio && isCompletedDailyPortfolio(existingPortfolio, cycle.cycleEndAt);
   const portfolioAction: SnapshotWriteAction =
     blockers.length > 0
       ? "blocked"
       : completed.length === 0
         ? "skip"
+        : preserveCompleted
+          ? "skip"
         : existingPortfolio
           ? "update"
           : "insert";
 
   return {
     account: "all",
-    status: blockers.length > 0 ? "blocked" : completed.length > 0 ? "planned" : "skipped",
+    status: blockers.length > 0 ? "blocked" : preserveCompleted ? "skipped" : completed.length > 0 ? "planned" : "skipped",
     reason:
       blockers.length > 0
         ? "preflight_blocked"
         : completed.length > 0
-          ? null
+          ? preserveCompleted ? "completed_cutoff_preserved" : null
           : "no_account_snapshots",
     accountsAggregated: completed.length,
     portfolioAction,
@@ -1050,7 +1164,8 @@ function buildAllAccountPlan({
     totalPnl,
     totalReturnPct: percentOrNull(totalPnl, investedAmount),
     blockers,
-    portfolio,
+    portfolio: preserveCompleted ? existingPortfolio : portfolio,
+    ...(preserveCompleted ? frozenPortfolioTotals(existingPortfolio) : {}),
     existingPortfolio,
   };
 }
@@ -1109,23 +1224,19 @@ function computeAccountSnapshot({
     const selectedClose = selectOfficialCloseForAsset(asset, closeContext);
     const valuationPrice = selectedPrice.price;
     const officialClosePrice =
-      selectedClose.price > 0 ? selectedClose.price : valuationPrice;
+      selectedClose.fromCloseSnapshot && selectedClose.price > 0 ? selectedClose.price : null;
     const fxResolution = resolveKrwFxRate(asset.currency, fx.usdKrw);
     const fxRate = fxResolution.ok ? fxResolution.rate : 0;
     const prior = priorByAssetId.get(asset.id) ?? null;
     const quantity = toNumber(asset.quantity) ?? 0;
     const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
     const fractionalAvgCost = toNumber(asset.fractionalAvgCost) ?? (fractionalKrwValue === 0 ? 0 : null);
-    const priorFractionalQuantity = toNumber(prior?.estimatedFractionalQuantity);
-    const estimatedFractionalQuantity =
-      provenance.insertOnly && priorFractionalQuantity !== null
-        ? priorFractionalQuantity
-        : fractionalKrwValue > 0 && valuationPrice > 0 && fxRate > 0
-        ? fractionalKrwValue / (valuationPrice * fxRate)
-        : 0;
-    const totalQuantity = quantity + estimatedFractionalQuantity;
-    const marketValueLocal = totalQuantity * valuationPrice;
-    const marketValueKrw = marketValueLocal * fxRate;
+    // A legacy entered KRW amount is not a fractional quantity. Preserve that
+    // fixed input separately; only actual recorded shares receive price returns.
+    const estimatedFractionalQuantity = fractionalKrwValue > 0 ? null : 0;
+    const totalQuantity = quantity;
+    const marketValueKrw = quantity * valuationPrice * fxRate + fractionalKrwValue;
+    const marketValueLocal = fxRate > 0 ? marketValueKrw / fxRate : 0;
     const currentWeight = percentOrZero(marketValueKrw, totalMarketValue);
     const group = asset.groupId ? context.groupsById.get(asset.groupId) : null;
     const groupValue = asset.groupId ? groupValueById.get(asset.groupId) ?? 0 : 0;
@@ -1156,10 +1267,13 @@ function computeAccountSnapshot({
       unitValueChangeKrw !== null && previousUnitValueKrw && previousUnitValueKrw > 0
         ? (unitValueChangeKrw / previousUnitValueKrw) * 100
         : null;
-    const movementQuantity = provenance.insertOnly ? totalQuantity : quantity;
-    const movementFixedKrwValue = provenance.insertOnly ? 0 : fractionalKrwValue;
+    const movementQuantity = quantity;
+    const movementFixedKrwValue = fractionalKrwValue;
+    const unchangedHolding = prior !== null &&
+      toNumber(prior.quantity) === quantity &&
+      (toNumber(prior.fractionalKrwValue) ?? 0) === fractionalKrwValue;
     const movement =
-      previousUnitPrice && previousUnitPrice > 0 && previousFxRate && previousFxRate > 0
+      unchangedHolding && previousUnitPrice && previousUnitPrice > 0 && previousFxRate && previousFxRate > 0
         ? calculateFxAwarePositionMovementKrw({
             marketExposedQuantity: movementQuantity,
             currentPrice: valuationPrice,
@@ -1181,10 +1295,10 @@ function computeAccountSnapshot({
         : null;
     const priceChangeKrw = movement?.priceChangeKrw ?? null;
     const fxChangeKrw =
-      fxResolution.ok && fxResolution.requiresFx && movement
-        ? movement.fxChangeKrw
-        : 0;
-    const costKrw = snapshotPositionCostBasisKrw(asset, fx.usdKrw);
+      fxResolution.ok && fxResolution.requiresFx
+        ? movement?.fxChangeKrw ?? null
+        : unchangedHolding ? 0 : null;
+    const costKrw = snapshotPositionCostBasisKrw(asset, fx.usdKrw ?? 0);
     const pnlKrw = costKrw === null ? null : marketValueKrw - costKrw;
     const exposureType = getFxExposureType(asset);
 
@@ -1225,7 +1339,19 @@ function computeAccountSnapshot({
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
         `close_source=${selectedClose.source}${selectedClose.referenceDate ? `@${selectedClose.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
+        `price_observed_at=${selectedPrice.observedAt ?? "unknown"}`,
+        `price_reference_at=${selectedPrice.referenceAt ?? selectedPrice.observedAt ?? "unknown"}`,
+        `price_timestamp_basis=${selectedPrice.timestampBasis ?? "unknown"}`,
+        `price_fetched_at=${selectedPrice.fetchedAt ?? "unknown"}`,
+        `price_quote_type=${selectedPrice.quoteType ?? selectedPrice.basis}`,
+        `fx_observed_at=${fx.observedAt ?? "unknown"}`,
+        `fx_reference_at=${fx.referenceAt ?? fx.observedAt ?? "unknown"}`,
+        `fx_timestamp_basis=${fx.timestampBasis ?? "unknown"}`,
+        `fx_fetched_at=${fx.fetchedAt ?? "unknown"}`,
+        `fx_rate_kind=${fx.rateKind ?? "unknown"}`,
         `cost_basis_source=${costKrw === null ? "unknown" : "asset_average_cost"}`,
+        ...(prior && !unchangedHolding ? ["movement_attribution=holdings_change_without_trade_bridge"] : []),
+        ...(fractionalKrwValue > 0 ? ["fractional_value_basis=entered_krw_amount", "fractional_quantity_basis=unknown"] : []),
         ...provenance.descriptionTags,
       ].join("; "),
       belowMa: false,
@@ -1402,16 +1528,16 @@ async function applySnapshotWrites(
 
   for (const build of accountBuilds) {
     if (build.status !== "planned" || !build.portfolio) continue;
-    pushPortfolioWriteQuery(
-      queries,
-      build.portfolio,
-      build.existingPortfolio,
-      insertOnly,
-    );
     pushPositionWriteQueries(
       queries,
       build.positions,
       build.existingPositionsByKey,
+      insertOnly,
+    );
+    pushPortfolioWriteQuery(
+      queries,
+      build.portfolio,
+      build.existingPortfolio,
       insertOnly,
     );
   }
@@ -1433,6 +1559,15 @@ async function applySnapshotWrites(
     tx.query("select set_config('lock_timeout','2s',true),set_config('app.trade_reliability_version','0059',true)"),tx.query("set local statement_timeout='15s'"),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`varda.portfolio_mutation.v1:${owner}`]),
     ...(fence ? [tx.query("select assert_daily_snapshot_fence($1::uuid,$2)",[fence.id,fence.generation])] : []),
+    // A second writer may have completed this cutoff after planning but before
+    // the owner lock. Abort atomically; its retry will reuse the completed row.
+    tx.query(`select 1/(case when not exists(select 1 from daily_portfolio_snapshots s
+      where s.canonical_owner_user_id=$1::uuid and s.snapshot_date=$2::date and s.account=any($3::text[])
+       and s.source=$4 and not s.is_sample and s.description like '%snapshot_status=complete%'
+       and s.cycle_end_at=$5::timestamptz and s.num_assets>0
+       and (s.account='all' or s.num_assets=(select count(*) from daily_position_snapshots p where p.canonical_owner_user_id=s.canonical_owner_user_id
+         and p.account_id=s.account_id and p.snapshot_date=s.snapshot_date and p.source=s.source and not p.is_sample and p.cycle_end_at=s.cycle_end_at)))
+      then 1 else 0 end)`,[owner,snapshotDate,[...accountBuilds.filter(b=>b.status==="planned"&&b.portfolio).map(b=>b.account),...(allBuild?.status==="planned"&&allBuild.portfolio?["all"]:[])],SNAPSHOT_SOURCE,cutoff.toISOString()]),
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,quantity numeric,"updatedAt" timestamptz)), actual as (
       select h.id,h.quantity,h.updated_at from assets h join accounts a on a.id=h.account_id
       where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is null and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
@@ -1666,6 +1801,8 @@ async function resolveSnapshotFx(
   snapshotDate: string,
   fxAsOfDate = snapshotDate,
   cutoffAt: Date | null = null,
+  retainedRows: Awaited<ReturnType<typeof readSnapshotCutoffObservations>>["fxRows"] = [],
+  required = true,
 ): Promise<ResolvedFxRate> {
   const rows = await db
     .select()
@@ -1678,11 +1815,12 @@ async function resolveSnapshotFx(
       cutoffAt ? lte(fxRates.fetchedAt, cutoffAt) : undefined,
     ))
     .orderBy(desc(fxRates.rateDate), desc(fxRates.fetchedAt), desc(fxRates.createdAt))
-    .limit(1);
-  const row = selectSnapshotCutoffFx(rows, fxAsOfDate, cutoffAt);
+    .limit(32);
+  const row = selectSnapshotCutoffFx([...rows, ...retainedRows], fxAsOfDate, cutoffAt);
 
   const usdKrw = toNumber(row?.usdKrw);
   if (!row || usdKrw === null || usdKrw <= 0) {
+    if (!required) return { usdKrw: null, referenceDate: null, source: "not_required_for_krw_valuation", status: "not_required", observedAt: null, fetchedAt: null, rateKind: null };
     throw new DailySnapshotRequestError(
       "missing_fx_rate",
       "A USD/KRW FX rate is required before writing a daily snapshot",
@@ -1696,6 +1834,11 @@ async function resolveSnapshotFx(
     referenceDate: row.rateDate,
     source: row.source ? `fx_rates:${row.source}@${row.rateDate}` : `fx_rates@${row.rateDate}`,
     status: row.status,
+    observedAt: "providerObservedAt" in row ? isoTimestamp(row.providerObservedAt) : isoTimestamp(row.observedAt),
+    fetchedAt: isoTimestamp(row.fetchedAt),
+    rateKind: row.rateKind,
+    referenceAt: isoTimestamp(row.observedAt),
+    timestampBasis: "timestampBasis" in row && row.timestampBasis === "collection" ? "collection" : "provider",
   };
 }
 
@@ -1720,6 +1863,7 @@ async function buildCloseContext({
   capturedAt,
   cycleEndAt,
   useCutoffValuation,
+  retainedQuotes,
 }: {
   snapshotDate: string;
   assets: AssetRow[];
@@ -1728,6 +1872,7 @@ async function buildCloseContext({
   capturedAt: Date;
   cycleEndAt: Date;
   useCutoffValuation: boolean;
+  retainedQuotes: Awaited<ReturnType<typeof readSnapshotCutoffObservations>>["quotes"];
 }): Promise<CloseContext> {
   const instruments = targetAssets.map(({ market, currency, ticker }) => ({
     market,
@@ -1812,7 +1957,7 @@ async function buildCloseContext({
     const cutoffValuation = useCutoffValuation
       ? selectSnapshotCutoffValuation({
           instrument: asset,
-          rows: liveRows,
+          rows: [...liveRows, ...retainedQuotes],
           capturedAt,
           cycleEndAt,
           officialClose: closeSelection,
@@ -1833,6 +1978,11 @@ async function buildCloseContext({
             expectedCloseDate: closeSelection.expectedCloseDate,
             basis: "cutoff_live",
             fromCloseSnapshot: false,
+            observedAt: "observedAt" in cutoffQuote.row ? isoTimestamp(cutoffQuote.row.observedAt) : null,
+            fetchedAt: cutoffQuote.fetchedAt.toISOString(),
+            quoteType: cutoffQuote.row.quoteType,
+            referenceAt: cutoffQuote.referenceAt.toISOString(),
+            timestampBasis: "timestampBasis" in cutoffQuote.row && cutoffQuote.row.timestampBasis === "provider" ? "provider" : "collection",
           }
         : cutoffValuation?.basis === "close"
           ? cutoffValuation.close
@@ -1861,9 +2011,7 @@ function summarizeCutoffValuation({
   required: boolean;
   cycleEndAt: Date;
 }): CutoffValuationSummary {
-  const requiredAssets = required
-    ? selectedAssets.filter((asset) => normalizeTicker(asset.ticker))
-    : [];
+  const requiredAssets = required ? selectedAssets : [];
   const observedCount = selectedAssets.filter(
     (asset) => closeContext.valuationByAssetId.get(asset.id)?.basis === "cutoff_live",
   ).length;
@@ -1871,6 +2019,9 @@ function summarizeCutoffValuation({
     .filter(
       (asset) => {
         const selected = closeContext.valuationByAssetId.get(asset.id);
+        if (!normalizeTicker(asset.ticker)) {
+          return !hasRecordedManualValuation(asset, selected, cycleEndAt);
+        }
         return !selected || (
           selected.basis !== "cutoff_live" &&
           !isSnapshotCutoffOfficialClose(selected, cycleEndAt)
@@ -1891,9 +2042,21 @@ function summarizeCutoffValuation({
     maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60_000,
     requiredCount: requiredAssets.length,
     observedCount,
-    fallbackCount: selectedAssets.length - observedCount,
+    fallbackCount: selectedAssets.length - observedCount - missing.length,
     missing,
   };
+}
+
+function hasRecordedManualValuation(asset: AssetRow, selected: PriceSelection | undefined, cutoffAt: Date) {
+  if (!selected || selected.basis !== "manual_current") return false;
+  const quantity = toNumber(asset.quantity) ?? 0;
+  // Amount-only legacy holdings retain the input timestamp and amount; they
+  // neither acquire invented shares nor require a market quote for that amount.
+  const recordedAt = quantity === 0 && (toNumber(asset.fractionalKrwValue) ?? 0) > 0
+    ? isoTimestamp(asset.updatedAt ?? asset.createdAt)
+    : isoTimestamp(asset.priceAsOf);
+  return recordedAt !== null && new Date(recordedAt) < cutoffAt &&
+    (quantity === 0 || selected.price > 0);
 }
 
 async function loadManualCarrySelections({
@@ -2066,6 +2229,10 @@ function selectClosePriceForAsset(
       expectedCloseDate: null,
       basis: "manual_current",
       fromCloseSnapshot: false,
+      observedAt: isoTimestamp(asset.priceAsOf),
+      fetchedAt: isoTimestamp(asset.priceFetchedAt),
+      quoteType: asset.priceQuoteType ?? "manual_valuation",
+      timestampBasis: "manual_input",
     };
   }
 
@@ -2105,6 +2272,8 @@ function selectClosePriceForAsset(
     expectedCloseDate: referenceDate,
     basis: "close",
     fromCloseSnapshot: true,
+    fetchedAt: isoTimestamp(row.fetchedAt),
+    quoteType: "close",
   };
 }
 
@@ -2194,12 +2363,22 @@ function buildCloseSyncPlan({
   snapshotDate,
   selectedAssets,
   freshClose,
+  cutoffValuation,
 }: {
   snapshotDate: string;
   selectedAssets: AssetRow[];
   freshClose: FreshCloseSummary;
+  cutoffValuation: CutoffValuationSummary | null;
 }): CloseSyncPlan {
-  const targets = freshClose.coverage.map(closeCoverageToSyncTarget);
+  const missingCutoffIds = cutoffValuation ? new Set(cutoffValuation.missing.map(row => row.assetId)) : null;
+  // Close collection is a fallback for missing cutoff valuation, not a second
+  // prerequisite once an eligible latest quote has already supplied the price.
+  const targets = freshClose.coverage.map(coverage => {
+    const target = closeCoverageToSyncTarget(coverage);
+    return missingCutoffIds && !missingCutoffIds.has(coverage.id)
+      ? { ...target, action: "covered" as const, reason: "cutoff_valuation_available" }
+      : target;
+  });
   const manualCurrentNotSyncable = selectedAssets
     .filter((asset) => !normalizeTicker(asset.ticker))
     .map((asset) => ({
@@ -2765,11 +2944,13 @@ function findTopHolding(positions: NewDailyPositionSnapshot[], totalMarketValue:
 function buildWarnings({
   selectedAssets,
   freshClose,
+  cutoffValuation,
   fx,
   unsupportedCurrencyAssets,
 }: {
   selectedAssets: AssetRow[];
   freshClose: FreshCloseSummary;
+  cutoffValuation: CutoffValuationSummary | null;
   fx: ResolvedFxRate;
   unsupportedCurrencyAssets: AssetRow[];
 }) {
@@ -2782,11 +2963,13 @@ function buildWarnings({
     );
   }
 
-  if (freshClose.missingCount > 0) {
+  if (cutoffValuation?.missing.length) {
+    warnings.push("cutoff valuation evidence is incomplete; write is blocked");
+  } else if (!cutoffValuation && freshClose.missingCount > 0) {
     warnings.push("fresh close coverage is incomplete; write is blocked");
   }
 
-  if (fx.referenceDate === null) {
+  if (fx.referenceDate === null && fx.status !== "not_required") {
     warnings.push("fx reference date is missing");
   }
 
@@ -2833,6 +3016,11 @@ function findDuplicateKeys<T>(rows: T[], keyFn: (row: T) => string) {
   return [...counts.entries()]
     .filter(([, count]) => count > 1)
     .map(([key]) => key);
+}
+
+function isoTimestamp(value: unknown) {
+  const parsed = value instanceof Date || typeof value === "string" ? new Date(value) : null;
+  return parsed && Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
 function dateFromTimestamp(value: Date | string | null | undefined) {

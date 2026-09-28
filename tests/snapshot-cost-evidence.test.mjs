@@ -43,7 +43,7 @@ describe("snapshot purchase cost evidence", () => {
     const rowsByTable = {
       accounts: holdings.map((row) => ({ id: row.accountId, canonicalOwnerUserId: owner, code: row.account, name: row.account, accountType: "investment", currency: "KRW", isActive: true })),
       assets: holdings,
-      fx_rates: [{ rateDate: "2026-09-08", usdKrw: "1500", source: "test", status: "ok", isSample: false, fetchedAt: cutoffObservation }],
+      fx_rates: [{ rateDate: "2026-09-08", usdKrw: "1500", source: "test", status: "ok", isSample: false, fetchedAt: cutoffObservation, observedAt: cutoffObservation, rateKind: "spot" }],
       asset_price_snapshots: holdings.map((row) => ({ ...row, priceDate: "2026-09-08", closePrice: "105", isSample: false, source: "kis", fetchedAt: now })),
       live_price_quotes: holdings.map((row) => ({ ticker: row.ticker, market: row.market, currency: row.currency, price: "110", source: "kis", provider: "kis", quoteType: "live", status: "ok", fetchedAt: cutoffObservation, priceAsOf: cutoffObservation })),
     };
@@ -58,6 +58,7 @@ describe("snapshot purchase cost evidence", () => {
       return query;
     };
     const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], {
+      "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => ({ quotes: [], fxRows: [] }) },
       "@/db/client": { sqlClient: { transaction: async build => build({query:()=>[]}) }, db: {
         select: selection, selectDistinct: selection,
         insert: (table) => ({ values: (rows) => { writes.push({ table: getTableName(table), rows: Array.isArray(rows) ? rows : [rows] }); return {toSQL:()=>({sql:"select 1",params:[]})}; } }),

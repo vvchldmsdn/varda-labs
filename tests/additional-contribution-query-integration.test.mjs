@@ -72,6 +72,19 @@ describe("additional contribution query to policy integration", () => {
     assert.ok(result.rows.every((row) => row.maEffectiveMultiplier === 1));
   });
 
+  it("does not use a legacy foreign average cost converted at current FX as KRW sale-profit evidence", async () => {
+    const fixture = makeFixture();
+    fixture.settings[0].trimDriftThreshold = "0";
+    fixture.model.rows[0].currency = "USD";
+    fixture.model.rows[0].market = "us";
+    fixture.model.rows[0].costBasisKrw = 1;
+    const result = await run(await loadQuery(fixture), 1000);
+    assert.equal(result.status, "ready");
+    assert.equal(result.rows[0].costBasisKrw, null);
+    assert.equal(result.rows[0].trimReason, "cost_basis_unavailable");
+    assert.equal(result.totalTrimProceedsKrw, 0);
+  });
+
   it("blocks an incomplete current vector and null valuation instead of silently filling them", async () => {
     const fixture = makeFixture();
     const query = await loadQuery(fixture);
@@ -249,6 +262,7 @@ function legacyFixture(rows, weights = rows.map((row) => row.targetWeightBps)) {
 async function loadQuery(fixture) {
   const read = (kind, value) => async (args) => { fixture.calls.push({ kind, ...args }); return value(); };
   return importWithPorts("../src/db/queries/additional-contribution.ts", {
+    '@/db/queries/additional-contribution-modifiers':{readAdditionalContributionModifiers:async()=>({modifiers:{fundingBasis:'KRW',fx:{status:'unavailable',reason:'fixture'},regime:{status:'unavailable',reason:'fixture'},eventScore:{status:'unavailable',reason:'fixture'},performance:{status:'unavailable',reason:'fixture'}},rows:{}})},
     "@/db/queries/portfolio-target-policy": { getReadOnlyTenantPortfolioTargetPolicyModel: read("model", () => fixture.model) },
     "@/db/queries/tenant-settings": { loadLatestTenantPortfolioSettingsRows: async (context) => { fixture.calls.push({ kind: "settings", tenantContext: context }); return fixture.settings; } },
     "@/db/queries/additional-contribution-ma120": { getReadOnlyTenantAdditionalContributionMa120Evidence: async () => { if (fixture.maFailure) throw new Error("fixture unavailable"); return fixture.ma; } },

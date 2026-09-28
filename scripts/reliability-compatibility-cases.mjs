@@ -37,7 +37,8 @@ export async function runCompatibilityCases({ admin: clusterAdmin, report, conne
         observation: { quantity: currency === 'USD' ? cash : '0', price: '1', currency, at, priceObservedAt: at, priceFetchedAt: at, basis: 'raw', source: 'native_ledger_cash' } }))] },
     history: [], trades: null, fx: [], ledgerComplete: true, nativeSequences: { [account]: sequence }, maxPriceAgeMs: 86400000, maxFxAgeMs: 86400000 });
   try {
-    const manifest = await migrationManifest(), last = manifest.at(-1);
+    // This matrix intentionally upgrades 0058 to 0059, independent of later DDL.
+    const manifest = (await migrationManifest()).filter(row => Number(row.tag.slice(0,4))<=59), last = manifest.at(-1);
     assert.match(last.tag, /^0059_/);
     const migrator = await admin.connect();
     try {
@@ -59,7 +60,7 @@ export async function runCompatibilityCases({ admin: clusterAdmin, report, conne
         event: { type: 'sell', at: '2026-08-03T00:00:00Z', assetId: asset, quantity: '3', currency: 'USD', settlement: { amount: '330', currency: 'USD' }, fee: { amount: '0', currency: 'USD' }, tax: { amount: '0', currency: 'USD' } } })).status, 'created');
       const data = await old.ledger.readNativeLedger(context, account);
       assert.equal(data.accounts[0].state.cash.USD, '1330'); assert.equal(data.accounts[0].state.positions[0].quantity, '7');
-      oldEvidence = evidence('7', '1330', 1, '2026-08-03T22:00:00.000Z', '2026-08-04T01:00:00Z', '2026-08-03T20:00:00Z');
+      oldEvidence = evidence('7', '1330', 1, '2026-08-03T22:00:00.000Z', '2026-08-04T01:00:00Z', '2026-08-03T21:59:00Z');
       assert.equal((await old.snapshots.saveNativeCutoffSnapshots(context, oldEvidence, '2026-08-04', '2026-08-04T01:00:00Z')).created, 1);
     });
     await admin.query(last.sql);
@@ -129,7 +130,7 @@ export async function runCompatibilityCases({ admin: clusterAdmin, report, conne
       const changes = [{ accountId: account, expectedState: state.state, expectedAssets: state.assets, next,
         event: { ...input.event, id: input.operationId, sequence: 4, source: 'user_native_ledger' }, effect: { cashLegs: [{ currency: 'USD', delta: '1', kind: 'external_in' }] }, entryId: randomUUID(), serviceDate: '2026-08-05', newAsset: null }];
       await assert.rejects(worker.query('select apply_native_portfolio_mutation($1,$2,$3,$4)', [owner, input.operationId, JSON.stringify(input), JSON.stringify(changes)]), rejected);
-      const late = evidence('7', '1330', 3, '2026-08-05T22:00:00.000Z', '2026-08-06T01:00:00Z', '2026-08-05T20:00:00Z');
+      const late = evidence('7', '1330', 3, '2026-08-05T22:00:00.000Z', '2026-08-06T01:00:00Z', '2026-08-05T21:59:00Z');
       await assert.rejects(old.snapshots.saveNativeCutoffSnapshots(context, late, '2026-08-06', '2026-08-06T01:00:00Z'), rejected);
       assert.equal((await ledger.readNativeLedger(context, account)).accounts[0].state.cash.USD, '1330');
       assert.equal((await admin.query('select count(*)::int n from daily_portfolio_snapshots where account_id=$1', [account])).rows[0].n, 1);
@@ -190,6 +191,6 @@ export async function runCompatibilityCases({ admin: clusterAdmin, report, conne
       assert.equal((await ledger.writeNativeMutation(context, missing)).status, 'existing');
       assert.deepEqual((await admin.query('select * from native_ledger_revisions where account_id=$1', [account])).rows, revision);
     });
-    report.compatibilityRehearsal = { status: 'PASS', base: old.base, oldSources: 'frozen-source-plus-verified-shared-runtime', database: 'separate-disposable-local-postgresql', firstReaderIncompatibility: 'first_native_ledger_revision', recoveredQuantity: '9', recoveredCashUsd: '1130' };
+    report.compatibilityRehearsal = { status: 'PASS', base: old.base, oldSources: 'complete-frozen-source-closure-verified-against-original-runtime-hashes', database: 'separate-disposable-local-postgresql', firstReaderIncompatibility: 'first_native_ledger_revision', recoveredQuantity: '9', recoveredCashUsd: '1130' };
   } finally { await Promise.allSettled([admin.end(), worker.end(), tenant.end()]); }
 }

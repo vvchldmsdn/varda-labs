@@ -6,6 +6,7 @@ import type {
 export const LIVE_PRICE_WRITE_CONTRACT = {
   updates: ["live_price_quotes by market/ticker/provider"],
   inserts: ["live_price_quotes"],
+  transactionalCapture: "snapshot_cutoff_price_observations (bounded 06:45–07:00 KST receipts)",
   snapshotWrites: false,
 } as const;
 

@@ -47,6 +47,7 @@ export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul"
     try { return format(zone); } catch { return format("UTC"); }
   };
   const unavailable = (reason: string | null) => {
+    if (reason === "price_observation_conflict") return t("같은 시각의 시세가 달라 확인이 필요해요.", "Conflicting quotes need review.");
     if (reason === "corporate_actions_pending" || reason === "corporate_actions_provisional") return t("기업행위 확인 중 · 평가 대기", "Corporate actions pending · valuation on hold");
     if (reason === "corporate_action_price_pending") return t("기업행위 이후 시세 확인 중", "Waiting for a post-action quote");
     if (reason === "corporate_actions_conflict" || reason === "corporate_action_ledger_mismatch") return t("기업행위와 보유 수량 확인 필요", "Corporate actions and recorded shares need reconciliation");
@@ -98,6 +99,11 @@ export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul"
   const titles = { home: ["내 자산의 흐름", "My portfolio"], today: ["오늘의 변화를 살펴보세요.", "What moved today?"], history: ["자산이 지나온 시간", "Your portfolio over time"], structure: ["내 포트폴리오의 구성", "Inside your portfolio"], contribution: ["다음 투자금, 목표에 가깝게.", "Bring your next contribution closer to your targets."] };
   const title = surface ? titles[surface] : ["통화가 바뀌면, 평가도 달라집니다.", "One portfolio. Two perspectives."];
   const active = current.positions.find(row => row.id === selected) ?? current.positions[0];
+  const priceTimeLabel = active?.priceTimestampBasis === "daily_close" ? t("종가 기준일", "Close session")
+    : active?.priceTimestampBasis === "collection" ? t("시세 수집 시각", "Quote collected") : t("시세 관측 시각", "Price observed");
+  const priceTimeValue = active?.priceTimestampBasis === "daily_close" ? active.priceReferenceDate ?? "—"
+    : active?.priceTimestampBasis === "collection" ? active.priceFetchedAt ? date(active.priceFetchedAt) : "—"
+      : active?.priceObservedAt ? date(active.priceObservedAt) : "—";
   const native = evidence.current.positions.find(row => row.id === active?.id)?.observation;
   const entries = current.positions.filter((row): row is typeof row & { weightPct: number } => row.weightPct !== null).map(row => ({ key: row.id, name: row.name, weightPct: row.weightPct }));
   const currentCalculation = calculation?.evidence === evidence ? calculation.result : null;
@@ -124,7 +130,7 @@ export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul"
     </section>
     {showHoldings ? <section className={styles.section} aria-label={t("보유자산", "Holdings")}><h2>{t("보유자산", "Holdings")}</h2>
       <div className={styles.holdings}>{current.positions.map(row => <div key={row.id}><button type="button" key={row.id} aria-pressed={active?.id === row.id} onClick={() => setSelected(row.id)}><span>{row.name}{row.reason ? <small>{unavailable(row.reason)}</small> : null}</span><span><strong>{money(row.value)}</strong>{row.weightPct !== null ? <small>{row.weightPct.toFixed(2)}%</small> : null}</span></button>{surface === "home" && evidence.current.source !== "synthetic_fixture" && evidence.current.positions.find(p => p.id === row.id)?.kind === "holding" ? <QuickTradeActions accountId={evidence.current.positions.find(p => p.id === row.id)?.accountId} assetId={row.id} name={row.name} quantity={evidence.current.positions.find(p => p.id === row.id)?.observation?.quantity} /> : null}</div>)}</div>{surface === "home" && evidence.current.source !== "synthetic_fixture" ? <QuickTradeActions /> : null}
-      {active ? <details className={styles.method}><summary>{active.name} · {t("평가 근거", "Valuation details")}</summary>{native ? <p>{t("원본 수량 × 원본 가격", "Original quantity × original price")} · {native.quantity} × {money(native.price, native.currency)} · {native.currency}</p> : null}<p>{t("시세 관측 시각", "Price observed")} · {active.priceObservedAt ? date(active.priceObservedAt) : "—"}</p><p>{t("근거가 있는 원가", "Cost with evidence")} · {money(active.cost)}</p><p>{t("조회한 보유자산의 평가입니다. 전체 재산이나 수익률을 뜻하지 않습니다.", "This values the included holdings. It is not total wealth or a performance return.")}</p></details> : null}
+      {active ? <details className={styles.method}><summary>{active.name} · {t("평가 근거", "Valuation details")}</summary>{native ? <p>{t("원본 수량 × 원본 가격", "Original quantity × original price")} · {native.quantity} × {money(native.price, native.currency)} · {native.currency}</p> : null}<p>{priceTimeLabel} · {priceTimeValue}</p><p>{t("근거가 있는 원가", "Cost with evidence")} · {money(active.cost)}</p><p>{t("조회한 보유자산의 평가입니다. 전체 재산이나 수익률을 뜻하지 않습니다.", "This values the included holdings. It is not total wealth or a performance return.")}</p></details> : null}
     </section> : null}
 
     {showMovement ? <section className={styles.section}><h2>{t("무엇이 변했나요?", "What changed?")}</h2>

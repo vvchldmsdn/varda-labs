@@ -96,8 +96,9 @@ export function AdditionalContributionLogicDialog({
               />
               <PolicyFact
                 label="3. 집행 참고기준"
-                value={`${formatKrw(preview.minimumExecutionTargetKrw)} · ${preview.minimumExecutionSatisfied ? "충족" : "미충족"}`}
-                detail={`매수 가능 재원의 ${formatNumber(preview.calculationParameters.minimumExecutionRatioPct)}%를 참고기준으로 확인합니다. 유효 목표 부족액이 작으면 미달할 수 있으며, 기준을 맞추기 위한 추가 매수는 하지 않습니다.`}
+                value={preview.minimumExecutionEvidenceAvailable === false ? "근거 부족 · 미적용" : `${formatKrw(preview.minimumExecutionTargetKrw)} · ${preview.minimumExecutionSatisfied ? "충족" : "미충족"}`}
+                valueEn={preview.minimumExecutionEvidenceAvailable === false ? "Missing evidence · not applied" : `${formatKrw(preview.minimumExecutionTargetKrw)} · ${preview.minimumExecutionSatisfied ? "Met" : "Not met"}`}
+                detail={preview.modifierEvidence ? "감액 후에도 조건을 충족하는 종목에만 부족액 한도 안에서 추가 배분합니다. 적격 종목이나 근거가 없으면 현금으로 남깁니다." : `매수 가능 재원의 ${formatNumber(preview.calculationParameters.minimumExecutionRatioPct)}%를 참고기준으로 확인합니다. 유효 목표 부족액이 작으면 미달할 수 있습니다.`}
               />
             </section>
 
@@ -113,7 +114,7 @@ export function AdditionalContributionLogicDialog({
               </div>
               <p><T ko="평균선 바로 아래에서 갑자기 크게 바뀌지 않도록, 0~3% 아래 구간에서는 배율을 서서히 낮춥니다. 예를 들어 광범위 지수형은 평균선에서 1.0, 1.5% 아래에서 0.9, 3% 이상 아래에서 0.8입니다." en="Between 0% and 3% below the average, the multiplier decreases gradually. For a broad index holding, it is 1.0 at the average, 0.9 at 1.5% below, and 0.8 at 3% or more below." /></p>
               <p className="mt-2"><T ko="금·채권은 이 MA120 목표 조정에서 제외합니다. 예·적금, 연금형 자산 등 적용 제외 자산이나 규칙이 꺼진 종목도 배율 1.0을 사용합니다. 가격 근거가 부족하거나 맞지 않으면 목표를 임의로 낮추지 않습니다." en="Gold and bonds are exempt from this MA120 target adjustment. Exempt asset types such as savings, deposits and pension-type assets, or holdings with the rule disabled, also use 1.0. Missing or incompatible price evidence does not trigger a target reduction." /></p>
-              <p className="mt-2"><T ko="예시: 새로 넣는 돈이 10만원이고 유일한 매수 후보의 조정 후 부족액이 34만원이면, 최종 매수금은 10만원입니다. 반대로 부족액이 재원보다 작으면 그 부족액까지만 배분하고 나머지는 현금으로 남깁니다." en="Example: with ₩100,000 available and an adjusted gap of ₩340,000 for the only purchase candidate, the final purchase remains ₩100,000. If the gap is smaller than the available funds, the purchase is capped at that gap and the rest stays in cash." /></p>
+              <p className="mt-2"><T ko="예시: 재원 10만원, 유일한 후보의 MA 반영 부족액이 34만원이면 원배분은 10만원입니다. 이후 감액·보충에 따라 최종 매수금이 달라지며, 부족액을 넘겨 매수하지 않습니다." en="Example: with ₩100,000 available and a ₩340,000 gap after MA adjustment, the only candidate receives a raw allocation of ₩100,000. Reductions and eligible topup determine the final purchase, capped at the gap." /></p>
               <p className="mt-2 text-xs"><T ko="이 배율과 3% 구간은 기존 서비스에서 이어온 정책값입니다. 자산별 최적 배율이나 손실 방지 효과가 검증되었다는 뜻은 아닙니다. 금·채권의 적용 제외도 안전한 자산이라는 판정은 아닙니다." en="These multipliers and the 3% range are inherited policy settings, not proven optimal values or a guarantee against loss. Exemption does not mean that gold or bonds are risk-free." /></p>
             </details>
 
@@ -122,6 +123,7 @@ export function AdditionalContributionLogicDialog({
               <p><PortfolioText ko={"유효 목표액 = (현재 총평가액 + 신규 투입금) × 목표비중 × MA120 배율"} /></p>
               <p><PortfolioText ko={"종목별 부족액 = 유효 목표액 − 계산상 매도 후 평가액 (0 미만이면 0)"} /></p>
               <p><PortfolioText ko={"신규 투입금 + 계산상 매도대금을 부족액 비례로 배분합니다. 매도 종목은 다시 매수하지 않습니다. 원 단위 최대잔여 방식으로 결정하며 매도는 보유 평가액, 매수는 유효 부족액을 넘지 않습니다."} /></p>
+              {preview.modifierEvidence ? <p><T ko="최종 매수금 = 원배분 × 환율·위험기여·시장·뉴스·성과 승수 + 적격 보충액. 적용 근거가 없는 승수는 미적용하며 남는 재원은 현금으로 둡니다." en="Final buy = raw allocation × FX, risk, regime, news and performance multipliers + eligible topup. Unsupported factors are not applied; unallocated funds remain in cash." /></p> : null}
               <p><PortfolioText ko={"목표 0% 종목도 손실이 아니고 원가 근거가 있을 때 정리합니다. 원 단위로 표현할 수 없는 1원 미만 평가액은 남을 수 있습니다. 수수료·세금·주문 단위는 반영하지 않은 금액 계획입니다."} /></p>
               <p><T ko="‘감액 종목 감소 합계’는 매수금이 줄어든 종목의 감소액을 합한 값입니다. 다른 종목으로 옮겨간 금액도 포함하므로, 총매수금 감소나 현금 증가와 같지는 않습니다." en="Total reductions across holdings sums decreases for holdings receiving less. It includes money reassigned to other holdings, so it is not the same as a decrease in total purchases or an increase in cash." /></p>
             </details>
@@ -131,7 +133,7 @@ export function AdditionalContributionLogicDialog({
                 <div>
                   <h3 id="holding-calculation-title" className="text-sm font-medium"><PortfolioText ko={"종목별 계산 근거"} /></h3>
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    <PortfolioText ko={"원래 목표로 계산한 금액과 MA120 반영 후 최종 금액을 함께 비교합니다."} />{" "}</p>
+                    <T ko="기본 배분과 조정 후 최종 금액을 비교합니다." en="Compare the base allocation with the final adjusted amounts." />{" "}</p>
                 </div>
                 <span className="text-xs text-[var(--muted)]">{rows.length}<PortfolioText ko={"개 종목"} /></span>
               </summary>
@@ -167,7 +169,7 @@ export function AdditionalContributionLogicDialog({
                           <p className="mt-0.5 text-xs text-[var(--muted)]"><PortfolioText ko={"부족액"} />{" "}{formatKrw(row.baseNeedKrw)}</p>
                         </td>
                         <td className={`px-2 py-3 text-right font-medium tabular-nums ${actionTone(row.action)}`}><PortfolioText ko={actionLabel(row)} /></td>
-                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={decisionReason(row)} /><MaEvidenceDetails evidence={row.ma120Evidence} /></td>
+                        <td className="max-w-[270px] px-2 py-3 text-xs leading-5 text-[var(--muted)]"><PortfolioText ko={decisionReason(row)} /><MaEvidenceDetails evidence={row.ma120Evidence} /><ModifierDetails row={row} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -178,7 +180,7 @@ export function AdditionalContributionLogicDialog({
             <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
               <h3 className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></h3>
               <p className="mt-1 leading-6 text-[var(--muted)]">
-                <T ko="목표비중과 현재 보유 상태, 확인된 가격 추세로 금액을 나눕니다. 현재가 시각이나 MA120 이력이 7일보다 오래되거나 검증되지 않으면 추세 감액을 적용하지 않습니다. 환율 전망·뉴스·금리·산업 전망을 자동 매수계수로 쓰지 않습니다. 시장·투입 가정에서 신규금 보류와 환율 변화를 기본안 옆에서 비교할 수 있습니다. 수수료·세금·실제 주문 단위는 포함하지 않습니다." en="Amounts use your targets, holdings and verified price trends. Trend reductions are skipped when the price timestamp or MA120 history is over seven days old or cannot be verified. FX forecasts, news, rates and industry outlooks are not automatic purchase multipliers. Market & cash assumptions lets you compare new-money reserves and FX changes alongside the base allocation. Fees, taxes and actual order sizes are excluded." /></p>
+                <T ko="확인된 근거만 반영합니다. 근거가 없는 감액은 미적용으로 표시하며, 수수료·세금·실제 주문 단위는 포함하지 않습니다." en="Only verified evidence is applied. Missing evidence is marked as not applied. Fees, taxes and actual order sizes are excluded." /></p>
             </section>
           </div>
         </div>
@@ -189,6 +191,23 @@ export function AdditionalContributionLogicDialog({
 
 function FlowStep({ index, label, value }: { index: string; label: string; value: string }) {
   return <div className="bg-[var(--paper)] px-4 py-4"><p className="text-[10px] text-[var(--faint)]">{index}</p><p className="mt-2 text-xs text-[var(--muted)]"><PortfolioText ko={label} /></p><p className="mt-1 font-medium tabular-nums"><PortfolioText ko={value} /></p></div>;
+}
+
+function ModifierDetails({ row }: { row: AdditionalContributionResultPreview["rows"][number] }) {
+  const detail = row.modifierBreakdown;
+  if (!detail) return null;
+  const labels = [["fx", "환율", "FX"], ["rc", "위험 기여", "Risk contribution"], ["regime", "시장 국면", "Regime"], ["event", "뉴스", "News"], ["performance", "성과", "Performance"]] as const;
+  return <details className="mt-3 border-t border-[var(--line)] pt-1">
+    <summary className="min-h-11 cursor-pointer py-3 font-medium"><T ko="감액·추가 배분 근거" en="Reduction and top-up evidence" /></summary>
+    <p><T ko="원배분" en="Raw allocation" /> {formatKrw(row.rawAllocationKrw ?? 0)}</p>
+    <dl className="my-2 space-y-1">{labels.map(([key, ko, en]) => {
+      const factor = detail.multipliers[key];
+      return <div key={key} className="flex flex-wrap justify-between gap-x-3"><dt><T ko={ko} en={en} /></dt><dd>{factor.status === "ready" ? `× ${formatNumber(factor.value)}` : factor.status === "not_applicable" ? <T ko="적용 제외" en="Not applicable" /> : <T ko="근거 부족 · 미적용" en="Missing evidence · not applied" />}</dd></div>;
+    })}</dl>
+    <p><T ko="감액 후" en="After reductions" /> {formatKrw(detail.penalizedAllocationKrw)}</p>
+    <p><T ko="추가 배분" en="Top-up" /> {formatKrw(detail.topupAllocationKrw)} · {detail.topupEligible ? <T ko="적격" en="Eligible" /> : <T ko="대상 아님" en="Not eligible" />}</p>
+    {detail.topupEligible ? <p><T ko="배분 점수" en="Allocation score" /> {formatNumber(detail.topupScore)}</p> : null}
+  </details>;
 }
 
 function PolicyFact({ detail, detailEn, label, labelEn, value, valueEn }: { detail: string; detailEn?: string; label: string; labelEn?: string; value: string; valueEn?: string }) {

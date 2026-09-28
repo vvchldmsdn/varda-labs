@@ -19,7 +19,8 @@ after(async()=>{ await database?.close(); });
 
 const ddl=`
 create table live_price_quotes(ticker text,market text,currency text,provider text,source text,quote_type text,status text,price numeric,price_as_of timestamptz,fetched_at timestamptz);
-create table fx_rates(usdkrw numeric,observed_at timestamptz,fetched_at timestamptz,source text,rate_kind text,status text,is_sample boolean default false);
+create table fx_rates(usdkrw numeric,date date,observed_at timestamptz,fetched_at timestamptz,source text,rate_kind text,status text,is_sample boolean default false);
+create table asset_price_snapshots(ticker text,market text,currency text,close_price numeric,source text,date date,fetched_at timestamptz,is_sample boolean default false,provider_symbol text,provider_exchange text);
 
 create table app_users(id uuid primary key,status text not null,role text default 'user');
 create table accounts(id uuid primary key,canonical_owner_user_id uuid,code text not null,name text not null,is_active boolean default true,updated_at timestamptz default now());
@@ -33,7 +34,7 @@ async function fixture(withApi=false) {
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
   await addNativeReliabilityFixtureTables(pg);
   await pg.exec(readFileSync(new URL('../drizzle/0050_native_portfolio_ledger.sql',import.meta.url),'utf8'));
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability','0060_snapshot_cutoff_observations']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
   await pg.exec('grant usage on schema public to varda_tenant_app; grant select on live_price_quotes,fx_rates to varda_tenant_app');
   for(const table of ['accounts','assets','event_ledger_entries','daily_portfolio_snapshots']) await pg.exec(`alter table ${table} enable row level security; alter table ${table} force row level security; create policy tenant_select on ${table} for select to varda_tenant_app using(canonical_owner_user_id = nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${table} to varda_tenant_app;`);
   await pg.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);
@@ -72,6 +73,14 @@ async function fixture(withApi=false) {
     return projection.attachNativeLedgerEvidence({ownerId:owner,reporting,asOf:time,current:{at:time,source:'test raw quote',scopeComplete:false,positions},history:[],trades:null,fx:[{base:'USD',quote:'KRW',rate:fxRate,observedAt:time,fetchedAt:time,kind:'daily_reference',source:'test fixture'}],maxFxAgeMs:0,maxPriceAgeMs:0},ledger,'account');
   }
   return {pg,queries,projection,valuation,snapshots,cutoff,route,evidence,open,mutate,batches,legacy,setBeforeWrite(fn){beforeWrite=fn;},setIdentity(nextSubject,active=true){subject=nextSubject;authenticated=active;}};
+}
+
+async function regularBaseline(f,t,kind='daily_reference') {
+  const boundary='2026-09-01T22:00:00.000Z';
+  setNow(t,boundary);
+  const initial=await f.evidence(boundary);
+  initial.current.boundary='before';initial.current.source='native_ledger_cutoff_v2';initial.fx[0].kind=kind;
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},initial,'2026-09-02',boundary)).created,1);
 }
 
 it('executes the actual SQL writer, tenant reads, engine and projection against fixed ledger amounts',async()=>{
@@ -152,11 +161,11 @@ it('fences both transfer accounts against recorded snapshots without inventing a
   }
   setNow(t,'2026-09-02T01:00:00Z');
   let report=f.valuation.buildTrackedCurrencyPortfolio(await f.evidence('2026-09-02T01:00:00Z','100','USD','1400',peer));
-  assert.equal(report.current.total,'100'); assert.equal(report.performanceReturn.totalReturn,0);
+  assert.equal(report.current.total,'100'); assert.equal(report.performanceReturn,null,'intraday evidence is not a daily baseline');
   const id=randomUUID(), valid=await f.mutate({type:'transfer',at:'2026-09-02T00:30:00Z',direction:'out',amount:'50',currency:'USD',transferId:id,peerAccountId:peer},account,{operationId:id});
   assert.equal(valid.result.status,'created');
   report=f.valuation.buildTrackedCurrencyPortfolio(await f.evidence('2026-09-02T01:00:00Z','100','USD','1400',peer));
-  assert.equal(report.current.total,'150'); assert.equal(report.performanceReturn.totalReturn,0,'a later scoped external transfer remains capital, not performance');
+  assert.equal(report.current.total,'150'); assert.equal(report.performanceReturn,null,'no performance is invented without a daily baseline');
   assert.deepEqual((await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows[0].native_evidence,original);
   setNow(t,'2026-09-03T00:00:00Z');
   assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},await f.evidence('2026-09-03T00:00:00Z','100','USD','1400',peer))).created,1);
@@ -185,7 +194,7 @@ it('rechecks every changed account after a snapshot commits between the tenant r
     setNow(t,'2026-09-02T01:00:00Z');
     const report=f.valuation.buildTrackedCurrencyPortfolio(await f.evidence('2026-09-02T01:00:00Z','100','USD','1400',capturedAccount));
     assert.equal(report.current.total,capturedAccount===account?'300':'100');
-    assert.equal(report.performanceReturn.totalReturn,0,'the immutable record cannot acquire phantom investment gain');
+    assert.equal(report.performanceReturn,null,'the intraday record cannot acquire phantom investment gain');
   }
 });
 
@@ -232,6 +241,8 @@ it('persists the real first capture once and recalculates USD +10% versus KRW -1
   const revised=await f.evidence(at,'999');
   assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},revised)).created,0);
   assert.deepEqual((await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows[0].native_evidence,original);
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(await f.evidence(later)).movement,null,'intraday captures never substitute for daily baselines');
+  await regularBaseline(f,t);
   setNow(t,later);
   for(const [currency,total,change] of [['USD','1100','100'],['KRW','1386000','-14000']]) {
     const next=await f.evidence(later,'110',currency,'1260');
@@ -267,7 +278,7 @@ it('rejects legacy quantity divergence before a native snapshot is stored',async
 it('includes income and fees in investment gain and excludes withdrawal from SQL-backed movement',async(t)=>{
   setNow(t,at);
   const f=await fixture(); await f.open(account,{KRW:'0',USD:'2000'});
-  assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},await f.evidence())).created,1);
+  await regularBaseline(f,t);
   setNow(t,later);
   assert.equal((await f.mutate({type:'buy',assetId:asset,quantity:'10',price:'100',currency:'USD',fee:{amount:'2',currency:'USD'}},account,{newAsset:{id:asset,name:'Actual test stock',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}})).result.status,'created');
   assert.equal((await f.mutate({type:'sell',assetId:asset,quantity:'4',price:'110',currency:'USD',fee:{amount:'1',currency:'USD'}})).result.status,'created');
@@ -293,7 +304,7 @@ it('applies an actual split and dividend once using original SQL quantities and 
   const f=await fixture();
   await f.pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,currency,quantity,name) values($1,$2,$3,'one','USD',10,'Existing')",[asset,owner,account]);
   await f.open(account,{KRW:'0',USD:'0'},[{assetId:asset,currency:'USD',quantity:'10',costLots:null}]);
-  assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},await f.evidence())).created,1);
+  await regularBaseline(f,t);
   setNow(t,later);
   assert.equal((await f.mutate({type:'split',assetId:asset,ratio:{n:'2',d:'1'}})).result.status,'created');
   assert.equal((await f.mutate({type:'dividend',assetId:asset,amount:'10',currency:'USD'})).result.status,'created');
@@ -324,7 +335,7 @@ it('captures cash-only owners on the existing daily job without provider calls a
 
 it('keeps closed empty account history and rejects further account writes',async(t)=>{
   setNow(t,at); const f=await fixture(); await f.open(account,{KRW:'0',USD:'1000'});
-  await f.snapshots.saveNativeSnapshots({ownerUserId:owner},await f.evidence());
+  await regularBaseline(f,t);
   setNow(t,later); await f.mutate({type:'withdraw',amount:'1000',currency:'USD'});
   await f.pg.query('update accounts set is_active=false,updated_at=$2 where id=$1',[account,later]);
   const ledger=await f.queries.readNativeLedger({ownerUserId:owner},account);
@@ -339,8 +350,7 @@ it('keeps closed empty account history and rejects further account writes',async
 
 it('retains the observed spot FX from an immutable capture without replacing it with today FX',async(t)=>{
   setNow(t,at); const f=await fixture(); await f.open(account,{KRW:'1400000',USD:'1000'});
-  const initial=await f.evidence(); initial.fx[0].kind='spot';
-  assert.equal((await f.snapshots.saveNativeSnapshots({ownerUserId:owner},initial)).created,1);
+  await regularBaseline(f,t,'spot');
   setNow(t,later);
   const result=f.valuation.buildTrackedCurrencyPortfolio(await f.evidence(later,'100','USD','1260'));
   assert.equal(result.history[0].total,'2000');
@@ -540,12 +550,13 @@ it('uses a pre-cutoff holding quantity even after a later full sale, with no cur
   const f=await fixture(); await f.open(account,{KRW:'0',USD:'1000'});
   const now='2026-09-01T22:30:00.000Z';
   await f.mutate({type:'buy',assetId:asset,quantity:'2',price:'100',currency:'USD',at:'2026-09-01T21:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});
-  await f.pg.query("insert into live_price_quotes values('TEST','us','USD','kis','kis_test','close','ok',110,'2026-09-01T21:00:00Z','2026-09-01T21:01:00Z')");
+  await f.pg.query("insert into asset_price_snapshots values('TEST','us','USD',110,'kis_overseas_daily_price','2026-09-01','2026-09-01T21:01:00Z',false,'TEST','NAS')");
   await f.mutate({type:'sell',assetId:asset,quantity:'2',price:'111',currency:'USD',at:'2026-09-01T22:05:00Z'});
   const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',now);
   assert.equal(evidence.current.positions.find(p=>p.id===asset).observation.quantity,'2');
   assert.equal(f.valuation.buildTrackedCurrencyPortfolio(evidence).current.total,'1020');
-  await f.pg.query("update live_price_quotes set price_as_of='2026-09-01T22:05:00Z',fetched_at='2026-09-01T22:06:00Z'");
+  await f.pg.query("delete from asset_price_snapshots");
+  await f.pg.query("insert into live_price_quotes values('TEST','us','USD','kis','kis_test','close','ok',110,'2026-09-01T22:05:00Z','2026-09-01T22:06:00Z')");
   const missing=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',now);
   assert.equal(f.valuation.buildTrackedCurrencyPortfolio(missing).current.complete,false);
   assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},missing,'2026-09-02',now)).status,'incomplete');
@@ -581,4 +592,44 @@ it('does not resurrect a rejected corporate-action price from an old frozen capt
   const cutoff=buildNativeCutoffEvidence(base,ledger,'2026-09-02','2026-09-01T22:30:00Z');
   assert.equal(cutoff.current.positions.find(p=>p.id===asset).observation,null);
   assert.equal(f.valuation.buildTrackedCurrencyPortfolio(cutoff).current.complete,false);
+});
+
+it('keeps 10 × 105 × 1300 at the cutoff after cache replacement, even with an official close of 100',async()=>{
+  const f=await fixture();await f.open(account,{KRW:'0',USD:'1000'});
+  await f.mutate({type:'buy',assetId:asset,quantity:'10',price:'100',currency:'USD',at:'2026-09-01T21:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});
+  await f.pg.query("insert into live_price_quotes values('TEST','us','USD','kis','kis_overseas_price:NAS','live','ok',105,'2026-09-01T21:59:00Z','2026-09-01T21:59:00Z')");
+  await f.pg.query("insert into fx_rates(usdkrw,date,observed_at,fetched_at,source,rate_kind,status) values(1300,'2026-09-02',null,'2026-09-01T21:59:00Z','kis_overseas_price_detail:NAS',null,'ok')");
+  await f.pg.query("insert into asset_price_snapshots values('TEST','us','USD',100,'kis_overseas_daily_price','2026-09-01','2026-09-01T22:05:00Z',false,'TEST','NAS')");
+  // A delayed worker reads actual preserved receipts after the live caches move.
+  await f.pg.query("update live_price_quotes set price=110,price_as_of='2026-09-01T22:20:00Z',fetched_at='2026-09-01T22:20:00Z'");
+  await f.pg.query("update fx_rates set usdkrw=1310,fetched_at='2026-09-01T22:20:00Z'");
+  const capturedAt='2026-09-01T22:20:01Z';
+  const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',capturedAt);
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio({...evidence,reporting:'KRW'}).current.total,'1365000');
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio({...evidence,reporting:'USD'}).current.total,'1050');
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},evidence,'2026-09-02',capturedAt)).created,1);
+  const original=(await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows[0].native_evidence;
+  const retry=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02','2026-09-01T23:00:00Z');
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},retry,'2026-09-02','2026-09-01T23:00:00Z')).created,0);
+  assert.deepEqual((await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows[0].native_evidence,original);
+  assert.equal(original.frame.positions.find(row=>row.id===asset).observation.price,'105.000000000000');
+  assert.equal(original.fx[0].timestampBasis,'collection');
+});
+
+it('does not choose between retained 105 and cache 110 for the same receipt; only a verified close can replace the conflict',async()=>{
+  const f=await fixture();await f.open(account,{KRW:'0',USD:'1000'});
+  await f.mutate({type:'buy',assetId:asset,quantity:'10',price:'100',currency:'USD',at:'2026-09-01T21:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});
+  await f.pg.query("insert into live_price_quotes values('TEST','us','USD','kis','kis_overseas_price:NAS','live','ok',105,'2026-09-01T21:59:00Z','2026-09-01T21:59:00Z')");
+  await f.pg.query("update live_price_quotes set price=110 where ticker='TEST'");
+  const capturedAt='2026-09-01T22:20:00Z';
+  const read=()=>f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',capturedAt);
+  const conflict=await read();
+  assert.equal(conflict.current.positions.find(row=>row.id===asset).observation,null);
+  assert.equal(conflict.current.positions.find(row=>row.id===asset).evidenceReason,'price_observation_conflict');
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(conflict).current.total,null);
+  assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},conflict,'2026-09-02',capturedAt)).status,'incomplete');
+  await f.pg.query("insert into asset_price_snapshots values('TEST','us','USD',100,'kis_overseas_daily_price','2026-09-01','2026-09-01T22:05:00Z',false,'TEST','NAS')");
+  const fallback=await read();
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio(fallback).current.total,'1000');
+  assert.equal(fallback.current.positions.find(row=>row.id===asset).observation.timestampBasis,'daily_close');
 });

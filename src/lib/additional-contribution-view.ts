@@ -1,3 +1,5 @@
+import type { ContributionModifiers, resolveContributionMultipliers } from "./additional-contribution-modifiers";
+
 export type AdditionalContributionViewInput = Readonly<{
   cashAmountKrw: number;
   currentPortfolioTotalKrw: number;
@@ -50,6 +52,14 @@ export type AdditionalContributionResultRow = AdditionalContributionViewInputRow
   Readonly<{
     action: "buy" | "hold" | "trim";
     baseNeedKrw: number;
+    rawAllocationKrw?: number;
+    modifierBreakdown?: Readonly<{
+      multipliers: ReturnType<typeof resolveContributionMultipliers>;
+      penalizedAllocationKrw: number;
+      topupEligible: boolean;
+      topupScore: number;
+      topupAllocationKrw: number;
+    }> | null;
     costBasisKrw: number | null;
     driftRatioPct: number | null;
     effectiveTargetWeightPct: number;
@@ -89,6 +99,8 @@ export type AdditionalContributionResultPreview = Omit<
     totalTrimProceedsKrw: number;
     minimumExecutionTargetKrw: number;
     minimumExecutionSatisfied: boolean;
+    modifierEvidence?: ContributionModifiers | null;
+    minimumExecutionEvidenceAvailable?: boolean;
     calculationParameters: Readonly<{
       minimumExecutionRatioPct: number;
       trimDriftThresholdPct: number;
