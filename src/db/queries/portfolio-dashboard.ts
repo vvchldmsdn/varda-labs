@@ -197,7 +197,9 @@ async function loadDashboardContextSources({
               positionScopePredicate,
               eq(dailyPositionSnapshots.account, accounts.code),
               eq(dailyPositionSnapshots.isSample, false),
-              brokerRecoveryBaselinePredicate(serviceDate, [...visibleAccountIds]),
+              // Each position retains its own recovery validity; account authorization above is unchanged.
+              eq(dailyPositionSnapshots.canonicalOwnerUserId, tenantContext.ownerUserId),
+              brokerRecoveryBaselinePredicate(serviceDate),
               gte(dailyPositionSnapshots.snapshotDate, baselineWindowStart),
               lte(dailyPositionSnapshots.snapshotDate, serviceDate),
             ),

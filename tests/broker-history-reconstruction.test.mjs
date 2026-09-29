@@ -17,3 +17,14 @@ it('admits only proven manual valuation provenance and labels stored carry hones
  a.positions=[p];let row=buildBrokerHistoryFrames(a)[1];assert.equal(row.complete,true);assert.equal(row.positions.find(x=>x.assetId==='manual').basis,'preserved_stored_manual_carry');
  for(const change of [{price_source:'fallback_current',price_date:'2026-08-20'},{price_date:'2026-08-20'},{source:'untrusted'},{price_basis:'current'},{captured_at:null},{current_price:null}]){a.positions=[{...p,...change}];assert.equal(buildBrokerHistoryFrames(a)[1].complete,false);}
 });
+it('uses scoped after-cutoff confirmation without changing original events or inventing an execution instant',()=>{
+ const a=input();const original=JSON.stringify(a);const confirmation={ownerId:'owner',accountId:'acct',reference:'synthetic confirmation',confirmedAt:'2026-08-04T00:00:00Z',afterCutoffTradeIds:['trade'],manualValuations:[]};
+ const rows=buildBrokerHistoryFrames({...a,confirmation});assert.equal(rows[0].totalMarketValue,'132000');assert.equal(rows[1].totalMarketValue,'165000');assert.equal(JSON.stringify(a),original);
+ assert.throws(()=>buildBrokerHistoryFrames({...a,confirmation:{...confirmation,ownerId:'other'}}),/owner_mismatch/);
+ assert.throws(()=>buildBrokerHistoryFrames({...a,confirmation:{...confirmation,afterCutoffTradeIds:['other']}}),/unmapped_trade/);
+});
+it('confirmed manual total is date-specific and never multiplied by quantity',()=>{
+ const a=input(),m={...asset,id:'manual',ticker:null,quantity:'8'};a.state.assets.push(m);a.batches[0].before_state.assets.push(m);
+ const confirmation={ownerId:'owner',accountId:'acct',reference:'synthetic confirmation',confirmedAt:'2026-08-04T00:00:00Z',afterCutoffTradeIds:['trade'],manualValuations:[{assetId:'manual',date:'2026-08-02',totalValueKrw:'80000'}]};
+ const rows=buildBrokerHistoryFrames({...a,confirmation});assert.equal(rows[1].totalMarketValue,'245000');assert.equal(rows[1].positions.find(p=>p.assetId==='manual').valueKrw,'80000');assert.equal(rows[0].complete,false);assert.equal(rows[2].complete,false);
+});

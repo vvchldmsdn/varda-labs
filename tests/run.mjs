@@ -390,3 +390,6 @@ import "./snapshot-progress.test.mjs";
 import "./simulation-market-calendar.test.mjs";
 
 import "./broker-history-reconstruction.test.mjs";
+import "./kis-paired-conflict-evidence.test.mjs";
+import "./manual-cutoff-carry.test.mjs";
+import "./simulation-adjusted-endpoint.test.mjs";

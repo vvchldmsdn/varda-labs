@@ -125,7 +125,7 @@ export function TodayMovement({
           <div className={styles.todayStageMain}>
           <section className={styles.stageSummary} aria-labelledby="today-movement-title" tabIndex={0}>
             <div className={styles.balance}>
-              <span><T ko={scopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="오늘 평가액 변동" en="Today's value change"/></span>
+              <span><T ko={scopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko={data.dataHealth.movementExcludedAssetCount>0?"상장 종목 변동":"오늘 평가액 변동"} en={data.dataHealth.movementExcludedAssetCount>0?"Listed holdings change":"Today's value change"}/></span>
               <strong className={toneClass(attribution.changeKrw)}>
                 {<T ko={movement.ready ? formatSignedKrw(attribution.changeKrw) : "계산 대기"} en={translateHomeHistory(movement.ready ? formatSignedKrw(attribution.changeKrw) : "계산 대기")}/>}
               </strong>
@@ -280,7 +280,7 @@ function MovementBridge({
           <p className={styles.evidenceIntro}><T ko="저장된 기준과 현재 근거 비교" en="Recorded baseline versus current data"/></p>
         </div>
         {movementExcludedCurrentValueKrw > 0 ? (
-          <p className={styles.status}><T ko="변동 제외 보유액" en="Holdings excluded from change"/> {<T ko={formatKrw(movementExcludedCurrentValueKrw)} en={translateHomeHistory(formatKrw(movementExcludedCurrentValueKrw))}/>} <T ko="정적 포함" en="included at a fixed value"/></p>
+          <p className={styles.status}><T ko="변동 제외 보유액" en="Holdings excluded from change"/> {<T ko={formatKrw(movementExcludedCurrentValueKrw)} en={translateHomeHistory(formatKrw(movementExcludedCurrentValueKrw))}/>} <T ko="비교 합계에서 제외" en="excluded from comparable totals"/></p>
         ) : null}
       </div>
       <dl className={styles.bridge}>

@@ -23,7 +23,7 @@ export function tradeAtCutoff(trade,date){
 
 /** Pure historical quantity replay and dated-close valuation. No cash, cost or
  * return is inferred from missing settlement/opening evidence. */
-export function buildBrokerHistoryFrames({state,batches,prices,fx,positions,startDate,endDate}){
+export function buildBrokerHistoryFrames({state,batches,prices,fx,positions,startDate,endDate,confirmation=null}){
   assert.match(startDate,/^\d{4}-\d{2}-\d{2}$/);assert.match(endDate,/^\d{4}-\d{2}-\d{2}$/);
   assert.equal(new Date(startDate+'T00:00:00Z').toISOString().slice(0,10),startDate);assert.equal(new Date(endDate+'T00:00:00Z').toISOString().slice(0,10),endDate);
   assert.ok(endDate<=resolveSnapshotCycle().snapshotDate,'future_reconstruction');
@@ -38,6 +38,20 @@ export function buildBrokerHistoryFrames({state,batches,prices,fx,positions,star
   const earliestTrade=batches.flatMap(b=>b.manifest.trades).map(t=>t.tradeDate).sort()[0];
   assert.ok(startDate>=earliestTrade,'reconstruction_precedes_confirmed_opening');
   const trades=[],seen=new Set();
+  if(confirmation){
+    assert.equal(confirmation.ownerId,state.account.canonical_owner_user_id,'confirmation_owner_mismatch');
+    assert.equal(confirmation.accountId,state.account.id,'confirmation_account_mismatch');
+    assert.ok(typeof confirmation.reference==='string'&&confirmation.reference.length>0,'confirmation_reference_missing');
+    assert.ok(Number.isFinite(Date.parse(confirmation.confirmedAt))&&Date.parse(confirmation.confirmedAt)<=Date.now(),'confirmation_time_invalid');
+    assert.equal(new Set(confirmation.afterCutoffTradeIds).size,confirmation.afterCutoffTradeIds.length,'duplicate_trade_confirmation');
+    const manualKeys=new Set();
+    for(const m of confirmation.manualValuations){
+      assert.ok(owned.has(m.assetId)&&!owned.get(m.assetId).ticker,'confirmed_asset_not_manual');
+      assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(m.date)&&m.date>=startDate&&m.date<=endDate,'manual_confirmation_date_invalid');
+      assert.ok(positive(m.totalValueKrw),'manual_confirmation_value_invalid');
+      const key=m.assetId+':'+m.date;assert.ok(!manualKeys.has(key),'duplicate_manual_confirmation');manualKeys.add(key);
+    }
+  }
   for(const batch of batches){
     assert.equal(batch.canonical_owner_user_id,state.account.canonical_owner_user_id);assert.equal(batch.account_id,state.account.id);
     for(const h of batch.manifest.holdings){
@@ -45,8 +59,11 @@ export function buildBrokerHistoryFrames({state,batches,prices,fx,positions,star
       if(!opening.has(h.id))opening.set(h.id,{...asset,quantity:'0',fractional_krw_value:null});
       if(batch===first){const initial=opening.get(h.id);initial.quantity=h.startQuantity;if(h.removeFractionalDisplay)initial.fractional_krw_value=null;}
     }
-    for(const trade of batch.manifest.trades){assert.ok(!seen.has(trade.id),'duplicate_reconstruction_trade');seen.add(trade.id);trades.push(trade);}
+    for(const trade of batch.manifest.trades){assert.ok(!seen.has(trade.id),'duplicate_reconstruction_trade');seen.add(trade.id);const confirmed=confirmation?.afterCutoffTradeIds.includes(trade.id);
+      if(confirmed&&trade.executedAt)assert.notEqual(tradeAtCutoff(trade,trade.tradeDate),'before','conflicting_execution_confirmation');
+      trades.push(confirmed?{...trade,executionNotBefore:buildCycleForSnapshotDate(trade.tradeDate,new Date()).cycleEndAt.toISOString()}:trade);}
   }
+  if(confirmation)assert.ok(confirmation.afterCutoffTradeIds.every(id=>seen.has(id)),'unmapped_trade_confirmation');
   // Original event payload is authority; manifest identities must all exist.
   for(const trade of trades){const event=state.events.find(e=>e.id===trade.id);assert.ok(event,'reconstruction_trade_not_applied');
     assert.equal(event.asset_id,trade.assetId);assert.equal(event.event_date,trade.tradeDate);assert.equal(event.event_type,trade.side);
@@ -68,6 +85,11 @@ export function buildBrokerHistoryFrames({state,batches,prices,fx,positions,star
       const base={assetId:id,ticker:a.ticker,name:a.name,market:a.market,currency:a.currency,assetType:a.asset_type,quantity:exact(quantity)};
       if(quantity.compare(0)===0&&!positive(initial.fractional_krw_value)){rows.push({...base,valueKrw:'0',price:null,fx:null,priceDate:null,priceSource:null,basis:'confirmed_zero'});continue;}
       if(!a.ticker||positive(initial.fractional_krw_value)){
+        const confirmed=confirmation?.manualValuations.find(m=>m.assetId===id&&m.date===date);
+        if(confirmed){
+          assert.ok(!trades.some(t=>t.assetId===id),'manual_confirmation_has_trades');
+          rows.push({...base,valueKrw:confirmed.totalValueKrw,price:null,fx:null,priceDate:date,priceSource:'user_confirmed_total_valuation',basis:'confirmed_manual_total',confirmationReference:confirmation.reference,observationCapturedAt:confirmation.confirmedAt});continue;
+        }
         const candidates=positions.filter(p=>p.asset_id===id&&day(p.snapshot_date)===date&&p.cycle_end_at&&new Date(p.cycle_end_at).toISOString()===cutoff&&!p.is_sample&&p.market_value_krw!=null&&numeric(p.quantity??0).compare(quantity)===0);
         if(candidates.length!==1||trades.some(t=>t.assetId===id)){reasons.push({assetId:id,reason:'manual_cutoff_observation_missing'});continue;}
         const p=candidates[0],policy=MANUAL_VALUATION_HISTORY_POLICY;
@@ -105,7 +127,7 @@ export async function readBrokerHistoryInput(client,ownerId,accountId,startDate,
 
 /** Immutable snapshots keyed by evidence hash. One owner-bounded transaction;
  * original rows are never updated/deleted and no partial account total is saved. */
-export async function reconstructBrokerHistory(client,{ownerId,accountId,startDate,endDate,expectedStateHash,write=false,confirmationHash,confirmedBasis}){
+export async function reconstructBrokerHistory(client,{ownerId,accountId,startDate,endDate,expectedStateHash,write=false,confirmationHash,confirmedBasis,confirmation=null}){
   await client.query('begin');
   try{
     await client.query("set local lock_timeout='3s'");await client.query("set local statement_timeout='30s'");
@@ -113,9 +135,9 @@ export async function reconstructBrokerHistory(client,{ownerId,accountId,startDa
     await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`varda.portfolio_mutation.v1:${ownerId}`]);
     const input=await readBrokerHistoryInput(client,ownerId,accountId,startDate,endDate);
     assert.equal(recoveryHash(input.state),expectedStateHash,'reconstruction_state_changed');
-    const frames=buildBrokerHistoryFrames(input),complete=frames.filter(f=>f.complete);
+    const frames=buildBrokerHistoryFrames({...input,confirmation}),complete=frames.filter(f=>f.complete);
     assert.ok(complete.reduce((n,f)=>n+f.positions.length+1,0)<=500,'reconstruction_transaction_too_large');
-    const hash=recoveryHash({version:1,stateHash:expectedStateHash,batchIds:input.batches.map(b=>b.id),frames}),source=RECONSTRUCTION_PREFIX+hash.slice(0,32);
+    const hash=recoveryHash({version:2,confirmation,stateHash:expectedStateHash,batchIds:input.batches.map(b=>b.id),frames}),source=RECONSTRUCTION_PREFIX+hash.slice(0,32);
     if(write){assert.equal(confirmationHash,hash,'reconstruction_confirmation_changed');assert.equal(confirmedBasis,'dated_close_reconstruction','reconstruction_basis_not_approved');}
     let inserted=0,existing=0,preserved=0;
     for(const frame of complete){
@@ -124,7 +146,7 @@ export async function reconstructBrokerHistory(client,{ownerId,accountId,startDa
       const old=(await client.query('select id from daily_portfolio_snapshots where canonical_owner_user_id=$1 and account_id=$2 and snapshot_date=$3 and source=$4',[ownerId,accountId,frame.date,source])).rows;
       if(old.length){existing++;continue;}
       const cycle=buildCycleForSnapshotDate(frame.date,new Date());
-      const evidence={version:1,hash,stateHash:expectedStateHash,batchIds:input.batches.map(b=>b.id),basis:'reconstructed_dated_close',cashIncluded:false,costAvailable:false,performanceAvailable:false,positions:frame.positions};
+      const evidence={version:2,confirmation,hash,stateHash:expectedStateHash,batchIds:input.batches.map(b=>b.id),basis:'reconstructed_dated_close',cashIncluded:false,costAvailable:false,performanceAvailable:false,positions:frame.positions};
       await client.query("insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,rule_version,description,total_market_value,num_assets,captured_at,cycle_start_at,cycle_end_at) values($1,$2,$3,$4,$5,'broker_history_reconstruction_v1',$6,$7,$8,clock_timestamp(),$9,$10)",[ownerId,accountId,input.state.account.code,frame.date,source,JSON.stringify(evidence),frame.totalMarketValue,frame.positions.filter(p=>numeric(p.quantity).compare(0)>0).length,cycle.cycleStartAt,cycle.cycleEndAt]);
       for(const p of frame.positions)await client.query('insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,asset_id,asset_name,ticker,market,currency,asset_type,snapshot_date,source,quantity,total_quantity,current_price,unit_price,close_price,market_value_krw,fx_rate,price_date,reference_date,fx_reference_date,price_source,price_basis,description,captured_at,cycle_start_at,cycle_end_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13,$13,$13,$14,$15,$16,$16,$17,$18,$19,$20,clock_timestamp(),$21,$22)',[ownerId,accountId,input.state.account.code,p.assetId,p.name,p.ticker,p.market,p.currency,p.assetType,frame.date,source,p.quantity,p.price,p.valueKrw,p.fx,p.priceDate,p.fxDate??null,p.priceSource,p.basis,JSON.stringify(p),cycle.cycleStartAt,cycle.cycleEndAt]);
       inserted++;
