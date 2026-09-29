@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {it} from 'node:test';
+import {importWithPorts} from './helpers/import-with-ports.mjs';
+const [m]=await importWithPorts(['src/lib/snapshots/manual-cutoff-carry.ts'],{});
+const a={id:'a',currency:'KRW',canonicalOwnerUserId:'owner',accountId:'account',ticker:null,quantity:'8',currentPrice:'10000',fractionalKrwValue:'0',updatedAt:'2026-08-01T00:00:00Z',priceAsOf:null};
+const r={id:'snapshot',currency:'KRW',assetId:'a',canonicalOwnerUserId:'owner',accountId:'account',snapshotDate:'2026-09-27',capturedAt:'2026-09-27T00:00:00Z',source:'varda_manual_daily_snapshot',priceBasis:'manual_current',priceSource:'asset_current_price',quantity:'8',currentPrice:'10000',marketValueKrw:'80000',referenceDate:'2026-09-27',priceDate:null,isSample:false};
+const resolve=(asset=a,row=r)=>m.resolveStoredManualCutoffCarry(asset,row,'2026-09-29',new Date('2026-09-28T22:00:00Z'));
+it('carries only unchanged previously stored manual state with provenance',()=>{assert.equal(resolve().price,10000);assert.equal(resolve().manualCarrySnapshotId,'snapshot');for(const patch of [{currency:'USD'},{ticker:'ABC'},{quantity:'9'},{updatedAt:'2026-09-28T00:00:00Z'},{priceAsOf:'2026-09-27T00:00:00Z'},{currentPrice:'11000'},{fractionalKrwValue:'1'}])assert.equal(resolve({...a,...patch}),null);});
+it('rejects cross-owner/account, future/late/sample and incompatible records',()=>{for(const patch of [{currency:'USD'},{canonicalOwnerUserId:'other'},{accountId:'other'},{assetId:'other'},{snapshotDate:'2026-09-29'},{capturedAt:'2026-09-28T22:00:00Z'},{referenceDate:'2026-09-30'},{isSample:true},{priceSource:'live'},{source:'unknown'}])assert.equal(resolve(a,{...r,...patch}),null);});
+it('confirmed KRW total becomes a per-unit stored manual carry once, never a live quote',()=>{const row={...r,source:'broker_reconstructed_close_v1:hash',priceBasis:'confirmed_manual_total',priceSource:'user_confirmed_total_valuation',currentPrice:null,marketValueKrw:'72000'};assert.equal(resolve(a,row).price,9000);assert.equal(resolve(a,row).source,'manual_entry');assert.equal(resolve({...a,currency:'USD'},{...row,currency:'USD'}),null);});

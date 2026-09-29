@@ -82,20 +82,20 @@ export async function maintainMarketCollection(partition: CollectionPartition = 
     available_at=now()+interval '1 hour', last_code='worker_interrupted', updated_at=now()
     where status='running' and leased_until<=now() and attempts >= $1::integer and starts_with(key,$2)`, [MARKET_COLLECTION_POLICY.maximumAttempts, partitionPrefix(partition)]);
   await sqlClient.query(`delete from market_collection_jobs where key in (
-    select key from market_collection_jobs where status in ('done','failed') and updated_at < now()-interval '7 days' and starts_with(key,$1)
+    select key from market_collection_jobs where status in ('done','failed') and last_code is distinct from 'paired_history_conflict' and updated_at < now()-interval '7 days' and starts_with(key,$1)
     order by updated_at limit 500)`, [partitionPrefix(partition)]);
 }
 
-export async function finishMarketCollection(job: ClaimedCollectionJob, outcome: { ok: boolean; code: string; retryAfterSeconds?: number; deferred?: boolean }) {
+export async function finishMarketCollection(job: ClaimedCollectionJob, outcome: { ok: boolean; code: string; retryAfterSeconds?: number; deferred?: boolean; terminal?: boolean }) {
   await sqlClient.query(`update market_collection_jobs set
-    status = case when $3::boolean then 'done' when not $7::boolean and attempts >= $6::integer then 'failed' else 'pending' end,
+    status = case when $3::boolean then 'done' when $8::boolean or (not $7::boolean and attempts >= $6::integer) then 'failed' else 'pending' end,
     attempts = greatest(0,attempts-case when $7::boolean then 1 else 0 end),
     available_at = clock_timestamp() + make_interval(secs => $4::integer),
     completed_at = case when $3::boolean then clock_timestamp() else null end,
     claim_token = null, leased_until = null, last_code = $5,
     updated_at = clock_timestamp()
     where key = $1 and claim_token = $2::uuid and status = 'running'`,
-  [job.key, job.claimToken, outcome.ok, outcome.retryAfterSeconds ?? 0, outcome.code, MARKET_COLLECTION_POLICY.maximumAttempts, outcome.deferred ?? false]);
+  [job.key, job.claimToken, outcome.ok, outcome.retryAfterSeconds ?? 0, outcome.code, MARKET_COLLECTION_POLICY.maximumAttempts, outcome.deferred ?? false, outcome.terminal ?? false]);
 }
 
 /** Admin worker summary only: no ticker, account, owner or credential material. */
@@ -122,9 +122,9 @@ const ENQUEUE_SQL = `with input as materialized (
   select key,kind,ticker,market,currency,"startDate","endDate" from input where (select ok from capacity)
   on conflict (key) do update set request_count = case when market_collection_jobs.status in ('pending','running') then market_collection_jobs.request_count + 1 else 1 end,
     ticker = case when market_collection_jobs.kind='fx' and market_collection_jobs.status in ('pending','failed') and market_collection_jobs.attempts>0 then excluded.ticker else market_collection_jobs.ticker end,
-    status = case when market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 'pending' else market_collection_jobs.status end,
-    enqueued_at = case when market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then now() else market_collection_jobs.enqueued_at end,
-    attempts = case when market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 0 else market_collection_jobs.attempts end
+    status = case when market_collection_jobs.last_code is distinct from 'paired_history_conflict' and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 'pending' else market_collection_jobs.status end,
+    enqueued_at = case when market_collection_jobs.last_code is distinct from 'paired_history_conflict' and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then now() else market_collection_jobs.enqueued_at end,
+    attempts = case when market_collection_jobs.last_code is distinct from 'paired_history_conflict' and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 0 else market_collection_jobs.attempts end
   returning key
 ) select count(*)::integer as accepted_count from written`;
 

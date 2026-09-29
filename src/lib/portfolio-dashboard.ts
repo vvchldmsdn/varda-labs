@@ -414,10 +414,9 @@ export async function getPortfolioDashboard(
     holdings.filter((holding) => !holding.movementEligible),
     (holding) => holding.valueKrw,
   );
-  const scopePreviousTotalKrw =
-    movement.ready && movement.changeKrw !== null
-      ? totalValueKrw - movement.changeKrw - movement.tradeFlowKrw
-      : null;
+  // Compare the exact movement-eligible set, never add today's manual value
+  // to fabricate yesterday's whole-portfolio value.
+  const scopePreviousTotalKrw = movement.ready ? movement.previousTotalKrw : null;
   const scopeTodayReturnPct = percentOrNull(
     movement.changeKrw,
     scopePreviousTotalKrw,
@@ -532,7 +531,7 @@ export async function getPortfolioDashboard(
       priceChangeKrw: movement.priceChangeKrw,
       fxChangeKrw: movement.fxChangeKrw,
       scopePreviousTotalKrw,
-      scopeCurrentTotalKrw: movement.ready ? totalValueKrw : null,
+      scopeCurrentTotalKrw: movement.ready && movement.changeKrw !== null ? movement.previousTotalKrw + movement.changeKrw + movement.tradeFlowKrw : null,
       movementExcludedCurrentValueKrw,
       contributionRows: movement.contributionRows,
       exclusions: movement.exclusions,

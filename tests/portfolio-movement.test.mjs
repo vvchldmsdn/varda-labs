@@ -879,3 +879,9 @@ describe("portfolio movement builder", () => {
     assert.equal(result.changeKrw, -50);
   });
 });
+
+it("partial ready coverage excludes a stale baseline from the comparable denominator",()=>{
+ const holdings=[holding({id:'a',legacyBase44Id:null,ticker:'A',valueKrw:950}),holding({id:'b',legacyBase44Id:null,ticker:'B',valueKrw:950}),holding({id:'c',legacyBase44Id:null,ticker:'C',quantity:1,valueKrw:100,currentPrice:100,priceFetchedAt:'2026-07-01T00:00:00Z'})];
+ const rows=[position({id:'sa',assetId:'a',legacyAssetId:null,ticker:'A'}),position({id:'sb',assetId:'b',legacyAssetId:null,ticker:'B'}),position({id:'sc',assetId:'c',legacyAssetId:null,ticker:'C',marketValueKrw:100})];
+ const r=buildDaily({holdings,positionRows:rows});assert.equal(r.ready,true);assert.equal(r.previousTotalKrw,2000);assert.equal(r.changeKrw,-100);assert.equal(r.returnPct,-5);assert.ok(r.coverage.snapshotCoveragePct<100);
+});

@@ -256,6 +256,22 @@ describe("dashboard query demand and independent market reads", () => {
     assert.equal(home.totalValueKrw, 1_442_000);
   });
 
+  it("uses only the comparable holdings as Today denominator without inventing a manual baseline", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-08T15:20:00Z") });
+    const manual={...baseAsset,id:otherAssetId,ticker:null,name:"Manual",market:"kr",currency:"KRW",assetType:"commodity",quantity:"1",currentPrice:"9000000"};
+    const f=await fixture({assetRows:[baseAsset,manual],eventRows:[],
+      baselineRows:[{id:"snapshot",snapshotDate:"2026-09-08",assetId,account:"brokerage",ticker:"QQQ",assetType:"etf",currency:"USD",quantity:"10",unitPrice:"100",marketValueKrw:"1000000",fxRate:"1000"}],
+      liveRows:[{ticker:"QQQ",market:"us",currency:"USD",price:"103",status:"ok",quoteType:"live",fetchedAt:new Date("2026-09-08T15:19:30Z"),priceAsOf:new Date("2026-09-08T15:19:00Z")}]
+    });
+    const home=await f.model.getPortfolioDashboard({analysisScopes:[scope],scope,tenantContext});
+    assert.equal(home.todayMovement.ready,true);
+    assert.equal(home.totalValueKrw,10442000);
+    assert.equal(home.todayMovement.scopePreviousTotalKrw,1000000);
+    assert.equal(home.todayMovement.scopeCurrentTotalKrw,1442000);
+    assert.equal(home.todayMovement.returnPct,44.2);
+    assert.equal(home.dataHealth.movementExcludedAssetCount,1);
+  });
+
   it("starts quote reads after assets even while settings and then the ledger remain pending", async () => {
     const settingsGate = deferred();
     const eventsGate = deferred();
@@ -397,10 +413,12 @@ it("executes Dashboard baseline SQL without bridging a recovered trade while pre
     const execute = async request => (await pg.query(`select daily_position_snapshots.id from daily_position_snapshots
       inner join accounts on daily_position_snapshots.account_id=accounts.id where ${request.predicate.sql}
       order by daily_position_snapshots.id`,request.predicate.params)).rows.map(row=>row.id);
-    assert.deepEqual(await execute(baseline), []);
+    assert.deepEqual(await execute(baseline), ["old-isa"]);
     assert.deepEqual(await execute(history), ["old-brokerage","old-isa"]);
     await pg.query("insert into daily_position_snapshots values('corrected',$1,$2,'brokerage',$3,'2026-09-08',false,'test','2026-09-08T03:00:00Z','2026-09-08T03:00:00Z')",[ownerId,accountId,assetId]);
-    assert.deepEqual(await execute(baseline), ["corrected"]);
+    assert.deepEqual(await execute(baseline), ["corrected","old-isa"]);
     assert.deepEqual(await execute(history), ["corrected","old-brokerage","old-isa"]);
+    await pg.query("insert into daily_position_snapshots values('foreign-owner','ffffffff-ffff-4fff-8fff-ffffffffffff',$1,'isa',$2,'2026-09-08',false,'test',now(),now())",[otherAccountId,otherAssetId]);
+    assert.deepEqual(await execute(baseline), ["corrected","old-isa"]);
   } finally { await pg.close(); }
 });

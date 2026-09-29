@@ -177,6 +177,7 @@ export async function runKisHistoryCacheSync(options: {
           conflictCount: writeSummary.conflictCount,
           failureCodes: providerDiagnostics.failureCodes,
           writeReasons: countWriteReasons(writeSummary.results),
+          writeResults: writeSummary.results,
           phase: "completed",
         },
       })

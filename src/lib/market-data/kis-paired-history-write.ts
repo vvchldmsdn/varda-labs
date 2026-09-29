@@ -19,7 +19,7 @@ export async function writeKisPairedHistory(query:Query,claim:KisHistoryClaim,ro
  }
  const result=await query(KIS_PAIRED_HISTORY_WRITE_SQL,[claim.key,claim.claimToken,JSON.stringify(rows)]);
  const written=Number(result[0]?.written??0),claimed=Number(result[0]?.claimed??0),inserted=Number(result[0]?.inserted??0);
- return {insertedCount:inserted,updatedCount:written-inserted,skippedCount:0,failedCount:claimed?0:rows.length,conflictCount:claimed?rows.length-written:0,results:[]};
+ return {insertedCount:inserted,updatedCount:written-inserted,skippedCount:0,failedCount:claimed?0:rows.length,conflictCount:claimed?rows.length-written:0,results:(result[0]?.diagnostics??[]) as Array<{reason:string;existing:unknown;candidate:unknown}>};
 }
 export const KIS_PAIRED_HISTORY_WRITE_SQL = `
 with claim as materialized (
@@ -47,5 +47,18 @@ with claim as materialized (
  and (existing.adjusted_close_price is null or (
  existing.adjusted_close_basis=excluded.adjusted_close_basis and existing.adjusted_close_provider=excluded.adjusted_close_provider
  and existing.adjusted_close_source=excluded.adjusted_close_source and existing.adjusted_close_fetched_at<=excluded.adjusted_close_fetched_at))
- returning id,(xmax=0) as inserted
-) select (select count(*) from claim)::int claimed,(select count(*) from written)::int written,(select count(*) from written where inserted)::int inserted`;
+ returning id,ticker,market,currency,date,(xmax=0) as inserted
+), diagnostics as materialized (
+ select jsonb_build_object('reason',case when e.id is null then 'claim_or_window_rejected'
+ when e.close_price<>i."closePrice" then 'raw_price_mismatch'
+ when e.provider_symbol is distinct from i."providerSymbol" or e.provider_exchange is distinct from i."providerExchange" then 'provider_identity_mismatch'
+ else 'protected_existing_provenance' end,
+ 'existing',jsonb_build_object('closePrice',e.close_price,'source',e.source,'providerSymbol',e.provider_symbol,'providerExchange',e.provider_exchange,'adjustedClosePrice',e.adjusted_close_price,'fetchedAt',e.fetched_at),'candidate',to_jsonb(i)) as detail
+ from input i left join asset_price_snapshots e on e.ticker=i.ticker and e.market=i.market and e.currency=i.currency and e.date=i."priceDate"
+ where exists(select 1 from claim) and not exists(select 1 from written w where w.ticker=i.ticker and w.market=i.market and w.currency=i.currency and w.date=i."priceDate")
+), evidence as (
+ insert into market_data_sync_runs(job_type,mode,status,started_at,finished_at,source,requested_count,failed_count,metadata_json)
+ select 'kis_paired_history_conflict','history','failed',clock_timestamp(),clock_timestamp(),'kis',
+ (select count(*) from input),count(*),jsonb_build_object('claimKey',$1::text,'comparisons',jsonb_agg(detail))
+ from diagnostics having count(*)>0 returning id
+) select coalesce((select jsonb_agg(detail) from diagnostics),'[]'::jsonb) diagnostics,(select count(*) from evidence) evidence_count,(select count(*) from claim)::int claimed,(select count(*) from written)::int written,(select count(*) from written where inserted)::int inserted`;

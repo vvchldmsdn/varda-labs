@@ -36,6 +36,7 @@ export async function drainMarketCollection() {
       while (processed < MARKET_COLLECTION_POLICY.maximumWorkerJobs && Date.now() < deadline) {
         const job = await claimMarketCollection();
         if (!job) break;
+        let terminal = false, failureCode = "provider_unavailable";
         let ok = false, cacheHit = false, deferred = false, retryAfterSeconds = collectionRetrySeconds(job.attempts);
         try {
           if (job.kind === "live") {
@@ -54,6 +55,7 @@ export async function drainMarketCollection() {
               startDate: job.startDate, endDate: job.endDate, provider,
               pairedClaim: job.key.startsWith("kis:history:paired_v1:") ? job : undefined });
             ok = result.failedCount === 0 && result.fetchedRowCount > 0;
+            if (result.conflictCount > 0) { terminal = true; failureCode = "paired_history_conflict"; }
           } else if (job.kind === "fx") {
             const now = new Date();
             cacheHit = await fxCacheIsFresh();
@@ -71,7 +73,7 @@ export async function drainMarketCollection() {
           const wait = typeof error === "object" && error !== null && "retryAfterSeconds" in error ? Number(error.retryAfterSeconds) : 0;
           if (Number.isFinite(wait) && wait > 0) retryAfterSeconds = Math.max(retryAfterSeconds, Math.min(3600, Math.ceil(wait)));
         }
-        await finishMarketCollection(job, { ok, deferred, code: ok ? cacheHit ? "cache_fresh" : "collected" : deferred ? "provider_budget_wait" : "provider_unavailable", retryAfterSeconds: ok ? 0 : retryAfterSeconds });
+        await finishMarketCollection(job, { ok, deferred, terminal, code: ok ? cacheHit ? "cache_fresh" : "collected" : deferred ? "provider_budget_wait" : failureCode, retryAfterSeconds: ok ? 0 : retryAfterSeconds });
         processed++; if (!ok) failed++; if (cacheHit) cacheHits++;
         // One failed provider operation yields fairly instead of probing every queued symbol.
         if (!ok) break;

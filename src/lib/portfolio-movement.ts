@@ -451,12 +451,14 @@ export function buildDailyPositionMovement({
     });
   }
 
+  let comparablePreviousTotalKrw = matchedSnapshotValue;
   let changeKrw = sumBy([...contributions.values()], (row) => row.changeKrw);
   for (const row of accountRows) {
     if (matchedSnapshotIds.has(row.id)) continue;
     if (currentHoldingSnapshotIds.has(row.id)) continue;
     const previousValueKrw = snapshotMarketValue(row);
     if (previousValueKrw <= 0) continue;
+    comparablePreviousTotalKrw += previousValueKrw;
     const removedTrades = tradeIndex.bySnapshot.get(row.id) ?? [];
     const removedTradeFlowKrw = sumTradeFlows(removedTrades);
     changeKrw += -previousValueKrw - removedTradeFlowKrw;
@@ -475,9 +477,9 @@ export function buildDailyPositionMovement({
     ready: true,
     source: "daily_position_snapshot",
     reason: null,
-    previousTotalKrw: snapshotTotalValue,
+    previousTotalKrw: comparablePreviousTotalKrw,
     changeKrw,
-    returnPct: percentOrNull(changeKrw, snapshotTotalValue),
+    returnPct: percentOrNull(changeKrw, comparablePreviousTotalKrw),
     tradeFlowKrw,
     priceChangeKrw: completeAttribution ? priceChangeKrw : null,
     fxChangeKrw: completeAttribution ? fxChangeKrw : null,

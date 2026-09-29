@@ -51,7 +51,13 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
         market: normalizedMarket,
         currency: normalizedCurrency,
         ticker: normalizedTicker,
-        latestSourceDate: sql<string | null>`max(${assetPriceSnapshots.priceDate})`,
+        // A newer raw-only close must not displace the latest usable adjusted research window.
+        latestSourceDate: sql<string | null>`max(${assetPriceSnapshots.priceDate}) filter (where
+          ${assetPriceSnapshots.adjustedClosePrice} > 0
+          and ${assetPriceSnapshots.adjustedCloseBasis}='provider_adjusted_close_v1'
+          and ${assetPriceSnapshots.adjustedCloseProvider}='kis'
+          and right(${assetPriceSnapshots.adjustedCloseSource},12)=':adjusted_v1'
+          and ${assetPriceSnapshots.adjustedCloseFetchedAt} is not null)`,
         providerBindingCount: sql<number>`count(distinct (upper(trim(${assetPriceSnapshots.providerSymbol})) || '|' || upper(trim(${assetPriceSnapshots.providerExchange}))))`,
       })
       .from(assetPriceSnapshots)

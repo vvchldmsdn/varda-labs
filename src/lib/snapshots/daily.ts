@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveStoredManualCutoffCarry } from "./manual-cutoff-carry";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 import { readSnapshotCutoffObservations } from "@/db/queries/snapshot-cutoff-observations";
 
@@ -401,6 +402,8 @@ type PriceSelection = {
   expectedCloseDate: string | null;
   basis: "cutoff_live" | "close" | "manual_current";
   fromCloseSnapshot: boolean;
+  manualCarryCapturedAt?: string;
+  manualCarrySnapshotId?: string;
   observedAt?: string | null;
   fetchedAt?: string | null;
   quoteType?: string | null;
@@ -1337,6 +1340,7 @@ function computeAccountSnapshot({
       description: [
         `source=${provenance.source}`,
         `price_basis=${selectedPrice.basis}`,
+        ...(selectedPrice.manualCarrySnapshotId?[`manual_carry_snapshot=${selectedPrice.manualCarrySnapshotId}`,`manual_carry_captured_at=${selectedPrice.manualCarryCapturedAt}`]:[]),
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
         `close_source=${selectedClose.source}${selectedClose.referenceDate ? `@${selectedClose.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
@@ -1930,7 +1934,7 @@ async function buildCloseContext({
           snapshotDate,
           assets: targetAssets,
         })
-      : new Map<string, PriceSelection>();
+      : useCutoffValuation ? await loadStoredManualCutoffSelections(ownerUserId,snapshotDate,targetAssets,cycleEndAt) : new Map<string, PriceSelection>();
   const manualCarryMissing =
     manualValuation === "latest_prior_generated_snapshot_carry"
       ? targetAssets
@@ -2050,6 +2054,7 @@ function summarizeCutoffValuation({
 
 function hasRecordedManualValuation(asset: AssetRow, selected: PriceSelection | undefined, cutoffAt: Date) {
   if (!selected || selected.basis !== "manual_current") return false;
+  if(selected.manualCarryCapturedAt)return new Date(selected.manualCarryCapturedAt)<cutoffAt;
   const quantity = toNumber(asset.quantity) ?? 0;
   // Amount-only legacy holdings retain the input timestamp and amount; they
   // neither acquire invented shares nor require a market quote for that amount.
@@ -2058,6 +2063,22 @@ function hasRecordedManualValuation(asset: AssetRow, selected: PriceSelection | 
     : isoTimestamp(asset.priceAsOf);
   return recordedAt !== null && new Date(recordedAt) < cutoffAt &&
     (quantity === 0 || selected.price > 0);
+}
+
+async function loadStoredManualCutoffSelections(ownerUserId:string,snapshotDate:string,targetAssets:AssetRow[],cutoff:Date){
+ const selections=new Map<string,PriceSelection>();
+ const manual=targetAssets.filter(a=>!normalizeTicker(a.ticker)&&!a.priceAsOf);
+ if(!manual.length)return selections;
+ const rows=await db.select().from(dailyPositionSnapshots).where(and(
+  eq(dailyPositionSnapshots.canonicalOwnerUserId,ownerUserId),inArray(dailyPositionSnapshots.assetId,manual.map(a=>a.id)),
+  lt(dailyPositionSnapshots.snapshotDate,snapshotDate),eq(dailyPositionSnapshots.isSample,false),
+  brokerRecoverySnapshotPredicate("daily_position_snapshots"),
+ )).orderBy(desc(dailyPositionSnapshots.snapshotDate),desc(dailyPositionSnapshots.capturedAt));
+ for(const row of rows){const asset=manual.find(a=>a.id===row.assetId);if(!asset||selections.has(asset.id))continue;
+  const carry=resolveStoredManualCutoffCarry(asset,row,snapshotDate,cutoff);
+  if(carry)selections.set(asset.id,{...carry,row:null,calendarReferenceDate:null,expectedCloseDate:null,basis:"manual_current",fromCloseSnapshot:false,quoteType:"stored_manual_carry"});
+ }
+ return selections;
 }
 
 async function loadManualCarrySelections({
