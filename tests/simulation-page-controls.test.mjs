@@ -105,7 +105,7 @@ test("simulation page returns authenticated controls while owner research is pen
   const ports = {
     "@/lib/server/simulation-path-details": { registerTenantSimulationPath: () => { throw new Error("detail registration must wait for the execution"); } },
     "@/lib/simulation-path-snapshot": { bootstrapPathSnapshot: () => { throw new Error("snapshot must wait for the execution"); }, economicPathSnapshot: () => { throw new Error("snapshot must wait for the execution"); } },
-    "@/db/queries/native-portfolio-ledger": { hasNativeLedger: async () => false },
+    "@/db/queries/native-portfolio-ledger": { requiresNativePortfolioSurface: async () => false },
     "@/db/queries/currency-tracked-portfolio": { getTrackedCurrencyEvidence: async () => { throw new Error("unexpected native read"); } },
     "@/db/queries/currency-research": { getCurrencyResearchInput: async () => { throw new Error("unexpected native research"); } },
     "@/components/currency-portfolio-surface": { CurrencyPortfolioSurface: () => null },

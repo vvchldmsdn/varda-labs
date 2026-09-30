@@ -268,38 +268,54 @@ async function recoveryQueryFixture() {
   await pg.exec(`
     create role event_query_test;
     create table accounts(id uuid primary key, canonical_owner_user_id uuid, code text, name text, sort_order integer, is_active boolean);
-    create table assets(id uuid primary key, canonical_owner_user_id uuid, account_id uuid, account text, archived_at timestamptz);
+    create table assets(id uuid primary key, canonical_owner_user_id uuid, account_id uuid, account text, archived_at timestamptz,
+      name text, ticker text, legacy_base44_id text);
     create table event_ledger_entries(
       id uuid primary key, canonical_owner_user_id uuid, account_id uuid, account text, legacy_base44_id text,
       is_sample boolean default false, event_date date, event_type text, source text, recorded_at timestamptz, rule_version text,
       asset_id uuid, legacy_asset_id text, ticker text, asset_name text, group_name text, corrects_event_id uuid,
       legacy_corrects_event_id text, amount_krw numeric, quantity_delta numeric, price numeric, fx_rate numeric,
-      broker_recovery_data jsonb, created_at timestamptz default now()
+      broker_recovery_data jsonb, created_at timestamptz default now(),
+      native_data jsonb, native_sequence integer, native_operation_id uuid
     );
-    grant select on accounts, assets, event_ledger_entries to event_query_test;
-    ${["accounts", "assets", "event_ledger_entries"].map(table => `
+    create table native_ledger_revisions(id uuid primary key,canonical_owner_user_id uuid,account_id uuid,
+      marker_sequence integer,effective_entries jsonb,recorded_at timestamptz);
+    grant select on accounts, assets, event_ledger_entries, native_ledger_revisions to event_query_test;
+    ${["accounts", "assets", "event_ledger_entries", "native_ledger_revisions"].map(table => `
       alter table ${table} enable row level security;
       create policy owner_read on ${table} for select to event_query_test
         using(canonical_owner_user_id = current_setting('app.current_user_id', true)::uuid);
     `).join("\n")}
   `);
+  // Execute the real revision-aware view definition, retaining invoker RLS.
+  // Only the surrounding compact fixture DDL is synthesized for this read test.
+  const effectiveViewSql = read("drizzle/0059_trade_daily_reliability.sql").match(/CREATE VIEW effective_native_ledger_entries[\s\S]*?;/)?.[0];
+  assert.ok(effectiveViewSql, "the actual migration must supply the effective ledger view");
+  await pg.exec(effectiveViewSql);
+  await pg.exec("grant select on effective_native_ledger_entries to event_query_test");
   for (const [id, owner, code] of [[uuid(1), uuid(101), "brokerage"], [uuid(2), uuid(101), "isa"], [uuid(3), uuid(102), "brokerage"]]) {
     await pg.query("insert into accounts values($1,$2,$3,$3,10,true)", [id, owner, code]);
   }
-  const [query] = await importWithPorts(["src/db/queries/tenant-events.ts"], {
-    "@/db/tenant-transaction-context": {
-      runTenantReadTransaction: (owner, build) => pg.transaction(async tx => {
+  const tenantClient = {
+    transaction: build => {
+      const commands = build({ query: (sql, parameters = []) => ({ sql, parameters }) });
+      return pg.transaction(async tx => {
         await tx.exec("set local role event_query_test");
-        await tx.query("select set_config('app.current_user_id',$1,true)", [owner]);
-        return Promise.all(build({ query: async (sql, parameters) => (await tx.query(sql, parameters)).rows }));
-      }),
+        const results = [];
+        for (const { sql, parameters } of commands) results.push((await tx.query(sql, parameters)).rows);
+        return results;
+      });
     },
+  };
+  const [query] = await importWithPorts(["src/db/queries/tenant-events.ts"], {
+    "@/db/tenant-client": { getTenantSqlClient: () => tenantClient },
+    "./tenant-client": { getTenantSqlClient: () => tenantClient },
   });
   return {
     close: () => pg.close(),
     read: (owner, scope = "brokerage") => query.getReadOnlyTenantEvents({ tenantContext: { ownerUserId: owner }, scope }),
     asset: ({ id, account, owner, archived = false }) => pg.query(
-      "insert into assets values($1,$2,$3,(select code from accounts where id=$3),$4)",
+      "insert into assets(id,canonical_owner_user_id,account_id,account,archived_at) values($1,$2,$3,(select code from accounts where id=$3),$4)",
       [id, owner, account, archived ? "2026-07-03T00:00:00Z" : null],
     ),
     event: ({ id, asset = null, account = uuid(1), owner = uuid(101), source = "broker_recovery_v1", type = "sell", ticker, legacyAsset = null, amount = null, price = null, quantity = "-0.125", sample = false }) => pg.query(`

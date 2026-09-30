@@ -1,5 +1,6 @@
+import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { sql, and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accounts, appUsers } from "@/db/schema";
 import { readNativeCutoffEvidence } from "@/db/queries/native-cutoff-evidence";
@@ -25,7 +26,7 @@ export async function runNativeDailySnapshotJob({ dryRun = true, now = new Date(
   }
   const targets = await db.select({ accountId: accounts.id, code: accounts.code, name: accounts.name, ownerUserId: appUsers.id, role: appUsers.role })
     .from(accounts).innerJoin(appUsers, eq(accounts.canonicalOwnerUserId, appUsers.id))
-    .where(and(eq(accounts.isActive,true),isNotNull(accounts.nativeState), eq(appUsers.status, "active"), inArray(appUsers.role, ["user", "admin"])))
+    .where(and(eq(accounts.isActive,true),sql.raw(`not ${holdingsPortfolioSql("accounts")}`), eq(appUsers.status, "active"), inArray(appUsers.role, ["user", "admin"])))
     .orderBy(asc(appUsers.id), asc(accounts.id));
   const owners = Map.groupBy(targets, row => row.ownerUserId);
   const results = await mapWithConcurrency([...owners.values()], 2, async group => {

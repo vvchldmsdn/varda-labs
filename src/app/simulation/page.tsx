@@ -3,7 +3,7 @@ import { registerTenantSimulationPath } from "@/lib/server/simulation-path-detai
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { bootstrapPathSnapshot, economicPathSnapshot } from "@/lib/simulation-path-snapshot";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
-import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
 import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 import { admitNativeKrwEconomic } from "@/lib/native-economic-admission";
 import { getOwnedCurrencyResearchInput } from "@/db/queries/currency-research";
@@ -90,7 +90,7 @@ export default async function SimulationPage({
   const pathModel = resolveSimulationPathModel(params.model);
   const model = buildSimulationPageControls({ endServiceDate: params.end, horizon: params.horizon, kodexWeight: params.kodexWeight, now });
   let admittedNativeResearch: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch> | undefined;
-  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+  if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
     const reporting = params.currency === "USD" ? "USD" : "KRW";
     // The economic model is calibrated to KRW returns. Never relabel it or
     // silently substitute a historical model when the user selected economic.

@@ -1,4 +1,6 @@
+import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
+import { loadNativeLegacyTrades } from "@/db/queries/native-legacy-trades";
 import { resolveStoredManualCutoffCarry } from "./manual-cutoff-carry";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 import { readSnapshotCutoffObservations } from "@/db/queries/snapshot-cutoff-observations";
@@ -53,6 +55,7 @@ import { resolveOperationalClosePrice } from "@/lib/market-data/asset-price-cons
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
+  getAssetReturnMetrics,
   summarizeRealizedReturnForAccount,
   type AccountRealizedReturnSummary,
   type ReturnMetricsSummary,
@@ -604,7 +607,9 @@ export async function runDailySnapshot(
       { snapshotDate, eventIds: changedEventsAfterCutoff }, 409,
     );
   }
-  const returnMetrics = buildReturnMetricsSummary(eventRows, investmentAssetRows, fx.usdKrw ?? 0, {
+  const nativeTrades = eventRows.some(row => row.nativeData != null) ? await loadNativeLegacyTrades(options.tenantContext) : [];
+  const calculationEvents = [...eventRows.filter(row => row.nativeData == null), ...nativeTrades.filter(row => row.eventDate <= snapshotDate)];
+  const returnMetrics = buildReturnMetricsSummary(calculationEvents, investmentAssetRows, fx.usdKrw ?? 0, {
     asOfDate: snapshotDate,
   });
   const realizedReturn = buildRealizedReturnRunSummary(
@@ -1316,7 +1321,8 @@ function computeAccountSnapshot({
       fxResolution.ok && fxResolution.requiresFx
         ? movement?.fxChangeKrw ?? null
         : unchangedHolding ? 0 : null;
-    const costKrw = snapshotPositionCostBasisKrw(asset, fx.usdKrw ?? 0);
+    const assetReturnMetrics = getAssetReturnMetrics(returnMetrics, asset, fx.usdKrw ?? 0);
+    const costKrw = assetReturnMetrics.nativeCostBasis ? assetReturnMetrics.costBasisKrw : snapshotPositionCostBasisKrw(asset, fx.usdKrw ?? 0);
     const pnlKrw = costKrw === null ? null : marketValueKrw - costKrw;
     const exposureType = getFxExposureType(asset);
 
@@ -1369,7 +1375,7 @@ function computeAccountSnapshot({
         `fx_timestamp_basis=${fx.timestampBasis ?? "unknown"}`,
         `fx_fetched_at=${fx.fetchedAt ?? "unknown"}`,
         `fx_rate_kind=${fx.rateKind ?? "unknown"}`,
-        `cost_basis_source=${costKrw === null ? "unknown" : "asset_average_cost"}`,
+        `cost_basis_source=${costKrw === null ? "unknown" : assetReturnMetrics.nativeCostBasis ? "native_remaining_cost" : "asset_average_cost"}`,
         ...(prior && !unchangedHolding ? ["movement_attribution=holdings_change_without_trade_bridge"] : []),
         ...(fractionalKrwValue > 0 ? ["fractional_value_basis=entered_krw_amount", "fractional_quantity_basis=unknown"] : []),
         ...provenance.descriptionTags,
@@ -1379,7 +1385,9 @@ function computeAccountSnapshot({
       quantity: decimal(quantity, 8),
       totalQuantity: decimal(totalQuantity, 8),
       estimatedFractionalQuantity: decimal(estimatedFractionalQuantity, 8),
-      avgCost: decimal(toNumber(asset.averageCost)),
+      avgCost: assetReturnMetrics.nativeCostBasis
+        ? asset.currency === "KRW" && costKrw !== null && quantity > 0 ? decimal(costKrw / quantity) : null
+        : decimal(toNumber(asset.averageCost)),
       currentPrice: decimal(valuationPrice),
       closePrice: decimal(officialClosePrice),
       unitPrice: decimal(valuationPrice),
@@ -1590,7 +1598,7 @@ async function applySnapshotWrites(
       then 1 else 0 end)`,[owner,snapshotDate,[...accountBuilds.filter(b=>b.status==="planned"&&b.portfolio).map(b=>b.account),...(allBuild?.status==="planned"&&allBuild.portfolio?["all"]:[])],SNAPSHOT_SOURCE]),
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,quantity numeric,"updatedAt" timestamptz)), actual as (
       select h.id,h.quantity,h.updated_at from assets h join accounts a on a.id=h.account_id
-      where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is null and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
+      where a.canonical_owner_user_id=$1::uuid and a.is_active and ${holdingsPortfolioSql("a")} and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
     ) select 1/(case when not exists(select 1 from expected e full join actual a on a.id=e.id where e.id is null or a.id is null or a.quantity is distinct from e.quantity or a.updated_at is distinct from e."updatedAt") then 1 else 0 end)`,[owner,JSON.stringify(expectedAssets.map(a=>({id:a.id,quantity:a.quantity,updatedAt:a.revisionToken}))),accountBuilds.map(b=>b.account),cutoff.toISOString()]),
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,"updatedAt" timestamptz)), actual as (
       select e.id,e.updated_at from event_ledger_entries e join accounts a on a.id=e.account_id and a.code=e.account

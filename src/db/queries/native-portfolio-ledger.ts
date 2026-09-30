@@ -1,4 +1,5 @@
 import "server-only";
+import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import { randomUUID } from "node:crypto";
 import { cache } from "react";
 import { getTenantSqlClient } from "@/db/tenant-client";
@@ -47,6 +48,18 @@ export const hasNativeLedger = cache(async (tenant: TenantContext, scope?: Portf
   const [, rows] = await getTenantSqlClient().transaction(tx => [
     tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
     tx.query(`select exists(select 1 from accounts a where a.canonical_owner_user_id=$1::uuid and a.native_state is not null and ($2::uuid is null or a.id=$2::uuid)
+      ${group ? `and (exists(select 1 from portfolio_group_account_memberships m where m.account_id=a.id and m.canonical_owner_user_id=$1::uuid and m.portfolio_group_id=$3::uuid and m.valid_from <= $4::date and (m.valid_to is null or m.valid_to > $4::date))
+        or exists(select 1 from assets h join portfolio_group_asset_memberships m on m.asset_id=h.id and m.canonical_owner_user_id=$1::uuid where h.account_id=a.id and h.canonical_owner_user_id=$1::uuid and m.portfolio_group_id=$3::uuid and m.valid_from <= $4::date and (m.valid_to is null or m.valid_to > $4::date)))` : ""}) as present`, [tenant.ownerUserId, scope?.kind === "account" ? scope.accountId : null, ...(group ? [scope.portfolioGroupId, resolveSnapshotCycle(new Date()).snapshotDate] : [])]),
+  ], { readOnly: true });
+  return rows[0]?.present === true;
+});
+
+/** Existing holdings portfolios keep their KRW presentation after recording trades. */
+export const requiresNativePortfolioSurface = cache(async (tenant: TenantContext, scope?: PortfolioAnalysisScope) => {
+  const group = scope?.kind === "portfolio_group";
+  const [, rows] = await getTenantSqlClient().transaction(tx => [
+    tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
+    tx.query(`select exists(select 1 from accounts a where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is not null and not ${holdingsPortfolioSql("a")} and ($2::uuid is null or a.id=$2::uuid)
       ${group ? `and (exists(select 1 from portfolio_group_account_memberships m where m.account_id=a.id and m.canonical_owner_user_id=$1::uuid and m.portfolio_group_id=$3::uuid and m.valid_from <= $4::date and (m.valid_to is null or m.valid_to > $4::date))
         or exists(select 1 from assets h join portfolio_group_asset_memberships m on m.asset_id=h.id and m.canonical_owner_user_id=$1::uuid where h.account_id=a.id and h.canonical_owner_user_id=$1::uuid and m.portfolio_group_id=$3::uuid and m.valid_from <= $4::date and (m.valid_to is null or m.valid_to > $4::date)))` : ""}) as present`, [tenant.ownerUserId, scope?.kind === "account" ? scope.accountId : null, ...(group ? [scope.portfolioGroupId, resolveSnapshotCycle(new Date()).snapshotDate] : [])]),
   ], { readOnly: true });

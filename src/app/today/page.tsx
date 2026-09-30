@@ -2,7 +2,7 @@ import { getOwnedLegacySnapshotProgress } from "@/db/queries/snapshot-progress";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
-import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
 import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 
 
@@ -82,7 +82,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     );
   }
 
-  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+  if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
     const reporting = params.currency === "USD" ? "USD" : "KRW";
     const selectedScope = scopeContext.resolution.scope;
     const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);

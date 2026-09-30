@@ -1,4 +1,5 @@
 import "server-only";
+import { loadNativeLegacyTrades } from "./native-legacy-trades";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import {
@@ -322,7 +323,11 @@ async function loadDashboardContextSources({
     recentPositionRows,
     historyAssetIds,
     recentPortfolioRows,
-    eventRows,
+    eventRows: [
+      ...eventRows.filter(row => row.nativeData == null),
+      ...(allAccountRows.some(row => row.nativeState != null) ? await loadNativeLegacyTrades(tenantContext) : [])
+        .filter(row => row.eventDate <= serviceDate && row.accountId && (wholeAccountIds.includes(row.accountId) || (row.assetId && directAssetIds.has(row.assetId)))),
+    ],
     unmatchedSnapshotCountRows,
   };
 }

@@ -1,3 +1,4 @@
+import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
 import { sqlClient } from "@/db/client";
 import {snapshotFence,snapshotDeadline} from "./write-context";
@@ -18,8 +19,8 @@ export async function discoverSnapshotWork(stage:"legacy"|"native", snapshotDate
    cross join generate_series($2::date-2,$2::date,interval '1 day') d
    left join lateral(select max(marker_sequence) revision from native_ledger_revisions where account_id=a.id and canonical_owner_user_id=u.id and affected_at<=(d::date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours') r on true
    where u.status='active' and u.role in('user','admin') and a.is_active
-    and (($1='native' and a.native_state is not null and (a.native_state->>'startedAt')::timestamptz<(d::date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours')
-     or ($1='legacy' and a.native_state is null and a.account_type<>'cash' and exists(select 1 from assets h where h.account_id=a.id and h.canonical_owner_user_id=u.id and h.archived_at is null and coalesce(h.asset_type,'etf') in('etf','stock','pension','commodity') and (h.quantity>0 or h.fractional_krw_value>0))))
+    and (($1='native' and (a.native_state is not null and not ${holdingsPortfolioSql("a")}) and (a.native_state->>'startedAt')::timestamptz<(d::date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours')
+     or ($1='legacy' and ${holdingsPortfolioSql("a")} and a.account_type<>'cash' and exists(select 1 from assets h where h.account_id=a.id and h.canonical_owner_user_id=u.id and h.archived_at is null and coalesce(h.asset_type,'etf') in('etf','stock','pension','commodity') and (h.quantity>0 or h.fractional_krw_value>0))))
    ), missing as materialized (
     select c.* from candidates c where not exists(select 1 from daily_snapshot_work w where w.account_id=c.account_id and w.snapshot_date=c.snapshot_date and w.stage=c.stage and w.revision=c.revision)
    ), inserted as (
@@ -35,7 +36,7 @@ export async function claimSnapshotWork(stage:"legacy"|"native", snapshotDate:st
     where stage=$1 and snapshot_date<=$2::date and status='running' and attempts>=4 and lease_until<clock_timestamp()`,[stage,snapshotDate]);
   const rows=await queueWrite(`with due as materialized (
     select w.id from daily_snapshot_work w join accounts a on a.id=w.account_id join app_users u on u.id=w.canonical_owner_user_id
-    where stage=$1 and snapshot_date<=$2::date and attempts<4 and a.is_active and u.status='active' and u.role in('user','admin') and (($1='native' and a.native_state is not null) or ($1='legacy' and a.native_state is null))
+    where stage=$1 and snapshot_date<=$2::date and attempts<4 and a.is_active and u.status='active' and u.role in('user','admin') and (($1='native' and (a.native_state is not null and not ${holdingsPortfolioSql("a")})) or ($1='legacy' and ${holdingsPortfolioSql("a")}))
      and w.status not in ('completed','blocked') and (w.status<>'running' or lease_until<clock_timestamp())
      and (next_attempt_at is null or next_attempt_at<=clock_timestamp())
      and revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=(w.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'),0)
@@ -71,7 +72,7 @@ export async function runSnapshotWork(stage:"legacy"|"native",snapshotDate:strin
     catch(error) { await finishSnapshotWork(work,isSnapshotLockContention(error) ? "deferred" : "failed",isSnapshotLockContention(error) ? "snapshot_lock_busy" : "snapshot_write_failed"); }
   }
   const rows=await sqlClient.query(`select w.status,count(*)::int as count,count(*) filter(where w.attempts>=4)::int as exhausted from daily_snapshot_work w join accounts a on a.id=w.account_id join app_users u on u.id=w.canonical_owner_user_id
-    where stage=$1 and snapshot_date<=$2::date and (snapshot_date >= $2::date-2 or w.status<>'completed') and a.is_active and u.status='active' and u.role in('user','admin') and (($1='native' and a.native_state is not null) or ($1='legacy' and a.native_state is null))
+    where stage=$1 and snapshot_date<=$2::date and (snapshot_date >= $2::date-2 or w.status<>'completed') and a.is_active and u.status='active' and u.role in('user','admin') and (($1='native' and (a.native_state is not null and not ${holdingsPortfolioSql("a")})) or ($1='legacy' and ${holdingsPortfolioSql("a")}))
     and w.revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=(w.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'),0)
     group by w.status`,[stage,snapshotDate]);
   const counts=Object.fromEntries(rows.map(r=>[String(r.status),Number(r.count)]));

@@ -25,6 +25,9 @@ export type PortfolioReturnAssetRow = {
 };
 
 export type PortfolioReturnEventRow = {
+  nativeProjection?: string;
+  nativeRemainingCostKrw?: string | null;
+  nativeCostBasisStatus?: "available" | "unavailable";
   id?: string;
   eventDate: string;
   eventType: string;
@@ -54,6 +57,7 @@ type AssetMaps = {
 };
 
 export type AssetReturnMetrics = {
+  nativeCostBasis?: boolean;
   assetKey: string;
   account: string;
   costBasisKrw: number | null;
@@ -141,6 +145,16 @@ export function buildReturnMetricsSummary(
     const account = portfolioEventAccount(event) ?? asset?.account ?? null;
     const quantity = eventTradeQuantity(event);
     const amountKrw = historyTradeAmountKrw(event, asset);
+    // A native trade changes quantity without rewriting the old asset average.
+    // Use only its remaining original cost lots, never that stale average/current FX.
+    if (assetKey && event.nativeProjection === "effective_native_trade_v1") {
+      const metrics = metricsByAssetKey.get(assetKey);
+      if (metrics) {
+        metrics.nativeCostBasis = true;
+        metrics.costBasisKrw = toNumber(event.nativeRemainingCostKrw);
+        metrics.missingCost = metrics.costBasisKrw === null;
+      }
+    }
 
     if (event.eventType === "buy") {
       if (!ledgerKey || amountKrw === null || amountKrw <= 0 || quantity <= 0) {
@@ -159,7 +173,7 @@ export function buildReturnMetricsSummary(
 
     const explicitMetrics = readExplicitTradeMetrics(event);
     const ledgerRow = ledgerKey && !incompleteLedgers.has(ledgerKey) ? runningLedger.get(ledgerKey) : undefined;
-    const disposedCostKrw =
+    const disposedCostKrw = event.nativeProjection === "effective_native_trade_v1" ? explicitMetrics.disposedCostKrw :
       explicitMetrics.disposedCostKrw ??
       estimateDisposedCostFromLedger(ledgerRow, quantity) ??
       estimateDisposedCostFromEvent(event, asset, quantity);
@@ -167,7 +181,7 @@ export function buildReturnMetricsSummary(
       disposedCostKrw !== null && amountKrw !== null && amountKrw > 0
         ? amountKrw - disposedCostKrw
         : parseRealizedPnl(event.memo);
-    const realizedPnlKrw =
+    const realizedPnlKrw = event.nativeProjection === "effective_native_trade_v1" ? explicitMetrics.realizedPnlKrw :
       explicitMetrics.realizedPnlKrw ?? fallbackRealizedPnlKrw;
     const realizedCostBasisKrw = disposedCostKrw;
     const missingCost = disposedCostKrw === null;
