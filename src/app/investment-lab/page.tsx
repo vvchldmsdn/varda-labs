@@ -1,6 +1,6 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
-import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
 import { getOwnedCurrencyResearchInput } from "@/db/queries/currency-research";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { Suspense, type ReactNode } from "react";
@@ -91,7 +91,7 @@ export default async function InvestmentLabPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+  if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
     const reporting = params.currency === "USD" ? "USD" : "KRW";
     const research = await getOwnedCurrencyResearchInput(resolution.tenantContext, selectedScope, reporting);
     return <CurrencyPortfolioSurface surface="lab" reporting={reporting} research={research} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;

@@ -40,6 +40,7 @@ async function fixture(withApi=false) {
   await pg.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);
   await pg.query("insert into accounts(id,canonical_owner_user_id,code,name) values($1,$4,'one','One'),($2,$4,'two','Two'),($3,$5,'foreign','Foreign')",[account,peer,foreign,owner,other]);
   await pg.query("insert into event_ledger_entries values($1,$2,'2026-08-01','legacy','base44_import',now(),null,'one',$3,null,'legacy-asset','Original','before','after',false,null,null,null)",[randomUUID(),owner,account]);
+  await pg.exec('alter table event_ledger_entries add column created_at timestamptz not null default now()');
   const legacy=(await pg.query("select * from event_ledger_entries where source='base44_import'")).rows;
   let beforeWrite=null;
   const batches=[];

@@ -393,3 +393,5 @@ import "./broker-history-reconstruction.test.mjs";
 import "./kis-paired-conflict-evidence.test.mjs";
 import "./manual-cutoff-carry.test.mjs";
 import "./simulation-adjusted-endpoint.test.mjs";
+
+import "./native-legacy-trade-projection.test.mjs";

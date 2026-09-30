@@ -1,4 +1,5 @@
 import "server-only";
+import { loadNativeLegacyTrades } from "./native-legacy-trades";
 
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import { HISTORY_EVENT_QUERY_LIMIT } from "@/lib/history-event-timeline";
@@ -36,7 +37,11 @@ export async function getReadOnlyTenantEvents({
         ]),
       ],
     );
-    const rows = sqlRows.map(projectTenantEventSqlRow);
+    const nativeRows = await loadNativeLegacyTrades(tenantContext);
+    const rows = [...sqlRows.map(projectTenantEventSqlRow), ...nativeRows.filter(row => row.account !== null && isNamedPortfolioAccount(row.account) && (scope === "all" || row.account === scope)).map(row => projectTenantEventSqlRow({
+      ...row, internalId: row.id, eventAccountId: row.accountId, ownedAccountId: row.accountId, accountCode: row.account,
+      recordedAt: row.recordedAt?.toISOString() ?? null,
+    }))];
 
     return projectTenantEventLedgerRows(rows, scope);
   } catch {
@@ -78,6 +83,7 @@ const TENANT_EVENT_ROWS_SQL = `
     and account.code = any($2::text[])
     and event.account = account.code
     and event.is_sample = false
+    and event.native_data is null
     and ($1::text is null or account.code = $1::text)
     and (
       event.source is distinct from 'broker_recovery_v1'

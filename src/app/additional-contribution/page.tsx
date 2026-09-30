@@ -1,6 +1,6 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
-import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
 import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 import { AdditionalContributionPageView } from "@/components/additional-contribution/additional-contribution-page-view";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
@@ -92,7 +92,7 @@ export default async function AdditionalContributionPage({
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  if (params.currency === "USD" || await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+  if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
     const reporting = params.currency === "USD" ? "USD" : "KRW";
     const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
     return <CurrencyPortfolioSurface surface="contribution" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;

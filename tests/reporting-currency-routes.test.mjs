@@ -28,7 +28,7 @@ async function route(path, { authenticated = true, native = true } = {}) {
   ports["@/components/currency-portfolio-surface"] = { CurrencyPortfolioSurface: Surface };
   ports["@/lib/auth/current-tenant-context"] = { resolveCurrentTenantContext: async () => authenticated ? { ok: true, tenantContext: tenant } : { ok: false, failure: { code: "unauthenticated" } } };
   ports["@/db/queries/portfolio-analysis-scopes"] = { getReadOnlyTenantPortfolioAnalysisScopeContext: async args => { assert.equal(args.tenantContext, tenant); calls.push("scope"); return { state: "ready", resolution: { state: "resolved", scope }, catalog: { scopes: [scope] } }; } };
-  ports["@/db/queries/native-portfolio-ledger"] = { hasNativeLedger: async value => { assert.equal(value, tenant); calls.push("native"); return native; } };
+  ports["@/db/queries/native-portfolio-ledger"] = { requiresNativePortfolioSurface: async value => { assert.equal(value, tenant); calls.push("native"); return native; } };
   ports["@/db/queries/currency-tracked-portfolio"] = { getTrackedCurrencyEvidence: async (value, selected, currency) => { assert.equal(value, tenant); assert.equal(selected, scope); calls.push(`valuation:${currency}`); return { ...trackedCurrencyFixture(), reporting: currency }; } };
   ports["@/db/queries/currency-research"] = { getOwnedCurrencyResearchInput: async (value, selected, currency, options) => { assert.equal(value, tenant); assert.equal(selected, scope); calls.push(`research:${currency}`); requests.push({ currency, options }); return null; } };
   ports["@/lib/simulation-model-selection"] = { resolveSimulationPathModel };

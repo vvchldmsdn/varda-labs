@@ -1,7 +1,7 @@
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
 import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
-import { hasNativeLedger } from "@/db/queries/native-portfolio-ledger";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
@@ -97,7 +97,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   // Native holdings and cash are authoritative even when legacy assets are
   // empty. Amount-only drafts still reach the existing QuickHome below.
-  if (await hasNativeLedger(resolution.tenantContext, scopeContext.resolution.scope)) {
+  if (await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
     const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, scopeContext.resolution.scope, params.currency === "USD" ? "USD" : "KRW");
     return <CurrencyPortfolioSurface surface="home" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={scopeContext.resolution.scope} />;
   }

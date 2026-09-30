@@ -1,6 +1,7 @@
+import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
 
-import { and, asc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
+import { sql, and, asc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 
 import { db,sqlClient } from "@/db/client";
 import { accounts, appUsers, assets } from "@/db/schema";
@@ -110,7 +111,7 @@ async function loadActiveSnapshotTenantContexts(): Promise<(TenantContext & {cod
       and(
         eq(accounts.canonicalOwnerUserId, appUsers.id),
         eq(accounts.isActive, true),
-        isNull(accounts.nativeState),
+        sql.raw(holdingsPortfolioSql("accounts")),
         ne(accounts.accountType, "cash"),
       ),
     )

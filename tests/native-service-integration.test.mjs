@@ -7,9 +7,11 @@ import { drizzle } from "drizzle-orm/pglite";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
 import { addNativeReliabilityFixtureTables } from './helpers/native-reliability-fixture.mjs';
+import { holdingsPortfolioSql } from '../src/lib/portfolio-presentation-policy.ts';
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", other = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const account = "11111111-1111-4111-8111-111111111111", peer = "22222222-2222-4222-8222-222222222222", foreign = "33333333-3333-4333-8333-333333333333", asset = "44444444-4444-4444-8444-444444444444";
+const retainedAsset = "77777777-7777-4777-8777-777777777777";
 let database;
 after(async () => { await database?.close(); });
 const baseDdl = `
@@ -22,7 +24,7 @@ create unique index snapshot_owner_date_account_source on daily_portfolio_snapsh
 `;
 const quote = value => `"${value.replaceAll('"', '""')}"`;
 
-async function fixture({ unknownCost = false } = {}) {
+async function fixture({ unknownCost = false, holdingsPresentation = false } = {}) {
   const pg = database ??= new PGlite();
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;" + baseDdl);
   for (const name of ["0043_powerful_living_tribunal.sql", "0049_twelve_data_collection.sql", "0050_native_portfolio_ledger.sql", "0051_market_provider_observations.sql"]) await pg.exec(readFileSync(`drizzle/${name}`, "utf8"));
@@ -74,8 +76,8 @@ async function fixture({ unknownCost = false } = {}) {
     if (endpoint === "/dividends") return { meta, dividends: state.dividends };
     throw new Error("unexpected_external_fixture_endpoint");
   };
-  const [writer, loader, service, engine, snapshots] = await importWithPorts([
-    "src/db/queries/native-portfolio-ledger.ts", "src/db/queries/currency-tracked-portfolio.ts", "src/lib/market-data/twelve-data-service.ts", "src/lib/currency-tracked-portfolio.ts", "src/db/queries/native-portfolio-snapshots.ts",
+  const [writer, loader, service, engine, snapshots, legacyTrades, durableWork] = await importWithPorts([
+    "src/db/queries/native-portfolio-ledger.ts", "src/db/queries/currency-tracked-portfolio.ts", "src/lib/market-data/twelve-data-service.ts", "src/lib/currency-tracked-portfolio.ts", "src/db/queries/native-portfolio-snapshots.ts", "src/db/queries/native-legacy-trades.ts", "src/lib/snapshots/durable-work.ts",
   ], {
     "@/db/client": { db: drizzle(pg), sqlClient: transport(false) },
     "@/db/tenant-client": { getTenantSqlClient: () => transport(true) },
@@ -88,7 +90,15 @@ async function fixture({ unknownCost = false } = {}) {
   async function open(accountId, ownerId, cash, positions = []) {
     assert.equal((await writer.writeNativeMutation({ ownerUserId: ownerId }, { operationId: randomUUID(), accountId, expectedSequence: null, opening: { at: openingAt, cash: { USD: cash, KRW: "0" }, positions } })).status, "created");
   }
-  if (unknownCost) {
+  if (holdingsPresentation) {
+    // Real non-native history precedes opening. This is a local-only synthetic
+    // observation; the new ledger must not opt this portfolio into a new UI.
+    await pg.query("update accounts set account_type='brokerage' where id=$1", [account]);
+    await pg.query("insert into daily_portfolio_snapshots(canonical_owner_user_id,snapshot_date,account,account_id,source,captured_at,total_market_value) values($1,'2026-09-07','one',$2,'daily_snapshot_v1','2026-09-06T22:00:00Z',1400)", [owner, account]);
+    await pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity) values($1,$2,$3,'one','Synthetic KRW ETF','123450','korea','KRW','etf',4)", [asset, owner, account]);
+    await pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity) values($1,$2,$3,'one','Retained synthetic ETF','543210','korea','KRW','etf',10)", [retainedAsset, owner, account]);
+    await open(account, owner, "0", [{ assetId: asset, quantity: "4", currency: "KRW", costLots: null }, { assetId: retainedAsset, quantity: "10", currency: "KRW", costLots: null }]);
+  } else if (unknownCost) {
     await pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity) values($1,$2,$3,'one','Owned VOO','VOO','us','USD','etf',2)", [asset, owner, account]);
     await open(account, owner, "800", [{ assetId: asset, quantity: "2", currency: "USD", costLots: null }]);
   } else {
@@ -99,8 +109,86 @@ async function fixture({ unknownCost = false } = {}) {
   }
   await open(peer, owner, "50"); await open(foreign, other, "400");
   const scope = accountId => ({ kind: "account", key: `account:${accountId}`, accountId, accountCode: accountId === account ? "one" : accountId === peer ? "two" : "foreign", label: "Test" });
-  return { pg, writer, loader, service, engine, snapshots, config, calls, scope, state, listing, buyAt };
+  return { pg, writer, loader, service, engine, snapshots, legacyTrades, durableWork, config, calls, scope, state, listing, buyAt };
 }
+
+it("keeps a holdings portfolio in its existing surface after an actual full sale while retaining native-only routing and owner isolation", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 10, 22) });
+  const f = await fixture({ holdingsPresentation: true }), tenant = { ownerUserId: owner };
+  const beforeSnapshot = (await f.pg.query("select to_jsonb(s) as row from daily_portfolio_snapshots s where account_id=$1", [account])).rows;
+  assert.equal(await f.writer.hasNativeLedger(tenant, f.scope(account)), true);
+  assert.equal(await f.writer.requiresNativePortfolioSurface(tenant, f.scope(account)), false);
+  assert.equal(await f.writer.requiresNativePortfolioSurface(tenant, f.scope(peer)), true);
+  await f.pg.query("insert into daily_portfolio_snapshots(canonical_owner_user_id,snapshot_date,account,account_id,source,captured_at,total_market_value) values($1,'2026-09-10','two',$2,'daily_snapshot_v1','2026-09-09T22:00:00Z',50)", [owner, peer]);
+  assert.equal(await f.writer.requiresNativePortfolioSurface(tenant, f.scope(peer)), true,
+    "a non-native snapshot captured after native opening cannot silently change its presentation cohort");
+  await f.pg.query("insert into event_ledger_entries(id,canonical_owner_user_id,event_date,event_type,source,recorded_at,account,account_id,asset_id,legacy_asset_id,asset_name,before_value,after_value) values($1,$2,'2026-09-06','account_created','user_account','2026-09-06T00:00:00Z','two',$3,null,'account-lifecycle','Synthetic account lifecycle','{}','{}')", [randomUUID(), owner, peer]);
+  assert.equal(await f.writer.requiresNativePortfolioSurface(tenant, f.scope(peer)), true,
+    "a pre-opening account-only lifecycle event is not evidence of an existing holdings portfolio");
+  assert.equal(await f.writer.requiresNativePortfolioSurface({ ownerUserId: other }, f.scope(account)), false);
+  assert.equal(await f.writer.hasNativeLedger({ ownerUserId: other }, f.scope(account)), false);
+
+  const sale = { operationId: randomUUID(), accountId: account, expectedSequence: 0,
+    event: { type: "sell", at: "2026-09-10T03:00:00Z", assetId: asset, quantity: "4", price: "110", currency: "KRW" } };
+  assert.equal((await f.writer.writeNativeMutation(tenant, sale)).status, "created");
+  assert.equal((await f.writer.writeNativeMutation(tenant, sale)).status, "existing");
+  const persisted = (await f.pg.query("select a.native_state,h.quantity::text as quantity,h.archived_at is not null as archived from accounts a join assets h on h.account_id=a.id where a.id=$1 and h.id=$2", [account, asset])).rows[0];
+  assert.equal(persisted.quantity, "0.000000");
+  assert.equal(persisted.archived, true);
+  assert.equal(persisted.native_state.cash.KRW, "440");
+  const readFingerprint = async () => (await f.pg.query("select (select jsonb_agg(to_jsonb(a) order by a.id) from accounts a) as accounts,(select jsonb_agg(to_jsonb(h) order by h.id) from assets h) as assets,(select jsonb_agg(to_jsonb(e) order by e.id) from event_ledger_entries e) as entries")).rows[0];
+  const beforeReads = await readFingerprint();
+  const rows = await f.legacyTrades.loadNativeLegacyTrades(tenant);
+  assert.equal(rows.length, 1, "the immutable opening is not another trade and retry is not a second sale");
+  assert.equal(rows[0].eventType, "sell");
+  assert.equal(rows[0].assetId, asset, "an archived holding still has stable trade identity");
+  assert.equal(rows[0].quantityDelta, "-4");
+  assert.equal(rows[0].amountKrw, "440");
+  assert.equal(rows[0].nativeCostBasisStatus, "unavailable");
+  assert.equal(rows[0].source, "native_ledger_v1");
+  assert.equal(rows[0].canonicalOwnerUserId, owner);
+  assert.deepEqual(await f.legacyTrades.loadNativeLegacyTrades({ ownerUserId: other }), []);
+  assert.deepEqual(await readFingerprint(), beforeReads, "presentation reads do not rewrite cash, quantities or original ledger");
+  assert.deepEqual((await f.pg.query("select to_jsonb(s) as row from daily_portfolio_snapshots s where account_id=$1", [account])).rows, beforeSnapshot);
+  assert.equal(f.calls.length, 0, "no provider HTTP is needed for presentation classification or ledger reads");
+
+  // The same cohort predicate used by queue/worker classifies historical
+  // holdings separately from a newly native cash-only account.
+  const cohorts = (await f.pg.query(`select a.id,${holdingsPortfolioSql("a")} as holdings from accounts a where a.canonical_owner_user_id=$1 order by a.id`, [owner])).rows;
+  assert.deepEqual(cohorts, [{ id: account, holdings: true }, { id: peer, holdings: false }]);
+  assert.equal(await f.writer.requiresNativePortfolioSurface(tenant, f.scope(account)), false);
+  assert.equal(await f.writer.hasNativeLedger(tenant, f.scope(account)), true, "a presentation fix never erases native authority");
+
+  // Exercise the real durable discovery and claim SQL with the migration's
+  // permissions, uniqueness and release guards, not just the shared predicate.
+  assert.equal(await f.durableWork.discoverSnapshotWork("legacy", "2026-09-11"), 0);
+  assert.equal(await f.durableWork.discoverSnapshotWork("native", "2026-09-11"), 0);
+  assert.equal(await f.durableWork.discoverSnapshotWork("legacy", "2026-09-11"), 0);
+  const workRows = (await f.pg.query("select account_id,stage,count(*)::int as count from daily_snapshot_work where canonical_owner_user_id=$1 group by account_id,stage order by account_id,stage", [owner])).rows;
+  assert.deepEqual(workRows, [{ account_id: account, stage: "legacy", count: 3 }, { account_id: peer, stage: "native", count: 3 }], "rediscovery is idempotent and each owned account has only its proper queue");
+  const legacyClaim = await f.durableWork.claimSnapshotWork("legacy", "2026-09-11");
+  assert.equal(legacyClaim.accountId, account);
+  assert.equal(legacyClaim.ownerUserId, owner);
+  assert.equal(legacyClaim.snapshotDate, "2026-09-09");
+  assert.equal(legacyClaim.generation, 1);
+  assert.equal(await f.durableWork.finishSnapshotWork(legacyClaim, "completed", null), true);
+  const secondClaim = await f.durableWork.claimSnapshotWork("legacy", "2026-09-11");
+  assert.equal(secondClaim.accountId, account);
+  assert.equal(secondClaim.snapshotDate, "2026-09-10", "completed work is not claimed again");
+  const nativeClaim = await f.durableWork.claimSnapshotWork("native", "2026-09-11");
+  assert.ok([peer, foreign].includes(nativeClaim.accountId));
+  assert.notEqual(nativeClaim.accountId, account, "first trade does not move the legacy holdings portfolio into native snapshot work");
+  assert.deepEqual((await f.pg.query("select to_jsonb(s) as row from daily_portfolio_snapshots s where account_id=$1", [account])).rows, beforeSnapshot, "queue work does not rewrite previous valuations");
+  assert.deepEqual(await readFingerprint(), beforeReads, "queue claims do not mutate financial state");
+
+  // Close the native-only peer using a real withdrawal first; lifecycle guards
+  // remain enabled and reject closing accounts with money left.
+  assert.equal((await f.writer.writeNativeMutation(tenant, { operationId: randomUUID(), accountId: peer, expectedSequence: 0,
+    event: { type: "withdraw", amount: "50", currency: "USD", at: "2026-09-10T04:00:00Z" } })).status, "created");
+  await f.pg.query("update accounts set is_active=false where id=$1", [peer]);
+  assert.equal(await f.writer.requiresNativePortfolioSurface(tenant, { kind: "all", key: "all", label: "All" }), false,
+    "an inactive native-only peer cannot replace the active holdings portfolio's surface");
+});
 
 it("connects group membership SQL and tenant RLS to the same native writer, snapshot and currency engines", async t => {
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 10, 22) });
