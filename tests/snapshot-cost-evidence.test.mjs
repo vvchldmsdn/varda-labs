@@ -45,7 +45,7 @@ describe("snapshot purchase cost evidence", () => {
       assets: holdings,
       fx_rates: [{ rateDate: "2026-09-08", usdKrw: "1500", source: "test", status: "ok", isSample: false, fetchedAt: cutoffObservation, observedAt: cutoffObservation, rateKind: "spot" }],
       asset_price_snapshots: holdings.map((row) => ({ ...row, priceDate: "2026-09-08", closePrice: "105", isSample: false, source: "kis", fetchedAt: now })),
-      live_price_quotes: holdings.map((row) => ({ ticker: row.ticker, market: row.market, currency: row.currency, price: "110", source: "kis", provider: "kis", quoteType: "live", status: "ok", fetchedAt: cutoffObservation, priceAsOf: cutoffObservation })),
+      live_price_quotes: holdings.map((row) => ({ ticker: row.ticker, market: row.market, currency: row.currency, price: "110", source: "kis", provider: "kis", quoteType: "live", status: "ok", fetchedAt: now, priceAsOf: now })),
     };
     const writes = [];
     const selection = () => {

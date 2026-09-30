@@ -92,7 +92,7 @@ export async function runUsdKrwFxCandidateJob({
       const receipt = new Date(candidate.fetchedAt);
       if (!Number.isFinite(receipt.getTime()) || receipt.getTime() > Date.now()) throw new Error('invalid_fx_receipt');
       const updated = await db.update(fxRates).set({fetchedAt: receipt, source: candidate.source, usdKrw: candidate.usdKrw, ...fxObservationWrite(candidate)}).where(and(
-        eq(fxRates.id, existingRows[0].id), eq(fxRates.usdKrw, existingRows[0].usdKrw!), existingRows[0].source == null ? isNull(fxRates.source) : eq(fxRates.source, existingRows[0].source),
+        eq(fxRates.id, existingRows[0].id), eq(fxRates.usdKrw, String(existingRows[0].usdKrw!)), existingRows[0].source == null ? isNull(fxRates.source) : eq(fxRates.source, existingRows[0].source),
         eq(fxRates.isSample, false), eq(fxRates.status, "ok"), isNull(fxRates.legacyBase44Id),
         or(isNull(fxRates.fetchedAt), lte(fxRates.fetchedAt, receipt)),
       )).returning({id:fxRates.id});
