@@ -138,6 +138,8 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
   const runId=claim.runId;
   // Drain even when today's cycle was already completed; preserve snapshot ordering.
   scheduleMarketCollection();
+  // Freeze native cutoff valuation before shared FX upserts. Its policy is unchanged.
+  const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false, durable:true, snapshotDate }).catch(() => ({ status: "failed" as const }));
   let result: CronMarketCycleRunResult;
   try {
     // All close groups and the following live refresh share one internal lease.
@@ -161,7 +163,6 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
       else result={...result,ok:true,status:work.targetCount ? "completed" : "no_action",blockers:[]};
     } catch { result={...result,ok:false,status:"failed",blockers:[...result.blockers,"legacy_snapshot_failed"]}; }
   }
-  const nativeSnapshot = result.nativeSnapshot ?? await runNativeDailySnapshotJob({ dryRun: false, durable:true, snapshotDate: result.snapshotDate }).catch(() => ({ status: "failed" as const }));
   const nativeFailed=nativeSnapshot.status === "failed" || ("failedCount" in nativeSnapshot && nativeSnapshot.failedCount>0);
   const nativeBlocked="blockedCount" in nativeSnapshot && nativeSnapshot.blockedCount>0;
   result={...result,nativeSnapshot,...(nativeFailed ? {ok:false,status:"failed" as const,blockers:[...result.blockers,"native_snapshot_failed"]} : nativeBlocked ? {ok:false,status:result.status==="failed" ? "failed" as const : "blocked" as const,blockers:[...result.blockers,"native_snapshot_incomplete"]} : {})};
@@ -261,7 +262,36 @@ async function runMarketCycleWithLease({
       factorSync = { ...emptyFactorSyncSummary(), status: "failed" };
     }
 
-    let { snapshotJob, plan, deferredBlockers } = await loadPlan(now);
+    // Current-cycle FX is collected before planning/writing; legacy prices and quantities use the actual valuation time.
+    try {
+      const fxResult = await runUsdKrwFxRefreshJob({
+        dryRun: false,
+        acceptExistingVardaRow: true,
+        refreshUnchangedReceipt: true,
+      });
+      if (fxResult.status === "planned" || fxResult.status === "blocked") {
+        fxSummary = { status: "failed", rateDate: null, source: null };
+      } else {
+        fxSummary = {
+          status: fxResult.status,
+          rateDate: fxResult.candidate.rateDate,
+          source: fxResult.candidate.source,
+        };
+      }
+    } catch {
+      fxSummary = { status: "failed", rateDate: null, source: null };
+    }
+
+    if (getKisProviderPolicy().configured) {
+      try {
+        kisProvider ??= createKisMarketDataProvider();
+        liveSync = await syncLiveQuotes(kisProvider);
+      } catch {
+        liveSync = { ...emptyLiveSyncSummary(), status: "failed" };
+      }
+    }
+
+    let { snapshotJob, plan, deferredBlockers } = await loadPlan(new Date());
     if (!plan.ok) {
       return finishBlocked({
         runId,
@@ -304,7 +334,7 @@ async function runMarketCycleWithLease({
             blockers: ["close_sync_retry_window_exhausted", closeSync.deferred.code, ...deferredBlockers] },
         });
       }
-      ({ snapshotJob, plan, deferredBlockers } = await loadPlan(now));
+      ({ snapshotJob, plan, deferredBlockers } = await loadPlan(new Date()));
       if (!plan.ok || plan.action === "sync_closes_then_snapshot") {
         return finishBlocked({
           runId,
@@ -350,8 +380,7 @@ async function runMarketCycleWithLease({
       return result;
     }
 
-    // Persist independently admitted cutoff evidence before requesting today's
-    // quotes. An unrelated live symbol/provider failure must not lose a day.
+    // A failed live request may still use an independently verified official close.
     const snapshotWrite = await runDailySnapshotJob({
       dryRun: false,
       durable:true,
@@ -381,42 +410,6 @@ async function runMarketCycleWithLease({
       return result;
     }
 
-    const nativeSnapshot = await runNativeDailySnapshotJob({dryRun:false,durable:true,snapshotDate}).catch(()=>({status:"failed" as const}));
-
-    if(nativeSnapshot.status==="failed" || nativeSnapshot.failedCount>0 || nativeSnapshot.blockedCount>0) {
-      return emptyResult({ok:false,status:nativeSnapshot.status==="failed" || nativeSnapshot.failedCount>0 ? "failed" : "blocked",runId,snapshotDate,fx:fxSummary,factorSync,closeSync,liveSync,snapshot:snapshotSummary,nativeSnapshot});
-    }
-
-    // Both ledger families must capture cutoff evidence before these upserts.
-    // FX rows are upserted by date. Refreshing before the snapshot can replace
-    // the last observation from before 07:00 with an inadmissible later one.
-    try {
-      const fxResult = await runUsdKrwFxRefreshJob({
-        dryRun: false,
-        acceptExistingVardaRow: true,
-      });
-      if (fxResult.status === "planned" || fxResult.status === "blocked") {
-        fxSummary = { status: "failed", rateDate: null, source: null };
-      } else {
-        fxSummary = {
-          status: fxResult.status,
-          rateDate: fxResult.candidate.rateDate,
-          source: fxResult.candidate.source,
-        };
-      }
-    } catch {
-      fxSummary = { status: "failed", rateDate: null, source: null };
-    }
-
-    if (getKisProviderPolicy().configured) {
-      try {
-        kisProvider ??= createKisMarketDataProvider();
-        liveSync = await syncLiveQuotes(kisProvider);
-      } catch {
-        liveSync = { ...emptyLiveSyncSummary(), status: "failed" };
-      }
-    }
-
     const result = emptyResult({
       ok: true,
       status: "completed",
@@ -427,7 +420,6 @@ async function runMarketCycleWithLease({
       closeSync,
       liveSync,
       snapshot: snapshotSummary,
-      nativeSnapshot,
     });
     return result;
   } catch (error) {

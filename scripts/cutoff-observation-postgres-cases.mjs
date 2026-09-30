@@ -44,7 +44,7 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
   const provider={name:'kis',supportedMarkets:['us'],fetchLiveQuotes:async targets=>({provider:'kis',fetchedAt:at,warnings:[],rows:targets.map(target=>({ticker:target.ticker,market:target.market,currency:target.currency,price,priceAsOf:at,fetchedAt:at,source:'kis_overseas_price:NAS',quoteType:'live',status:'ok'}))})};
   const writePrice=()=>lease.withKisCollectionLease(()=>sync.runMarketPriceSync({mode:'live',dryRun:false,fixture:false,provider,explicitTargets:[{ticker:'CUTUNIT',market:'us',currency:'USD'}]}));
   const writeFx=value=>fx.runUsdKrwFxCandidateJob({dryRun:false,acceptExistingVardaRow:true,candidate:{provider:'kis',pair:'USD/KRW',rateDate:snapshotDate,usdKrw:value,source:'kis_overseas_price_detail:NAS',status:'ok',fetchedAt:at.toISOString()}});
-  const snapshot=()=>daily.runDailySnapshot({tenantContext:{ownerUserId:owner},now:new Date(receipt('22:20:00')),dryRun:false,account:'brokerage'});
+  const snapshot=(now=new Date(receipt('22:20:00')))=>daily.runDailySnapshot({tenantContext:{ownerUserId:owner},now,dryRun:false,account:'brokerage'});
   await check('cutoff-real-writer-cache-overwrite-retains-precutoff-price-and-fx',async()=>{
     const [runner]=await importWithPorts(['src/lib/cron-market-cycle-runner.ts'],{
       'next/server':{after:nextServer.after,NextResponse:nextServer.NextResponse},
@@ -72,6 +72,17 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     assert.equal(evidence.fxRows[0].providerObservedAt,null);assert.equal(evidence.fxRows[0].timestampBasis,'collection');
     assert.equal(Number((await worker.query("select price from live_price_quotes where ticker='CUTUNIT'")).rows[0].price),110);
   });
+  await check('historical-dry-run-retains-strict-cutoff-10-times-105-times-1300-equals-1365000',async()=>{
+    const options={tenantContext:{ownerUserId:owner},snapshotDate,now:new Date(Date.parse(receipt('22:20:00'))+86400000),account:'brokerage'};
+    const historical=await daily.runDailySnapshot({...options,dryRun:true});
+    assert.equal(historical.results.brokerage.totalMarketValue,1365000);
+    assert.equal(historical.fx.usdKrw,1300);
+    assert.equal(historical.cutoffValuation.policy,'pre_cutoff_kis_quote_else_exact_official_close');
+    assert.equal(historical.cycle.cycleEndAt,new Date(receipt('22:00:00')).toISOString());
+    await assert.rejects(daily.runDailySnapshot({...options,dryRun:false}),error=>error.code==='historical_write_not_enabled');
+    assert.equal((await worker.query('select count(*)::int n from daily_portfolio_snapshots where account_id=$1',[account])).rows[0].n,0);
+    assert.equal((await worker.query('select count(*)::int n from daily_position_snapshots where account_id=$1',[account])).rows[0].n,0);
+  });
   for (const table of ['assets', 'event_ledger_entries']) {
     await check(`cutoff-${table}-one-microsecond-concurrent-change-rejects-and-rolls-back`, async()=>{
       const modify=async token=>{const c=await admin.connect();try{await c.query('BEGIN');await c.query("select set_config('app.trade_reliability_version','0059',true)");await c.query(`update ${table} set updated_at=$2 where account_id=$1`,[account,token]);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}};
@@ -82,24 +93,44 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
       await modify(openingDate);
     });
   }
-  await check('cutoff-real-daily-writer-concurrency-10-times-105-times-1300-equals-1365000',async()=>{
+  await check('execution-real-daily-writer-concurrency-10-times-110-times-1310-equals-1441000',async()=>{
     gate=true;const results=await Promise.allSettled([snapshot(),snapshot()]);gate=false;
     assert.equal(arrivals,2,'both plans reached real concurrent transactions');
     assert.equal(results.filter(row=>row.status==='fulfilled').length,1);
     assert.equal(results.filter(row=>row.status==='rejected').length,1);
-    const rows=(await worker.query('select total_market_value,num_assets from daily_portfolio_snapshots where account_id=$1 and snapshot_date=$2',[account,snapshotDate])).rows;
-    assert.equal(rows.length,1);assert.equal(Number(rows[0].total_market_value),1365000);assert.equal(rows[0].num_assets,1);
-    const positions=(await worker.query('select quantity,current_price,market_value_krw,fx_rate,description from daily_position_snapshots where account_id=$1 and snapshot_date=$2',[account,snapshotDate])).rows;
-    assert.equal(positions.length,1);assert.equal(Number(positions[0].quantity),10);assert.equal(Number(positions[0].current_price),105);
-    assert.equal(Number(positions[0].market_value_krw),1365000);assert.equal(Number(positions[0].fx_rate),1300);
+    const completed=results.find(row=>row.status==='fulfilled').value;
+    assert.equal(completed.cutoffValuation.policy,'execution_quote_else_exact_official_close');
+    assert.equal(completed.fx.usdKrw,1310);
+    assert.equal(completed.fx.fetchedAt,new Date(receipt('22:20:00')).toISOString());
+    const rows=(await worker.query('select total_market_value,num_assets,description,cycle_end_at,captured_at from daily_portfolio_snapshots where account_id=$1 and snapshot_date=$2',[account,snapshotDate])).rows;
+    assert.equal(rows.length,1);assert.equal(Number(rows[0].total_market_value),1441000);assert.equal(rows[0].num_assets,1);
+    const positions=(await worker.query('select quantity,current_price,market_value_krw,fx_rate,description,cycle_end_at,captured_at from daily_position_snapshots where account_id=$1 and snapshot_date=$2',[account,snapshotDate])).rows;
+    assert.equal(positions.length,1);assert.equal(Number(positions[0].quantity),10);assert.equal(Number(positions[0].current_price),110);
+    assert.equal(Number(positions[0].market_value_krw),1441000);assert.equal(Number(positions[0].fx_rate),1310);
+    for(const row of [rows[0],positions[0]]) {
+      assert.match(row.description,/(?:^|; )valuation_policy=execution_collection_v1(?:;|$)/);
+      assert.match(row.description,/(?:^|; )fx_valuation_policy=execution_collection_v1(?:;|$)/);
+      assert.equal(row.cycle_end_at.toISOString(),new Date(receipt('22:20:00')).toISOString());
+      assert.equal(row.captured_at.toISOString(),new Date(receipt('22:20:00')).toISOString());
+    }
+    assert.ok(positions[0].description.includes(`fx_fetched_at=${new Date(receipt('22:20:00')).toISOString()}`));
+    assert.match(positions[0].description,/(?:^|; )fx_observed_at=unknown(?:;|$)/);
+    assert.match(positions[0].description,/(?:^|; )fx_timestamp_basis=collection(?:;|$)/);
   });
-  await check('cutoff-completed-record-survives-refresh-retry-and-shared-evidence-prune',async()=>{
-    const before=(await worker.query('select to_jsonb(s) data from daily_portfolio_snapshots s where account_id=$1',[account])).rows;
+  await check('execution-completed-record-survives-refresh-retry-and-shared-evidence-prune',async()=>{
+    const before=(await worker.query('select to_jsonb(s) data from daily_portfolio_snapshots s where account_id=$1 order by id',[account])).rows;
+    const positionsBefore=(await worker.query('select to_jsonb(s) data from daily_position_snapshots s where account_id=$1 order by id',[account])).rows;
+    at=new Date(receipt('22:30:00'));price='120';
+    assert.equal((await writePrice()).status,'completed');assert.equal((await writeFx('1320')).status,'written');
     await worker.query("delete from snapshot_cutoff_price_observations where ticker='CUTUNIT'");
     await worker.query('delete from snapshot_cutoff_fx_observations where snapshot_date=$1',[snapshotDate]);
-    const retry=await snapshot();assert.equal(retry.results.brokerage.totalMarketValue,1365000);
+    const retry=await snapshot(at);assert.equal(retry.results.brokerage.totalMarketValue,1441000);
     assert.equal(retry.results.brokerage.reason,'completed_cutoff_preserved');
-    assert.deepEqual((await worker.query('select to_jsonb(s) data from daily_portfolio_snapshots s where account_id=$1',[account])).rows,before);
+    assert.equal(retry.cutoffValuation.policy,'execution_quote_else_exact_official_close');
+    assert.equal(retry.fx.usdKrw,1310);
+    assert.equal(retry.cycle.capturedAt,new Date(receipt('22:20:00')).toISOString());
+    assert.deepEqual((await worker.query('select to_jsonb(s) data from daily_portfolio_snapshots s where account_id=$1 order by id',[account])).rows,before);
+    assert.deepEqual((await worker.query('select to_jsonb(s) data from daily_position_snapshots s where account_id=$1 order by id',[account])).rows,positionsBefore);
   });
   await check('cutoff-shared-observations-tenant-read-and-write-denied',async()=>{
     for(const table of ['snapshot_cutoff_price_observations','snapshot_cutoff_fx_observations']) {

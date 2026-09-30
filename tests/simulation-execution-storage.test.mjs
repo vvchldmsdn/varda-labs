@@ -72,6 +72,35 @@ test('release rollout is closed by default and admits only explicitly allowed ow
   assert.equal(sharedExecutionOwnerEnabled(env,A),true);assert.equal(sharedExecutionOwnerEnabled(env,B),false);
   assert.equal(sharedExecutionOwnerEnabled({...env,SIMULATION_EXECUTION_ENVIRONMENT:'preview'},A),false);
 });
+test('general rollout admits owners only while storage, cleanup and environment gates remain enabled',()=>{
+  const env={VERCEL_ENV:'production',SIMULATION_EXECUTION_STORAGE_ENABLED:'true',SIMULATION_EXECUTION_CLEANUP_ENABLED:'true',SIMULATION_EXECUTION_ENVIRONMENT:'production',SIMULATION_EXECUTION_ROLLOUT:'all'};
+  assert.equal(sharedExecutionOwnerEnabled(env,A),true);
+  assert.equal(sharedExecutionOwnerEnabled(env,B),true);
+  assert.equal(sharedExecutionOwnerEnabled({...env,SIMULATION_EXECUTION_STORAGE_ENABLED:'false'},A),false);
+  assert.equal(sharedExecutionOwnerEnabled({...env,SIMULATION_EXECUTION_CLEANUP_ENABLED:'false'},A),false);
+  assert.equal(sharedExecutionOwnerEnabled({...env,SIMULATION_EXECUTION_ENVIRONMENT:'preview'},A),false);
+  assert.equal(sharedExecutionOwnerEnabled({...env,SIMULATION_EXECUTION_ROLLOUT:'off'},A),false);
+});
+
+test('capacity consumed after admission is a limit outcome and never writes a partial execution',async()=>{
+  const {pg,store}=await fixture();
+  try {
+    await pg.query('update simulation_execution_service set max_count=1');
+    assert.equal(await store.canAdmitSharedExecution(A),true);
+    const winner=await store.saveSharedExecution(B,packExecution(B,executionFixture()));
+    assert.equal(winner.status,'ready');
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,executionFixture())),{status:'limit'});
+    assert.equal((await pg.query('select count(*)::int as n from simulation_executions where owner_user_id=$1',[A])).rows[0].n,0);
+    assert.equal((await store.readSharedExecution(B,winner.handle,141)).ok,true);
+  } finally { await pg.close(); }
+});
+
+test('storage failures remain errors instead of being relabeled as capacity limits',async()=>{
+  const offline=new Error('offline');
+  const [store]=await importWithPorts(['src/db/queries/simulation-execution-storage.ts'],{'@/db/tenant-client':{getTenantSqlClient:()=>({transaction:async()=>{throw offline;}})}});
+  await assert.rejects(store.saveSharedExecution(A,packExecution(A,executionFixture())),error=>error===offline);
+});
+
 test('shared SQL writer/query preserves both exact engine models, retries, owner and bounded reads',async()=>{
   const {pg,store,metrics}=await fixture();
   try { for(const model of ['economic','bootstrap']) {

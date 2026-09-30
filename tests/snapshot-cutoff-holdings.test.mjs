@@ -28,21 +28,21 @@ describe("snapshot holding cutoff evidence", () => {
 });
 
 describe("daily snapshot cutoff admission through actual server code", () => {
-  it("includes an asset archived after cutoff in the guard instead of silently omitting it", async t => {
-    const f = await snapshotFixture(t, { changed: { archivedAt: "2026-09-09T23:43:00Z", updatedAt: "2026-09-09T23:43:00Z" } });
+  it("includes an asset archived after execution in the guard instead of silently omitting it", async t => {
+    const f = await snapshotFixture(t, { changed: { archivedAt: "2026-09-10T00:10:00Z", updatedAt: "2026-09-10T00:10:00Z" } });
     await assert.rejects(f.run(), error => error.code === "holdings_changed_after_cutoff" && error.details.assetIds.includes("changed"));
     assert.equal(f.writes.length, 0);
   });
 
   it("checks a position reduced to zero before selecting the current open positions", async t => {
-    const f = await snapshotFixture(t, { changed: { quantity: "0", updatedAt: "2026-09-09T23:43:00Z" } });
+    const f = await snapshotFixture(t, { changed: { quantity: "0", updatedAt: "2026-09-10T00:10:00Z" } });
     await assert.rejects(f.run(), error => error.code === "holdings_changed_after_cutoff" && error.details.assetIds.includes("changed"));
     assert.equal(f.writes.length, 0);
   });
 
   it("keeps earlier archived assets outside current valuation and ignores another requested account's changes", async t => {
-    const f = await snapshotFixture(t, { changed: { account: "acct1", accountId: "account-1", quantity: "0", updatedAt: "2026-09-09T23:43:00Z" },
-      archived: true, events: [{ account: "acct1", updatedAt: "2026-09-09T23:43:00Z" }] });
+    const f = await snapshotFixture(t, { changed: { account: "acct1", accountId: "account-1", quantity: "0", updatedAt: "2026-09-10T00:10:00Z" },
+      archived: true, events: [{ account: "acct1", updatedAt: "2026-09-10T00:10:00Z" }] });
     const result = await f.run({ account: "acct0" });
     assert.equal(result.ok, true);
     const positions = f.writes.filter(write => write.table === "daily_position_snapshots").flatMap(write => write.rows);
@@ -50,15 +50,25 @@ describe("daily snapshot cutoff admission through actual server code", () => {
     assert.equal(result.results.acct0.totalMarketValue, 210);
   });
 
-  it("blocks ledger-only changes before writing either positions or portfolio totals", async t => {
+  it("blocks ledger-only changes after execution before writing positions or portfolio totals", async t => {
     for (const timestamps of [
-      { createdAt: "2026-09-09T23:43:00Z" },
-      { updatedAt: "2026-09-09T23:43:00Z" },
+      { createdAt: "2026-09-10T00:10:00Z" },
+      { updatedAt: "2026-09-10T00:10:00Z" },
     ]) {
       const f = await snapshotFixture(t, { events: [timestamps] });
       await assert.rejects(f.run(), error => error.code === "event_changed_after_cutoff" && error.details.eventIds.includes("event-0"));
       assert.equal(f.writes.length, 0);
     }
+  });
+
+  it("admits ledger changes after 07:00 that already existed when the daily job runs", async t => {
+    const f = await snapshotFixture(t, { events: [{ createdAt: "2026-09-09T23:43:00Z", updatedAt: "2026-09-09T23:43:00Z" }] });
+    const result = await f.run();
+    assert.equal(result.ok, true);
+    assert.equal(result.cycle.cycleEndAt, "2026-09-10T00:00:00.000Z");
+    assert.equal(result.results.acct0.totalMarketValue, 210);
+    assert.ok(f.writes.some(write => write.table === "daily_position_snapshots"));
+    assert.ok(f.writes.some(write => write.table === "daily_portfolio_snapshots"));
   });
 
   it("does not admit a sample close as an official cutoff fallback", async t => {

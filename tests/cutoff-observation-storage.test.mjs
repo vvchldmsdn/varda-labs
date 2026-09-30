@@ -85,3 +85,14 @@ it('no cache history is fabricated outside the receipt window or from an unappro
   assert.equal(rows.filter(row=>['EARLY','LATE','OTHER'].includes(row.ticker)).length,0);
   await assert.rejects(runtime.reader.readSnapshotCutoffObservations('2026-02-31'),/invalid_snapshot_date/);
 });
+
+it('unchanged FX collection refreshes only a matching receipt and rejects an older racing response', async () => {
+  const candidate={provider:'kis',pair:'USD/KRW',rateDate:snapshotDate,usdKrw:'1310',source:'kis_overseas_price_detail:NAS',status:'ok',fetchedAt:receipt('22:21:00')};
+  const before=(await runtime.reader.readSnapshotCutoffObservations(snapshotDate)).fxRows;
+  const write=value=>runtime.fx.runUsdKrwFxCandidateJob({candidate:value,dryRun:false,acceptExistingVardaRow:true,refreshUnchangedReceipt:true});
+  assert.equal((await write(candidate)).status,'skipped');
+  const stored=(await pg.query('select usdkrw,fetched_at,observed_at from fx_rates where date=$1',[snapshotDate])).rows[0];
+  assert.equal(Number(stored.usdkrw),1310);assert.equal(new Date(stored.fetched_at).toISOString(),receipt('22:21:00.000'));assert.equal(stored.observed_at,null);
+  await assert.rejects(write({...candidate,fetchedAt:receipt('22:20:30')}),/fx_receipt_changed/);
+  assert.deepEqual((await runtime.reader.readSnapshotCutoffObservations(snapshotDate)).fxRows,before);
+});
