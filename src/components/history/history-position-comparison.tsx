@@ -1,3 +1,4 @@
+import { HistoryEndpointSelect } from "./history-endpoint-select";
 
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
@@ -6,7 +7,7 @@ import { HistoryEvidenceLink as Link, HistoryEvidenceForm } from "./history-reco
 import type { HistoryPositionComparisonModel } from "@/lib/history-position-comparison";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 
-import { historySourceLabel } from "./history-format";
+
 import { HistoryPositionComparisonResult } from "./history-position-comparison-result";
 
 export function HistoryPositionComparison({
@@ -85,15 +86,17 @@ function ComparisonForm({
     >
       <input type="hidden" name="scope" value={scopeKey} />
       <input type="hidden" name="lane" value={model.lane} />
-      <EndpointSelect
+      <HistoryEndpointSelect
         label="이전 저장점"
+        key={`from:${defaults.from}`}
         name="comparisonFrom"
         options={model.options}
         defaultValue={defaults.from}
         disabled={!canCompare}
       />
-      <EndpointSelect
+      <HistoryEndpointSelect
         label="이후 저장점"
+        key={`to:${defaults.to}`}
         name="comparisonTo"
         options={model.options}
         defaultValue={defaults.to}
@@ -107,39 +110,6 @@ function ComparisonForm({
         ><T ko="비교" en="Compare"/></button>
       </div>
     </HistoryEvidenceForm>
-  );
-}
-
-function EndpointSelect({
-  label,
-  name,
-  options,
-  defaultValue,
-  disabled,
-}: {
-  label: string;
-  name: "comparisonFrom" | "comparisonTo";
-  options: HistoryPositionComparisonModel["options"];
-  defaultValue: string | null;
-  disabled: boolean;
-}) {
-  return (
-    <label className="grid min-w-0 gap-1 text-xs font-semibold text-[var(--muted)]">
-      {<T ko={label} en={translateHomeHistory(label)}/>}
-      <select
-        name={name}
-        defaultValue={defaultValue ?? ""}
-        disabled={disabled}
-        className="min-w-0 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] disabled:bg-[var(--wash)]"
-      >
-        {options.length === 0 ? <option value=""><T ko="저장점 없음" en="No snapshot"/></option> : null}
-        {options.map((option) => (
-          <option key={option.token} value={option.token}>
-            {option.snapshotDate} · {<T ko={historySourceLabel(option.source)} en={translateHomeHistory(historySourceLabel(option.source))}/>}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 

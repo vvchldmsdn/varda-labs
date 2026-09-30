@@ -3,7 +3,8 @@
 .segmentEntry { transform-origin: 260px 260px; animation: ring-enter 550ms cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--segment-delay); }
 .segment { cursor: pointer; transform: translate(0,0); transition: transform 220ms cubic-bezier(.2,.8,.2,1), opacity 180ms, filter 220ms; }
 .segment[data-active="true"] { transform: translate(var(--lift-x), var(--lift-y)); filter: drop-shadow(0 6px 5px rgb(32 33 31 / .13)); }
-.segment:focus-visible { outline: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 3 3; }
+.segment:focus { outline: none; }
+.segment:focus-visible { outline: none; stroke: var(--ink); stroke-width: 3; stroke-dasharray: 3 3; }
 .center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-60%); width: 50%; text-align: center; pointer-events: none; }
 .centerLabel { color: var(--muted); font-size: 11px; }
 .centerValue { animation: value-enter 180ms ease-out; }

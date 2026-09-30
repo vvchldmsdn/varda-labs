@@ -118,18 +118,13 @@ function ResearchHorizonSelector({
       className="flex items-center gap-3"
       data-simulation-research-horizon={selectedHorizon ?? "invalid"} as="section" en={{"aria-label": simulationEnglish("연구 기간 선택")}}
     >
-      <span className="text-[11px] text-[var(--faint)]"><SimulationText ko={"연구 기간"} /></span>
-      <nav className="flex gap-1 rounded-md bg-[var(--wash)] p-1">
+      <nav className={styles.textTabs}>
         {SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons.map((horizon) => {
           const selected = horizon === selectedHorizon;
           return (
             <Link
               aria-current={selected ? "page" : undefined}
-              className={
-                selected
-                  ? "rounded bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] shadow-sm"
-                  : "rounded px-3 py-1.5 text-xs text-[var(--faint)] hover:text-[var(--ink)]"
-              }
+              className={styles.textTab}
               href={buildSimulationHref({
                 scope: scopeKey,
                 endServiceDate,

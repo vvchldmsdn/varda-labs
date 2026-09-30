@@ -10,13 +10,14 @@ import { packExecution,decodePath,EXECUTION_POLICY } from '../src/lib/simulation
 import { projectPath } from '../src/lib/simulation-path-detail-store.ts';
 import { sharedExecutionEnabled,sharedExecutionCleanupEnabled,sharedExecutionOwnerEnabled } from '../src/lib/simulation-execution-availability.ts';
 const A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-async function fixture() {
+async function fixture({ rotation = true } = {}) {
   let afterLookup;
   const pg=new PGlite();
   await pg.exec("create role varda_tenant_app nosuperuser nobypassrls; create table app_users(id uuid primary key,status text); grant usage on schema public to varda_tenant_app;");
   await pg.exec(readFileSync(new URL('../drizzle/0045_investment_plans.sql',import.meta.url),'utf8'));
   await pg.exec(readFileSync(new URL('../drizzle/0054_simulation_executions.sql',import.meta.url),'utf8'));
   await pg.exec(readFileSync(new URL('../drizzle/0055_simulation_execution_admission.sql',import.meta.url),'utf8'));
+  if(rotation) await pg.exec(readFileSync(new URL('../drizzle/0062_simulation_execution_rotation.sql',import.meta.url),'utf8'));
   await pg.exec("update simulation_execution_service set enabled=true,qa_only=false,max_creating=4,max_hourly=100,owner_interval_seconds=0,cleanup_succeeded_at=clock_timestamp()");
   await pg.query("insert into app_users values($1,'active'),($2,'active')",[A,B]);
   const metrics={requests:0,requestBytes:0,responseBytes:0};
@@ -99,6 +100,85 @@ test('storage failures remain errors instead of being relabeled as capacity limi
   const offline=new Error('offline');
   const [store]=await importWithPorts(['src/db/queries/simulation-execution-storage.ts'],{'@/db/tenant-client':{getTenantSqlClient:()=>({transaction:async()=>{throw offline;}})}});
   await assert.rejects(store.saveSharedExecution(A,packExecution(A,executionFixture())),error=>error===offline);
+});
+
+test('preflight reaches owner expiry pruning without relaxing service or cleanup admission',async()=>{
+  const {pg,store}=await fixture();
+  try {
+    await pg.query('update simulation_execution_service set max_count=1');
+    const snapshot=executionFixture(), first=await store.saveRenderedExecution(A,packExecution(A,snapshot));
+    await pg.exec('alter table simulation_executions disable trigger simulation_execution_immutable');
+    await pg.query("update simulation_executions set expires_at=clock_timestamp()-interval '1 second' where owner_user_id=$1",[A]);
+    await pg.exec('alter table simulation_executions enable trigger simulation_execution_immutable');
+    // The same order as registerTenantSimulationPath: preflight must allow the
+    // bounded owner prune even though expired rows consume all global capacity.
+    assert.equal(await store.canAdmitSharedExecution(A),true);
+    assert.equal(await store.canAdmitSharedExecution(B),false,'another owner cannot prune this execution');
+    await pg.query("update simulation_execution_service set cleanup_succeeded_at=clock_timestamp()-interval '27 hours'");
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,snapshot)),{status:'limit'});
+    assert.equal((await store.listStoredSharedExecutions(A))[0].id,first.handle.executionId,'failed insertion rolls back owner pruning');
+    await pg.query('update simulation_execution_service set cleanup_succeeded_at=clock_timestamp(),enabled=false');
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,snapshot)),{status:'limit'});
+    await pg.query('update simulation_execution_service set enabled=true,qa_only=true,qa_owners=$1::uuid[]',[[B]]);
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,snapshot)),{status:'limit'});
+    await pg.query('update simulation_execution_service set qa_only=false,owner_interval_seconds=86400');
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,snapshot)),{status:'limit'});
+    await pg.query('update simulation_execution_service set owner_interval_seconds=0,max_hourly=1');
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,snapshot)),{status:'limit'});
+    await pg.query('update simulation_execution_service set max_hourly=100');
+    const replacement=await store.saveRenderedExecution(A,packExecution(A,snapshot));
+    assert.equal(replacement.status,'ready');
+    assert.notEqual(replacement.handle.executionId,first.handle.executionId);
+    assert.equal((await store.listStoredSharedExecutions(A)).length,1);
+  } finally { await pg.close(); }
+});
+
+test('storage actions list minimal owner metadata and only explicitly delete the session owner run',async()=>{
+  const {pg,store}=await fixture();
+  try {
+    const snapshot=executionFixture(), first=await store.saveRenderedExecution(A,packExecution(A,snapshot));
+    const second=await store.saveRenderedExecution(A,packExecution(A,executionFixture('bootstrap')));
+    const other=await store.saveRenderedExecution(B,packExecution(B,snapshot));
+
+    assert.deepEqual((await store.saveRenderedExecution(A,packExecution(A,snapshot))).handle,first.handle,'full storage still reuses the identical run without changing TTL');
+    let session={ok:true,tenantContext:{ownerUserId:A,role:'user'}}, enabled=true;
+    const [actions]=await importWithPorts(['src/app/simulation/storage-actions.ts'],{
+      '@/lib/auth/current-tenant-context':{resolveCurrentTenantContext:async()=>session},
+      '@/lib/simulation-execution-availability':{sharedExecutionOwnerEnabled:()=>enabled},
+      '@/db/queries/simulation-execution-storage':store,
+    });
+    const listed=await actions.listSimulationExecutions(); assert.equal(listed.ok,true); assert.equal(listed.executions.length,2);
+    for(const row of listed.executions) assert.deepEqual(Object.keys(row).sort(),['createdAt','expiresAt','horizon','id','model','state']);
+    assert.deepEqual(new Set(listed.executions.map(row=>row.id)),new Set([first.handle.executionId,second.handle.executionId]));
+    assert.equal(listed.executions.every(row=>row.horizon===21 && Number.isSafeInteger(row.createdAt) && row.expiresAt>row.createdAt),true);
+    assert.deepEqual(await actions.deleteSimulationExecution({executionId:first.handle.executionId,ownerUserId:A}),{ok:false,error:'invalid_request'});
+    session={ok:true,tenantContext:{ownerUserId:B,role:'user'}};
+    assert.deepEqual(await actions.deleteSimulationExecution(first.handle.executionId),{ok:false,error:'not_found'});
+    assert.deepEqual((await actions.listSimulationExecutions()).executions.map(row=>row.id),[other.handle.executionId]);
+    session={ok:false};
+    assert.deepEqual(await actions.listSimulationExecutions(),{ok:false,error:'authentication_required'});
+    assert.deepEqual(await actions.deleteSimulationExecution(first.handle.executionId),{ok:false,error:'authentication_required'});
+    session={ok:true,tenantContext:{ownerUserId:A,role:'user'}}; enabled=false;
+    assert.deepEqual(await actions.listSimulationExecutions(),{ok:false,error:'disabled'});
+    assert.deepEqual(await actions.deleteSimulationExecution(first.handle.executionId),{ok:false,error:'disabled'});
+    enabled=true;
+    assert.deepEqual(await actions.deleteSimulationExecution(first.handle.executionId),{ok:true});
+    assert.deepEqual(await actions.deleteSimulationExecution(first.handle.executionId),{ok:false,error:'not_found'});
+    assert.equal((await pg.query('select count(*)::int as n from simulation_execution_chunks where owner_user_id=$1 and execution_id=$2',[A,first.handle.executionId])).rows[0].n,0);
+    assert.equal((await store.readSharedExecution(A,second.handle,141)).ok,true);
+    assert.equal((await store.readSharedExecution(B,other.handle,141)).ok,true);
+    assert.equal((await store.saveRenderedExecution(A,packExecution(A,{...snapshot,seed:99}))).status,'ready','explicit deletion restores the owner slot');
+  } finally { await pg.close(); }
+});
+
+test('storage management actions expose no raw error or data on a failed read/write',async()=>{
+  const [actions]=await importWithPorts(['src/app/simulation/storage-actions.ts'],{
+    '@/lib/auth/current-tenant-context':{resolveCurrentTenantContext:async()=>({ok:true,tenantContext:{ownerUserId:A,role:'user'}})},
+    '@/lib/simulation-execution-availability':{sharedExecutionOwnerEnabled:()=>true},
+    '@/db/queries/simulation-execution-storage':{listStoredSharedExecutions:async()=>{throw Error('private diagnostic');},deleteStoredSharedExecution:async()=>{throw Error('private diagnostic');}},
+  });
+  assert.deepEqual(await actions.listSimulationExecutions(),{ok:false,error:'unavailable'});
+  assert.deepEqual(await actions.deleteSimulationExecution(randomUUID()),{ok:false,error:'unavailable'});
 });
 
 test('shared SQL writer/query preserves both exact engine models, retries, owner and bounded reads',async()=>{
@@ -245,4 +325,65 @@ test('cleanup HTTP boundary requires a server job secret and explicit activation
     assert.equal(response.status,409);assert.equal(response.headers.get('cache-control'),'private, no-store');
     assert.deepEqual(await response.json(),{status:'disabled'});
   }finally{for(const key of names)if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}
+});
+
+test('upgrades populated storage and atomically rotates only after a complete verified upload',async()=>{
+  const {pg,store}=await fixture({rotation:false});
+  try {
+    const s=executionFixture();
+    const first=await store.saveRenderedExecution(A,packExecution(A,s));
+    const second=await store.saveRenderedExecution(A,packExecution(A,{...s,seed:2}));
+    const other=await store.saveRenderedExecution(B,packExecution(B,s));
+    const before=await store.listStoredSharedExecutions(A);
+    await pg.exec(readFileSync(new URL('../drizzle/0062_simulation_execution_rotation.sql',import.meta.url),'utf8'));
+    assert.deepEqual(await store.listStoredSharedExecutions(A),before,'upgrade leaves existing content and expiry intact');
+    const p=packExecution(A,{...s,seed:3});
+    assert.equal(await store.beginSharedExecution(A,p),'creating');
+    assert.equal((await store.listStoredSharedExecutions(A)).length,3,'two ready plus a single upload');
+    assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,{...s,seed:4})),{status:'limit'},'a competing different upload cannot evict anything');
+    await assert.rejects(store.appendSharedExecution(A,p,[{...p.chunks[0],data:'AAAA'}]),/execution_chunk_invalid/);
+    await store.appendSharedExecution(A,p,p.chunks.slice(0,4));
+    await assert.rejects(store.finishSharedExecution(A,p),/execution_incomplete/);
+    for(const run of [first,second]) assert.equal((await store.readSharedExecution(A,run.handle,141)).ok,true);
+    for(let i=4;i<p.chunks.length;i+=EXECUTION_POLICY.batch) await store.appendSharedExecution(A,p,p.chunks.slice(i,i+EXECUTION_POLICY.batch));
+    await pg.exec("create function test_rotation_failure() returns trigger language plpgsql as $$ begin if NEW.state='ready' then raise exception 'synthetic_finish_failure'; end if; return NEW; end $$; create trigger zz_test_rotation_failure after update on simulation_executions for each row execute function test_rotation_failure()");
+    await assert.rejects(store.finishSharedExecution(A,p),/synthetic_finish_failure/);
+    for(const run of [first,second]) assert.equal((await store.readSharedExecution(A,run.handle,141)).ok,true,'ready transition rollback also restores the deleted oldest run');
+    await pg.exec('drop trigger zz_test_rotation_failure on simulation_executions; drop function test_rotation_failure()');
+    const completed=await store.saveRenderedExecution(A,packExecution(A,{...s,seed:3}));
+    assert.equal(completed.status,'ready');assert.equal(completed.handle.executionId,p.id);
+    assert.equal((await store.readSharedExecution(A,first.handle,141)).status,404);
+    assert.equal((await store.readSharedExecution(A,second.handle,141)).ok,true);
+    assert.equal((await store.readSharedExecution(B,other.handle,141)).ok,true);
+    const retained=await store.listStoredSharedExecutions(A);assert.equal(retained.length,2);assert.ok(retained.every(r=>r.state==='ready'));
+    const usage=(await pg.query('select retained,creating,used_bytes,hourly from simulation_execution_service')).rows[0];
+    assert.equal(usage.retained,3);assert.equal(usage.creating,0);
+    assert.equal(Number(usage.used_bytes),Number((await pg.query('select sum(reserved_bytes) as total from simulation_executions')).rows[0].total));
+    const reused=await store.saveRenderedExecution(A,packExecution(A,{...s,seed:3}));
+    assert.deepEqual(reused.handle,completed.handle,'identical content reuses handle and original TTL');
+    assert.equal((await pg.query('select hourly from simulation_execution_service')).rows[0].hourly,usage.hourly,'reuse spends no new admission');
+    assert.deepEqual(await store.listStoredSharedExecutions(A),retained);
+  } finally {await pg.close();}
+});
+
+test('rotation preserves both ready runs when global capacity or policy blocks the staging slot',async()=>{
+  const {pg,store}=await fixture();
+  try {
+    const s=executionFixture();
+    await store.saveRenderedExecution(A,packExecution(A,s));
+    await store.saveRenderedExecution(A,packExecution(A,{...s,seed:2}));
+    const before=await store.listStoredSharedExecutions(A);
+    for(const policy of [
+      'max_count=2',
+      'max_count=8,enabled=false',
+      "enabled=true,cleanup_succeeded_at=clock_timestamp()-interval '27 hours'",
+      'cleanup_succeeded_at=clock_timestamp(),owner_interval_seconds=86400',
+      'owner_interval_seconds=0,max_hourly=1',
+      'max_hourly=100,max_bytes=1048576',
+    ]) {
+      await pg.query(`update simulation_execution_service set ${policy}`);
+      assert.deepEqual(await store.saveRenderedExecution(A,packExecution(A,{...s,seed:3})),{status:'limit'});
+      assert.deepEqual(await store.listStoredSharedExecutions(A),before);
+    }
+  } finally {await pg.close();}
 });

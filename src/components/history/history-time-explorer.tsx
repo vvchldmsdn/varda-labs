@@ -113,7 +113,6 @@ export function HistoryTimeExplorer({
         <aside className={styles.hero} aria-label={t("선택한 날짜", "Selected date")}>
           <div className={styles.heroNumbers}>
             <p className={styles.heroDate}>{<T ko={formatDate(inspectedPoint?.date ?? null)} en={translateHomeHistory(formatDate(inspectedPoint?.date ?? null))}/>}</p>
-            {inspectedPoint?.liveValuation ? <CurrentValuationEvidence point={inspectedPoint} /> : null}
             <p className={styles.heroValue} data-history-inspected-value>{<T ko={mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </p>
             <p className={styles.heroCaption}>{<T ko={mode === "value" ? "총평가액" : "저장 수익률"} en={translateHomeHistory(mode === "value" ? "총평가액" : "저장 수익률")}/>}<span className={tone(inspectedPoint?.movementKrw ?? null)}><T ko="이전 대비" en="Previous change"/> {<T ko={formatSignedKrw(inspectedPoint?.movementKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.movementKrw ?? null))}/>}</span></p>
           </div>

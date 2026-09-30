@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createContext, useContext, useTransition, type ComponentProps, type ReactNode } from "react";
 import { CalendarDays, ArrowRight } from "lucide-react";
 import loadingStyles from "./simulation-loading.module.css";
+import styles from "./simulation-workspace.module.css";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import type {
   PortfolioAnalysisScope,
@@ -93,12 +94,12 @@ export function SimulationContextFields() {
 export function SimulationModelSelector() {
   const params = useSearchParams();
   const selected = params.get("model") ?? "economic";
-  return <nav aria-label="Simulation model" className="flex min-w-0 gap-1 rounded-md bg-[var(--wash)] p-1" data-simulation-model-selector>
+  return <nav aria-label="Simulation model" className={styles.textTabs} data-simulation-model-selector>
     {(["economic", "bootstrap"] as const).map((model) => {
       const next = new URLSearchParams(params.toString());
       next.set("model", model);
       return <SimulationLink key={model} href={`/simulation?${next}`} aria-current={selected === model ? "page" : undefined}
-        className={`min-h-10 rounded px-3 py-2 text-xs transition-colors ${selected === model ? "bg-[var(--paper)] font-medium text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}>
+        className={styles.textTab}>
         <SimulationText ko={model === "economic" ? "경제지표 경로" : "과거 수익률 경로"} en={model === "economic" ? "Economic paths" : "Historical paths"} />
       </SimulationLink>;
     })}

@@ -45,18 +45,18 @@ export function OwnerResearchExecutionSection({
             <SimulationText ko={"내 포트폴리오 확률 경로"} />{" "}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-1">
-        <CalculationGuideDialog
-          guide={simulationCalculationGuide}
-          label={{ ko: "계산 과정", en: "How it works" }}
-          title={{ ko: "시뮬레이션, 이렇게 계산해요", en: "How the simulation is calculated" }}
-        />
         <SimulationDialog
-          label="종목별 계산 근거" labelEn="Holdings & calculation evidence"
+          label="세부 사항" labelEn="Details"
           title="사용한 종목과 계산 근거" titleEn="Holdings and calculation evidence"
           icon="table"
           size="wide"
           compactLabel
         >
+        <CalculationGuideDialog
+          guide={simulationCalculationGuide}
+          label={{ ko: "계산 과정", en: "How it works" }}
+          title={{ ko: "시뮬레이션, 이렇게 계산해요", en: "How the simulation is calculated" }}
+        />
           <p className="text-sm leading-6 text-[var(--muted)]"><SimulationText ko="어떤 종목이 포함됐는지 먼저 확인하세요. 계산 방식과 용어는 ‘계산 과정’에서 순서대로 볼 수 있습니다." en="Check which holdings were included below. The How it works guide walks through the method and terms." /></p>
           <details className="mt-4 border-y border-[var(--line)] py-3">
             <summary className="cursor-pointer text-sm font-medium"><SimulationText ko="계산 기준 상세" en="Detailed calculation criteria" /></summary>

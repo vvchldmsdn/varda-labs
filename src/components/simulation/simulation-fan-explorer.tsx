@@ -21,10 +21,12 @@ import {
   type ResearchFanChartValueDomain,
 } from "./simulation-presentation";
 import styles from "./simulation-workspace.module.css";
+
 import chartStyles from "./simulation-path-chart.module.css";
 import detailStyles from "./simulation-path-detail.module.css";
 import { ExpandableChart } from "@/components/presentation/expandable-chart";
 import { SimulationPathCanvas } from "./simulation-path-canvas";
+const SimulationStorageManager = lazy(() => import("./simulation-storage-manager").then(module => ({ default: module.SimulationStorageManager })));
 const SimulationPathDetailPanel = lazy(() => import("./simulation-path-detail-panel"));
 
 export function SimulationFanExplorer({
@@ -350,9 +352,10 @@ export function SimulationFanExplorer({
         <button type="button" disabled={selectedPath === pathCount - 1} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath + 1)} aria-label={pt("다음 경로", "Next path")}><ChevronRight size={14} aria-hidden="true" /></button>
         {selectedPath !== null ? <button type="button" onClick={() => selectPath(null)} aria-label={pt("경로 선택 해제", "Clear path selection")}><X size={13} aria-hidden="true" /></button> : null}
         {selectedPath !== null && pathDetail ? <button ref={detailTrigger} type="button" style={{ borderRadius: 8, padding: "0 12px" }} aria-expanded={detailOpen} onClick={() => { setActiveStep(selectedStep); setDetailOpen(true); }}>{pt("경로 자세히 보기", "Path details")}</button> : null}
-        {selectedPath !== null && !pathDetail ? <span>{pathDetailNotice === "limit" ? pt("다른 실행을 저장 중이거나 보관 한도에 도달했어요. 잠시 후 다시 시도해 주세요.", "Another execution is being saved or storage is full. Try again later.") : pathDetailNotice === "disabled" ? pt("경로 상세 기능이 현재 활성화되지 않았어요. 그래프는 계속 볼 수 있습니다.", "Path details are not enabled right now. The chart remains available.") : pathDetailNotice === "storage" ? pt("이번 실행의 상세를 저장하지 못했어요. 그래프는 계속 볼 수 있습니다.", "Details could not be saved for this execution. The chart remains available.") : pt("이 모형은 경로별 상세 상태를 제공하지 않습니다.", "This model does not provide per-path details.")}</span> : null}
+        {selectedPath !== null && !pathDetail ? <span>{pathDetailNotice === "limit" ? pt("상세 저장이 잠시 제한됐어요. 잠시 후 다시 시도해 주세요.", "Path storage is temporarily limited. Please retry shortly.") : pathDetailNotice === "disabled" ? pt("경로 상세 기능이 현재 활성화되지 않았어요. 그래프는 계속 볼 수 있습니다.", "Path details are not enabled right now. The chart remains available.") : pathDetailNotice === "storage" ? pt("이번 실행의 상세를 저장하지 못했어요. 그래프는 계속 볼 수 있습니다.", "Details could not be saved for this execution. The chart remains available.") : pt("이 모형은 경로별 상세 상태를 제공하지 않습니다.", "This model does not provide per-path details.")}</span> : null}
         <span className={chartStyles.pathCount}>{pt(`${source.kind === "all" ? "전체" : "표본"} ${pathCount.toLocaleString()}개`, `${source.kind === "all" ? "All" : "Sample"} ${pathCount.toLocaleString()} paths`)}</span>
       </div> : null}
+      {selectedPath !== null && !pathDetail && pathDetailNotice === "limit" ? <Suspense fallback={null}><SimulationStorageManager /></Suspense> : null}
       <div className="mt-2 flex items-center gap-4">
         <input
           className={styles.scrubber}
@@ -379,7 +382,7 @@ export function SimulationFanExplorer({
           {displayedStep}<SimulationText ko={"단계"} />{" "}</span>
       </div>
       {compact ? null : (
-        <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]">
+        <figcaption className={large ? "sr-only" : "flex flex-wrap items-center gap-x-5 gap-y-2 py-4 text-[11px] text-[var(--muted)]"}>
           <span className="flex items-center gap-2">
             <i className="h-0.5 w-5 bg-[var(--ink)]" />
             <SimulationText ko={"중앙값 P50"} />{" "}</span>

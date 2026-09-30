@@ -13,3 +13,9 @@
   .frame[data-expanded] { inset:12px; padding:18px; overflow:auto; }
   .frame[data-expanded] > figure { flex:none; }
 }
+.frame { position:relative; }
+.frame:not([data-expanded]) > .toolbar { position:absolute; right:0; top:0; z-index:2; padding:0; }
+.frame:not([data-expanded]) > .toolbar button { width:36px; height:36px; min-width:36px; min-height:36px; border:0; background:transparent; }
+@media (max-width:760px) {
+  .frame:not([data-expanded]) > .toolbar button { height:44px; }
+}

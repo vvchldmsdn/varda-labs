@@ -19,3 +19,7 @@
   .pathCount { font-size:10px; }
 }
 @media (prefers-reduced-motion:reduce) { .canvas { animation:none; } }
+.pathControls { gap:5px; padding-top:4px; }
+.pathControls input { width:58px; min-width:58px; min-height:32px; padding:3px 4px; border:0; border-bottom:1px solid var(--line); border-radius:0; font-size:13px; }
+.pathControls button { min-height:32px; min-width:32px; background:transparent; border-radius:0; }
+@media (max-width:600px) { .pathControls input,.pathControls button { min-height:44px; } .pathControls button { min-width:40px; } }

@@ -4,13 +4,38 @@ import { getTenantSqlClient } from "@/db/tenant-client";
 import { decodePath, EXECUTION_POLICY as P, manifestOf, type PackedExecution, type Piece } from "@/lib/simulation-execution-codec";
 import type { SimulationPathHandle } from "@/lib/simulation-path-detail";
 import type { PathReadResult } from "@/lib/simulation-path-detail-store";
+import type { StoredSimulationExecution } from "@/lib/simulation-storage-management";
 const requestDeadline = new AsyncLocalStorage<AbortSignal>();
 export function withExecutionDeadline<T>(work: () => Promise<T>) {
   return requestDeadline.run(AbortSignal.timeout(20_000), work);
 }
 export async function canAdmitSharedExecution(owner: string) {
-  const [rows] = await transaction(owner, [{ sql: "select simulation_execution_admission() or exists(select 1 from simulation_executions where owner_user_id=$1::uuid and state in ('creating','ready') and expires_at>clock_timestamp()) as allowed", params: [owner] }]);
+  // Existing runs can be resumed, and this owner's expired/incomplete rows can
+  // be pruned by beginSharedExecution. This is only an optimistic preflight:
+  // the INSERT trigger still checks every service gate after that pruning.
+  const [rows] = await transaction(owner, [{ sql: `select simulation_execution_admission() or exists(
+    select 1 from simulation_executions where owner_user_id=$1::uuid and (
+      (state in ('creating','ready') and expires_at>clock_timestamp())
+      or expires_at<=clock_timestamp()
+      or (state<>'ready' and created_at<clock_timestamp()-interval '30 minutes')
+    )) as allowed`, params: [owner] }]);
   return rows[0]?.allowed === true;
+}
+
+/** Minimized owner-only metadata; never exports bindings, paths or inputs. */
+export async function listStoredSharedExecutions(owner: string): Promise<StoredSimulationExecution[]> {
+  const [rows] = await transaction(owner, [{ sql: `select id,model,(manifest->>'horizon')::int as horizon,state,
+    (extract(epoch from created_at)*1000)::bigint as created,
+    (extract(epoch from expires_at)*1000)::bigint as expires
+    from simulation_executions where owner_user_id=$1::uuid order by created_at desc,id limit 3`, params: [owner] }]);
+  return rows.map(row => ({ id: row.id, model: row.model, horizon: row.horizon, state: row.state,
+    createdAt: Number(row.created), expiresAt: Number(row.expires) }));
+}
+
+/** Explicit user deletion; automatic rotation handles normal retention. */
+export async function deleteStoredSharedExecution(owner: string, executionId: string) {
+  const [rows] = await transaction(owner, [{ sql: "delete from simulation_executions where owner_user_id=$1::uuid and id=$2::uuid returning 1 as removed", params: [owner, executionId] }], true);
+  return rows.length === 1;
 }
 
 // All private queries use the existing tenant HTTP transaction client. No process state.
@@ -36,7 +61,7 @@ export async function beginSharedExecution(owner: string, p: PackedExecution) {
       select $1::uuid,$2::uuid,$3,$4,1,$5,$6,$7::jsonb,decode($8,'base64'),$9::bigint
       where investment_plan_tenant_active() and not exists(select 1 from prior)
       and not exists(select 1 from simulation_executions where owner_user_id=$1::uuid and binding=$3)
-      and (select count(*) from simulation_executions where owner_user_id=$1::uuid)<2
+      and (select count(*) from simulation_executions where owner_user_id=$1::uuid)<${P.ownerCount + P.ownerInFlight}
       and (select coalesce(sum(reserved_bytes),0) from simulation_executions where owner_user_id=$1::uuid)+$9::bigint<=201326592
       and not exists(select 1 from simulation_executions where owner_user_id=$1::uuid and state='creating') returning id)
       select case when exists(select 1 from added) then 'creating' when exists(select 1 from prior where binding=$3 and state in ('creating','ready')) then (select state from prior) when exists(select 1 from prior) then 'conflict' else 'limit' end as status`, params: [owner,p.id,p.binding,P.codec,p.model,p.currency,JSON.stringify(manifest),common.data,p.bytes] },
@@ -66,7 +91,7 @@ export async function saveSharedExecution(owner: string, p: PackedExecution) {
   } catch (error) {
     // Admission is rechecked by the SQL trigger under the global budget lock.
     // Another request can consume capacity after the earlier read-only check.
-    if (error instanceof Error && error.message === "execution_service_limit") return { status: "limit" } as const;
+    if (error instanceof Error && ["execution_service_limit", "execution_limit"].includes(error.message)) return { status: "limit" } as const;
     throw error;
   }
   if(status==='limit'||status==='conflict') return {status} as const;

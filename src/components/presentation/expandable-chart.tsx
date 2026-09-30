@@ -77,7 +77,7 @@ export function ExpandableChart({ children, title, enabled = true, onEscape }: {
     {expanded ? <button className={styles.backdrop} tabIndex={-1} aria-label={t("닫기", "Close")} onClick={() => setExpanded(false)} /> : null}
     <div className={styles.toolbar}>
       <h2 id={titleId} hidden={!expanded}>{title}</h2>
-      <button ref={trigger} hidden={expanded} type="button" className="varda-presentation-detail-trigger" onClick={() => setExpanded(true)}><span>{t("크게 보기", "Expand chart")}</span><Maximize2 size={15} aria-hidden="true" /></button>
+      <button ref={trigger} hidden={expanded} type="button" className="varda-icon-button" aria-label={t("크게 보기", "Expand chart")} title={t("크게 보기", "Expand chart")} onClick={() => setExpanded(true)}><Maximize2 size={17} aria-hidden="true" /></button>
       <button ref={closeButton} hidden={!expanded} type="button" className="varda-icon-button" aria-label={t("확대 차트 닫기", "Close expanded chart")} onClick={() => setExpanded(false)}><X size={20} /></button>
     </div>
     {children}
