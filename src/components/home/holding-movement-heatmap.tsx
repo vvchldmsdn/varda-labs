@@ -320,7 +320,7 @@ function HeatmapRow({
           <button
             key={`${row.holdingId}:${cell.date}`}
             type="button"
-            aria-label={`${row.name} ${formatDate(cell.date)} ${cell.priceReturnEvidence ? t("가격 등락", "Price change") : ""} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
+            aria-label={`${row.name} ${formatDate(cell.date)} ${cell.basis === "live_movement" || cell.priceReturnEvidence ? t("평가액 변동률", "Value change (%)") : ""} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
             aria-pressed={selected}
             className={styles.heatmapCell}
             data-cell-index={cellIndex}

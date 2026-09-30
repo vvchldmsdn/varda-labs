@@ -96,6 +96,7 @@ describe("holding connection graph", () => {
       const pct = sign > 0 ? "+0.08%" : "-0.08%";
       const amount = sign > 0 ? "+₩800" : "-₩800";
       assert.ok(mobileRow.includes(pct)); assert.ok(mobileRow.includes(amount));
+      assert.ok(html.includes(`${language === "ko" ? "평가액 변동률" : "Value change (%)"} ${pct}"`), "desktop accessible label uses the same valuation metric");
       assert.ok(!mobileRow.includes("0.26%"));
       assert.ok(html.includes(language === "ko" ? "가격 등락 · 거래통화 기준" : "Price change · trading currency"));
       assert.ok(html.includes(sign > 0 ? "-0.26%" : "+0.26%"));
