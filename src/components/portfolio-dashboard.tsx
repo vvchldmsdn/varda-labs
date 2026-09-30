@@ -246,7 +246,7 @@ function movementBasisText(data: DashboardData) {
 }
 
 function movementPendingReason(data: DashboardData) {
-  if (data.dataHealth.movementReason === "stale_baseline_snapshot") return "07:00 KST 기준 기록 준비 중";
+  if (data.dataHealth.movementReason === "stale_baseline_snapshot") return "일일 기준 기록 준비 중";
   if (data.dataHealth.movementReason === "missing_current_price") return "현재가 근거 부족";
   if (data.dataHealth.movementReason === "missing_baseline_snapshot") return "기준 스냅샷 부족";
   if (data.dataHealth.movementReason === "missing_fresh_live_prices") return "실시간 시세 갱신 필요";

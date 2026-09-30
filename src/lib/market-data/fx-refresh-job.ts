@@ -2,7 +2,7 @@ import "server-only";
 import { fxObservationWrite } from "./fx-observation-write";
 import { preserveUnchangedCutoffFx } from "@/db/queries/snapshot-cutoff-observations";
 
-import { eq } from "drizzle-orm";
+import { and, eq, lte, isNull, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { fxRates } from "@/db/schema";
@@ -25,16 +25,19 @@ export async function runUsdKrwFxRefreshJob({
   dryRun = true,
   provider = "er-api-open",
   acceptExistingVardaRow = false,
+  refreshUnchangedReceipt = false,
 }: {
   dryRun?: boolean;
   provider?: FxRefreshProviderName;
   acceptExistingVardaRow?: boolean;
+  refreshUnchangedReceipt?: boolean;
 } = {}) {
   const candidate = await fetchUsdKrwFxCandidate({ provider });
   return runUsdKrwFxCandidateJob({
     candidate,
     dryRun,
     acceptExistingVardaRow,
+    refreshUnchangedReceipt,
   });
 }
 
@@ -42,10 +45,12 @@ export async function runUsdKrwFxCandidateJob({
   candidate,
   dryRun = true,
   acceptExistingVardaRow = false,
+  refreshUnchangedReceipt = false,
 }: {
   candidate: FxRateCandidate;
   dryRun?: boolean;
   acceptExistingVardaRow?: boolean;
+  refreshUnchangedReceipt?: boolean;
 }) {
   const existingRows = await getExistingFxRows(candidate.rateDate);
   const plannedWrite = planFxRateWrite(candidate, existingRows);
@@ -83,6 +88,16 @@ export async function runUsdKrwFxCandidateJob({
     plannedWrite.reason === "same_varda_row_value"
   ) {
     await preserveUnchangedCutoffFx(candidate);
+    if (refreshUnchangedReceipt) {
+      const receipt = new Date(candidate.fetchedAt);
+      if (!Number.isFinite(receipt.getTime()) || receipt.getTime() > Date.now()) throw new Error('invalid_fx_receipt');
+      const updated = await db.update(fxRates).set({fetchedAt: receipt, source: candidate.source, usdKrw: candidate.usdKrw, ...fxObservationWrite(candidate)}).where(and(
+        eq(fxRates.id, existingRows[0].id), eq(fxRates.usdKrw, existingRows[0].usdKrw!), existingRows[0].source == null ? isNull(fxRates.source) : eq(fxRates.source, existingRows[0].source),
+        eq(fxRates.isSample, false), eq(fxRates.status, "ok"), isNull(fxRates.legacyBase44Id),
+        or(isNull(fxRates.fetchedAt), lte(fxRates.fetchedAt, receipt)),
+      )).returning({id:fxRates.id});
+      if (!updated.length) throw new Error('fx_receipt_changed');
+    }
     return {
       ...baseResult,
       ok: true,

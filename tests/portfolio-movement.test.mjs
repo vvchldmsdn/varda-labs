@@ -91,6 +91,41 @@ function buildDaily(overrides = {}) {
 }
 
 describe("portfolio movement builder", () => {
+  it("does not deduct an execution-baseline trade that is already included in its quantities", () => {
+    const result = buildDaily({
+      holdings: [holding({ quantity: 12, currentPrice: 100, valueKrw: 1200 })],
+      positionRows: [position({ quantity: 12, marketValueKrw: 1200, capturedAt: "2026-07-07T22:40:00Z", description: "valuation_policy=execution_collection_v1" })],
+      eventRows: [tradeEvent({ quantityDelta: 2, price: 100, createdAt: "2026-07-07T22:20:00Z" })],
+    });
+    assert.equal(result.ready, true);
+    assert.equal(result.changeKrw, 0);
+    assert.equal(result.tradeFlowKrw, 0);
+    assert.equal(result.priceChangeKrw, 0);
+  });
+
+  it("deducts a post-execution trade even when its entered transaction timestamp is earlier", () => {
+    const result = buildDaily({
+      holdings: [holding({ quantity: 14, currentPrice: 100, valueKrw: 1400 })],
+      positionRows: [position({ quantity: 12, marketValueKrw: 1200, capturedAt: "2026-07-07T22:40:00Z", description: "valuation_policy=execution_collection_v1" })],
+      eventRows: [tradeEvent({ quantityDelta: 2, price: 100, recordedAt: "2026-07-07T22:20:00Z", createdAt: "2026-07-07T22:50:00Z" })],
+    });
+    assert.equal(result.ready, true);
+    assert.equal(result.changeKrw, 0);
+    assert.equal(result.tradeFlowKrw, 200);
+    assert.equal(result.priceChangeKrw, 0);
+  });
+
+  it("does not guess whether an undated trade was included in an execution baseline", () => {
+    const result = buildDaily({
+      holdings: [holding({ quantity: 12, currentPrice: 100, valueKrw: 1200 })],
+      positionRows: [position({ quantity: 12, marketValueKrw: 1200, capturedAt: "2026-07-07T22:40:00Z", description: "valuation_policy=execution_collection_v1" })],
+      eventRows: [tradeEvent({ quantityDelta: 2, price: 100 })],
+    });
+    assert.equal(result.ready, false);
+    assert.equal(result.reason, "incomplete_trade_attribution");
+    assert.equal(result.changeKrw, null);
+  });
+
   it("computes KRW snapshot movement from fresh current prices", () => {
     const result = buildDaily();
     const contribution = result.contributions.get("asset-kr");

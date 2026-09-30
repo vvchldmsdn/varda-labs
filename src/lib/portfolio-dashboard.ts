@@ -167,6 +167,8 @@ export type DashboardData = {
   usdKrwRate: number;
   fxTrend: readonly DashboardFxTrendPoint[];
   movementBaselineDate: string | null;
+  baselineExecutionFxFetchedAt?: string | null;
+  baselineExecutionCapturedAt?: string | null;
   marketPriceReferenceDate: string | null;
   totalValueKrw: number;
   costBasisKrw: number | null;
@@ -479,6 +481,14 @@ export async function getPortfolioDashboard(
     usdKrwRate,
     fxTrend: demand.surface === "home" ? buildDashboardFxTrend(recentFxRows) : [],
     movementBaselineDate,
+    baselineExecutionCapturedAt: latestPositionRows
+      .filter(row => row.description?.split(/;\s*/).includes("valuation_policy=execution_collection_v1"))
+      .map(row => row.capturedAt?.toISOString()).filter((at): at is string => !!at).sort().at(-1) ?? null,
+    baselineExecutionFxFetchedAt: latestPositionRows
+      .filter(row => row.description?.includes("fx_valuation_policy=execution_collection_v1") && row.currency === "USD")
+      .map(row => row.description?.match(/(?:^|;\s*)fx_fetched_at=([^;]+)/)?.[1])
+      .filter((at): at is string => !!at && Number.isFinite(Date.parse(at))).sort().at(-1) ?? null,
+
     marketPriceReferenceDate,
     totalValueKrw,
     costBasisKrw,

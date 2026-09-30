@@ -69,6 +69,8 @@ export type PortfolioMovementPositionSnapshotInput = {
   previousFxRate: string | number | null;
   quantity?: string | number | null;
   currency?: string | null;
+  capturedAt?: Date | string | null;
+  description?: string | null;
 };
 
 export type PortfolioMovementEventInput = {
@@ -952,7 +954,7 @@ function indexMovementTrades(
   selectedAccount: PortfolioMovementSelectedAccount,
   baselineDate: string,
 ): { byHolding: Map<string, ResolvedMovementTrade[]>; bySnapshot: Map<string, ResolvedMovementTrade[]> } |
-   { reason: "ambiguous_trade_identity" | "missing_trade_amount" } {
+   { reason: "ambiguous_trade_identity" | "missing_trade_amount" | "incomplete_trade_attribution" } {
   const byHolding = new Map<string, ResolvedMovementTrade[]>();
   const bySnapshot = new Map<string, ResolvedMovementTrade[]>();
   const exitedSnapshots = snapshots.filter((snapshot) =>
@@ -963,6 +965,18 @@ function indexMovementTrades(
     const snapshotMatches = exitedSnapshots.filter((snapshot) => eventMatchesSnapshot(event, snapshot, selectedAccount));
     if (holdingMatches.length + snapshotMatches.length > 1) return { reason: "ambiguous_trade_identity" };
     if (holdingMatches.length + snapshotMatches.length === 0) continue;
+    const baseline = holdingMatches.length === 1
+      ? snapshots.find((snapshot) => positionSnapshotMatchesHolding(snapshot, holdingMatches[0]))
+      : snapshotMatches[0];
+    if (baseline?.description?.split(/;\s*/).includes("valuation_policy=execution_collection_v1")) {
+      const capturedAt = baseline.capturedAt == null ? NaN : new Date(baseline.capturedAt).getTime();
+      // A backdated event recorded after capture was not included in that
+      // snapshot. Creation time is the ledger inclusion boundary, not its date.
+      const includedAt = event.createdAt ?? event.recordedAt;
+      const recordedAt = includedAt == null ? NaN : new Date(includedAt).getTime();
+      if (!Number.isFinite(capturedAt) || !Number.isFinite(recordedAt)) return { reason: "incomplete_trade_attribution" };
+      if (recordedAt <= capturedAt) continue;
+    }
     const amountKrw = resolveMovementTradeAmount(event, holdingMatches[0]?.currency ?? snapshotMatches[0]?.currency);
     if (amountKrw === null) return { reason: "missing_trade_amount" };
     const resolvedEvent = { ...event, amountKrw };

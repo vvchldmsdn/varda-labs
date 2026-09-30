@@ -8,7 +8,7 @@ describe("Daily market cycle cutoff recovery", () => {
     const result = await f.run({ now: new Date("2026-09-09T22:01:00Z"), cronScheduleUtc: "55 21 * * *" });
     assert.equal(result.phase, undefined);assert.equal(result.snapshotDate,"2026-09-10");
     assert.notEqual(result.status,"prepared");assert.equal(f.claims[0].phase,undefined);
-    assert.ok(f.events.indexOf("snapshot")<f.events.indexOf("live"));
+    assert.ok(f.events.indexOf("live")<f.events.indexOf("snapshot"));
   });
   it("preparation price success cannot hide missing FX and never completes daily work", async () => {
     const f=await fixture({fxError:true});const result=await f.run({now:new Date("2026-09-09T21:55:00Z")});
@@ -88,17 +88,17 @@ describe("Daily market cycle cutoff recovery", () => {
   it("includes a native failure in response and persisted final outcome",async()=>{
     const f=await fixture({nativeResult:{status:"partial",targetCount:1,created:0,failedCount:1,blockedCount:0}});
     const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"failed");
-    assert.equal(f.finished.length,1);assert.equal(f.finished[0].status,"failed");assert.equal(f.finished[0].failedCount,1);assert.equal(f.finished[0].metadata.nativeSnapshot.failedCount,1);assert.ok(!f.events.includes("live"));assert.ok(!f.events.includes("fx"));
+    assert.equal(f.finished.length,1);assert.equal(f.finished[0].status,"failed");assert.equal(f.finished[0].failedCount,1);assert.equal(f.finished[0].metadata.nativeSnapshot.failedCount,1);assert.ok(f.events.indexOf("native-snapshot") < f.events.indexOf("fx"));
   });
   it("keeps native missing evidence blocked instead of hiding it as no targets",async()=>{
     const f=await fixture({nativeResult:{status:"partial",targetCount:1,created:0,failedCount:0,blockedCount:1}});
-    const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"blocked");assert.equal(f.finished[0].metadata.nativeSnapshot.targetCount,1);assert.ok(!f.events.includes("live"));assert.ok(!f.events.includes("fx"));
+    const result=await f.run();assert.equal(result.ok,false);assert.equal(result.status,"blocked");assert.equal(f.finished[0].metadata.nativeSnapshot.targetCount,1);assert.ok(f.events.indexOf("native-snapshot") < f.events.indexOf("fx"));
   });
   it("uses the collection lease and completes close sync without a legacy cooldown veto", async () => {
     const f = await fixture({ missingClose: true });
     const result = await f.run();
     assert.equal(result.status, "completed");
-    assert.deepEqual(f.events, ["claim", "collection-lease", "factors", "preflight", "close", "preflight", "snapshot", "native-snapshot", "fx", "live", "finish:completed"]);
+    assert.deepEqual(f.events, ["claim", "native-snapshot", "collection-lease", "factors", "fx", "live", "preflight", "close", "preflight", "snapshot", "finish:completed"]);
     assert.equal(result.closeSync.successCount, 1);
     assert.equal(result.snapshot.writtenCount, 1);
   });
@@ -109,7 +109,7 @@ describe("Daily market cycle cutoff recovery", () => {
     assert.equal(result.status, "completed");
     assert.equal(result.snapshot.writtenCount, 1);
     assert.equal(result.liveSync.status, "partial");
-    assert.ok(f.events.indexOf("snapshot") < f.events.indexOf("live"));
+    assert.ok(f.events.indexOf("live") < f.events.indexOf("snapshot"));
     assert.equal(f.finished.at(-1).metadata.liveSync.failedCount, 1);
   });
 
@@ -122,11 +122,11 @@ describe("Daily market cycle cutoff recovery", () => {
     assert.equal(f.finished.at(-1).status, "completed");
   });
 
-  it("captures the pre-cutoff FX observation before a refresh overwrites it", async () => {
+  it("collects execution FX before current-cycle planning and valuation", async () => {
     const f = await fixture();
     const result = await f.run();
     assert.equal(result.status, "completed");
-    assert.equal(f.snapshotFx(), 1375);
+    assert.equal(f.snapshotFx(), 1382);
     assert.equal(f.currentFx(), 1382);
     assert.equal(result.fx.status, "written");
   });
@@ -165,14 +165,14 @@ describe("Daily market cycle cutoff recovery", () => {
     assert.equal(result.status, "blocked");
     assert.ok(result.blockers.includes("close_sync_incomplete"));
     assert.ok(!f.events.includes("snapshot"));
-    assert.ok(!f.events.includes("live"));
+    assert.ok(f.events.indexOf("live") < f.events.indexOf("preflight"));
   });
 
   it("waits for a deferred close budget and writes the cutoff exactly once", async () => {
     const f = await fixture({ missingClose: true, closeErrors: [deferred("provider_budget_limited", 25)] });
     const result = await f.run();
     assert.equal(result.status, "completed");
-    assert.deepEqual(f.events, ["claim", "collection-lease", "factors", "preflight", "close", "wait:25", "close", "preflight", "snapshot", "native-snapshot", "fx", "live", "finish:completed"]);
+    assert.deepEqual(f.events, ["claim", "native-snapshot", "collection-lease", "factors", "fx", "live", "preflight", "close", "wait:25", "close", "preflight", "snapshot", "finish:completed"]);
     assert.equal(result.closeSync.deferred, null);
     assert.equal(result.snapshot.writtenCount, 1);
     assert.equal(f.events.filter((event) => event === "snapshot").length, 1);
@@ -185,8 +185,8 @@ describe("Daily market cycle cutoff recovery", () => {
     const result = await f.run();
     assert.equal(result.status, "completed");
     assert.deepEqual(f.events.filter((event) => event.startsWith("wait:")), ["wait:20", "wait:60"]);
-    assert.equal(f.snapshotFx(), 1375);
-    assert.ok(f.events.indexOf("snapshot") < f.events.indexOf("fx"));
+    assert.equal(f.snapshotFx(), 1382);
+    assert.ok(f.events.indexOf("fx") < f.events.indexOf("preflight"));
   });
 
   it("does not replay a completed close group when a later group is deferred", async () => {
@@ -210,8 +210,8 @@ describe("Daily market cycle cutoff recovery", () => {
     assert.equal(result.closeSync.successCount, 1);
     assert.equal(result.snapshot.targetCount, 1);
     assert.ok(!f.events.includes("snapshot"));
-    assert.ok(!f.events.includes("fx"));
-    assert.ok(!f.events.includes("live"));
+    assert.ok(f.events.indexOf("fx") < f.events.indexOf("preflight"));
+    assert.ok(f.events.indexOf("live") < f.events.indexOf("preflight"));
     assert.ok(!f.events.some((event) => event.startsWith("wait:")));
     assert.equal(f.finished.at(-1).metadata.closeSync.deferred.retryAfterSeconds, 3600);
   });
@@ -260,8 +260,8 @@ describe("Daily market cycle cutoff recovery", () => {
     assert.equal(result.status, "failed");
     assert.deepEqual(result.blockers, ["snapshot_write_incomplete", "legacy_snapshot_failed"]);
     assert.equal(result.snapshot.writtenCount, 0);
-    assert.ok(!f.events.includes("live"));
-    assert.ok(!f.events.includes("fx"));
+    assert.ok(f.events.indexOf("live") < f.events.indexOf("preflight"));
+    assert.ok(f.events.indexOf("fx") < f.events.indexOf("preflight"));
   });
 
   it("does not repeat a completed service date", async () => {

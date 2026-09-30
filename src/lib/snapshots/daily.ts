@@ -69,7 +69,7 @@ import {
   uniqueStrings,
 } from "@/lib/portfolio-math";
 import { snapshotPositionCostBasisKrw, summarizeSnapshotCostEvidence } from "@/lib/snapshots/cost-evidence";
-import { selectSnapshotCutoffFx } from "@/lib/snapshots/cutoff-fx";
+import { selectSnapshotCutoffFx, selectSnapshotExecutionFx } from "@/lib/snapshots/cutoff-fx";
 import { eventsChangedAfterCutoff, holdingsChangedAfterCutoff } from "@/lib/snapshots/cutoff-holdings";
 import {
   buildCycleForSnapshotDate,
@@ -194,7 +194,7 @@ type FreshCloseSummary = {
 };
 
 type CutoffValuationSummary = {
-  policy: "pre_cutoff_kis_quote_else_exact_official_close";
+  policy: "pre_cutoff_kis_quote_else_exact_official_close" | "execution_quote_else_exact_official_close";
   maxQuoteAgeMinutes: number;
   requiredCount: number;
   observedCount: number;
@@ -459,7 +459,8 @@ export async function runDailySnapshot(
   options: RunOptions,
 ): Promise<DailySnapshotRunResult> {
   const dryRun = options.dryRun ?? true;
-  const resolvedCycle = resolveSnapshotCycle(options.now);
+  const executionAt = options.now ?? new Date();
+  const resolvedCycle = resolveSnapshotCycle(executionAt);
   const snapshotDate = options.snapshotDate ?? resolvedCycle.snapshotDate;
   const requestedAccount = options.account ?? ALL_SNAPSHOT_ACCOUNTS;
 
@@ -507,12 +508,19 @@ export async function runDailySnapshot(
     );
   }
 
+  const executionValuation = snapshotDate === resolvedCycle.snapshotDate && !historicalValidation?.ok;
   const provenance = buildSnapshotProvenance({
     snapshotDate,
     historicalBackfill: historicalValidation?.ok === true,
+    executionFx: executionValuation,
   });
 
-  const cycle = buildCycleForSnapshotDate(snapshotDate, options.now ?? new Date());
+  const scheduledCycle = buildCycleForSnapshotDate(snapshotDate, executionAt);
+  // 07:00 determines the service date. A current daily run records the actual
+  // execution valuation; it does not reconstruct a price or holding at 07:00.
+  const cycle = executionValuation
+    ? { ...scheduledCycle, cycleEndAt: executionAt }
+    : scheduledCycle;
   const ownerUserId = options.tenantContext.ownerUserId;
   const context = await loadAccountContext(snapshotDate, ownerUserId);
   if (!provenance.insertOnly) {
@@ -578,7 +586,8 @@ export async function runDailySnapshot(
   const retainedObservations = provenance.insertOnly ? null : await readSnapshotCutoffObservations(snapshotDate);
   const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate,
     provenance.insertOnly ? null : cycle.cycleEndAt, retainedObservations?.fxRows ?? [],
-    selectedAssets.some(asset => normalizeCurrencyCode(asset.currency) !== "KRW"));
+    selectedAssets.some(asset => normalizeCurrencyCode(asset.currency) !== "KRW"),
+    !provenance.insertOnly && snapshotDate === resolvedCycle.snapshotDate ? cycle.capturedAt : null);
   const unsupportedCurrencyAssets = selectedAssets.filter(
     (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
   );
@@ -611,6 +620,7 @@ export async function runDailySnapshot(
     capturedAt: cycle.capturedAt,
     cycleEndAt: cycle.cycleEndAt,
     useCutoffValuation: !provenance.insertOnly,
+    useExecutionValuation: executionValuation,
     retainedQuotes: retainedObservations?.quotes ?? [],
   });
   const freshClose = summarizeFreshClose(selectedAssets, closeContext, snapshotDate);
@@ -619,6 +629,7 @@ export async function runDailySnapshot(
     closeContext,
     required: !provenance.insertOnly,
     cycleEndAt: cycle.cycleEndAt,
+    executionValuation,
   });
   const closeSyncPlan = buildCloseSyncPlan({
     snapshotDate,
@@ -647,7 +658,7 @@ export async function runDailySnapshot(
   if (!dryRun && cutoffValuation.missing.length > 0) {
     throw new DailySnapshotRequestError(
       "missing_cutoff_price_evidence",
-      "A pre-cutoff KIS quote or the exact official close is required before writing the current daily snapshot",
+      "An admissible quote at the valuation time or the exact official close is required before writing the daily snapshot",
       { snapshotDate, missingCutoffAssets: cutoffValuation.missing },
       409,
     );
@@ -792,7 +803,7 @@ export async function runDailySnapshot(
 }
 
 /** Completed daily values are authoritative even after the live cache expires
- * or holdings change. Only the same owned account/cutoff is reused here. */
+ * or holdings change. The first completed owned account/service-date is frozen. */
 async function readCompletedDailyResult({ context, cycle, provenance, requestedAccount, dryRun }: {
   context: AccountContext; cycle: InternalCycle; provenance: SnapshotProvenance; requestedAccount: SnapshotAccount; dryRun: boolean;
 }): Promise<DailySnapshotRunResult | null> {
@@ -807,10 +818,10 @@ async function readCompletedDailyResult({ context, cycle, provenance, requestedA
   const selected: PortfolioRow[] = [];
   for (const code of codes) {
     const accountId = context.accountRowsByCode.get(code);
-    const candidates = portfolios.filter(row => row.canonicalOwnerUserId === context.ownerUserId && row.account === code && row.accountId === accountId && row.snapshotDate === cycle.snapshotDate && isCompletedDailyPortfolio(row, cycle.cycleEndAt));
+    const candidates = portfolios.filter(row => row.canonicalOwnerUserId === context.ownerUserId && row.account === code && row.accountId === accountId && row.snapshotDate === cycle.snapshotDate && isCompletedDailyPortfolio(row, row.cycleEndAt));
     if (candidates.length !== 1) return null;
     const row = candidates[0];
-    const holdings = positions.filter(p => p.canonicalOwnerUserId === context.ownerUserId && p.account === code && p.accountId === accountId && p.snapshotDate === cycle.snapshotDate && isVardaGeneratedRow(p) && !p.isSample && sameCutoff(p.cycleEndAt, cycle.cycleEndAt));
+    const holdings = positions.filter(p => p.canonicalOwnerUserId === context.ownerUserId && p.account === code && p.accountId === accountId && p.snapshotDate === cycle.snapshotDate && isVardaGeneratedRow(p) && !p.isSample && sameCutoff(p.cycleEndAt, row.cycleEndAt));
     if (holdings.length !== row.numAssets || new Set(holdings.map(positionKey)).size !== holdings.length) return null;
     selected.push(row); used.push(...holdings);
     results[code] = publicAccountPlan({ ...emptyAccountPlan(code), ...frozenPortfolioTotals(row), reason: "completed_cutoff_preserved", positionCount: holdings.length,
@@ -821,7 +832,7 @@ async function readCompletedDailyResult({ context, cycle, provenance, requestedA
     });
   }
   if (requestedAccount === ALL_SNAPSHOT_ACCOUNTS) {
-    const all = portfolios.filter(row => row.canonicalOwnerUserId === context.ownerUserId && row.account === "all" && row.snapshotDate === cycle.snapshotDate && isCompletedDailyPortfolio(row, cycle.cycleEndAt));
+    const all = portfolios.filter(row => row.canonicalOwnerUserId === context.ownerUserId && row.account === "all" && row.snapshotDate === cycle.snapshotDate && isCompletedDailyPortfolio(row, row.cycleEndAt));
     if (all.length !== 1 || all[0].numAssets !== used.length) return null;
     results.all = { ...results[codes[0]], ...frozenPortfolioTotals(all[0]), account: "all", accountsAggregated: codes.length, portfolioAction: "skip", blockers: [] };
   }
@@ -829,12 +840,12 @@ async function readCompletedDailyResult({ context, cycle, provenance, requestedA
   const observedCount = used.filter(row => row.priceBasis === "cutoff_live").length;
   return {
     ok: true, dryRun, writeReady: true, snapshotDate: cycle.snapshotDate, requestedAccount, accounts: codes,
-    cycle: { snapshotDate: cycle.snapshotDate, capturedAt: isoTimestamp(first.capturedAt) ?? cycle.capturedAt.toISOString(), cycleStartAt: cycle.cycleStartAt.toISOString(), cycleEndAt: cycle.cycleEndAt.toISOString() },
+    cycle: { snapshotDate: cycle.snapshotDate, capturedAt: isoTimestamp(first.capturedAt) ?? cycle.capturedAt.toISOString(), cycleStartAt: isoTimestamp(first.cycleStartAt) ?? cycle.cycleStartAt.toISOString(), cycleEndAt: isoTimestamp(first.cycleEndAt) ?? cycle.cycleEndAt.toISOString() },
     fx: { usdKrw: toNumber(first.usdKrw), referenceDate: used[0]?.fxReferenceDate ?? null, source: "stored_daily_snapshot", status: "stored",
       observedAt: descriptionValue(used[0]?.description, "fx_observed_at"), fetchedAt: descriptionValue(used[0]?.description, "fx_fetched_at"), rateKind: descriptionValue(used[0]?.description, "fx_rate_kind") },
     closeReferences: [], freshClose: { requiredCount: 0, satisfiedCount: 0, missingCount: 0, rowsUsedCount: 0, closeReferences: [], coverage: [], missing: [] },
     closeSyncPlan: { snapshotDate: cycle.snapshotDate, canProceedToSnapshotWrite: true, requiredCount: 0, coveredCount: 0, missingCount: 0, staleCount: 0, manualCurrentNotSyncableCount: 0, markets: [], manualCurrentNotSyncable: [], suggestedKisBatches: [] },
-    cutoffValuation: { policy: "pre_cutoff_kis_quote_else_exact_official_close", maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60000, requiredCount: used.length, observedCount, fallbackCount: used.length - observedCount, missing: [] },
+    cutoffValuation: { policy: first.description?.includes("valuation_policy=execution_collection_v1") ? "execution_quote_else_exact_official_close" : "pre_cutoff_kis_quote_else_exact_official_close", maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60000, requiredCount: used.length, observedCount, fallbackCount: used.length - observedCount, missing: [] },
     // No current-ledger calculation is substituted for the frozen record.
     realizedReturn: null, plannedWrites: { dailyPortfolioSnapshots: { insert: 0, update: 0, skip: selected.length, blocked: 0 }, dailyPositionSnapshots: { insert: 0, update: 0, skip: used.length, blocked: 0 } },
     results, warnings: ["completed_cutoff_preserved"], writePolicy: publicWritePolicy(provenance),
@@ -850,9 +861,11 @@ function descriptionNumber(description: string | null, key: string) { return toN
 function buildSnapshotProvenance({
   snapshotDate,
   historicalBackfill,
+  executionFx,
 }: {
   snapshotDate: string;
   historicalBackfill: boolean;
+  executionFx: boolean;
 }): SnapshotProvenance {
   if (!historicalBackfill) {
     return Object.freeze({
@@ -862,7 +875,7 @@ function buildSnapshotProvenance({
       insertOnly: false,
       fxAsOfDate: snapshotDate,
       manualValuation: "asset_current" as const,
-      descriptionTags: Object.freeze([] as string[]),
+      descriptionTags: Object.freeze(executionFx ? ["fx_valuation_policy=execution_collection_v1", "valuation_policy=execution_collection_v1"] : []),
     });
   }
 
@@ -944,7 +957,7 @@ function buildAccountPlan({
 
   // Re-reading live evidence must never revalue a completed daily record. This
   // check also applies to direct/admin writers, not only durable-job retries.
-  if (blockers.length === 0 && existingPortfolio && isCompletedDailyPortfolio(existingPortfolio, computed.positions[0]?.cycleEndAt) &&
+  if (blockers.length === 0 && existingPortfolio && isCompletedDailyPortfolio(existingPortfolio, existingPortfolio.cycleEndAt) &&
       existingPositionsByKey.size === existingPortfolio.numAssets &&
       [...existingPositionsByKey.values()].every(row => sameCutoff(row.cycleEndAt, existingPortfolio.cycleEndAt))) {
     const frozenPositions = [...existingPositionsByKey.values()];
@@ -1133,7 +1146,7 @@ function buildAllAccountPlan({
           base44UpdatedAt: null,
         }
       : null;
-  const preserveCompleted = existingPortfolio && isCompletedDailyPortfolio(existingPortfolio, cycle.cycleEndAt);
+  const preserveCompleted = existingPortfolio && isCompletedDailyPortfolio(existingPortfolio, existingPortfolio.cycleEndAt);
   const portfolioAction: SnapshotWriteAction =
     blockers.length > 0
       ? "blocked"
@@ -1569,10 +1582,10 @@ async function applySnapshotWrites(
     tx.query(`select 1/(case when not exists(select 1 from daily_portfolio_snapshots s
       where s.canonical_owner_user_id=$1::uuid and s.snapshot_date=$2::date and s.account=any($3::text[])
        and s.source=$4 and not s.is_sample and s.description like '%snapshot_status=complete%'
-       and s.cycle_end_at=$5::timestamptz and s.num_assets>0
+       and s.cycle_end_at is not null and s.num_assets>0
        and (s.account='all' or s.num_assets=(select count(*) from daily_position_snapshots p where p.canonical_owner_user_id=s.canonical_owner_user_id
          and p.account_id=s.account_id and p.snapshot_date=s.snapshot_date and p.source=s.source and not p.is_sample and p.cycle_end_at=s.cycle_end_at)))
-      then 1 else 0 end)`,[owner,snapshotDate,[...accountBuilds.filter(b=>b.status==="planned"&&b.portfolio).map(b=>b.account),...(allBuild?.status==="planned"&&allBuild.portfolio?["all"]:[])],SNAPSHOT_SOURCE,cutoff.toISOString()]),
+      then 1 else 0 end)`,[owner,snapshotDate,[...accountBuilds.filter(b=>b.status==="planned"&&b.portfolio).map(b=>b.account),...(allBuild?.status==="planned"&&allBuild.portfolio?["all"]:[])],SNAPSHOT_SOURCE]),
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,quantity numeric,"updatedAt" timestamptz)), actual as (
       select h.id,h.quantity,h.updated_at from assets h join accounts a on a.id=h.account_id
       where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is null and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
@@ -1808,6 +1821,7 @@ async function resolveSnapshotFx(
   cutoffAt: Date | null = null,
   retainedRows: Awaited<ReturnType<typeof readSnapshotCutoffObservations>>["fxRows"] = [],
   required = true,
+  executionAt: Date | null = null,
 ): Promise<ResolvedFxRate> {
   const rows = await db
     .select()
@@ -1817,11 +1831,13 @@ async function resolveSnapshotFx(
       eq(fxRates.isSample, false),
       eq(sql<string>`lower(trim(${fxRates.status}))`, "ok"),
       sql`${fxRates.usdKrw} > 0 and ${fxRates.usdKrw} < 'Infinity'::numeric`,
-      cutoffAt ? lte(fxRates.fetchedAt, cutoffAt) : undefined,
+      executionAt ? lte(fxRates.fetchedAt, executionAt) : cutoffAt ? lte(fxRates.fetchedAt, cutoffAt) : undefined,
     ))
     .orderBy(desc(fxRates.rateDate), desc(fxRates.fetchedAt), desc(fxRates.createdAt))
     .limit(32);
-  const row = selectSnapshotCutoffFx([...rows, ...retainedRows], fxAsOfDate, cutoffAt);
+  const row = executionAt
+    ? selectSnapshotExecutionFx(rows, fxAsOfDate, executionAt)
+    : selectSnapshotCutoffFx([...rows, ...retainedRows], fxAsOfDate, cutoffAt);
 
   const usdKrw = toNumber(row?.usdKrw);
   if (!row || usdKrw === null || usdKrw <= 0) {
@@ -1842,8 +1858,8 @@ async function resolveSnapshotFx(
     observedAt: "providerObservedAt" in row ? isoTimestamp(row.providerObservedAt) : isoTimestamp(row.observedAt),
     fetchedAt: isoTimestamp(row.fetchedAt),
     rateKind: row.rateKind,
-    referenceAt: isoTimestamp(row.observedAt),
-    timestampBasis: "timestampBasis" in row && row.timestampBasis === "collection" ? "collection" : "provider",
+    referenceAt: executionAt ? isoTimestamp(row.fetchedAt) : isoTimestamp(row.observedAt),
+    timestampBasis: executionAt ? "collection" : "timestampBasis" in row && row.timestampBasis === "collection" ? "collection" : "provider",
   };
 }
 
@@ -1868,6 +1884,7 @@ async function buildCloseContext({
   capturedAt,
   cycleEndAt,
   useCutoffValuation,
+  useExecutionValuation,
   retainedQuotes,
 }: {
   snapshotDate: string;
@@ -1877,6 +1894,7 @@ async function buildCloseContext({
   capturedAt: Date;
   cycleEndAt: Date;
   useCutoffValuation: boolean;
+  useExecutionValuation: boolean;
   retainedQuotes: Awaited<ReturnType<typeof readSnapshotCutoffObservations>>["quotes"];
 }): Promise<CloseContext> {
   const instruments = targetAssets.map(({ market, currency, ticker }) => ({
@@ -1934,7 +1952,7 @@ async function buildCloseContext({
           snapshotDate,
           assets: targetAssets,
         })
-      : useCutoffValuation ? await loadStoredManualCutoffSelections(ownerUserId,snapshotDate,targetAssets,cycleEndAt) : new Map<string, PriceSelection>();
+      : useCutoffValuation && !useExecutionValuation ? await loadStoredManualCutoffSelections(ownerUserId,snapshotDate,targetAssets,cycleEndAt) : new Map<string, PriceSelection>();
   const manualCarryMissing =
     manualValuation === "latest_prior_generated_snapshot_carry"
       ? targetAssets
@@ -2010,11 +2028,13 @@ function summarizeCutoffValuation({
   closeContext,
   required,
   cycleEndAt,
+  executionValuation,
 }: {
   selectedAssets: AssetRow[];
   closeContext: CloseContext;
   required: boolean;
   cycleEndAt: Date;
+  executionValuation: boolean;
 }): CutoffValuationSummary {
   const requiredAssets = required ? selectedAssets : [];
   const observedCount = selectedAssets.filter(
@@ -2043,7 +2063,7 @@ function summarizeCutoffValuation({
     }));
 
   return {
-    policy: "pre_cutoff_kis_quote_else_exact_official_close",
+    policy: executionValuation ? "execution_quote_else_exact_official_close" : "pre_cutoff_kis_quote_else_exact_official_close",
     maxQuoteAgeMinutes: SNAPSHOT_CUTOFF_QUOTE_MAX_AGE_MS / 60_000,
     requiredCount: requiredAssets.length,
     observedCount,
@@ -2867,7 +2887,9 @@ function selectOfficialCloseForAsset(
 function portfolioValuationBasis(provenance: SnapshotProvenance) {
   return provenance.insertOnly
     ? "historical_close_or_manual_carry"
-    : "pre_cutoff_quote_or_exact_official_close";
+    : provenance.descriptionTags.includes("valuation_policy=execution_collection_v1")
+      ? "execution_quote_or_exact_official_close"
+      : "pre_cutoff_quote_or_exact_official_close";
 }
 
 function assetValueKrw(asset: AssetRow, price: number, fxRate: number) {

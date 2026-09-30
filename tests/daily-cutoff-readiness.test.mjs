@@ -38,7 +38,7 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     assert.equal(position.closePrice, null);
   });
 
-  it("keeps the cutoff quote ahead of the official $100 reference", async () => {
+  it("keeps a fresh execution quote ahead of the official $100 reference", async () => {
     const f = await fixture();
     const result = await f.run();
     assert.equal(result.results.brokerage.totalMarketValue, 1365000);
@@ -59,32 +59,35 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     assert.equal(missing.writes.length, 0);
   });
 
-  it("does not call a post-cutoff quote ready during dry-run", async () => {
+  it("admits a quote collected by the actual run even when it is after 07:00", async () => {
     const f = await fixture({ close: false });
     f.rows.live_price_quotes[0].fetchedAt = new Date("2026-09-09T22:20:00Z");
     f.rows.live_price_quotes[0].priceAsOf = new Date("2026-09-09T22:20:00Z");
     const result = await f.run({ dryRun: true });
-    assert.equal(result.writeReady, false);
-    assert.equal(result.cutoffValuation.missing.length, 1);
-    await assert.rejects(f.run(), error => error.code === "missing_cutoff_price_evidence");
+    assert.equal(result.writeReady, true);
+    assert.equal(result.cutoffValuation.missing.length, 0);
+    const saved = await f.run();
+    assert.equal(saved.cycle.cycleEndAt, "2026-09-09T22:20:00.000Z");
+    assert.equal(saved.cutoffValuation.policy, "execution_quote_else_exact_official_close");
   });
 
-  it("reads retained cutoff observations after a 07:20 live-cache replacement", async () => {
+  it("uses execution prices and FX instead of retained 07:00 observations", async () => {
     const f = await fixture({ close: false });
-    f.retained.quotes.push({ ...f.rows.live_price_quotes[0], observedAt: null, timestampBasis: "collection" });
+    f.retained.quotes.push({ ...f.rows.live_price_quotes[0], priceAsOf: observed, fetchedAt: observed, observedAt: null, timestampBasis: "collection" });
     f.retained.fxRows.push({ ...f.rows.fx_rates[0], providerObservedAt: null, timestampBasis: "collection" });
     Object.assign(f.rows.live_price_quotes[0], { price: "110", priceAsOf: new Date("2026-09-09T22:20:00Z"), fetchedAt: new Date("2026-09-09T22:20:00Z") });
     Object.assign(f.rows.fx_rates[0], { usdKrw: "1310", observedAt: new Date("2026-09-09T22:20:00Z"), fetchedAt: new Date("2026-09-09T22:20:00Z") });
     const result = await f.run();
-    assert.equal(result.results.brokerage.totalMarketValue, 1365000);
+    assert.equal(result.results.brokerage.totalMarketValue, 1441000);
     assert.equal(planFor(result).closeTargetCount, 0);
     const position = f.writes.find(row => row.table === "daily_position_snapshots").rows[0];
-    assert.match(position.description, /price_reference_at=2026-09-09T21:59:00.000Z/);
-    assert.match(position.description, /fx_reference_at=2026-09-09T21:59:00.000Z/);
+    assert.match(position.description, /price_reference_at=2026-09-09T22:20:00.000Z/);
+    assert.match(position.description, /fx_reference_at=2026-09-09T22:20:00.000Z/);
     assert.match(position.description, /price_observed_at=unknown/);
-    assert.match(position.description, /fx_observed_at=unknown/);
+    assert.match(position.description, /fx_observed_at=2026-09-09T22:20:00.000Z/);
     assert.match(position.description, /price_timestamp_basis=collection/);
     assert.match(position.description, /fx_timestamp_basis=collection/);
+    assert.match(position.description, /(?:^|; )valuation_policy=execution_collection_v1(?:;|$)/);
   });
 
   it("preserves a completed cutoff on a direct writer retry with changed market evidence", async () => {
@@ -95,12 +98,13 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     f.writes.length = 0;
     f.rows.live_price_quotes[0].price = "110";
     f.rows.fx_rates[0].usdKrw = "1310";
-    const retry = await f.run();
+    const retry = await f.run({ now: new Date(cutoff.getTime() + 40 * 60_000) });
     assert.equal(f.writes.length, 0);
     assert.equal(retry.results.brokerage.totalMarketValue, 1365000);
     assert.equal(JSON.stringify([f.rows.daily_portfolio_snapshots, f.rows.daily_position_snapshots]), saved);
     assert.equal(retry.plannedWrites.dailyPortfolioSnapshots.update, 0);
     assert.equal(planFor(retry).action, "no_action");
+    assert.equal(retry.cycle.cycleEndAt, "2026-09-09T22:20:00.000Z");
     f.rows.fx_rates.length = 0;
     f.rows.live_price_quotes.length = 0;
     f.rows.assets[0].quantity = "20";
@@ -109,6 +113,23 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     assert.equal(expiredEvidence.results.brokerage.totalMarketValue, 1365000);
     assert.equal(f.writes.length, 0);
     assert.equal(JSON.stringify([f.rows.daily_portfolio_snapshots, f.rows.daily_position_snapshots]), saved);
+  });
+
+  it("includes holdings created after 07:00 but before execution without reconstructing an earlier balance", async () => {
+    const f = await fixture();
+    Object.assign(f.rows.assets[0], { createdAt: new Date(cutoff.getTime() + 5 * 60_000), updatedAt: new Date(cutoff.getTime() + 10 * 60_000), quantity: "12" });
+    const result = await f.run();
+    assert.equal(result.results.brokerage.totalMarketValue, 1638000);
+    assert.equal(result.cycle.cycleEndAt, "2026-09-09T22:20:00.000Z");
+  });
+
+  it("rejects prices and holdings that are later than the actual run", async () => {
+    const price = await fixture({ close: false });
+    Object.assign(price.rows.live_price_quotes[0], { fetchedAt: new Date(cutoff.getTime() + 21 * 60_000), priceAsOf: new Date(cutoff.getTime() + 21 * 60_000) });
+    await assert.rejects(price.run(), error => error.code === "missing_cutoff_price_evidence");
+    const holding = await fixture();
+    holding.rows.assets[0].updatedAt = new Date(cutoff.getTime() + 21 * 60_000);
+    await assert.rejects(holding.run(), error => error.code === "holdings_changed_after_cutoff");
   });
 
   it("uses actual fractional shares and never derives shares from an entered amount", async () => {
@@ -178,9 +199,9 @@ async function fixture({ live = true, close = true } = {}) {
     fractionalKrwValue: null, fractionalAvgCost: null, groupId: null, targetWeight: null, maAssetClass: null,
     createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z" };
   const rows = { accounts: [{ id: "account-a", canonicalOwnerUserId: owner, code: "brokerage", name: "Synthetic", accountType: "investment", currency: "USD", isActive: true }], assets: [asset],
-    fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1300", source: "synthetic", status: "ok", isSample: false, observedAt: observed, fetchedAt: observed, rateKind: "spot" }],
+    fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1300", source: "synthetic", status: "ok", isSample: false, observedAt: new Date(cutoff.getTime()+19*60_000), fetchedAt: new Date(cutoff.getTime()+19*60_000), rateKind: "spot" }],
     asset_price_snapshots: close ? [{ ticker: asset.ticker, market: asset.market, currency: "USD", priceDate: "2026-09-09", closePrice: "100", source: "kis", isSample: false, fetchedAt: observed }] : [],
-    live_price_quotes: live ? [{ ticker: asset.ticker, market: asset.market, currency: "USD", provider: "kis", source: "kis_overseas_price:NAS", quoteType: "live", status: "ok", price: "105", priceAsOf: observed, fetchedAt: observed }] : [] };
+    live_price_quotes: live ? [{ ticker: asset.ticker, market: asset.market, currency: "USD", provider: "kis", source: "kis_overseas_price:NAS", quoteType: "live", status: "ok", price: "105", priceAsOf: new Date(cutoff.getTime()+19*60_000), fetchedAt: new Date(cutoff.getTime()+19*60_000) }] : [] };
   const writes = [];
   const select = () => { let table; let condition; const query = { from(value) { table = getTableName(value); return query; }, where(value) { condition = value; return query; }, innerJoin() { return query; }, orderBy() { return query; }, limit() { return query; },
     then(resolve, reject) { let result = rows[table] ?? [];

@@ -39,3 +39,23 @@ export function selectSnapshotCutoffFx<T extends SnapshotFxEvidence>(
     && Decimal.from(row.usdKrw!).compare(latest.usdKrw!) !== 0)) return null;
   return latest;
 }
+
+/** Current-cycle valuation uses the rate collected at execution, not a backdated 07:00 tick.
+ * Historical backfill continues to use selectSnapshotCutoffFx. */
+export function selectSnapshotExecutionFx<T extends SnapshotFxEvidence>(rows: readonly T[], asOfDate: string, executionAt: Date): T | null {
+  const at = executionAt.getTime();
+  if (!Number.isFinite(at)) return null;
+  const candidates = selectUsableFxRows(rows).filter(row => {
+    const fetched = new Date(row.fetchedAt ?? '').getTime();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.rateDate) || !Number.isFinite(Date.parse(row.rateDate)) || row.rateDate > asOfDate || !Number.isFinite(fetched) || fetched > at || at - fetched > SNAPSHOT_FX_SPOT_MAX_AGE_MS) return false;
+    const observed = row.observedAt == null ? null : new Date(row.observedAt).getTime();
+    if (observed !== null && (!Number.isFinite(observed) || observed > fetched)) return false;
+    if (row.rateKind === 'daily_reference') return observed !== null && at - observed <= SNAPSHOT_FX_REFERENCE_MAX_AGE_MS;
+    if (Date.parse(asOfDate) - Date.parse(row.rateDate) > 24 * 60 * 60 * 1000) return false;
+    return (observed === null && row.rateKind == null) || (row.rateKind === 'spot' && observed !== null && at - observed <= SNAPSHOT_FX_SPOT_MAX_AGE_MS);
+  }).sort((a,b) => new Date(b.fetchedAt!).getTime() - new Date(a.fetchedAt!).getTime());
+  const latest = candidates[0];
+  if (!latest) return null;
+  if (candidates.some(row => new Date(row.fetchedAt!).getTime() === new Date(latest.fetchedAt!).getTime() && Decimal.from(row.usdKrw!).compare(latest.usdKrw!) !== 0)) return null;
+  return latest;
+}

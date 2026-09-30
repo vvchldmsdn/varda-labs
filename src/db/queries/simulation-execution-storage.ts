@@ -60,7 +60,15 @@ export async function finishSharedExecution(owner: string, p: PackedExecution): 
   const r=rows[0]; return {executionId:r.id,binding:r.binding,model:r.model,currency:r.currency,preview:false,expiresAt:Number(r.expires)};
 }
 export async function saveSharedExecution(owner: string, p: PackedExecution) {
-  const status=await beginSharedExecution(owner,p);
+  let status: Awaited<ReturnType<typeof beginSharedExecution>>;
+  try {
+    status = await beginSharedExecution(owner, p);
+  } catch (error) {
+    // Admission is rechecked by the SQL trigger under the global budget lock.
+    // Another request can consume capacity after the earlier read-only check.
+    if (error instanceof Error && error.message === "execution_service_limit") return { status: "limit" } as const;
+    throw error;
+  }
   if(status==='limit'||status==='conflict') return {status} as const;
   if(status==='creating') for(let i=0;i<p.chunks.length;i+=P.batch) await appendSharedExecution(owner,p,p.chunks.slice(i,i+P.batch));
   return {status:'ready' as const,handle:await finishSharedExecution(owner,p)};

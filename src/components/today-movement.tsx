@@ -159,6 +159,8 @@ export function TodayMovement({
             <p><T ko="시세 조회" en="Quotes retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange(freshness.fetched, data.generatedAt)}</span></p>
             {freshness.hasFxExposure ? <p><T ko="환율 조회" en="FX retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange({ oldest: freshness.fxFetchedAt, newest: freshness.fxFetchedAt }, data.generatedAt)}</span></p> : null}
             {freshness.staleQuoteCount + freshness.missingQuoteCount > 0 || freshness.fxNeedsRefresh ? <p className="text-[var(--warning)]"><T ko="일부 시세·환율 갱신 대기" en="Some quotes or FX await a refresh"/></p> : null}
+            {data.baselineExecutionCapturedAt ? <p><T ko="기준 평가 시각" en="Baseline valued at"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionCapturedAt, newest: data.baselineExecutionCapturedAt }, data.generatedAt)}</p> : null}
+            {data.baselineExecutionFxFetchedAt ? <p><T ko="기준 평가 환율 · 저장 시 조회" en="Baseline FX · retrieved when saved"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionFxFetchedAt, newest: data.baselineExecutionFxFetchedAt }, data.generatedAt)}</p> : null}
             <details>
               <summary className="w-fit cursor-pointer underline decoration-[var(--line)] underline-offset-4"><T ko="시세 기준 안내" en="About these timestamps"/></summary>
               <p className="mt-2"><T ko="화면이 보이는 동안 5분 간격으로 시세를 확인합니다. 조회 시각은 실제 체결 시각과 다를 수 있으며, 종목별로 다릅니다." en="Quotes are checked every 5 minutes while this page is visible. Retrieval times vary by holding and may differ from trade times."/></p>
@@ -572,7 +574,7 @@ function reasonLabel(reason: string | null) {
   if (!reason) return "오늘 변동 계산 근거를 준비하고 있습니다.";
   const labels: Record<string, string> = {
     missing_baseline_snapshot: "비교할 기준 스냅샷이 없습니다.",
-    stale_baseline_snapshot: "07:00 KST 기준 기록 준비 중",
+    stale_baseline_snapshot: "일일 기준 기록 준비 중",
     missing_fresh_live_prices: "현재 가격 근거가 부족합니다.",
     manual_valuation_not_updated_in_cycle:
       "이번 주기에 수동 평가 종목이 갱신되지 않았습니다.",
