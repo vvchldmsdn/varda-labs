@@ -6,6 +6,7 @@ import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import { translateHomeHistory } from "../src/components/home/home-history-messages.ts";
 
 import { buildHoldingConnectionGraph } from "../src/lib/holding-connection-graph.ts";
+import { buildPortfolioDashboardHoldingHistory } from "../src/lib/portfolio-dashboard-history.ts";
 
 describe("holding connection graph", () => {
   it("builds deterministic positive and negative correlation edges", () => {
@@ -64,14 +65,44 @@ describe("holding connection graph", () => {
     assert.equal(graph.edges.length, 0); assert.equal(graph.emptyReason, "insufficient_variation");
   });
 
-  it("does not mix today's native price returns into saved KRW unit-value correlations", () => {
+  for (const basis of ["live_price", "live_movement"]) it(`does not mix today's ${basis} into saved daily correlations`, () => {
     const rows = [historyRow("a", "Alpha", 60, [1, 2, 3, 4, 5, 6]), historyRow("b", "Beta", 40, [2, 4, 6, 8, 10, 12])];
-    rows[0].cells.push({ ...rows[0].cells[0], date: "2026-08-07", changePct: 50, basis: "live_price" });
-    rows[1].cells.push({ ...rows[1].cells[0], date: "2026-08-07", changePct: -50, basis: "live_price" });
+    rows[0].cells.push({ ...rows[0].cells[0], date: "2026-08-07", changePct: 50, basis });
+    rows[1].cells.push({ ...rows[1].cells[0], date: "2026-08-07", changePct: -50, basis });
     const graph = buildHoldingConnectionGraph({ dates: dates(7), rows, observedCellCount: 14, expectedCellCount: 14, coveragePct: 100 });
     assert.equal(graph.edges.length, 1);
     assert.equal(graph.edges[0].observations, 6);
     assert.ok(Math.abs(graph.edges[0].correlation - 1) < 1e-12);
+  });
+
+  it("renders matching Home and Today valuation metrics with separate native-price details in both languages", async () => {
+    let locale = "ko", stateIndex = 0;
+    const [home, today] = await importUiWithPorts(["src/components/home/holding-movement-heatmap.tsx", "src/components/today/today-contribution-explorer.tsx"], {
+      react: { useId, useMemo: fn => fn(), useEffect: () => {}, useRef: current => ({ current }), useState: initial => [stateIndex++ === 1 && initial === null ? { rowIndex: 0, cellIndex: 0 } : initial, () => {}] },
+      "next/link": { default: ({ children, ...props }) => { delete props.scroll; delete props.prefetch; return createElement("a", props, children); } },
+      "@/components/i18n/locale-provider": { useI18n: () => ({ locale, t: (ko, en) => locale === "ko" ? ko : en }) },
+      "@/components/i18n/localized-text": { T: ({ ko, en }) => locale === "ko" ? ko : en },
+    });
+    for (const language of ["ko", "en"]) for (const sign of [1, -1]) {
+      locale = language;
+      const history = buildPortfolioDashboardHoldingHistory({ currentDate: "2026-10-01", rows: [], holdings: [{
+        id: "synthetic", name: "Synthetic holding", ticker: "TEST", account: "test", currentWeight: 100,
+        valueKrw: 1000000, dailyChangeKrw: sign * 800, dailyReturnPct: sign * 0.08,
+        dailyPriceReturn: { changePct: sign * -0.26, currentPrice: 99.74, previousClose: 100, previousCloseDate: "2026-09-29", currency: "USD", observedAt: "2026-10-01T00:00:00Z", reason: null },
+      }] });
+      stateIndex = 0;
+      const html = renderToStaticMarkup(createElement(home.HoldingMovementHeatmap, { history, stage: true, riskHref: "/portfolio/risk", structureHref: "/portfolio/structure" }));
+      const mobileRow = html.match(/<button[^>]*aria-controls="holding-heatmap-selection"[^>]*>[\s\S]*?<\/button>/)[0];
+      const pct = sign > 0 ? "+0.08%" : "-0.08%";
+      const amount = sign > 0 ? "+₩800" : "-₩800";
+      assert.ok(mobileRow.includes(pct)); assert.ok(mobileRow.includes(amount));
+      assert.ok(!mobileRow.includes("0.26%"));
+      assert.ok(html.includes(language === "ko" ? "가격 등락 · 거래통화 기준" : "Price change · trading currency"));
+      assert.ok(html.includes(sign > 0 ? "-0.26%" : "+0.26%"));
+      stateIndex = 100;
+      const todayHtml = renderToStaticMarkup(createElement(today.TodayContributionExplorer, { rows: [{ accountLabel: "Test", key: "synthetic", name: "Synthetic holding", ticker: "TEST", href: "/today", selected: false, changeKrw: sign * 800, returnPct: sign * 0.08, fxImpactKrw: sign * 800, priceImpactKrw: 0, tradeFlowKrw: 0 }] }));
+      assert.ok(todayHtml.includes(pct)); assert.ok(todayHtml.includes(amount));
+    }
   });
 
   it("renders honest Korean and English empty states with the structure entry point", async () => {

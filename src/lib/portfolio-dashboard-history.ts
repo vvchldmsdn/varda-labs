@@ -151,7 +151,9 @@ function currentMovementCell(
   date: string,
   holding: PortfolioDashboardHistoryHolding,
 ): PortfolioDashboardHeatmapCell {
-  const changePct = toNumber(holding.dailyPriceReturn?.changePct);
+  // Reuse Today's valuation return. The trading-currency price return is
+  // independent evidence for the detail view, never a fallback for this metric.
+  const changePct = toNumber(holding.dailyReturnPct);
   const changeKrw = toNumber(holding.dailyChangeKrw);
   const marketValueKrw = toNumber(holding.valueKrw);
 
@@ -175,7 +177,7 @@ function currentMovementCell(
     changeKrw,
     priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
     fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
-    basis: "live_price" as const,
+    basis: "live_movement" as const,
     priceReturnEvidence: holding.dailyPriceReturn,
   });
 }

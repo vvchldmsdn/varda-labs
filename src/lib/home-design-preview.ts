@@ -9,6 +9,7 @@ import type {
   PortfolioDashboardHoldingHistory,
 } from "@/lib/portfolio-dashboard-history";
 import { buildDashboardFxTrend } from "@/lib/fx-trend";
+import { buildPortfolioDashboardHoldingHistory } from "@/lib/portfolio-dashboard-history";
 
 const BROKERAGE_ID = "11111111-1111-4111-8111-111111111111";
 const ISA_ID = "22222222-2222-4222-8222-222222222222";
@@ -348,6 +349,7 @@ function buildHoldingHistory(holdings: readonly DashboardHolding[], endDate: str
     new Date(end - (30 - index) * 86_400_000).toISOString().slice(0, 10),
   );
   let observedCellCount = 0;
+  const liveHistory = buildPortfolioDashboardHoldingHistory({ currentDate: endDate, holdings, rows: [] });
   const rows: PortfolioDashboardHeatmapRow[] = holdings.map((holding, rowIndex) => ({
     holdingId: holding.id,
     name: holding.name,
@@ -355,11 +357,10 @@ function buildHoldingHistory(holdings: readonly DashboardHolding[], endDate: str
     account: holding.account,
     currentWeight: holding.currentWeight,
     cells: dates.map((date, cellIndex) => {
-      if (cellIndex === dates.length - 1 && holding.dailyPriceReturn) {
-        observedCellCount += 1;
-        return { date, changePct: holding.dailyPriceReturn.changePct, marketValueKrw: holding.valueKrw,
-          changeKrw: holding.dailyChangeKrw, priceChangeKrw: holding.priceDailyChangeKrw, fxChangeKrw: holding.fxDailyChangeKrw,
-          basis: "live_price" as const, priceReturnEvidence: holding.dailyPriceReturn };
+      if (cellIndex === dates.length - 1) {
+        const cell = liveHistory.rows[rowIndex].cells[0];
+        if (cell.basis !== "missing") observedCellCount += 1;
+        return cell;
       }
       const missing = (rowIndex * 5 + cellIndex) % 23 === 0;
       if (missing) {
