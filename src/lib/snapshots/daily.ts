@@ -404,6 +404,7 @@ type PriceSelection = {
   fromCloseSnapshot: boolean;
   manualCarryCapturedAt?: string;
   manualCarrySnapshotId?: string;
+  manualInputRecordedAt?: string | null;
   observedAt?: string | null;
   fetchedAt?: string | null;
   quoteType?: string | null;
@@ -1354,6 +1355,7 @@ function computeAccountSnapshot({
         `source=${provenance.source}`,
         `price_basis=${selectedPrice.basis}`,
         ...(selectedPrice.manualCarrySnapshotId?[`manual_carry_snapshot=${selectedPrice.manualCarrySnapshotId}`,`manual_carry_captured_at=${selectedPrice.manualCarryCapturedAt}`]:[]),
+        ...(selectedPrice.manualInputRecordedAt ? [`manual_input_recorded_at=${selectedPrice.manualInputRecordedAt}`] : []),
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
         `close_source=${selectedClose.source}${selectedClose.referenceDate ? `@${selectedClose.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
@@ -1975,6 +1977,11 @@ async function buildCloseContext({
           rowsByInstrument,
           referencesByMarket,
         );
+    if (useExecutionValuation && !normalizeTicker(asset.ticker) && asset.priceAsOf == null) {
+      // This is the saved manual input, not a newly observed market quote.
+      closeSelection.manualInputRecordedAt = isoTimestamp(asset.updatedAt ?? asset.createdAt);
+      closeSelection.referenceAt = closeSelection.manualInputRecordedAt;
+    }
     selectedByAssetId.set(asset.id, closeSelection);
 
     const cutoffValuation = useCutoffValuation
@@ -2045,7 +2052,7 @@ function summarizeCutoffValuation({
       (asset) => {
         const selected = closeContext.valuationByAssetId.get(asset.id);
         if (!normalizeTicker(asset.ticker)) {
-          return !hasRecordedManualValuation(asset, selected, cycleEndAt);
+          return !hasRecordedManualValuation(asset, selected, cycleEndAt, executionValuation);
         }
         return !selected || (
           selected.basis !== "cutoff_live" &&
@@ -2072,7 +2079,7 @@ function summarizeCutoffValuation({
   };
 }
 
-function hasRecordedManualValuation(asset: AssetRow, selected: PriceSelection | undefined, cutoffAt: Date) {
+function hasRecordedManualValuation(asset: AssetRow, selected: PriceSelection | undefined, cutoffAt: Date, executionValuation: boolean) {
   if (!selected || selected.basis !== "manual_current") return false;
   if(selected.manualCarryCapturedAt)return new Date(selected.manualCarryCapturedAt)<cutoffAt;
   const quantity = toNumber(asset.quantity) ?? 0;
@@ -2080,7 +2087,7 @@ function hasRecordedManualValuation(asset: AssetRow, selected: PriceSelection | 
   // neither acquire invented shares nor require a market quote for that amount.
   const recordedAt = quantity === 0 && (toNumber(asset.fractionalKrwValue) ?? 0) > 0
     ? isoTimestamp(asset.updatedAt ?? asset.createdAt)
-    : isoTimestamp(asset.priceAsOf);
+    : isoTimestamp(asset.priceAsOf) ?? (executionValuation && asset.priceAsOf == null ? selected.manualInputRecordedAt ?? null : null);
   return recordedAt !== null && new Date(recordedAt) < cutoffAt &&
     (quantity === 0 || selected.price > 0);
 }

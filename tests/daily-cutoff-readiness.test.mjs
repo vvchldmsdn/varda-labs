@@ -161,17 +161,49 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     assert.equal(Number(position.fxRate), 1);
   });
 
-  it("requires a recorded pre-cutoff input for a tickerless manual valuation", async () => {
+  it("saves a tickerless current manual input without inventing an observed market timestamp", async () => {
+    const f = await fixture({ live: false, close: false });
+    Object.assign(f.rows.assets[0], { ticker: null, currency: "KRW", currentPrice: "10000", priceAsOf: null, priceFetchedAt: null });
+    assert.equal((await f.run({ dryRun: true })).writeReady, true);
+    assert.equal((await f.run()).results.brokerage.totalMarketValue, 100000);
+    const position = f.writes.find(row => row.table === "daily_position_snapshots").rows[0];
+    assert.equal(Number(position.quantity), 10);
+    assert.equal(Number(position.currentPrice), 10000);
+    assert.equal(position.priceBasis, "manual_current");
+    assert.match(position.description, /manual_input_recorded_at=2026-09-01T00:00:00.000Z/);
+    assert.match(position.description, /price_timestamp_basis=manual_input/);
+    assert.match(position.description, /price_observed_at=unknown/);
+    assert.match(position.description, /price_fetched_at=unknown/);
+  });
+
+  it("keeps explicit manual observation provenance when it is available", async () => {
     const f = await fixture({ live: false, close: false });
     Object.assign(f.rows.assets[0], { ticker: null, currency: "KRW", currentPrice: "10000" });
-    const missing = await f.run({ dryRun: true });
-    assert.equal(missing.writeReady, false);
-    await assert.rejects(f.run(), error => error.code === "missing_cutoff_price_evidence");
     Object.assign(f.rows.assets[0], { priceAsOf: "2026-09-09T10:00:00Z", priceSource: "manual_entry", priceQuoteType: "manual_valuation", priceFetchedAt: null });
     assert.equal((await f.run()).results.brokerage.totalMarketValue, 100000);
     const position = f.writes.find(row => row.table === "daily_position_snapshots").rows[0];
     assert.match(position.description, /price_observed_at=2026-09-09T10:00:00.000Z/);
     assert.equal(position.priceBasis, "manual_current");
+  });
+
+  it("does not use current manual inputs to reconstruct a historical cutoff without price evidence", async () => {
+    const f = await fixture({ live: false, close: false });
+    Object.assign(f.rows.assets[0], { ticker: null, currency: "KRW", currentPrice: "10000", priceAsOf: null });
+    const historical = await f.run({ dryRun: true, snapshotDate: "2026-09-09" });
+    assert.equal(historical.writeReady, false);
+    assert.equal(historical.cutoffValuation.missing.length, 1);
+    assert.equal(f.writes.length, 0);
+  });
+
+  it("rejects a manual input or manual observation timestamp later than execution", async () => {
+    const input = await fixture({ live: false, close: false });
+    Object.assign(input.rows.assets[0], { ticker: null, currency: "KRW", currentPrice: "10000", priceAsOf: null, updatedAt: "2026-09-09T22:21:00Z" });
+    await assert.rejects(input.run(), error => error.code === "holdings_changed_after_cutoff");
+    assert.equal(input.writes.length, 0);
+    const quote = await fixture({ live: false, close: false });
+    Object.assign(quote.rows.assets[0], { ticker: null, currency: "KRW", currentPrice: "10000", priceAsOf: "2026-09-09T22:21:00Z" });
+    await assert.rejects(quote.run(), error => error.code === "missing_cutoff_price_evidence");
+    assert.equal(quote.writes.length, 0);
   });
 
   it("does not attribute new shares to price or FX movement without trade evidence", async () => {
