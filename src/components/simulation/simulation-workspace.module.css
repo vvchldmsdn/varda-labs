@@ -260,34 +260,37 @@
   .stageHeading { justify-content:space-between; }
   .stageHeader > nav { width:100%; max-width:100%; }
   .workspaceSlot,.currentResult,.workspace,.canvas,.execution { flex:none; height:auto; min-height:0; }
-  .workspace { gap:22px; }
+  .workspace { gap:10px; }
   .toolbar > span { display:none; }
   .toolbar > div { width:100%; flex-wrap:wrap; gap:8px; }
   .executionMeta { font-size:11px; line-height:1.7; margin-bottom:18px; }
   .resultLayout { display:flex; flex-direction:column; min-height:0; gap:26px; }
-  .resultSummary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 18px; width:100%; padding:0; }
-  .resultSummary > div:first-child { grid-column:1 / -1; padding-bottom:20px; border-bottom:1px solid var(--line); }
-  .resultSummary > div:first-child dd { font-size:48px; }
+  .resultSummary { order:1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 18px; width:100%; padding:0; }
+  .resultSummary > div:first-child { grid-column:auto; padding:0; border:0; }
+  .resultSummary > div:first-child dd { font-size:28px; }
   .resultSummary dt { min-height:0; font-size:12px; line-height:1.6; }
   .resultSummary dd { margin-top:10px; font-size:28px; }
   .resultSummary p { display:block; max-width:none; font-size:11px; line-height:1.8; }
   .economicExecution .resultLayout { gap:20px; }
-  .economicExecution .resultSummary { order:1; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:12px 0 16px; border-block:1px solid var(--line); }
+  .economicExecution .startingFactors { order:1; margin:12px 0 0; border:0; }
+  .economicExecution > button { order:2; }
+  .economicExecution .resultSummary { order:1; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:12px 0 16px; border:0; }
   .economicExecution .resultLayout > figure { order:0; }
   .economicExecution .resultSummary > div:first-child { grid-column:auto; padding:0; border:0; }
   .economicExecution .resultSummary dt { min-height:32px; font-size:10px; line-height:1.5; }
   .economicExecution .resultSummary dd,
   .economicExecution .resultSummary > div:first-child dd { font-size:clamp(22px,6.5vw,28px); margin-top:6px; overflow-wrap:anywhere; }
   .economicExecution .resultSummary p { font-size:10px; line-height:1.5; margin-top:8px; }
-  .resultLayout > figure,.stageFan { height:auto; flex:none; width:100%; }
+  .resultLayout > figure,.stageFan { order:0; height:auto; flex:none; width:100%; }
   .stageFan .fanControls { flex-wrap:wrap; gap:10px; padding:0 0 12px; }
-  .stageFan .fanControls button { min-height:44px; padding:10px 12px; font-size:12px; }
+  .stageFan .fanControls button { min-height:44px; padding:10px 8px; font-size:12px; border:0; border-radius:0; background:transparent; color:var(--muted); }
+  .stageFan .fanControls button[aria-pressed="true"] { color:var(--ink); font-weight:650; box-shadow:inset 0 -2px var(--brand); }
   .stageFan .fanReadout { gap:14px; padding:6px 0 16px; }
-  .stageFan .fanReadout p { font-size:12px; }
+  .stageFan .fanReadout p { display:none; }
   .stageFan .fanReadout dl { width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
   .stageFan .fanReadout dt { font-size:11px; }
   .stageFan .fanReadout dd { font-size:17px; }
-  .fanPlot { flex:none; height:240px; min-height:240px; }
+  .fanPlot { flex:none; height:280px; min-height:280px; }
   .scrubber { height:44px; }
   .scrubber::-webkit-slider-thumb { width:20px; height:20px; margin-top:-9px; }
   .scrubber::-moz-range-thumb { width:20px; height:20px; }
@@ -296,8 +299,14 @@
   .stageFan .pathChoices span { flex-basis:100%; font-size:11px; }
   .stageFan .pathChoices button { min-width:44px; min-height:44px; font-size:12px; }
   .launchers { display:grid; grid-template-columns:1fr; gap:0; }
-  .launcher { min-height:60px; padding:16px 0; border-bottom:1px solid var(--line); gap:12px; }
+  .launcher { min-height:52px; padding:12px 0; border:0; gap:12px; }
   .launcher strong { font-size:14px; }
   .launcher > svg { width:18px; height:18px; }
   .stageFootnote { font-size:11px; line-height:1.8; }
+}
+
+@media (max-width:360px) {
+  .stageFan .fanControls { gap:6px; }
+  .stageFan .fanControls button { padding-inline:4px; font-size:11px; }
+  .stageFan .fanControls button svg { width:14px; height:14px; }
 }

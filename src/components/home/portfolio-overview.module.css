@@ -308,7 +308,7 @@
 .mobileMovementRow:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 760px), (max-width: 1000px) and (max-height: 500px) {
   .stage { height: auto; min-height: 0; gap: 24px; }
-  .stageHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-bottom: 4px; }
+  .stageHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-bottom: 4px; border:0; }
   .stageTitle { font-size: 24px; line-height: 1.4; }
   .stageScope { grid-column: 1 / -1; grid-row: 2; max-width: 100%; width: 100%; }
   .stageScope :global(.scrollable-nav-rail-content) { gap: 24px; }
@@ -317,18 +317,18 @@
   .homeStageMain, .todayStageMain { display: flex; flex-direction: column; flex: none; min-height: 0; gap: 28px; }
   .stageSummary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px 16px; padding: 0; }
   .todayStageMain > .stageSummary { overflow: visible; justify-content: normal; gap: 24px 16px; padding: 0; }
-  .stageSummary .balance { grid-column: 1 / -1; }
+  .stageSummary .balance { grid-column: 1 / -1; text-align:center; padding:12px 0 8px; }
   .stageSummary .balance > span { font-size: 12px; }
-  .stageSummary .balance > strong { margin-top: 12px; font-size: clamp(32px, 9.2vw, 44px); letter-spacing: -.055em; white-space: normal; overflow-wrap: anywhere; }
+  .stageSummary .balance > strong { margin-top: 12px; font-size: clamp(38px, 10.8vw, 48px); letter-spacing: -.055em; white-space: normal; overflow-wrap: anywhere; }
   .stageSummary .balance p { margin-top: 10px; font-size: 11px; }
   .stageSummary .summaryMetric { border: 0; padding: 0; gap: 8px; }
   .stageSummary .summaryMetric dt { font-size: 12px; }
   .stageSummary .summaryMetric dd { font-size: clamp(20px, 5.8vw, 26px); overflow-wrap: anywhere; }
   .stageSummary .summaryMetric dd.status { font-size: 11px; line-height: 1.65; }
-  .stageSummary .stageNote { display: block; grid-column: 1 / -1; padding-top: 18px; }
+  .stageSummary .stageNote { display: block; grid-column: 1 / -1; padding-top: 0; border:0; }
   .stageNote > span, .stageNote > p { font-size: 11px; }
   .stageNote > strong { font-size: 14px; line-height: 1.6; }
-  .stageVisual { flex: none; min-height: 0; padding: 22px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
+  .stageVisual { flex: none; min-height: 0; padding: 8px 0 0; border: 0; border-radius: 0; background: transparent; }
   .stageHeatmap, .stageHeatmapViewport, .stageMatrix { height: auto; min-height: 0; overflow: visible; flex: none; }
   .stageHeatmap > :first-child { align-items: center; gap: 12px; margin-bottom: 14px; }
   .stageHeatmap .panelTitle { font-size: 18px; }
@@ -343,13 +343,13 @@
   .stageLaunchers > a { display: inline-flex; font-size: 12px; min-height: 44px; }
   .stageLaunchers > button { min-height: 48px; }
   .stageContribution { flex: none; min-height: 0; padding: 0; }
-  .stageContribution .contributionHeader { flex-wrap: wrap; margin-bottom: 18px; }
+  .stageContribution .contributionHeader { flex-wrap: wrap; margin-bottom: 8px; }
   .stageContribution .contributionHeader .panelTitle { font-size: 18px; }
   .stageContribution .contributionHeader .evidenceIntro, .stageContribution .contributionHeader > .status { font-size: 11px; line-height: 1.6; }
   .stageContribution .explorer { display: flex; flex-direction: column; gap: 22px; }
   .contributionScroll { overflow: visible; padding: 0; }
   .stageContribution .axisLabels { display: none; }
-  .stageContribution .contributionRow { grid-template-columns: minmax(0, 1fr) 100px; min-height: 90px; gap: 10px 12px; padding-block: 16px; }
+  .stageContribution .contributionRow { grid-template-columns: minmax(0, 1fr) 100px; min-height: 86px; gap: 10px 12px; padding-block: 16px; border:0; }
   .stageContribution .contributionRow > span:first-child > span:first-child { font-size: 13px; }
   .stageContribution .contributionRow > span:first-child > span:last-child { font-size: 11px; }
   .stageContribution .contributionRow > span:last-child > span:first-child { font-size: 14px; }
@@ -370,3 +370,19 @@
 }
 
 .tradeHoldings{padding:28px 0 60px}.tradeHoldings h2{font-size:20px;font-weight:550;margin-bottom:18px}.tradeHoldings>div:not(:last-child){display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:14px 0}.tradeHoldings>div:last-child{margin-top:16px}.tradeHoldings small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+
+.baselineSummary { font-size:12px; line-height:1.8; }
+.baselineSummary > span,.baselineSummary > p { color:var(--muted); }
+.baselineSummary > strong { display:block; margin-top:4px; font-weight:500; }
+.quoteDetails { margin-top:10px; color:var(--muted); font-size:11px; line-height:1.8; }
+.quoteDetails > summary { display:list-item; width:fit-content; min-height:44px; padding:12px 0; cursor:pointer; }
+.quoteDetails > div { padding:4px 0 12px; }
+@media (max-width:760px), (max-width:1000px) and (max-height:500px) {
+  .baselineSummary { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; font-size:11px; }
+  .baselineSummary > strong { display:inline; margin:0; }
+  .baselineSummary > p { flex-basis:100%; }
+  .quoteDetails { margin-top:0; }
+  .mobileMovementRow { border:0; }
+  .stageContribution .contributionHeader .evidenceIntro { display:none; }
+  .stageRefresh .targetEntry { min-width:44px; min-height:44px; font-size:0; gap:0; justify-content:center; }
+}

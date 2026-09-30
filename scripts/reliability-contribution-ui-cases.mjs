@@ -2,6 +2,19 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { expect } from '@playwright/test';
 
+async function switchLanguage(page, label) {
+  const menuButton = page.getByRole('button', {name: /^(메뉴 열기|Open menu)$/});
+  const mobile = await menuButton.isVisible();
+  if (mobile) await menuButton.click();
+  const surface = mobile ? page.getByRole('dialog', {name: /^(전체 메뉴|All navigation)$/}) : page;
+  await surface.getByRole('button', {name: label, exact: true}).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', label === 'Switch to English' ? 'en' : 'ko');
+  if (mobile) {
+    await surface.getByRole('button', {name: /^(메뉴 닫기|Close menu)$/}).click();
+    await expect(surface).not.toBeVisible();
+  }
+}
+
 /** Actual Next pages/actions/API + local PostgreSQL. No route, query or result mocks. */
 export async function runContributionUiCases({page,check,admin,owner,account,url,output}) {
   const scope=`account:${account}`, query=new URLSearchParams({scope,currency:'KRW'}).toString();
@@ -55,7 +68,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,url
     assert.equal(state.positions[0].quantity,'10');assert.equal(state.cash.KRW,'101000');
   });
   await check('fullapp-contribution-en-mobile-refresh-frozen-plan-and-evidence',async()=>{
-    await page.getByRole('button',{name:'Switch to English',exact:true}).click();
+    await switchLanguage(page,'Switch to English');
     await page.setViewportSize({width:390,height:844});await page.reload();
     const planner=page.getByRole('region',{name:'Contribution plan',exact:true});
     await expect(planner.getByRole('heading',{name:'Saved plans',exact:true})).toBeVisible();
@@ -73,7 +86,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,url
       await page.screenshot({path:path.join(output,`contribution-en-${width}.png`),fullPage:true});
     }
     assert.equal(Number((await admin.query('select count(*) as n from native_contribution_plans where owner_user_id=$1',[owner])).rows[0].n),1);
-    await page.getByRole('button',{name:'한국어로 전환',exact:true}).click();
+    await switchLanguage(page,'한국어로 전환');
   });
 }
 
@@ -102,8 +115,8 @@ export async function runLegacyContributionUiCase({page,check,account,url,output
         await page.screenshot({path:path.join(output,`contribution-legacy-${locale}-${width}.png`)});
       }
       await dialog.getByRole('button',{name:locale==='ko'?'계산 로직 닫기':'Close calculation details',exact:true}).click();
-      if(locale==='ko')await page.getByRole('button',{name:'Switch to English',exact:true}).click();
+      if(locale==='ko')await switchLanguage(page,'Switch to English');
     }
-    await page.getByRole('button',{name:'한국어로 전환',exact:true}).click();
+    await switchLanguage(page,'한국어로 전환');
   });
 }
