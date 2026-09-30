@@ -149,25 +149,25 @@ export function TodayMovement({
               {baselineIsDelayed ? <p><T ko="마지막 기준일" en="Last baseline"/> {formatDate(data.movementBaselineDate)}</p> : null}
             </div>
           ) : (
-            <div className="text-xs leading-6">
-              <span className="block text-[var(--muted)]"><T ko="비교 기준" en="Comparison baseline"/></span>
-              <strong className="mt-1 block font-medium">{<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</strong>
-              <p className="mt-1 text-[var(--muted)]">{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p>
+            <div className={styles.baselineSummary}>
+              <span><T ko="비교 기준" en="Baseline"/></span>
+              <strong>{<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</strong>
+              <p>{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p>
             </div>
           )}
-          <div className="mt-3 space-y-1 text-[10px] leading-5 text-[var(--muted)] sm:text-[11px]" data-today-quote-freshness>
-            <p><T ko="시세 조회" en="Quotes retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange(freshness.fetched, data.generatedAt)}</span></p>
-            {freshness.hasFxExposure ? <p><T ko="환율 조회" en="FX retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange({ oldest: freshness.fxFetchedAt, newest: freshness.fxFetchedAt }, data.generatedAt)}</span></p> : null}
-            {freshness.staleQuoteCount + freshness.missingQuoteCount > 0 || freshness.fxNeedsRefresh ? <p className="text-[var(--warning)]"><T ko="일부 시세·환율 갱신 대기" en="Some quotes or FX await a refresh"/></p> : null}
-            {data.baselineExecutionCapturedAt ? <p><T ko="기준 평가 시각" en="Baseline valued at"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionCapturedAt, newest: data.baselineExecutionCapturedAt }, data.generatedAt)}</p> : null}
-            {data.baselineExecutionFxFetchedAt ? <p><T ko="기준 평가 환율 · 저장 시 조회" en="Baseline FX · retrieved when saved"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionFxFetchedAt, newest: data.baselineExecutionFxFetchedAt }, data.generatedAt)}</p> : null}
-            <details>
-              <summary className="w-fit cursor-pointer underline decoration-[var(--line)] underline-offset-4"><T ko="시세 기준 안내" en="About these timestamps"/></summary>
+          {freshness.staleQuoteCount + freshness.missingQuoteCount > 0 || freshness.fxNeedsRefresh ? <p className="text-[var(--warning)]"><T ko="일부 시세·환율 갱신 대기" en="Some quotes or FX await a refresh"/></p> : null}
+          <details className={styles.quoteDetails} data-today-quote-freshness>
+            <summary><T ko="시세·비교 기준" en="Quote & baseline details"/></summary>
+            <div>
+              <p><T ko="시세 조회" en="Quotes retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange(freshness.fetched, data.generatedAt)}</span></p>
+              {freshness.hasFxExposure ? <p><T ko="환율 조회" en="FX retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange({ oldest: freshness.fxFetchedAt, newest: freshness.fxFetchedAt }, data.generatedAt)}</span></p> : null}
+              {data.baselineExecutionCapturedAt ? <p><T ko="기준 평가 시각" en="Baseline valued at"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionCapturedAt, newest: data.baselineExecutionCapturedAt }, data.generatedAt)}</p> : null}
+              {data.baselineExecutionFxFetchedAt ? <p><T ko="기준 평가 환율 · 저장 시 조회" en="Baseline FX · retrieved when saved"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionFxFetchedAt, newest: data.baselineExecutionFxFetchedAt }, data.generatedAt)}</p> : null}
               <p className="mt-2"><T ko="화면이 보이는 동안 5분 간격으로 시세를 확인합니다. 조회 시각은 실제 체결 시각과 다를 수 있으며, 종목별로 다릅니다." en="Quotes are checked every 5 minutes while this page is visible. Retrieval times vary by holding and may differ from trade times."/></p>
               <p className="mt-1"><T ko="저장된 가격 근거 시각" en="Recorded price evidence time"/> {formatTodayEvidenceRange(freshness.observed, data.generatedAt)}</p>
               <p className="mt-1"><T ko="KIS 가격 근거 시각은 조회 시각으로 기록됩니다." en="KIS price evidence is recorded at retrieval time."/></p>
-            </details>
-          </div>
+            </div>
+          </details>
           </div>
           </section>
 

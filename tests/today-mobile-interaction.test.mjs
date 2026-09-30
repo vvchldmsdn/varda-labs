@@ -34,6 +34,8 @@ describe("Today mobile selection and holding dialog", () => {
     const mobileButtons = tree.filter(element => element.props?.["data-today-select-holding"]);
     assert.equal(mobileButtons.length, 2);
     assert.ok(mobileButtons.every(element => element.type === "button" && element.props.href === undefined));
+    assert.equal(tree.some(element => element.props?.id === "today-selected-holding-summary"), false, "the initial mobile list is unobstructed");
+    assert.ok(mobileButtons.every(element => element.props["aria-pressed"] === false));
     const before = structuredClone(rows);
     mobileButtons[1].props.onClick();
     tree = render();
@@ -55,14 +57,14 @@ describe("Today mobile selection and holding dialog", () => {
     assert.equal(typeof desktop[0].props.onMouseEnter, "function");
   });
 
-  it("falls back within the current authorized rows when a scope change removes the selected holding", async () => {
+  it("clears the mobile summary when a scope change removes the selected holding", async () => {
     let index = 0;
     const states = [null, rows[1].key];
     const [component] = await importUiWithPorts(["src/components/today/today-contribution-explorer.tsx"], {
       ...copyPorts, "next/link": { default: () => null }, react: { useId: () => "dot", useState: () => [states[index++], () => {}] },
     });
     const tree = elements(component.TodayContributionExplorer({ rows: [rows[0]] }));
-    assert.equal(tree.find(element => element.props?.id === "today-selected-holding-summary").props.href, rows[0].href);
+    assert.equal(tree.find(element => element.props?.id === "today-selected-holding-summary"), undefined);
   });
 
   for (const method of ["button", "escape", "backdrop"]) {

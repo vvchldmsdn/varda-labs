@@ -8,7 +8,8 @@
       "codex/trade-entry-hotfix-20260924": false,
       "codex/trade-settlement-snapshot-repair": false,
       "codex/trade-daily-reliability": false,
-      "codex/operating-recovery-20260928": false
+      "codex/operating-recovery-20260928": false,
+      "codex/mobile-focus": false
     }
   },
   "crons": [

@@ -38,7 +38,7 @@ export function TodayContributionExplorer({
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
   const [mobileSelectedKey, setMobileSelectedKey] = useState<string | null>(null);
   const selectedRow = rows.find((row) => row.selected) ?? null;
-  const mobileSelectedRow = rows.find((row) => row.key === mobileSelectedKey) ?? selectedRow ?? rows[0] ?? null;
+  const mobileSelectedRow = rows.find((row) => row.key === mobileSelectedKey) ?? selectedRow ?? null;
   const activeRow =
     rows.find((row) => row.href === hoveredHref) ?? selectedRow ?? rows[0] ?? null;
   const maxMagnitude = Math.max(
@@ -107,7 +107,7 @@ export function TodayContributionExplorer({
                 data-today-select-holding={row.key}
                 data-active={mobileSelectedRow?.key === row.key}
                 aria-pressed={mobileSelectedRow?.key === row.key}
-                aria-controls="today-selected-holding-summary"
+                aria-controls={mobileSelectedRow ? "today-selected-holding-summary" : undefined}
                 onClick={() => setMobileSelectedKey(row.key)}
                 style={{ "--row-delay": `${Math.min(rowIndex * 35, 280)}ms` } as CSSProperties}
               >

@@ -20,5 +20,5 @@ export function ReportingCurrencySwitch() {
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
-  return <label className="varda-reporting-control"><span>{t("분석 통화", "Analysis currency")}</span><select aria-label={t("분석 통화", "Analysis currency")} value={params.get("currency") === "USD" ? "USD" : "KRW"} disabled={pending} onChange={event => { const href = reportingCurrencyHref(pathname, params.toString(), event.target.value as Currency); startTransition(() => router.push(href, { scroll: false })); }}><option value="KRW">KRW · ₩</option><option value="USD">USD · $</option></select>{pending ? <span role="status">{t("계산 중", "Updating")}</span> : null}</label>;
+  return <label className="varda-reporting-control"><span>{t("분석 통화", "Analysis currency")}</span><select aria-label={t("분석 통화", "Analysis currency")} value={params.get("currency") === "USD" ? "USD" : "KRW"} disabled={pending} onChange={event => { const href = reportingCurrencyHref(pathname, params.toString(), event.target.value as Currency); startTransition(() => router.push(href, { scroll: false })); }}><option value="KRW">KRW</option><option value="USD">USD</option></select>{pending ? <span role="status">{t("계산 중", "Updating")}</span> : null}</label>;
 }
