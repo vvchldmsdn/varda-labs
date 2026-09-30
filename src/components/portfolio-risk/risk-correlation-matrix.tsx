@@ -19,7 +19,7 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
   const [rowIndex, columnIndex] = selected;
   const selectedValue = matrix[rowIndex]?.[columnIndex] ?? null;
   const finiteSelected = selectedValue !== null && Number.isFinite(selectedValue);
-  const minWidth = compact ? Math.max(260, (instruments.length + 1) * 24) : Math.max(360, (instruments.length + 1) * 59);
+  const minWidth = compact ? Math.max(480, 112 + instruments.length * 66) : Math.max(540, 132 + instruments.length * 74);
 
   return (
     <div className={`${styles.interactiveMatrix} ${compact ? stageStyles.compactMatrix : ""}`}>
@@ -31,15 +31,15 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
       <p className={styles.matrixPairNames} data-matrix-pair>{instruments[rowIndex]?.names.join(", ") ?? <PortfolioText ko="종목 근거 없음" />}<span>×</span>{instruments[columnIndex]?.names.join(", ") ?? <PortfolioText ko="종목 근거 없음" />}</p>
       <div className={styles.matrixScroll} data-matrix-scroll tabIndex={0} role="region" aria-label={pt("좌우로 스크롤할 수 있는 상관관계 행렬")}>
         <table className={styles.heatmapTable} style={{ minWidth }}>
-          <thead><tr><th scope="col"><span className="sr-only"><PortfolioText ko={"종목"} /></span></th>{instruments.map((instrument, index) => <th key={instrument.instrumentKey} scope="col" data-highlight={columnIndex === index} title={instrument.names.join(", ")}>{instrument.ticker}</th>)}</tr></thead>
+          <thead><tr><th scope="col"><span className="sr-only"><PortfolioText ko={"종목"} /></span></th>{instruments.map((instrument, index) => <th key={instrument.instrumentKey} scope="col" data-highlight={columnIndex === index} title={instrumentName(instrument)}><span className={styles.instrumentName}>{instrumentName(instrument)}</span></th>)}</tr></thead>
           <tbody>{instruments.map((instrument, row) => <tr key={instrument.instrumentKey}>
-            <th scope="row" data-highlight={rowIndex === row} title={instrument.names.join(", ")}>{instrument.ticker}</th>
+            <th scope="row" data-highlight={rowIndex === row} title={instrumentName(instrument)}><span className={styles.instrumentName}>{instrumentName(instrument)}</span></th>
             {instruments.map((column, col) => {
               const raw = matrix[row]?.[col] ?? null;
               const value = raw !== null && Number.isFinite(raw) ? raw : null;
               const isSelected = row === rowIndex && col === columnIndex;
               return <td key={column.instrumentKey} className={styles.correlationCell}>
-                <button type="button" tabIndex={isSelected ? 0 : -1} data-matrix-cell aria-label={pt(`${instrument.ticker} / ${column.ticker}: ${value === null ? "계산 근거 없음" : value.toFixed(2)}`)} aria-pressed={isSelected} data-crosshair={row === rowIndex || col === columnIndex} data-diagonal={row === col} onPointerEnter={(event) => { if (event.pointerType !== "touch") setSelected([row, col]); }} onFocus={() => setSelected([row, col])} onClick={() => setSelected([row, col])} onKeyDown={(event) => {
+                <button type="button" tabIndex={isSelected ? 0 : -1} data-matrix-cell aria-label={pt(`${instrumentName(instrument)} / ${instrumentName(column)}: ${value === null ? "계산 근거 없음" : value.toFixed(2)}`)} aria-pressed={isSelected} data-crosshair={row === rowIndex || col === columnIndex} data-diagonal={row === col} onPointerEnter={(event) => { if (event.pointerType !== "touch") setSelected([row, col]); }} onFocus={() => setSelected([row, col])} onClick={() => setSelected([row, col])} onKeyDown={(event) => {
                   const steps: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
                   const step = steps[event.key];
                   if (!step) return;
@@ -58,6 +58,10 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
       <div className={styles.matrixLegend} data-matrix-legend><span><PortfolioText ko={"반대 방향"} />{" "}<b>−1</b></span><i /><span><b>+1</b> {" "}<PortfolioText ko={"같은 방향"} /></span><small><PortfolioText ko={"셀을 선택해 종목 쌍을 확인하세요"} /></small></div>
     </div>
   );
+}
+
+function instrumentName(instrument: Instrument) {
+  return instrument.names.filter(name => name.trim()).join(", ") || instrument.ticker;
 }
 
 function correlationFill(value: number | null, diagonal: boolean) {

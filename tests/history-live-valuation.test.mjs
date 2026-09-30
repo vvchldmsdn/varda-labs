@@ -99,14 +99,18 @@ describe("ephemeral current valuation in History", () => {
     assert.equal(unavailable.valueKrw, null);
   });
 
-  it("server-renders the real current date and truthful live/recorded provenance in both locales", async () => {
-    const [explorer, locale] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx", "src/components/i18n/locale-provider.tsx"], {});
+  it("keeps current date in the hero and live/recorded provenance in details in both locales", async () => {
+    const [explorer, locale] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx", "src/components/i18n/locale-provider.tsx"], {
+      "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children }) => React.createElement("section", { "data-open-detail": true }, children) },
+    });
     for (const language of ["ko", "en"]) {
       for (const input of [structure(), structure([{ ...valued, priceEvidenceSource: "asset_current_price_fallback" }])]) {
         const model = buildHistoryOverview({ rows: [row("2026-09-08", 1_400_000)], liveValuation: live(input) });
         const html = renderToStaticMarkup(React.createElement(locale.LocaleProvider, { initialLocale: language }, React.createElement(explorer.HistoryTimeExplorer, { model, scopeLabel: "Actual scope name" })));
         assert.match(html, /data-history-live="true"/);
         assert.match(html, /2026[.\-]09[.\-]09/);
+        const hero = html.match(/<aside[^>]*>([\s\S]*?)<\/aside>/)?.[1] ?? "";
+        assert.doesNotMatch(hero, /00:20|KST|저장 가격 포함|Includes recorded prices/);
         assert.match(html, /00:20/);
         assert.doesNotMatch(html, /(?:AM|PM|오전|오후)\s*\d/);
         assert.match(html, /KST/);

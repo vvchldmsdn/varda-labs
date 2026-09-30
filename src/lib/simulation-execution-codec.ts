@@ -3,7 +3,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { PATH_DETAIL_LIMITS, projectPath, type PathSnapshot } from "./simulation-path-detail-store.ts";
 import type { SimulationPathHandle } from "./simulation-path-detail.ts";
 
-export const EXECUTION_POLICY = Object.freeze({ codec: "path-f64le-gzip-v1", projection: 1, group: 8, ttlSeconds: 21600, creatingSeconds: 1800, maxBytes: 96 * 1024 * 1024, ownerBytes: 192 * 1024 * 1024, ownerCount: 2, commonRaw: 2 * 1024 * 1024, chunkRaw: 600 * 1024, batch: 4 });
+export const EXECUTION_POLICY = Object.freeze({ codec: "path-f64le-gzip-v1", projection: 1, group: 8, ttlSeconds: 21600, creatingSeconds: 1800, maxBytes: 96 * 1024 * 1024, ownerBytes: 192 * 1024 * 1024, ownerCount: 2, ownerInFlight: 1, commonRaw: 2 * 1024 * 1024, chunkRaw: 600 * 1024, batch: 4 });
 export type Piece = { index: number; first: number; count: number; rawBytes: number; bytes: number; checksum: string; compressedHash: string; data: string };
 export type Manifest = Omit<Piece, "data">;
 export type PackedExecution = { id: string; binding: string; model: PathSnapshot["model"]; currency: PathSnapshot["currency"]; modelVersion: string; seed: number; pathCount: number; horizon: number; assets: number; factors: number; rawBytes: number; bytes: number; common: Piece; chunks: Piece[] };

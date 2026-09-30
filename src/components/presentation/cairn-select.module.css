@@ -1,0 +1,16 @@
+.root { position:relative; min-width:0; }
+.trigger { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:44px; padding:9px 0; color:var(--ink); font-size:12px; text-align:left; cursor:pointer; background:transparent; border:0; }
+.trigger > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.trigger > svg { flex-shrink:0; color:var(--muted); transition:transform 160ms; }
+.trigger[aria-expanded="true"] > svg { transform:rotate(180deg); }
+.trigger:focus-visible { outline:2px solid var(--brand); outline-offset:4px; border-radius:4px; }
+.trigger:disabled { color:var(--muted); cursor:default; }
+.options { position:absolute; z-index:60; inset:calc(100% + 5px) 0 auto; margin:0; padding:5px; list-style:none; overflow:auto; overscroll-behavior:contain; border:1px solid var(--line); border-radius:12px; background:var(--paper); box-shadow:0 10px 30px rgb(32 33 31 / .12); }
+.options[data-above="true"] { inset:auto 0 calc(100% + 5px); }
+.options > li { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:44px; padding:10px; border-radius:7px; color:var(--ink); font-size:12px; line-height:1.5; cursor:pointer; }
+.options > li > span { min-width:0; overflow-wrap:anywhere; }
+.options > li > svg { flex-shrink:0; color:var(--brand); }
+.options > li[data-active="true"] { background:var(--wash); }
+.options > li[aria-selected="true"] { color:var(--brand); }
+.options > li[aria-disabled="true"] { opacity:.5; cursor:default; }
+@media (prefers-reduced-motion:reduce) { .trigger > svg { transition:none; } }

@@ -122,7 +122,7 @@ export const TENANT_WRITER_REGISTRY = [
   },
   {
     id: "session_simulation_execution", classification: "user_owned", authorization: "server_verified_session",
-    entrypoints: ["src/lib/server/simulation-path-details.ts", "src/app/api/simulation/path-detail/route.ts"],
+    entrypoints: ["src/lib/server/simulation-path-details.ts", "src/app/api/simulation/path-detail/route.ts", "src/app/simulation/storage-actions.ts"],
     implementationPaths: ["src/db/queries/simulation-execution-storage.ts"],
     targets: [userTarget("simulation_executions", "insert", "update", "delete"), userTarget("simulation_execution_chunks", "insert")],
     transition: USER_API_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",

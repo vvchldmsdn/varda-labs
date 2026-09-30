@@ -17,7 +17,7 @@
 .notice:empty { display:none; }
 .notice > div { margin-top:0; font-size:11px; line-height:1.7; }
 .riskStage { display:grid; grid-template-columns:minmax(0,1fr) 180px; gap:30px; flex:1; min-height:0; }
-.matrix { display:flex; flex-direction:column; gap:12px; min-height:0; background:var(--surface); border-radius:24px; padding:22px 26px 15px; }
+.matrix { display:flex; flex-direction:column; gap:12px; min-height:0; background:transparent; padding:22px 0 15px; }
 .matrixHeading { display:flex; justify-content:space-between; align-items:baseline; gap:15px; flex-shrink:0; }
 .matrixHeading h2 { font-size:19px; font-weight:530; letter-spacing:-.035em; }
 .matrixHeading p { color:var(--muted); font-size:9px; }
@@ -30,8 +30,8 @@
 .compactMatrix [data-matrix-pair] { margin:0; font-size:9px; }
 .compactMatrix [data-matrix-scroll] { min-height:0; height:100%; padding:1px 1px 4px; }
 .compactMatrix table { height:100%; border-spacing:3px; }
-.compactMatrix th { font-size:9px; height:22px; }
-.compactMatrix th:first-child { width:58px; }
+.compactMatrix th { font-size:10px; height:40px; }
+.compactMatrix th:first-child { width:112px; }
 .compactMatrix td { height:auto; }
 .compactMatrix td > button { min-height:22px; height:100%; font-size:10px; }
 .compactMatrix [data-matrix-legend] { padding:2px 0 0; font-size:8px; }
@@ -89,4 +89,14 @@
   .compactMatrix [data-matrix-legend],.compactMatrix [data-matrix-legend] small,.compactMatrix [data-matrix-legend] b { font-size:10px; }
   .footer { justify-content:stretch; }
   .launchers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:8px; }
+}
+
+/* Keep the matrix part of the page at every size, with room for real names. */
+.matrix { padding-inline:0; border:0; border-radius:0; background:transparent; }
+.compactMatrix table { width:100%; table-layout:fixed; }
+.compactMatrix th { height:42px; font-size:10px; padding:3px; }
+.compactMatrix th:first-child { width:112px; min-width:112px; }
+@media (max-width:760px) {
+  .compactMatrix th { height:44px; min-width:66px; }
+  .compactMatrix td > button { width:100%; }
 }

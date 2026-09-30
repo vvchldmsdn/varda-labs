@@ -19,19 +19,11 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
   return <section data-economic-execution={result.status} className={`${styles.execution} ${styles.economicExecution}`}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-sm font-medium sm:text-base"><SimulationText ko="경제지표 시뮬레이션" en="Economic simulation" /></h2>
-      <CalculationGuideDialog guide={economicCalculationGuide} label={{ ko: "계산 과정", en: "How it works" }} title={{ ko: "경제지표에서 내 자산까지", en: "From economic indicators to your assets" }} />
-    </div>
-    <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
-      <SimulationText ko="환율 · 금리 · 종목 가격을 함께 변화시킨 조건부 연구" en="Conditional research with joint FX, yield and holding-price changes" />
-      {" · "}{baseline.coverage.modeledCurrentValuePct.toFixed(1)}<SimulationText ko="% 포함" en="% covered" />
-    </p>
-    {result.status !== "ready" ? <div role="status" className="my-6 border-y border-[var(--line)] py-10" data-economic-unavailable={result.reason}>
-      <p className="text-xl"><SimulationText ko="경제지표 경로를 아직 계산할 수 없습니다." en="Economic paths cannot be calculated yet." /></p>
-      <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]"><SimulationText ko="현재 보유 종목의 가격 이력과 환율·금리의 겹치는 관측이 필요합니다. 최신 경제지표가 오래됐거나 이력이 부족하면 이 모형은 실행하지 않습니다. ‘과거 수익률 경로’를 선택해 준비된 다른 모형을 확인할 수 있습니다." en="This model needs overlapping holding returns, FX and yields, plus recent economic observations. Missing or stale evidence stops this model. Select Historical paths to inspect the other model if its data is ready." /></p>
-      <p className="mt-3 text-xs text-[var(--muted)]"><SimulationText ko="확인 상태" en="Status" />: <EconomicReason reason={result.reason} /></p>
-      <EconomicObservationReadiness result={result} />
-      <p className="mt-4 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="‘모형·데이터’에서 종목별 준비 상태와 경제지표의 날짜를 확인하세요. 종목 가격 이력은 보유종목 관리에서 확인할 수 있습니다." en="Open Model & data for each holding's readiness and economic-data dates. Review holding price history in holdings management." /></p>
-    </div> : <>
+      <div className="flex items-center gap-4">
+        <span className="text-xs text-[var(--muted)]">{baseline.coverage.modeledCurrentValuePct.toFixed(1)}<SimulationText ko="% 포함" en="% covered" /></span>
+        {result.status === "ready" ? (      <InvestmentLabDialog label="세부 사항" labelEn="Details" title="경제지표와 자산을 연결한 근거" titleEn="How economic data connects to holdings" icon="table" size="wide">
+        <p className="text-sm leading-7 text-[var(--muted)]"><SimulationText ko="환율 · 금리 · 종목 가격을 함께 변화시킨 조건부 연구입니다. 검은 선은 중앙값 P50, 분포 구간은 P10~P90이며 모형 내 약 80%의 경로를 포함합니다. 미래 수익을 보장하는 구간이 아닙니다." en="Conditional research with joint FX, yields and holding prices. The black line is P50; P10–P90 contains about 80% of model paths, not a guaranteed future return range." /></p>
+        <CalculationGuideDialog guide={economicCalculationGuide} label={{ ko: "계산 과정", en: "How it works" }} title={{ ko: "경제지표에서 내 자산까지", en: "From economic indicators to your assets" }} />
       <details className={styles.startingFactors} data-economic-starting-state>
         <summary><SimulationText ko="경제지표 출발값" en="Starting economic values" /><span><SimulationText ko="환율 · 금리" en="FX · yields" /></span></summary>
         <div className="flex flex-wrap gap-x-6 gap-y-2 pb-3">
@@ -42,6 +34,20 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
         </InvestmentLabDialog>)}
         </div>
       </details>
+        <EconomicDataEvidence result={result} />
+        <div className="mt-6 border-y border-[var(--line)]"><SimulationTerminalRiskMetrics terminal={result.terminal} /></div>
+        <p className="mt-4 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="저장된 종가와 날짜별 환율로 계산합니다. 미조정 종가는 배당·분할을 반영한 총수익률과 다릅니다. 환율 효과는 이미 원화 수익률에 들어 있어 다시 곱하지 않습니다. 현재 평가액에서 제외된 부분은 포함 종목만 100%로 환산합니다." en="Inputs use stored closes and dated FX. Raw closes differ from dividend/split-adjusted total returns. FX is already represented in KRW returns and is not multiplied twice. Included holdings are renormalized to 100% when coverage is partial." /></p>
+        <div className="mt-5 divide-y divide-[var(--line)]">{result.executionWeights.map((row) => <div key={row.instrumentKey} className="flex justify-between gap-4 py-3 text-sm"><span>{row.ticker} <span className="text-[var(--muted)]">{row.currency}</span></span><span>{(row.weightBps / 100).toFixed(2)}%</span></div>)}</div>
+      </InvestmentLabDialog>) : <CalculationGuideDialog guide={economicCalculationGuide} label={{ ko: "계산 과정", en: "How it works" }} title={{ ko: "경제지표에서 내 자산까지", en: "From economic indicators to your assets" }} />}
+      </div>
+    </div>
+    {result.status !== "ready" ? <div role="status" className="my-6 border-y border-[var(--line)] py-10" data-economic-unavailable={result.reason}>
+      <p className="text-xl"><SimulationText ko="경제지표 경로를 아직 계산할 수 없습니다." en="Economic paths cannot be calculated yet." /></p>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]"><SimulationText ko="현재 보유 종목의 가격 이력과 환율·금리의 겹치는 관측이 필요합니다. 최신 경제지표가 오래됐거나 이력이 부족하면 이 모형은 실행하지 않습니다. ‘과거 수익률 경로’를 선택해 준비된 다른 모형을 확인할 수 있습니다." en="This model needs overlapping holding returns, FX and yields, plus recent economic observations. Missing or stale evidence stops this model. Select Historical paths to inspect the other model if its data is ready." /></p>
+      <p className="mt-3 text-xs text-[var(--muted)]"><SimulationText ko="확인 상태" en="Status" />: <EconomicReason reason={result.reason} /></p>
+      <EconomicObservationReadiness result={result} />
+      <p className="mt-4 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="‘모형·데이터’에서 종목별 준비 상태와 경제지표의 날짜를 확인하세요. 종목 가격 이력은 보유종목 관리에서 확인할 수 있습니다." en="Open Model & data for each holding's readiness and economic-data dates. Review holding price history in holdings management." /></p>
+    </div> : <>
       <div className={styles.resultLayout}>
         <dl className={styles.resultSummary}>
           <div><dt><SimulationText ko="마지막 수익률 중간값" en="Median final return" /></dt><dd>{simulationReturnLabel(100 + result.terminal.p50ReturnPct)}</dd><p>{result.assumptions.horizon}<SimulationText ko={`단계 · ${result.assumptions.pathCount.toLocaleString("ko-KR")}개 공동 경로`} en={` steps · ${result.assumptions.pathCount.toLocaleString("en-US")} joint paths`} /></p></div>
@@ -50,12 +56,7 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
         </dl>
         <ResearchFanChart pathDetail={pathDetail} pathDetailNotice={pathDetailNotice} large execution={result} />
       </div>
-      <InvestmentLabDialog label="출발 상태와 포함 종목" labelEn="Starting state & holdings" title="경제지표와 자산을 연결한 근거" titleEn="How economic data connects to holdings" icon="table" size="wide">
-        <EconomicDataEvidence result={result} />
-        <div className="mt-6 border-y border-[var(--line)]"><SimulationTerminalRiskMetrics terminal={result.terminal} /></div>
-        <p className="mt-4 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="저장된 종가와 날짜별 환율로 계산합니다. 미조정 종가는 배당·분할을 반영한 총수익률과 다릅니다. 환율 효과는 이미 원화 수익률에 들어 있어 다시 곱하지 않습니다. 현재 평가액에서 제외된 부분은 포함 종목만 100%로 환산합니다." en="Inputs use stored closes and dated FX. Raw closes differ from dividend/split-adjusted total returns. FX is already represented in KRW returns and is not multiplied twice. Included holdings are renormalized to 100% when coverage is partial." /></p>
-        <div className="mt-5 divide-y divide-[var(--line)]">{result.executionWeights.map((row) => <div key={row.instrumentKey} className="flex justify-between gap-4 py-3 text-sm"><span>{row.ticker} <span className="text-[var(--muted)]">{row.currency}</span></span><span>{(row.weightBps / 100).toFixed(2)}%</span></div>)}</div>
-      </InvestmentLabDialog>
+
     </>}
   </section>;
 }

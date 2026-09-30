@@ -8,6 +8,7 @@ import type {
   PortfolioRiskWindow,
 } from "@/lib/portfolio-risk-read-model-types";
 import { buildPortfolioRiskHref } from "@/lib/portfolio-risk-route";
+import styles from "./risk-workspace.module.css";
 
 const WINDOWS: PortfolioRiskWindow[] = [30, 90, 252];
 
@@ -44,7 +45,7 @@ export function PortfolioRiskControls({
             href={`${buildPortfolioRiskHref(selectedScope.key, window)}${isDesignPreview ? "&preview=design" : ""}`}
             active={selection.window === window}
           >
-            {window}<PortfolioText ko={"일"} /><PortfolioText ko={isDesignPreview ? " 예시" : ""} />
+            {window}<PortfolioText ko={"일"} />{isDesignPreview ? <> <PortfolioText ko="예시" /></> : null}
           </RiskOptionLink>
         ))}
       </RiskOptionGroup>
@@ -62,7 +63,7 @@ function RiskOptionGroup({
   return (
     <div>
       <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
-      <div className="flex min-h-10 flex-wrap gap-1 rounded-md border border-[var(--line)] bg-white p-1">
+      <div className={styles.periodOptions}>
         {children}
       </div>
     </div>
@@ -82,11 +83,7 @@ function RiskOptionLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`min-w-16 rounded px-3 py-2 text-center text-sm font-semibold ${
-        active
-          ? "bg-[var(--ink)] text-white"
-          : "text-[var(--muted)] hover:bg-[var(--wash)]"
-      }`}
+      className={styles.periodOption}
     >
       {children}
     </Link>

@@ -75,7 +75,7 @@ describe("beginner simulation calculation guide", () => {
     }
   });
 
-  it("keeps the guide available for ready and blocked calculations while deferring the unopened guide", async () => {
+  it("keeps details available for ready and blocked calculations while deferring the nested guide", async () => {
     const [provider, owner] = await importUiWithPorts([
       "src/components/i18n/locale-provider.tsx",
       "src/components/simulation/owner-research-execution-section.tsx",
@@ -99,7 +99,7 @@ describe("beginner simulation calculation guide", () => {
         const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale },
           React.createElement(owner.OwnerResearchExecutionSection, { execution, selectedScopeKey: "all" }),
         ));
-        assert.ok(markup.includes(initialLocale === "ko" ? "계산 과정" : "How it works"));
+        assert.ok(markup.includes(initialLocale === "ko" ? "세부 사항" : "Details"));
         assert.match(markup, new RegExp(`data-owner-research-status="${execution.status}"`));
         assert.doesNotMatch(markup, /data-calculation-guide=/);
       }

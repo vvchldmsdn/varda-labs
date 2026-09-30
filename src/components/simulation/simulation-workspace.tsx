@@ -62,7 +62,7 @@ export function SimulationWorkspace({
 
   return (
     <div className={styles.workspace} data-simulation-workspace="integrated">
-      <div className={styles.toolbar}><span><SimulationText ko={"현재 보유 구성 · 연구 분포"} /></span><div>{tools}</div></div>
+      <div className={styles.toolbar}><div>{tools}</div></div>
 
       <div className={`${styles.canvas} ${loadingStyles.resultFrame}`}>
         <div className={loadingStyles.pendingResult}><SimulationLoading /></div>
