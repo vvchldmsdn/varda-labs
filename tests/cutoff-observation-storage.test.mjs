@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
+import { resolveSnapshotCycle } from '../src/lib/snapshots/market-calendar.ts';
 
 const pg = new PGlite();
 // Keep fixed financial inputs, but place receipts within the real DB's retention
@@ -28,7 +29,7 @@ it('actual cache writer preserves the 06:59 evidence after a 07:20 refresh', asy
     'src/db/queries/snapshot-cutoff-observations.ts',
   ], {'@/db/client':{db:drizzle(pg),sqlClient}});
   const [fx] = await importWithPorts(['src/lib/market-data/fx-refresh-job.ts'], {'@/db/client':{db:drizzle(pg),sqlClient}});
-  runtime={reader,fx};
+  runtime={reader,fx,sqlClient};
   let at = new Date(receipt('21:59:00')), price='105.000000000001';
   const provider = {name:'kis',supportedMarkets:['us'],fetchLiveQuotes:async()=>({provider:'kis',fetchedAt:at,warnings:[],rows:[{
     ticker:'UNIT',market:'us',currency:'USD',price,priceAsOf:at,fetchedAt:at,source:'kis_overseas_price:NAS',quoteType:'live',status:'ok',
@@ -94,5 +95,54 @@ it('unchanged FX collection refreshes only a matching receipt and rejects an old
   const stored=(await pg.query('select usdkrw,fetched_at,observed_at from fx_rates where date=$1',[snapshotDate])).rows[0];
   assert.equal(Number(stored.usdkrw),1310);assert.equal(new Date(stored.fetched_at).toISOString(),receipt('22:21:00.000'));assert.equal(stored.observed_at,null);
   await assert.rejects(write({...candidate,fetchedAt:receipt('22:20:30')}),/fx_receipt_changed/);
+  assert.deepEqual((await pg.query('select usdkrw,fetched_at,observed_at from fx_rates where date=$1',[snapshotDate])).rows[0],stored);
   assert.deepEqual((await runtime.reader.readSnapshotCutoffObservations(snapshotDate)).fxRows,before);
+});
+
+it('durable FX worker refreshes an unchanged receipt once, then reuses it without another provider call', async () => {
+  const rateDate=resolveSnapshotCycle(new Date()).snapshotDate;
+  const staleReceipt=new Date(Date.now()-600_000).toISOString();
+  const candidate={provider:'kis',pair:'USD/KRW',rateDate,usdKrw:'1320',source:'kis_overseas_price_detail:NAS',status:'ok',fetchedAt:staleReceipt};
+  assert.equal((await runtime.fx.runUsdKrwFxCandidateJob({candidate,dryRun:false,acceptExistingVardaRow:true})).status,'written');
+  let providerCalls=0, fetchedAt=null, providerFailure=false;
+  const [queue,worker]=await importWithPorts(['src/lib/market-data/collection-queue.ts','src/lib/market-data/collection-worker.ts'],{
+    'next/server':{after:()=>assert.fail('This fixture drains the worker directly')},
+    '@/db/client':{db:drizzle(pg),sqlClient:runtime.sqlClient},
+    '@/lib/market-data/providers/kis':{
+      getKisProviderPolicy:()=>({configured:true}),createKisProviderRequestSession:()=>({}),createKisMarketDataProvider:()=>({}),
+      fetchKisUsdKrwFxCandidate:async input=>{
+        providerCalls++;
+        if(providerFailure) throw new Error('fixture_provider_failure');
+        fetchedAt=input.fetchedAt.toISOString();
+        return {...candidate,rateDate:input.rateDate,fetchedAt};
+      },
+    },
+    '@/lib/market-data/kis-refresh-lease':{KisRefreshLeaseBusyError:class extends Error{},withKisCollectionLease:task=>task()},
+    '@/lib/market-data/provider-budget':{withKisCollectionDeadline:task=>task()},
+    '@/lib/market-data/price-sync':{runMarketPriceSync:()=>assert.fail('No live job was enqueued')},
+    '@/lib/market-data/kis-history-cache-sync':{runKisHistoryCacheSync:()=>assert.fail('No history job was enqueued')},
+    '@/lib/market-data/fx-refresh-job':{runUsdKrwFxCandidateJob:runtime.fx.runUsdKrwFxCandidateJob},
+    '@/lib/market-data/latest-close-revalidation':{revalidateLatestClose:()=>assert.fail('No live job was enqueued')},
+    '@/lib/market-data/twelve-data-service':{resumeConfiguredTwelveDataService:()=>assert.fail('No other provider is used')},
+  });
+  const target={kind:'fx',ticker:'VOO',market:'us',currency:'USD'};
+  await queue.enqueueMarketCollection([target]);
+  let result=await worker.drainMarketCollection();
+  assert.equal(result.failed,0);assert.equal(result.processed,1);assert.equal(result.cacheHits,0);assert.equal(providerCalls,1);
+  const stored=(await pg.query('select usdkrw,fetched_at,observed_at,rate_kind from fx_rates where date=$1',[rateDate])).rows[0];
+  assert.equal(Number(stored.usdkrw),1320);assert.equal(stored.fetched_at.toISOString(),fetchedAt);
+  assert.equal(stored.observed_at,null);assert.equal(stored.rate_kind,null);
+  await queue.enqueueMarketCollection([target]);
+  result=await worker.drainMarketCollection();
+  assert.equal(result.failed,0);assert.equal(result.cacheHits,1);assert.equal(providerCalls,1);
+  assert.equal((await pg.query("select last_code from market_collection_jobs where key='kis:fx:USD:KRW'")).rows[0].last_code,'cache_fresh');
+
+  // A failed recheck must neither refresh the receipt nor mark its job collected.
+  await pg.query('update fx_rates set fetched_at=$1 where date=$2',[staleReceipt,rateDate]);
+  providerFailure=true;
+  await queue.enqueueMarketCollection([target]);
+  result=await worker.drainMarketCollection();
+  assert.equal(result.failed,1);assert.equal(providerCalls,2);
+  assert.equal((await pg.query('select fetched_at from fx_rates where date=$1',[rateDate])).rows[0].fetched_at.toISOString(),staleReceipt);
+  assert.equal((await pg.query("select status from market_collection_jobs where key='kis:fx:USD:KRW'")).rows[0].status,'pending');
 });

@@ -3,7 +3,7 @@ import "server-only";
 
 import { sql, and, asc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 
-import { db,sqlClient } from "@/db/client";
+import { db } from "@/db/client";
 import { accounts, appUsers, assets } from "@/db/schema";
 import { mapWithConcurrency } from "@/lib/async/map-with-concurrency";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -38,13 +38,8 @@ export async function runDailySnapshotJob(
     options.snapshotDate ?? resolveSnapshotCycle(options.now).snapshotDate;
   if(options.durable && !dryRun) {
     const totals=await runSnapshotWork("legacy",snapshotDate,async work=>{
-      const completed=await sqlClient.query(`select 1 from daily_portfolio_snapshots s
-        where s.canonical_owner_user_id=$1::uuid and s.account_id=$2::uuid and s.snapshot_date=$3::date
-         and s.source='varda_manual_daily_snapshot' and not s.is_sample and s.description like '%snapshot_status=complete%'
-         and s.cycle_end_at=($3::date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'
-         and s.num_assets>0 and s.num_assets=(select count(*) from daily_position_snapshots p where p.canonical_owner_user_id=s.canonical_owner_user_id and p.account_id=s.account_id and p.snapshot_date=s.snapshot_date and p.source=s.source and not p.is_sample and p.cycle_end_at=s.cycle_end_at)
-        limit 1`,[work.ownerUserId,work.accountId,work.snapshotDate]);
-      if(completed.length) return {status:"completed"};
+      // The shared writer first repairs an invalidated ledger revision. A row
+      // count alone cannot certify that a previously completed valuation is valid.
       // No operator unchanged-holdings authorization is manufactured. The
       // ordinary cutoff guard must admit the historical evidence on its own.
       try { await runDailySnapshot({tenantContext:{ownerUserId:work.ownerUserId,role:work.role},account:work.code,snapshotDate:work.snapshotDate,dryRun:false}); return {status:"completed"}; }

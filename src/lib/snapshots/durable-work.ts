@@ -1,5 +1,6 @@
 import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
+import { snapshotWorkRevisionCutoffSql } from "./holdings-revision-policy";
 import { sqlClient } from "@/db/client";
 import {snapshotFence,snapshotDeadline} from "./write-context";
 export {snapshotFence,snapshotDeadline} from "./write-context";
@@ -39,7 +40,7 @@ export async function claimSnapshotWork(stage:"legacy"|"native", snapshotDate:st
     where stage=$1 and snapshot_date<=$2::date and attempts<4 and a.is_active and u.status='active' and u.role in('user','admin') and (($1='native' and (a.native_state is not null and not ${holdingsPortfolioSql("a")})) or ($1='legacy' and ${holdingsPortfolioSql("a")}))
      and w.status not in ('completed','blocked') and (w.status<>'running' or lease_until<clock_timestamp())
      and (next_attempt_at is null or next_attempt_at<=clock_timestamp())
-     and revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=(w.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'),0)
+     and revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=${snapshotWorkRevisionCutoffSql("w")}),0)
     order by snapshot_date,w.id limit 1 for update of w skip locked
    ), claimed as(update daily_snapshot_work set status='running',generation=generation+1,attempts=attempts+1,started_at=clock_timestamp(),lease_until=clock_timestamp()+interval '90 seconds',updated_at=clock_timestamp() where id in(select id from due) returning *)
    select c.id,c.canonical_owner_user_id as "ownerUserId",c.account_id as "accountId",a.code,u.role,c.snapshot_date::text as "snapshotDate",c.revision,c.generation from claimed c join accounts a on a.id=c.account_id join app_users u on u.id=c.canonical_owner_user_id`,[stage,snapshotDate]);
@@ -73,7 +74,7 @@ export async function runSnapshotWork(stage:"legacy"|"native",snapshotDate:strin
   }
   const rows=await sqlClient.query(`select w.status,count(*)::int as count,count(*) filter(where w.attempts>=4)::int as exhausted from daily_snapshot_work w join accounts a on a.id=w.account_id join app_users u on u.id=w.canonical_owner_user_id
     where stage=$1 and snapshot_date<=$2::date and (snapshot_date >= $2::date-2 or w.status<>'completed') and a.is_active and u.status='active' and u.role in('user','admin') and (($1='native' and (a.native_state is not null and not ${holdingsPortfolioSql("a")})) or ($1='legacy' and ${holdingsPortfolioSql("a")}))
-    and w.revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=(w.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'),0)
+    and w.revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=${snapshotWorkRevisionCutoffSql("w")}),0)
     group by w.status`,[stage,snapshotDate]);
   const counts=Object.fromEntries(rows.map(r=>[String(r.status),Number(r.count)]));
   return {targetCount:deferred+rows.reduce((sum,r)=>sum+Number(r.count),0),writtenCount:counts.completed??0,failedCount:counts.failed??0,blockedCount:deferred+(counts.blocked??0)+(counts.pending??0)+(counts.running??0),exhaustedCount:rows.reduce((sum,r)=>sum+Number(r.exhausted??0),0),evidenceBlockedCount:counts.blocked??0};

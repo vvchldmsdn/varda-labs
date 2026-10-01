@@ -3324,3 +3324,15 @@ export const snapshotCutoffFxObservations = pgTable("snapshot_cutoff_fx_observat
   check("cutoff_fx_date", sql`${t.snapshotDate}=(${t.fetchedAt} at time zone 'Asia/Seoul')::date`),
   check("cutoff_fx_window", sql`(${t.fetchedAt} at time zone 'Asia/Seoul')::time between time '06:45' and time '07:00'`),
 ]).enableRLS();
+
+// Server-only immutable before-images; no tenant grants or public read surface.
+export const holdingsSnapshotRepairArchive = pgTable("holdings_snapshot_repair_archive", {
+ id:uuid("id").defaultRandom().primaryKey(),
+ canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),
+ accountId:uuid("account_id").references(()=>accounts.id), snapshotDate:date("snapshot_date").notNull(),
+ revision:integer("revision").notNull(),portfolioId:uuid("portfolio_id").notNull(),
+ portfolio:jsonb("portfolio").notNull(),positions:jsonb("positions").notNull(),
+ createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>[uniqueIndex("holdings_snapshot_repair_archive_portfolio_id_revision_key").on(t.portfolioId,t.revision),
+ check("holdings_snapshot_repair_archive_revision_check",sql`${t.revision}>0`),
+ check("holdings_snapshot_repair_archive_check",sql`jsonb_typeof(${t.portfolio})='object' AND jsonb_typeof(${t.positions})='array'`)]).enableRLS();

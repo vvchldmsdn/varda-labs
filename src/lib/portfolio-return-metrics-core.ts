@@ -4,6 +4,8 @@ import {
   sumComplete,
   toNumber,
 } from "./portfolio-math.ts";
+import { Decimal } from "./money.ts";
+import type { NativeHoldingCostEvidence } from "./native-legacy-trade-projection.ts";
 
 type ParsedObject = Record<string, unknown>;
 
@@ -108,7 +110,7 @@ export function buildReturnMetricsSummary(
   events: PortfolioReturnEventRow[],
   assetRows: PortfolioReturnAssetRow[],
   usdKrwRate: number,
-  options: { asOfDate?: string | null } = {},
+  options: { asOfDate?: string | null; nativeHoldingCosts?: readonly NativeHoldingCostEvidence[] } = {},
 ): ReturnMetricsSummary {
   const asOfDate = options.asOfDate ?? null;
   const assetMaps = buildAssetMaps(assetRows);
@@ -215,6 +217,25 @@ export function buildReturnMetricsSummary(
       realizedCostBasisKrw,
       missingCost,
     });
+  }
+
+  // Latest account state is authoritative for remaining cost, including splits
+  // and cost-basis completion. It must not change realized trade economics.
+  for (const cost of options.nativeHoldingCosts ?? []) {
+    const asset = assetMaps.byId.get(cost.assetId);
+    if (!asset || asset.account !== cost.account || asset.currency !== cost.currency) continue;
+    // Current evidence can never fill a past valuation. Dated evidence belongs
+    // only to the requested Korean service date.
+    if (asOfDate && (!cost.asOf || !Number.isFinite(Date.parse(cost.asOf)) ||
+        new Date(Date.parse(cost.asOf) + 9 * 3600000).toISOString().slice(0, 10) !== asOfDate)) continue;
+    const metrics = metricsByAssetKey.get(assetMetricKey(asset));
+    if (!metrics) continue;
+    let sameQuantity = false;
+    try { sameQuantity = cost.quantity !== null && asset.quantity !== null && Decimal.from(cost.quantity).compare(String(asset.quantity)) === 0; }
+    catch { /* Preserve unknown if the two reads straddle a holding mutation. */ }
+    metrics.nativeCostBasis = true;
+    metrics.costBasisKrw = sameQuantity ? toNumber(cost.costKrw) : null;
+    metrics.missingCost = metrics.costBasisKrw === null || metrics.realizedCostBasisKrw === null;
   }
 
   return {

@@ -1,5 +1,5 @@
 import "server-only";
-import { loadNativeLegacyTrades } from "./native-legacy-trades";
+import { loadNativeLegacyTrades, loadNativeHoldingCosts } from "./native-legacy-trades";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import {
@@ -323,6 +323,8 @@ async function loadDashboardContextSources({
     recentPositionRows,
     historyAssetIds,
     recentPortfolioRows,
+    nativeHoldingCosts: allAccountRows.some(row => row.nativeState != null)
+      ? await loadNativeHoldingCosts(tenantContext) : [],
     eventRows: [
       ...eventRows.filter(row => row.nativeData == null),
       ...(allAccountRows.some(row => row.nativeState != null) ? await loadNativeLegacyTrades(tenantContext) : [])

@@ -18,6 +18,48 @@ export type NativeLegacyTradeAccount = {
   assets: readonly { id: string; name: string; ticker?: string | null; legacyBase44Id?: string | null }[];
 };
 
+export type NativeHoldingCostEvidence = {
+  assetId: string;
+  account: string;
+  currency: string;
+  quantity: string | null;
+  costKrw: string | null;
+  stateAt: string;
+  /** null is current state only; a historical caller must request a cutoff. */
+  asOf: string | null;
+};
+
+/** Current/dated holding cost is separate from cash-flow events. A split or an
+ * explicit cost-basis completion changes this state without creating a trade. */
+export function projectNativeHoldingCosts(input: {
+  accountId: string;
+  account: string;
+  state: NativePortfolioState;
+  assets: readonly { id: string; currency: string }[];
+  asOf?: string | null;
+  boundary?: "before" | "inclusive";
+}): NativeHoldingCostEvidence[] {
+  const { state, asOf = null } = input;
+  if (state.accountId !== input.accountId || !Number.isFinite(Date.parse(state.at)) ||
+      (asOf !== null && (!Number.isFinite(Date.parse(asOf)) || Date.parse(state.at) > Date.parse(asOf) ||
+        (input.boundary !== "inclusive" && Date.parse(state.at) === Date.parse(asOf))))) {
+    throw new Error("native_holding_cost_scope_mismatch");
+  }
+  return input.assets.map(asset => {
+    const position = state.positions.find(row => row.assetId === asset.id && row.currency === asset.currency);
+    let costKrw: string | null = null;
+    if (position) {
+      const components = nativeCostAmounts(position.costLots);
+      if (components !== null && components.every(row => row.currency === "KRW")) {
+        try { costKrw = components.reduce((sum, row) => sum.add(row.amount), Decimal.from(0)).toExactString(); }
+        catch { /* A nonterminating rational remains unavailable to the decimal DTO. */ }
+      }
+    }
+    return { assetId: asset.id, account: input.account, currency: asset.currency,
+      quantity: position?.quantity ?? null, costKrw, stateAt: state.at, asOf };
+  });
+}
+
 /** Read projection only: callers supply EFFECTIVE native entries, never the
  * superseded raw event rows. Quantity/cash/cost in storage are not modified. */
 export function projectNativeLegacyTrade<T extends object>(

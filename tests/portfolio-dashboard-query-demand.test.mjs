@@ -406,7 +406,11 @@ it("executes Dashboard baseline SQL without bridging a recovered trade while pre
   try {
     await pg.exec(`create table accounts(id uuid,canonical_owner_user_id uuid,is_active boolean,code text);
       create table daily_position_snapshots(id text,canonical_owner_user_id uuid,account_id uuid,account text,asset_id uuid,
-        snapshot_date date,is_sample boolean,source text,captured_at timestamptz,created_at timestamptz);
+        snapshot_date date,is_sample boolean,source text,captured_at timestamptz,created_at timestamptz,
+        description text,cycle_end_at timestamptz,updated_at timestamptz);
+      create table daily_portfolio_snapshots(canonical_owner_user_id uuid,account_id uuid,account text,snapshot_date date,
+        is_sample boolean,source text,captured_at timestamptz,created_at timestamptz,description text,cycle_end_at timestamptz,updated_at timestamptz);
+      create table native_ledger_revisions(canonical_owner_user_id uuid,account_id uuid,affected_at timestamptz,recorded_at timestamptz,marker_sequence integer);
       create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);`);
     await pg.query("insert into accounts values($1,$2,true,'brokerage'),($3,$2,true,'isa')", [accountId,ownerId,otherAccountId]);
     await pg.query("insert into broker_recovery_batches values($1,$2,$3,'2026-09-08T02:00:00Z')", [ownerId,accountId,JSON.stringify({trades:[{tradeDate:"2026-09-08"}]})]);
@@ -414,16 +418,16 @@ it("executes Dashboard baseline SQL without bridging a recovered trade while pre
       ["old-brokerage",accountId,"brokerage",assetId,"2026-09-07"],
       ["old-isa",otherAccountId,"isa",otherAssetId,"2026-09-07"],
       ["affected",accountId,"brokerage",assetId,"2026-09-08"],
-    ]) await pg.query("insert into daily_position_snapshots values($1,$2,$3,$4,$5,$6,false,'test','2026-09-08T01:00:00Z','2026-09-08T01:00:00Z')",[name,ownerId,account,code,asset,date]);
+    ]) await pg.query("insert into daily_position_snapshots(id,canonical_owner_user_id,account_id,account,asset_id,snapshot_date,is_sample,source,captured_at,created_at) values($1,$2,$3,$4,$5,$6,false,'test','2026-09-08T01:00:00Z','2026-09-08T01:00:00Z')",[name,ownerId,account,code,asset,date]);
     const execute = async request => (await pg.query(`select daily_position_snapshots.id from daily_position_snapshots
       inner join accounts on daily_position_snapshots.account_id=accounts.id where ${request.predicate.sql}
       order by daily_position_snapshots.id`,request.predicate.params)).rows.map(row=>row.id);
     assert.deepEqual(await execute(baseline), ["old-isa"]);
     assert.deepEqual(await execute(history), ["old-brokerage","old-isa"]);
-    await pg.query("insert into daily_position_snapshots values('corrected',$1,$2,'brokerage',$3,'2026-09-08',false,'test','2026-09-08T03:00:00Z','2026-09-08T03:00:00Z')",[ownerId,accountId,assetId]);
+    await pg.query("insert into daily_position_snapshots(id,canonical_owner_user_id,account_id,account,asset_id,snapshot_date,is_sample,source,captured_at,created_at) values('corrected',$1,$2,'brokerage',$3,'2026-09-08',false,'test','2026-09-08T03:00:00Z','2026-09-08T03:00:00Z')",[ownerId,accountId,assetId]);
     assert.deepEqual(await execute(baseline), ["corrected","old-isa"]);
     assert.deepEqual(await execute(history), ["corrected","old-brokerage","old-isa"]);
-    await pg.query("insert into daily_position_snapshots values('foreign-owner','ffffffff-ffff-4fff-8fff-ffffffffffff',$1,'isa',$2,'2026-09-08',false,'test',now(),now())",[otherAccountId,otherAssetId]);
+    await pg.query("insert into daily_position_snapshots(id,canonical_owner_user_id,account_id,account,asset_id,snapshot_date,is_sample,source,captured_at,created_at) values('foreign-owner','ffffffff-ffff-4fff-8fff-ffffffffffff',$1,'isa',$2,'2026-09-08',false,'test',now(),now())",[otherAccountId,otherAssetId]);
     assert.deepEqual(await execute(baseline), ["corrected","old-isa"]);
   } finally { await pg.close(); }
 });

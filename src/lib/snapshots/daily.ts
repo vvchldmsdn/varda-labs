@@ -1,7 +1,10 @@
 import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
-import { loadNativeLegacyTrades } from "@/db/queries/native-legacy-trades";
+import { getSnapshotFxExposureType } from "./fx-exposure";
+import { loadNativeLegacyTrades, loadNativeHoldingCosts } from "@/db/queries/native-legacy-trades";
 import { resolveStoredManualCutoffCarry } from "./manual-cutoff-carry";
+import { repairHoldingsSnapshotRevisions } from "./holdings-revision-repair";
+import { holdingsRevisionValidSql } from "./holdings-revision-policy";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 import { readSnapshotCutoffObservations } from "@/db/queries/snapshot-cutoff-observations";
 
@@ -104,14 +107,7 @@ const SNAPSHOT_SOURCE = "varda_manual_daily_snapshot";
 const SNAPSHOT_RULE_VERSION = "varda-manual-daily-snapshot-v1";
 const FRESH_CLOSE_MAX_AGE_DAYS = 7;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const KOREA_UNHEDGED_GLOBAL_CATEGORIES = new Set([
-  "\ubbf8\uad6d\uc8fc\uc2dd",
-  "\uc120\uc9c4\uad6d\uc8fc\uc2dd",
-  "\uc2e0\ud765\uad6d\uc8fc\uc2dd",
-  "\uae00\ub85c\ubc8c\ucc44\uad8c",
-  "\uc6d0\uc790\uc7ac",
-  "\uae08/\uadc0\uae08\uc18d",
-]);
+
 
 export type { SnapshotAccount } from "@/lib/snapshots/account-target";
 
@@ -528,6 +524,9 @@ export async function runDailySnapshot(
   const ownerUserId = options.tenantContext.ownerUserId;
   const context = await loadAccountContext(snapshotDate, ownerUserId);
   if (!provenance.insertOnly) {
+    const repaired = await repairHoldingsSnapshotRevisions(options.tenantContext, snapshotDate, requestedAccount, dryRun);
+    if (repaired.status === "blocked") throw new DailySnapshotRequestError(repaired.reason,
+      "The corrected ledger requires a historical valuation repair", { snapshotDate }, 409);
     const completed = await readCompletedDailyResult({ context, cycle, provenance, requestedAccount, dryRun });
     if (completed) return completed;
   }
@@ -607,10 +606,12 @@ export async function runDailySnapshot(
       { snapshotDate, eventIds: changedEventsAfterCutoff }, 409,
     );
   }
-  const nativeTrades = eventRows.some(row => row.nativeData != null) ? await loadNativeLegacyTrades(options.tenantContext) : [];
+  const nativeTrades = eventRows.some(row => row.nativeData != null) ? await loadNativeLegacyTrades(options.tenantContext, { asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [];
   const calculationEvents = [...eventRows.filter(row => row.nativeData == null), ...nativeTrades.filter(row => row.eventDate <= snapshotDate)];
   const returnMetrics = buildReturnMetricsSummary(calculationEvents, investmentAssetRows, fx.usdKrw ?? 0, {
     asOfDate: snapshotDate,
+    nativeHoldingCosts: eventRows.some(row => row.nativeData != null)
+      ? await loadNativeHoldingCosts(options.tenantContext, { asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [],
   });
   const realizedReturn = buildRealizedReturnRunSummary(
     returnMetrics,
@@ -816,8 +817,8 @@ async function readCompletedDailyResult({ context, cycle, provenance, requestedA
   const codes = requestedAccount === ALL_SNAPSHOT_ACCOUNTS ? [...context.activeAccountCodes] : [requestedAccount];
   if (!codes.length || codes.some(code => !context.accountRowsByCode.has(code))) return null;
   const [portfolios, positions] = await Promise.all([
-    db.select().from(dailyPortfolioSnapshots).where(and(eq(dailyPortfolioSnapshots.canonicalOwnerUserId, context.ownerUserId), eq(dailyPortfolioSnapshots.snapshotDate, cycle.snapshotDate))),
-    db.select().from(dailyPositionSnapshots).where(and(eq(dailyPositionSnapshots.canonicalOwnerUserId, context.ownerUserId), eq(dailyPositionSnapshots.snapshotDate, cycle.snapshotDate))),
+    db.select().from(dailyPortfolioSnapshots).where(and(eq(dailyPortfolioSnapshots.canonicalOwnerUserId, context.ownerUserId), eq(dailyPortfolioSnapshots.snapshotDate, cycle.snapshotDate), sql.raw(holdingsRevisionValidSql("daily_portfolio_snapshots")))),
+    db.select().from(dailyPositionSnapshots).where(and(eq(dailyPositionSnapshots.canonicalOwnerUserId, context.ownerUserId), eq(dailyPositionSnapshots.snapshotDate, cycle.snapshotDate), sql.raw(holdingsRevisionValidSql("daily_position_snapshots")))),
   ]);
   const results: DailySnapshotRunResult["results"] = {};
   const used: PositionRow[] = [];
@@ -1020,7 +1021,7 @@ function sameCutoff(left: Date | string | null | undefined, right: Date | string
 }
 
 function isCompletedDailyPortfolio(row: PortfolioRow, cutoff: Date | string | null | undefined) {
-  return isVardaGeneratedRow(row) && !row.isSample && (row.numAssets ?? 0) > 0 &&
+  return isVardaGeneratedRow(row) && !row.isSample && ((row.numAssets ?? 0) > 0 || (row.numAssets === 0 && /(?:^|; )native_revision=\d+/.test(row.description ?? ""))) &&
     row.description?.includes("snapshot_status=complete") === true && sameCutoff(row.cycleEndAt, cutoff);
 }
 
@@ -1324,7 +1325,7 @@ function computeAccountSnapshot({
     const assetReturnMetrics = getAssetReturnMetrics(returnMetrics, asset, fx.usdKrw ?? 0);
     const costKrw = assetReturnMetrics.nativeCostBasis ? assetReturnMetrics.costBasisKrw : snapshotPositionCostBasisKrw(asset, fx.usdKrw ?? 0);
     const pnlKrw = costKrw === null ? null : marketValueKrw - costKrw;
-    const exposureType = getFxExposureType(asset);
+    const exposureType = getSnapshotFxExposureType(asset);
 
     if (asset.market === "korea") krValue += marketValueKrw;
     if (asset.market === "us") usValue += marketValueKrw;
@@ -2917,25 +2918,6 @@ function assetFxRate(asset: AssetRow, fx: ResolvedFxRate) {
   return resolveKrwFxRate(asset.currency, fx.usdKrw).rate ?? 0;
 }
 
-function getFxExposureType(asset: AssetRow) {
-  if (asset.market === "us" || asset.currency === "USD") return "US_LISTED";
-  const ticker = normalizeTicker(asset.ticker) ?? "";
-  const name = asset.name.toLowerCase();
-  if (
-    ticker.endsWith("(H)") ||
-    name.includes("(h)") ||
-    name.includes("hedged")
-  ) {
-    return "HEDGED";
-  }
-  if (
-    asset.market === "korea" &&
-    KOREA_UNHEDGED_GLOBAL_CATEGORIES.has(asset.category ?? "")
-  ) {
-    return "KR_UNHEDGED_GLOBAL";
-  }
-  return "DOMESTIC";
-}
 
 function isFreshCloseRow(actualDate: string, referenceDate: string) {
   const ageDays = diffDays(referenceDate, actualDate);

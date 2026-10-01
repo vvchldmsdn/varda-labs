@@ -63,7 +63,9 @@ export async function drainMarketCollection() {
             else {
               const candidate = await fetchKisUsdKrwFxCandidate({ target: { ticker: job.ticker, exchange: null },
                 fetchedAt: now, rateDate: resolveSnapshotCycle(now).snapshotDate, session });
-              const result = await runUsdKrwFxCandidateJob({ candidate, dryRun: false, acceptExistingVardaRow: true });
+              // A successful recheck refreshes cache freshness even if the rate
+              // is unchanged; the writer preserves provider-time semantics and CAS.
+              const result = await runUsdKrwFxCandidateJob({ candidate, dryRun: false, acceptExistingVardaRow: true, refreshUnchangedReceipt: true });
               ok = result.ok;
             }
           }

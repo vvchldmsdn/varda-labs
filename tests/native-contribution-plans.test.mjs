@@ -57,6 +57,22 @@ it('preserves native funds, cost lots, planned sales and USD cents with the exis
   for(const amount of ['1.001','NaN','1e3','1,000','-1']) assert.equal(validNativeContributionRequest(input({newMoney:{amount,currency:'USD'}})),false);
   assert.equal(validNativeContributionRequest({...input(),rows:[]}),false);
 });
+it('previews and saves a zero-new-money rebalance funded only by profitable sales',async()=>{
+  context.input.rows.forEach(row=>{row.maRuleEnabled=false;});
+  const command=input({newMoney:{amount:'0',currency:'USD'},useAvailableCash:false});
+  assert.equal(validNativeContributionRequest(command),true);
+  const preview=buildNativeContributionPlan(context,command);
+  assert.equal(preview.status,'ready');
+  // USD 900 + 100, with a 50% target and 105% landing: sell 900 - 525 = 375.
+  assert.deepEqual(preview.document.result.rows.map(row=>[row.sell,row.buy]),[[375,0],[0,375]]);
+  assert.equal(preview.document.result.available,375);
+  assert.equal(preview.document.result.remainingCash,0);
+  const saved=await queries.saveNativeContributionPlan({ownerUserId:owner},command);
+  assert.equal(saved.status,'created');
+  assert.deepEqual(saved.plan.document.result,JSON.parse(JSON.stringify(preview.document.result)));
+  assert.equal((await queries.saveNativeContributionPlan({ownerUserId:owner},command)).status,'existing');
+  assert.equal((await pg.query('select native_state from accounts')).rows[0].native_state.sequence,1);
+});
 it('recomputes on the server and stores an immutable plan with idempotent retry and frozen currency',async(t)=>{
   const oldMode=process.env.NATIVE_LEDGER_ROLLOUT, oldOwners=process.env.NATIVE_LEDGER_QA_OWNERS;
   t.after(()=>{for(const [key,value] of [['NATIVE_LEDGER_ROLLOUT',oldMode],['NATIVE_LEDGER_QA_OWNERS',oldOwners]]) { if(value===undefined) delete process.env[key]; else process.env[key]=value; }});

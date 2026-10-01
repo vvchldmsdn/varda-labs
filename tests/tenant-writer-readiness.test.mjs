@@ -242,7 +242,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 47);
-    assert.equal(registeredPaths.length, 58);
+    assert.equal(registeredPaths.length, 59);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -482,6 +482,10 @@ describe("tenant writer Phase 1D-A readiness", () => {
           hasRawCanonicalOwnerDml
         ) {
           canonicalOwnerWriters.push(writer.id);
+        } else if (["admin_daily_snapshot","cron_market_cycle_controller","cron_snapshot_retry"].includes(writer.id) && path === "src/lib/snapshots/holdings-revision-repair.ts" && hasRawCanonicalOwnerDml) {
+          assert.match(source, /where s\.id=\$2::uuid and s\.canonical_owner_user_id=\$1::uuid/);
+          assert.match(source, /varda\.portfolio_mutation\.v1:/);
+          canonicalOwnerWriters.push(writer.id);
         } else if (((["cron_market_cycle_controller","cron_snapshot_retry"].includes(writer.id) && path === "src/lib/snapshots/durable-work.ts") || (writer.id==="cron_snapshot_retry"&&path==="src/db/queries/native-portfolio-snapshots.ts")) && hasRawCanonicalOwnerDml) {
           // Only the reviewed database-derived owner discovery path, never all
           // implementations sharing the cron writer ID, receives this allowance.
@@ -513,8 +517,11 @@ describe("tenant writer Phase 1D-A readiness", () => {
       "session_portfolio_group_management",
       "session_account_management",
       "portfolio_target_policy_session_write",
+      "admin_daily_snapshot",
       "cron_snapshot_retry",
       "cron_snapshot_retry",
+      "cron_snapshot_retry",
+      "cron_market_cycle_controller",
       "cron_market_cycle_controller",
     ]);
   });
