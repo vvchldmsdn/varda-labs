@@ -10,12 +10,21 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const owner = id(1), otherOwner=id(2), brokerage=id(11), isa=id(12), otherAccount=id(21);
 const recorded='2026-07-20T10:00:00Z';
 
+async function revisionFixture(pg) {
+  await pg.exec(`create table native_ledger_revisions(canonical_owner_user_id uuid,account_id uuid,affected_at timestamptz,recorded_at timestamptz,marker_sequence integer);
+    create table if not exists daily_portfolio_snapshots(id text,canonical_owner_user_id uuid,account_id uuid,account text,snapshot_date date,captured_at timestamptz,created_at timestamptz,source text,is_sample boolean default false);
+    create table if not exists daily_position_snapshots(id text,canonical_owner_user_id uuid,account_id uuid,account text,snapshot_date date,captured_at timestamptz,created_at timestamptz,source text,is_sample boolean default false);
+    alter table daily_portfolio_snapshots add column if not exists description text,add column if not exists cycle_end_at timestamptz,add column if not exists updated_at timestamptz;
+    alter table daily_position_snapshots add column if not exists description text,add column if not exists cycle_end_at timestamptz,add column if not exists updated_at timestamptz;`);
+}
+
 describe('broker recovery historical evidence admission', () => {
   it('excludes old observations only in the recovered owner/scope, preserving original rows and admitting new evidence', async () => {
     const pg = new PGlite();
     try {
       await pg.exec(`create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);
         create table daily_position_snapshots(id text,canonical_owner_user_id uuid,account_id uuid,account text,snapshot_date date,captured_at timestamptz,created_at timestamptz,source text default 'test',is_sample boolean default false);`);
+      await revisionFixture(pg);
       await pg.query('insert into broker_recovery_batches values($1,$2,$3,$4)',[owner,brokerage,JSON.stringify({trades:[{tradeDate:'2026-07-16'},{tradeDate:'2026-07-17'}]}),recorded]);
       const seeds=[
         ['before',owner,brokerage,'brokerage','2026-07-15','2026-07-15T08:00:00Z'],
@@ -57,10 +66,11 @@ describe('broker recovery historical evidence admission', () => {
       for(const table of [schema.accounts,schema.assets,schema.dailyPortfolioSnapshots,schema.dailyPositionSnapshots]) {
         await pg.exec(`create table ${getTableName(table)} (${Object.values(getTableColumns(table)).map(c=>`"${c.name}" ${c.getSQLType()}`).join(',')})`);
       }
+      await revisionFixture(pg);
       await pg.exec(`create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);
         create role snapshot_recovery_test;
-        grant select on accounts,assets,daily_portfolio_snapshots,daily_position_snapshots,broker_recovery_batches to snapshot_recovery_test;`);
-      for(const table of ['accounts','assets','daily_portfolio_snapshots','daily_position_snapshots','broker_recovery_batches']) {
+        grant select on accounts,assets,daily_portfolio_snapshots,daily_position_snapshots,broker_recovery_batches,native_ledger_revisions to snapshot_recovery_test;`);
+      for(const table of ['accounts','assets','daily_portfolio_snapshots','daily_position_snapshots','broker_recovery_batches','native_ledger_revisions']) {
         await pg.exec(`alter table ${table} enable row level security;create policy owner_read on ${table} for select to snapshot_recovery_test using(canonical_owner_user_id=current_setting('app.current_user_id')::uuid)`);
       }
       for(const [a,o,code] of [[brokerage,owner,'brokerage'],[isa,owner,'isa'],[otherAccount,otherOwner,'brokerage']]) {
@@ -100,4 +110,56 @@ describe('broker recovery historical evidence admission', () => {
   });
 });
 
- it('selects the latest reconstructed revision while keeping every original row and another owner',async()=>{const pg=new PGlite();try{await pg.exec(`create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);create table daily_portfolio_snapshots(id text,canonical_owner_user_id uuid,account_id uuid,account text,snapshot_date date,captured_at timestamptz,created_at timestamptz,source text,is_sample boolean default false);`);for(const [id,who,source,at]of [['original',owner,'base44_import','2026-08-02T00:00:00Z'],['revision1',owner,'broker_reconstructed_close_v1:first','2026-08-03T00:00:00Z'],['revision2',owner,'broker_reconstructed_close_v1:second','2026-08-04T00:00:00Z'],['other',otherOwner,'base44_import','2026-08-02T00:00:00Z']])await pg.query("insert into daily_portfolio_snapshots values($1,$2,$3,'brokerage','2026-08-02',$4,$4,$5,false)",[id,who,brokerage,at,source]);const q=new PgDialect().sqlToQuery(brokerRecoverySnapshotPredicate('daily_portfolio_snapshots'));assert.deepEqual((await pg.query(`select id from daily_portfolio_snapshots where ${q.sql} order by id`,q.params)).rows.map(r=>r.id),['original','other','revision2']);assert.equal((await pg.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n,4);}finally{await pg.close();}});
+it('selects the latest reconstructed revision while keeping every original row and another owner',async()=>{
+  const pg=new PGlite();
+  try {
+    await pg.exec(`create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);`);
+    await revisionFixture(pg);
+    for(const [rowId,who,source,at]of [['original',owner,'base44_import','2026-08-02T00:00:00Z'],['revision1',owner,'broker_reconstructed_close_v1:first','2026-08-03T00:00:00Z'],['revision2',owner,'broker_reconstructed_close_v1:second','2026-08-04T00:00:00Z'],['other',otherOwner,'base44_import','2026-08-02T00:00:00Z']]) {
+      await pg.query("insert into daily_portfolio_snapshots(id,canonical_owner_user_id,account_id,account,snapshot_date,captured_at,created_at,source,is_sample) values($1,$2,$3,'brokerage','2026-08-02',$4,$4,$5,false)",[rowId,who,brokerage,at,source]);
+    }
+    const q=new PgDialect().sqlToQuery(brokerRecoverySnapshotPredicate('daily_portfolio_snapshots'));
+    assert.deepEqual((await pg.query(`select id from daily_portfolio_snapshots where ${q.sql} order by id`,q.params)).rows.map(r=>r.id),['original','other','revision2']);
+    assert.equal((await pg.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n,4);
+  } finally { await pg.close(); }
+});
+
+it('invalidates native revisions at the saved execution cutoff and restores only repaired scope rows', async () => {
+  const pg = new PGlite();
+  try {
+    await pg.exec('create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz)');
+    await revisionFixture(pg);
+    const affected = '2026-07-16T00:30:00Z';
+    await pg.query('insert into native_ledger_revisions values($1,$2,$3,$4,5)', [owner, brokerage, affected, recorded]);
+    const seeds = [
+      // Same service date: a trade after the saved 09:00 valuation cannot alter it.
+      ['before-execution', owner, brokerage, 'brokerage', '2026-07-16T00:00:00Z', null, null, '2026-07-16T00:00:00Z'],
+      ['equal-execution', owner, brokerage, 'brokerage', affected, null, null, affected],
+      ['stale-execution', owner, brokerage, 'brokerage', '2026-07-16T00:59:00Z', null, null, '2026-07-16T00:59:00Z'],
+      ['repaired-tag', owner, brokerage, 'brokerage', '2026-07-16T00:59:00Z', 'snapshot_status=complete; native_revision=5; cost=known', null, '2026-07-16T00:59:00Z'],
+      ['old-tag', owner, brokerage, 'brokerage', '2026-07-16T00:59:00Z', 'native_revision=4', null, '2026-07-16T00:59:00Z'],
+      ['other-account', owner, isa, 'isa', '2026-07-16T00:59:00Z', null, null, '2026-07-16T00:59:00Z'],
+      ['other-owner', otherOwner, otherAccount, 'brokerage', '2026-07-16T00:59:00Z', null, null, '2026-07-16T00:59:00Z'],
+      ['aggregate-stale', owner, null, 'all', '2026-07-16T00:59:00Z', null, '2026-07-16T00:59:00Z', '2026-07-16T00:59:00Z'],
+      ['aggregate-repaired', owner, null, 'all', '2026-07-16T00:59:00Z', null, '2026-07-21T00:00:00Z', '2026-07-16T00:59:00Z'],
+      ['captured-after-revision', owner, brokerage, 'brokerage', '2026-07-21T00:00:00Z', null, null, '2026-07-21T00:00:00Z'],
+    ];
+    for (const [rowId, who, accountId, code, cutoff, description, updated, captured] of seeds) {
+      await pg.query(`insert into daily_portfolio_snapshots(id,canonical_owner_user_id,account_id,account,snapshot_date,cycle_end_at,description,updated_at,captured_at,created_at,source)
+        values($1,$2,$3,$4,'2026-07-16',$5,$6,$7,$8,$8,'varda_manual_daily_snapshot')`, [rowId, who, accountId, code, cutoff, description, updated, captured]);
+    }
+    const read = async scope => {
+      const query = new PgDialect().sqlToQuery(brokerRecoverySnapshotPredicate('daily_portfolio_snapshots', scope));
+      return (await pg.query(`select id from daily_portfolio_snapshots where ${query.sql} order by id`, query.params)).rows.map(row => row.id);
+    };
+    assert.deepEqual(await read(), ['aggregate-repaired','before-execution','captured-after-revision','other-account','other-owner','repaired-tag']);
+    assert.ok((await read([isa])).includes('other-account'), 'an unaffected account remains readable on its own');
+    assert.deepEqual(await read([brokerage, isa]), ['other-owner'], 'a combined view cannot silently omit an invalidated account');
+    // Repair account rows in place with their original captured/cutoff time and
+    // revision stamp; aggregate completion has its separate update timestamp.
+    await pg.query("update daily_portfolio_snapshots set description='snapshot_status=complete; native_revision=5' where id in ('equal-execution','stale-execution','old-tag')");
+    await pg.query("update daily_portfolio_snapshots set updated_at='2026-07-21T00:00:00Z' where id='aggregate-stale'");
+    assert.equal((await read([brokerage, isa])).length, seeds.length);
+    assert.equal((await pg.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n, seeds.length, 'the reader never deletes old evidence');
+  } finally { await pg.close(); }
+});

@@ -44,9 +44,22 @@ describe("public demo is an isolated deterministic product projection", () => {
     for (const amount of [-1, 0.1, NaN, Infinity, 1_000_000_001]) assert.equal(contribution.buildDemoContribution(holdingRows, amount), null);
     assert.equal(contribution.buildDemoContribution([], 100), null);
     const zero = contribution.buildDemoContribution(holdingRows, 0);
-    // The existing policy blocks an empty funding pool. Demo must not manufacture
-    // a ready plan when that engine has no allocatable contribution.
-    assert.equal(zero, null);
+    // Zero new money is valid, but unknown demo costs cannot justify profitable
+    // sales. With no sale proceeds the preview must leave every holding alone.
+    assert.ok(zero);
+    assert.equal(zero.status, "ready");
+    assert.equal(zero.cashAmountKrw, 0);
+    assert.equal(zero.totalAllocatedKrw, 0);
+    assert.equal(zero.totalTrimProceedsKrw, 0);
+    assert.equal(zero.totalAvailableFundsKrw, 0);
+    assert.equal(zero.residualCashKrw, 0);
+    assert.equal(zero.postTopupTotalKrw, holdingRows.reduce((sum, row) => sum + row.currentValueKrw, 0));
+    for (const row of zero.rows) {
+      assert.equal(row.action, "hold");
+      assert.equal(row.allocationKrw, 0);
+      assert.equal(row.trimAmountKrw, 0);
+      assert.equal(row.postTopupValueKrw, row.currentValueKrw);
+    }
   });
   it("does not import protected readers or route mutations in the public surface", async () => {
     for (const path of ["src/app/demo/[view]/page.tsx", "src/components/demo/demo-shell.tsx", "src/components/demo/demo-contribution.tsx", "src/components/demo/demo-research.tsx", "src/lib/demo-portfolio.ts", "src/lib/demo-contribution.ts"]) {

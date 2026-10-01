@@ -246,7 +246,7 @@ async function fixture({ live = true, close = true } = {}) {
   const record = (table, values) => { writes.push({ table: getTableName(table), rows: Array.isArray(values) ? values : [values] });
     const q = { where() { return q; }, onConflictDoNothing() { return q; }, toSQL: () => ({ sql: "select 1", params: [] }) }; return q; };
   const retained = { quotes: [], fxRows: [] };
-  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => retained }, "@/db/client": { sqlClient: { transaction: async build => build({ query: () => [] }) }, db: {
+  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "./holdings-revision-repair": { repairHoldingsSnapshotRevisions: async () => ({status:"ready",repaired:0}) }, "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => retained }, "@/db/client": { sqlClient: { transaction: async build => build({ query: () => [] }) }, db: {
     select, selectDistinct: select, insert: table => ({ values: value => record(table, value) }), update: table => ({ set: value => record(table, value) }) } } });
   return { rows, writes, retained, run: options => module.runDailySnapshot({ tenantContext: { ownerUserId: owner }, now: new Date(cutoff.getTime() + 20 * 60_000), dryRun: false, account: "brokerage", ...options }) };
 }

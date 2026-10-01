@@ -442,6 +442,13 @@
       "when": 1790812800000,
       "tag": "0062_simulation_execution_rotation",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1790899200000,
+      "tag": "0063_holdings_snapshot_revision_repair",
+      "breakpoints": true
     }
   ]
 }

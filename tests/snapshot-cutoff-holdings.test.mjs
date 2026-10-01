@@ -135,7 +135,7 @@ async function snapshotFixture(t, { changed, archived = false, events = [], samp
     };
     return query;
   };
-  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => ({ quotes: [], fxRows: [] }) }, "@/db/client": { sqlClient: { transaction: async build => build({query:()=>[]}) }, db: {
+  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "./holdings-revision-repair": { repairHoldingsSnapshotRevisions: async () => ({status:"ready",repaired:0}) }, "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => ({ quotes: [], fxRows: [] }) }, "@/db/client": { sqlClient: { transaction: async build => build({query:()=>[]}) }, db: {
     select: selection, selectDistinct: selection,
     insert: table => ({ values: rows => { writes.push({ table: getTableName(table), rows: Array.isArray(rows) ? rows : [rows] }); return {toSQL:()=>({sql:"select 1",params:[]})}; } }),
     batch: async () => [],

@@ -36,7 +36,7 @@ export async function migrationManifest(root = ROOT) {
   const journal = JSON.parse(await readFile(path.join(root, 'drizzle/meta/_journal.json'), 'utf8'));
   assert.equal(journal.dialect, 'postgresql');
   assert.deepEqual(journal.entries.slice(48,54).map(entry => entry.tag), RC_TAGS, 'RC migration range changed; review this runner');
-  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability','0060_snapshot_cutoff_observations','0061_portfolio_target_plan_rows','0062_simulation_execution_rotation'], 'Review any migration after execution admission');
+  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability','0060_snapshot_cutoff_observations','0061_portfolio_target_plan_rows','0062_simulation_execution_rotation','0063_holdings_snapshot_revision_repair'], 'Review any migration after execution admission');
   const seen = new Set();
   let previousTime = -1;
   return Promise.all(journal.entries.map(async (entry, position) => {

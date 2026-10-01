@@ -279,6 +279,7 @@ export async function getPortfolioDashboard(
     historyAssetIds,
     recentPortfolioRows,
     eventRows,
+    nativeHoldingCosts,
     unmatchedSnapshotCountRows,
     liveQuoteRows,
     recentPriceRows,
@@ -322,6 +323,7 @@ export async function getPortfolioDashboard(
     eventRows,
     investmentAssetRows,
     usdKrwRate,
+    { nativeHoldingCosts },
   );
 
   const allHoldingsWithoutWeights = valuationAssetRows.map((asset) =>

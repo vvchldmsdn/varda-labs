@@ -21,6 +21,45 @@ describe("explainable additional contribution policy", () => {
     ]);
   });
 
+  it("rebalances from profitable sale proceeds without adding new cash", () => {
+    const result = calculate([
+      row("a", 900_000, 400_000, 5_000),
+      row("b", 100_000, 50_000, 5_000),
+    ], { cashAmountKrw: 0 });
+
+    assert.equal(result.status, "ready");
+    // 1,000,000 × 50% × 105% = 525,000 retained in A; sell 375,000.
+    assert.equal(result.totalTrimProceedsKrw, 375_000);
+    assert.equal(result.totalAvailableFundsKrw, 375_000);
+    assert.equal(result.totalAllocatedKrw, 375_000);
+    assert.equal(result.residualCashKrw, 0);
+    assert.deepEqual(result.rows.map(item => [item.allocationKey, item.trimAmountKrw, item.allocationKrw, item.postTradeValueKrw]), [
+      ["a", 375_000, 0, 525_000],
+      ["b", 0, 375_000, 475_000],
+    ]);
+    assertConservation(result);
+  });
+
+  it("does not manufacture buying funds when zero cash has no eligible sales", () => {
+    for (const cost of [null, 0, 1_000_000]) {
+      const result = calculate([
+        row("a", 900_000, cost, 5_000),
+        row("b", 100_000, 50_000, 5_000),
+      ], { cashAmountKrw: 0 });
+      assert.equal(result.status, "ready");
+      assert.equal(result.totalTrimProceedsKrw, 0);
+      assert.equal(result.totalAvailableFundsKrw, 0);
+      assert.equal(result.totalAllocatedKrw, 0);
+      assert.equal(result.residualCashKrw, 0);
+      assert.ok(result.rows.every(item => item.action === "hold"));
+      assertConservation(result);
+    }
+    const balanced = calculate([row("a", 100, 50, 10_000)], { cashAmountKrw: 0 });
+    assert.equal(balanced.status, "ready");
+    assert.equal(balanced.rows[0].postTradeValueKrw, 100);
+    assert.equal(balanced.totalAvailableFundsKrw, 0);
+  });
+
   it("does not trim a loss position or a holding without cost basis", () => {
     const loss = calculateExplainableAdditionalContribution({
       cashAmountKrw: 200_000,
@@ -284,7 +323,7 @@ describe("explainable additional contribution policy", () => {
       assert.equal(cost.status, "blocked");
       assert.ok(cost.blockers.includes("invalid_cost_basis"));
     }
-    for (const value of [0, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const value of [NaN, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
       const result = calculate([row("a", 100, 100, 10_000)], { cashAmountKrw: value });
       assert.equal(result.status, "blocked");
       assert.ok(result.blockers.includes("invalid_cash_amount"));

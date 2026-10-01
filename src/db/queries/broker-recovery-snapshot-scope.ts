@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { holdingsRevisionValidSql } from "../../lib/snapshots/holdings-revision-policy.ts";
 
 /** Static SQL identifiers only; never pass request text as an alias or scope. */
 export function brokerRecoverySnapshotPredicateText(
@@ -8,7 +9,7 @@ export function brokerRecoverySnapshotPredicateText(
 ) {
   // A late trade invalidates the old observation, not the underlying immutable row.
   // Whole-scope exclusion avoids presenting the remaining accounts as a full total.
-  return `not exists (
+  return `${holdingsRevisionValidSql(alias, scopeAccountsSql)} and not exists (
     select 1 from public.broker_recovery_batches as recovery
     where recovery.canonical_owner_user_id = ${alias}.canonical_owner_user_id
       and (recovery.account_id = ${alias}.account_id or ${alias}.account = 'all'

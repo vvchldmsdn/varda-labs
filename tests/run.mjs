@@ -1,3 +1,6 @@
+import "./native-holding-cost-read.test.mjs";
+import "./holdings-revision-rebuild.test.mjs";
+import "./holdings-revision-repair.test.mjs";
 import "./kis-paired-history.test.mjs";
 import "./market-calendar.test.mjs";
 import "./cutoff-contract-followup.test.mjs";

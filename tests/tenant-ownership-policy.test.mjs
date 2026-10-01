@@ -14,6 +14,7 @@ import {
   HOLDING_ONBOARDING_EXPANDED_TENANT_TABLE_POLICIES,
   HOLDING_ONBOARDING_TABLE_POLICIES,
   HOLDING_LIFECYCLE_TABLE_POLICIES,
+  HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES,
   HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES,
   HOLDING_STATE_CORRECTION_TABLE_POLICIES,
   LEGACY_EXCLUDED_USER_TABLE_NAMES,
@@ -33,9 +34,34 @@ import {
   summarizeTenantClassifications,
 } from "../scripts/lib/tenant-ownership-policy.mjs";
 
+const PRE_REPAIR_TABLE_POLICIES = EXPANDED_TENANT_TABLE_POLICIES.filter(
+  policy => !HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES.includes(policy),
+);
+
 describe("tenant ownership policy", () => {
+  it("adds the private 0063 archive only after its dependencies without changing the 0059 contract", () => {
+    const priorNames = PRE_REPAIR_TABLE_POLICIES.map(({ table }) => table);
+    const prior = resolveTenantTablePolicies(priorNames);
+    assert.equal(prior.length, 64);
+    assert.deepEqual(prior, PRE_REPAIR_TABLE_POLICIES);
+    assert.equal(prior.some(({ table }) => table === "holdings_snapshot_repair_archive"), false);
+    assert.equal(TRADE_DAILY_RELIABILITY_TABLE_POLICIES.length, 4);
+    const allNames = [...priorNames, "holdings_snapshot_repair_archive"];
+    assert.deepEqual(resolveTenantTablePolicies(allNames), [...prior, ...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES]);
+    const [archive] = HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES;
+    assert.equal(archive.classification, "user_owned");
+    assert.equal(archive.currentOwnerColumn, "canonical_owner_user_id");
+    assert.equal(archive.canonicalOwnerRequired, true);
+    assert.equal(archive.ownershipPath, "direct_column");
+    assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes(archive.table), false);
+    for (const dependency of ["app_users", "auth_identities", "accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots", "daily_position_snapshots", ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES.map(({ table }) => table)]) {
+      assert.throws(() => resolveTenantTablePolicies(allNames.filter(table => table !== dependency)), /repair archive requires complete ownership, reliability and snapshot tables/);
+    }
+    assert.throws(() => resolveTenantTablePolicies([archive.table]), /repair archive requires complete ownership, reliability and snapshot tables/);
+  });
+
   it("adds target plan ownership without requiring it on an older schema", () => {
-    const all = EXPANDED_TENANT_TABLE_POLICIES.map(({table})=>table);
+    const all = PRE_REPAIR_TABLE_POLICIES.map(({table})=>table);
     const prior = all.filter(table=>table !== "portfolio_target_plan_rows");
     assert.equal(resolveTenantTablePolicies(prior).length,63);
     const plan = resolveTenantTablePolicies(all).find(({table})=>table === "portfolio_target_plan_rows");
@@ -66,7 +92,7 @@ describe("tenant ownership policy", () => {
     assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes("member_activity_daily"),false);
   });
   it("classifies provider reservations as optional operational data without changing earlier collection schemas", () => {
-    const names = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !SNAPSHOT_CUTOFF_TABLE_POLICIES.includes(policy) && !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.includes(policy) && !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && policy.table !== "broker_recovery_batches" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table);
+    const names = PRE_REPAIR_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !SNAPSHOT_CUTOFF_TABLE_POLICIES.includes(policy) && !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.includes(policy) && !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && policy.table !== "broker_recovery_batches" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table);
     const priorNames = names.filter(table => table !== "market_provider_reservations");
     const prior = resolveTenantTablePolicies(priorNames);
     assert.equal(prior.length, 47);
@@ -91,7 +117,7 @@ describe("tenant ownership policy", () => {
     const coreNames = CORE_EXPANDED_TENANT_TABLE_POLICIES.map(({ table }) => table);
     assert.throws(() => resolveTenantTablePolicies(["investment_plans"]), /complete identity core/);
     assert.deepEqual(resolveTenantTablePolicies([...coreNames, "investment_plans"]), [...CORE_EXPANDED_TENANT_TABLE_POLICIES, policy]);
-    const priorNames = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !SNAPSHOT_CUTOFF_TABLE_POLICIES.includes(policy) && !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.includes(policy) && !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && policy.table !== "broker_recovery_batches" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table).filter(table => table !== "investment_plans" && table !== "portfolio_drafts" && table !== "market_provider_reservations");
+    const priorNames = PRE_REPAIR_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !SNAPSHOT_CUTOFF_TABLE_POLICIES.includes(policy) && !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.includes(policy) && !PROVIDER_EVIDENCE_TABLE_POLICIES.includes(policy) && policy.table !== "native_contribution_plans" && policy.table !== "broker_recovery_batches" && !policy.table.startsWith("simulation_execution")).map(({ table }) => table).filter(table => table !== "investment_plans" && table !== "portfolio_drafts" && table !== "market_provider_reservations");
     const prior = resolveTenantTablePolicies(priorNames);
     assert.equal(prior.length, 45);
     assert.equal(prior.some(({ table }) => table === "investment_plans"), false);
@@ -110,7 +136,7 @@ describe("tenant ownership policy", () => {
   });
 
   it("adds broker recovery ownership only when its required owner and holding tables exist", () => {
-    const names = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.includes(policy)).map(({ table }) => table);
+    const names = PRE_REPAIR_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.includes(policy)).map(({ table }) => table);
     const policy = resolveTenantTablePolicies(names).find(({ table }) => table === "broker_recovery_batches");
     assert.equal(policy.classification, "user_owned");
     assert.equal(policy.canonicalOwnerRequired, true);
@@ -138,7 +164,7 @@ describe("tenant ownership policy", () => {
       // Already non-null on creation; never added to the old legacy backfill list.
       assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes(policy.table), false);
     }
-    const all = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !SNAPSHOT_CUTOFF_TABLE_POLICIES.includes(policy)).map(({ table }) => table);
+    const all = PRE_REPAIR_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").filter(policy => !SNAPSHOT_CUTOFF_TABLE_POLICIES.includes(policy)).map(({ table }) => table);
     const prior = all.filter(table => !reliabilityNames.includes(table));
     assert.equal(resolveTenantTablePolicies(prior).length, 57);
     assert.deepEqual(resolveTenantTablePolicies(all), [...TRADE_DAILY_RELIABILITY_TABLE_POLICIES, ...resolveTenantTablePolicies(prior)]);
@@ -154,7 +180,7 @@ describe("tenant ownership policy", () => {
     const tables = SNAPSHOT_CUTOFF_TABLE_POLICIES.map(({ table }) => table);
     assert.deepEqual(tables, ["snapshot_cutoff_price_observations", "snapshot_cutoff_fx_observations"]);
     assert.ok(SNAPSHOT_CUTOFF_TABLE_POLICIES.every(policy => policy.classification === "shared_reference" && !policy.canonicalOwnerRequired));
-    const all = EXPANDED_TENANT_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").map(({ table }) => table);
+    const all = PRE_REPAIR_TABLE_POLICIES.filter(policy => policy.table !== "portfolio_target_plan_rows").map(({ table }) => table);
     const prior = all.filter(table => !tables.includes(table));
     assert.equal(resolveTenantTablePolicies(prior).length, 61);
     assert.deepEqual(resolveTenantTablePolicies(all), [...SNAPSHOT_CUTOFF_TABLE_POLICIES, ...resolveTenantTablePolicies(prior)]);
@@ -218,11 +244,11 @@ describe("tenant ownership policy", () => {
     assert.equal(holdingOnboardingExpandedNames.length, 36);
     assert.equal(portfolioTargetPolicyExpandedNames.length, 39);
     assert.equal(holdingStateCorrectionExpandedNames.length, 40);
-    assert.equal(expandedNames.length, 64);
+    assert.equal(expandedNames.length, 65);
     for (const name of ["simulation_execution_service", "simulation_execution_frequency"]) {
       assert.equal(EXPANDED_TENANT_TABLE_POLICIES.find(policy => policy.table === name)?.classification, "admin_system");
     }
-    const withoutEvidence = expandedNames.filter(name => ![...SNAPSHOT_CUTOFF_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES].some(policy => policy.table === name));
+    const withoutEvidence = expandedNames.filter(name => ![...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES, ...SNAPSHOT_CUTOFF_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES].some(policy => policy.table === name));
     assert.equal(resolveTenantTablePolicies(withoutEvidence.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets" && name !== "market_provider_reservations")).length, 56);
     assert.throws(() => resolveTenantTablePolicies(withoutEvidence.filter(name => name !== "market_provider_budgets" && name !== "market_provider_reservations")), /market collection tables must be expanded atomically/);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
@@ -301,7 +327,7 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 39,
+        user_owned: 40,
         shared_reference: 9,
       admin_system: 12,
         identity_system: 4,

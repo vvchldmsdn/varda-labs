@@ -316,7 +316,8 @@ function validateInputs<T>({ cashAmountKrw, minimumExecutionRatioPct, rows, trim
   trimDriftThresholdPct: number;
 }) {
   const blockers = new Set<AdditionalContributionPolicyBlocker>();
-  if (!Number.isSafeInteger(cashAmountKrw) || cashAmountKrw <= 0) blockers.add("invalid_cash_amount");
+  // A zero contribution may still be funded by eligible trim proceeds.
+  if (!Number.isSafeInteger(cashAmountKrw) || cashAmountKrw < 0) blockers.add("invalid_cash_amount");
   if (rows.length === 0) blockers.add("empty_valuation_universe");
   if (!validPercent(minimumExecutionRatioPct) || !validPercent(trimDriftThresholdPct)) blockers.add("invalid_policy_parameter");
   const keys = new Set<string>();

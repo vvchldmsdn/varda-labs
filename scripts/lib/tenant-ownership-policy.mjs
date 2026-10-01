@@ -236,6 +236,13 @@ export const TRADE_DAILY_RELIABILITY_TABLE_POLICIES = Object.freeze([
   userOwned("daily_snapshot_work", TRANSITIONAL_OWNER_COLUMN),
 ]);
 
+// 0063 is a later, optional expansion of the 0059 reliability schema.
+// Private before-images retain tenant ownership even though only the worker
+// may read or write them; older schemas must not require this absent table.
+export const HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES = Object.freeze([
+  userOwned("holdings_snapshot_repair_archive", TRANSITIONAL_OWNER_COLUMN),
+]);
+
 export const SNAPSHOT_CUTOFF_TABLE_POLICIES = Object.freeze([
   sharedReference("snapshot_cutoff_price_observations"),
   sharedReference("snapshot_cutoff_fx_observations"),
@@ -250,10 +257,25 @@ export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...SIMULATION_EXECUTION_TABLE_POLICIES,
   ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES, ...PROVIDER_RESERVATION_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES, ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES,
   ...PORTFOLIO_TARGET_PLAN_TABLE_POLICIES,
+  ...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES,
 ]);
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  if (publicTableSet.has("holdings_snapshot_repair_archive")) {
+    const dependencies = [
+      ...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table),
+      ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES.map(({ table }) => table),
+      "accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots", "daily_position_snapshots",
+    ];
+    if (!dependencies.every(table => publicTableSet.has(table))) {
+      throw new Error("holdings snapshot repair archive requires complete ownership, reliability and snapshot tables");
+    }
+    return Object.freeze([
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "holdings_snapshot_repair_archive")),
+      ...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES,
+    ]);
+  }
   const cutoffTables=SNAPSHOT_CUTOFF_TABLE_POLICIES.map(({table})=>table);
   if(cutoffTables.some(table=>publicTableSet.has(table))) {
     if(!cutoffTables.every(table=>publicTableSet.has(table)) || !["live_price_quotes","fx_rates"].every(table=>publicTableSet.has(table))) throw new Error("cutoff observations require both archives and shared caches");
