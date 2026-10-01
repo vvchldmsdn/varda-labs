@@ -158,3 +158,8 @@ export function simulationReturnLabel(indexValue: number) {
   const value = indexValue - 100;
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
+
+/** Signed returns share one presentation rule; unavailable values remain neutral. */
+export function simulationReturnTone(value: number | null | undefined) {
+  return value == null || !Number.isFinite(value) || value === 0 ? "neutral" : value > 0 ? "positive" : "negative";
+}

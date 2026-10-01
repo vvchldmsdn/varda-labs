@@ -8,7 +8,7 @@ import { CalculationGuideDialog } from "@/components/explanations/calculation-gu
 import { simulationCalculationGuide } from "./simulation-calculation-guide";
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
-import { simulationReturnLabel } from "./simulation-presentation";
+import { simulationReturnLabel, simulationReturnTone } from "./simulation-presentation";
 import styles from "./simulation-workspace.module.css";
 
 type ReadyExecution = Extract<
@@ -234,7 +234,7 @@ function ReadyOwnerExecution({ execution, pathDetail, pathDetailNotice }: { exec
       <dl className={styles.resultSummary}>
         <div>
           <dt><SimulationText ko="마지막 수익률 중간값" en="Middle final return" /></dt>
-          <dd className={execution.terminal.p50ReturnPct >= 0 ? "text-[var(--brand)]" : "text-[var(--negative)]"}>
+          <dd data-value-tone={simulationReturnTone(execution.terminal.p50ReturnPct)}>
             <SimulationText ko={simulationReturnLabel(100 + execution.terminal.p50ReturnPct)} />
           </dd>
           <p>{execution.assumptions.horizon}<SimulationText ko={`단계 후 · ${execution.assumptions.pathCount.toLocaleString("ko-KR")}개 경로의 가운데 값`} en={` steps · Middle of ${execution.assumptions.pathCount.toLocaleString("en-US")} paths`} /></p>

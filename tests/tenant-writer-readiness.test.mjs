@@ -53,6 +53,7 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
   "scripts/reliability-retry-cases.mjs", // Same injected loopback cluster; no remote connection configuration.
   "scripts/reliability-compatibility-cases.mjs", // Separate database in the injected disposable loopback cluster.
   "scripts/reliability-fullapp-cases.mjs", // Actual Next app against the isolated cluster through a loopback-only SQL bridge.
+  "scripts/ui-convergence-fullapp-cases.mjs", // Same injected disposable cluster; synthetic UI fixtures only.
   "scripts/reliability-limit-cases.mjs", // Bounded synthetic replay fixtures on injected isolated pools.
   "scripts/reliability-browser-cases.mjs", // Browser fixture uses the same isolated DB and synthetic identity ports.
   "scripts/rehearse-tenant-expand.mjs",

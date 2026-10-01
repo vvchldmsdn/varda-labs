@@ -65,7 +65,7 @@ export function HoldingMovementHeatmap({
           <h2 id="holding-heatmap-title" className={styles.panelTitle}><T ko="종목 흐름" en="Holding history"/></h2>
           <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="오늘 변동과 같은 원화 평가 기준입니다. 과거는 저장된 일별 변동입니다." en="Today uses the same KRW valuation basis as Today. Past dates show recorded daily changes."/></p>
         </div>
-        <div className={styles.chartRanges} aria-label={t("종목 흐름 보기 방식", "Holding history view")}>
+        <div className={`cairn-tabs ${styles.chartRanges}`} aria-label={t("종목 흐름 보기 방식", "Holding history view")}>
           <ModeButton active={mode === "movement"} onClick={() => setMode("movement")}><T ko="일별 변동" en="Daily changes"/></ModeButton>
           <ModeButton active={mode === "allocation"} onClick={() => setMode("allocation")}><T ko="구성" en="Allocation"/></ModeButton>
           <ModeButton active={mode === "connections"} onClick={() => setMode("connections")}><T ko="동반 움직임" en="Co-movement"/></ModeButton>

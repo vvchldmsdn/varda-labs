@@ -68,12 +68,12 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
       <div className={styles.editor}>
         <div className={styles.editorHeading}>
           <div><h2>{t("종목별 목표", "Targets by holding")}</h2><p>{t("전체 합계가 100%가 되도록 입력하세요.", "Set each share so the total equals 100%.")}</p></div>
-          <button className={styles.reset} type="button" disabled={pending || (!changed && !candidates.length && !removed.length)} onClick={() => {
+          <button className={`cairn-inline ${styles.reset}`} type="button" disabled={pending || (!changed && !candidates.length && !removed.length)} onClick={() => {
             setWeights(initialWeights);setCandidates([]);setRemoved([]);
             setEditedSinceSubmit(true);
           }}><RotateCcw size={14} aria-hidden="true" />{t("입력 되돌리기", "Reset edits")}</button>
         </div>
-        <div className={styles.legend}><span><i />{t("현재 비중", "Current weight")}</span><span><i />{t("입력한 목표", "Your target")}</span></div>
+        <div className={styles.columns} aria-hidden="true"><span>{t("종목", "Holding")}</span><span>{t("현재", "Current")}</span><span>{t("목표", "Target")}</span></div>
         <ol className={styles.rows}>
           {editorRows.map((row, index) => {
             if(row.assetId && removed.includes(row.assetId)) return <li key={row.assetId} hidden><input name={"targetWeight:"+index} type="hidden" value="0" /></li>;
@@ -93,7 +93,7 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
               /><span aria-hidden="true">%</span></div>{!buyable ? <input name={`targetWeight:${index}`} type="hidden" value="0" /> : null}</div>
               <div className={styles.comparison}>
                 <div className={styles.tracks} aria-hidden="true"><span style={{ width: `${currentWeight ?? 0}%` }} /><span style={{ width: `${(parsedWeights[index] ?? 0) / 100}%` }} /></div>
-                <span>{t("현재", "Current")} {currentWeight === null ? "—" : `${percent(currentWeight)}%`}</span>
+                <span aria-label={t("현재 비중", "Current weight")}>{currentWeight === null ? "—" : `${percent(currentWeight)}%`}</span>
               </div>
               {invalid ? <p className={styles.fieldError} id={errorId}>{t("0~100 사이, 소수점 둘째 자리까지 입력하세요.", "Enter 0–100 with up to two decimal places.")}</p> : null}
               {!buyable ? <p className={styles.restriction} id={`${fieldId}-restriction`}>{t("이 종목은 현재 목표 0%만 설정할 수 있어요.", "This holding currently supports a target of 0% only.")}</p> : null}
@@ -106,7 +106,7 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
           })}
         </ol>
         {!isDesignPreview && accounts.length>0 ? <details><summary>{t("목표 종목 추가","Add a target")}</summary>
-          <label>{t("계좌","Account")}<select value={candidateAccount} disabled={pending} onChange={e=>setCandidateAccount(e.target.value)}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+          <label>{t("계좌","Account")}<select className="cairn-form-select" value={candidateAccount} disabled={pending} onChange={e=>setCandidateAccount(e.target.value)}>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
           <InstrumentSearch privateQuery manualEntryAvailable={false} label={{ko:"목표에 넣을 종목",en:"Choose a target instrument"}} disabled={pending || editorRows.length>=64} onSelect={instrument=>{
             const account=accounts.find(a=>a.id===candidateAccount);if(!account)return;
             const restore=rows.find(row=>row.accountId===account.id && row.market===instrument.market && row.currency===instrument.currency && row.ticker===instrument.ticker && row.assetId && removed.includes(row.assetId));
@@ -124,7 +124,7 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
         <p className={styles.totalStatus} aria-live="polite" data-valid={totalIsValid}>{totalIsValid ? <Check size={16} aria-hidden="true" /> : null}{status}</p>
         <p className={styles.summaryNote}>{t("추가 투입과 포트폴리오 분석에 사용할 나의 기준입니다. 저장해도 주문은 실행되지 않습니다.", "Your reference for contribution calculations and portfolio analysis. Saving does not place any orders.")}</p>
         <div className={styles.saveArea}>
-          <button className={styles.save} disabled={isDesignPreview || pending || !totalIsValid || editorRows.length === removed.length} type="submit">{pending ? <span className={styles.spinner} aria-hidden="true" /> : null}{t(pending ? "저장 중" : "목표비중 저장", pending ? "Saving…" : "Save targets")}<ArrowRight size={17} aria-hidden="true" /></button>
+          <button className={`cairn-primary ${styles.save}`} disabled={isDesignPreview || pending || !totalIsValid || editorRows.length === removed.length} type="submit">{pending ? <span className={styles.spinner} aria-hidden="true" /> : null}{t(pending ? "저장 중" : "목표비중 저장", pending ? "Saving…" : "Save targets")}<ArrowRight size={17} aria-hidden="true" /></button>
           {isDesignPreview ? <p>{t("예시 데이터입니다. 편집만 체험할 수 있으며 저장하지 않습니다.", "Demo data. Try editing; changes cannot be saved.")}</p> : <p>{t("저장하면 이 범위의 새 승인본으로 적용됩니다.", "Saving creates a new approved revision for this scope.")}</p>}
         </div>
         {state.message && !editedSinceSubmit && !(onSaved && state.status === "success") ? <div className={styles.feedback} role="status" data-success={state.status === "success"}><ManagementText>{state.message}</ManagementText>{state.status === "success" && returnHref && returnLabel ? <Link href={returnHref}>{t(returnLabel.ko, returnLabel.en)}<ArrowRight size={15} aria-hidden="true" /></Link> : null}</div> : null}

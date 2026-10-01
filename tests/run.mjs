@@ -1,3 +1,4 @@
+import "./ui-context-convergence.test.mjs";
 import "./native-holding-cost-read.test.mjs";
 import "./holdings-revision-rebuild.test.mjs";
 import "./holdings-revision-repair.test.mjs";

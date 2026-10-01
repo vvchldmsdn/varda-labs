@@ -12,6 +12,7 @@ import { importWithPorts } from '../tests/helpers/import-with-ports.mjs';
 import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 import { childEnvironment } from './reliability-ci.mjs';
 import { runContributionUiCases, runLegacyContributionUiCase } from './reliability-contribution-ui-cases.mjs';
+import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
 
 /** Neon wire transport only. The app's SQL, tenant roles, transactions and RLS are unchanged. */
 export function createSqlBridge({ worker, tenant, connectionStrings, token }) {
@@ -208,6 +209,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.getByText('과거 거래 추가·정정', { exact: true }).click();
       await page.getByLabel('시작 잔액 이후 거래를 다시 계산', { exact: true }).check();
       await page.getByLabel('수량', { exact: true }).fill('1'); await page.getByLabel('체결 총액', { exact: true }).fill('100');
+      await page.getByText('초 단위 시각 확인·수정',{exact:true}).click();
       await page.locator('input[name="at"]').fill('2026-08-02T12:00');
       await page.getByLabel('변경 이유', { exact: true }).fill('Synthetic missing buy');
       await page.getByLabel('시작 잔액에 이미 포함된 거래가 아닙니다.', { exact: true }).check();
@@ -405,6 +407,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
 
       }finally{await stale.close();}
     });
+    await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };

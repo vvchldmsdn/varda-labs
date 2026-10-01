@@ -25,7 +25,7 @@ export function NativeTradeFields({ kind, fields, unit, quantity, edit }: {
       <button type="button" aria-pressed={totalMode} onClick={() => edit("inputMode", "total")}>{t("체결 총액", "Executed total")}</button>
       <button type="button" aria-pressed={!totalMode} onClick={() => edit("inputMode", "unit")}>{t("1주당 체결가", "Execution per share")}</button>
     </div>
-    {totalMode ? <div className={styles.row}><label>{t("체결 총액", "Executed total")}<MoneyInput value={fields.total ?? ""} allowDecimals={settlementCurrency === "USD"} onValueChange={value => edit("total", value)} required /></label><label>{t("결제 통화", "Settlement currency")}<select value={settlementCurrency} onChange={event => edit("settlementCurrency", event.target.value)}><option>KRW</option><option>USD</option></select></label></div>
+    {totalMode ? <div className={styles.row}><label>{t("체결 총액", "Executed total")}<MoneyInput value={fields.total ?? ""} allowDecimals={settlementCurrency === "USD"} onValueChange={value => edit("total", value)} required /></label><label>{t("결제 통화", "Settlement currency")}<select className="cairn-form-select" value={settlementCurrency} onChange={event => edit("settlementCurrency", event.target.value)}><option>KRW</option><option>USD</option></select></label></div>
       : <label>{t("실제 평균 체결가", "Actual average execution price")} · {unit}<input inputMode="decimal" value={fields.price ?? ""} onChange={event => edit("price", event.target.value)} required /></label>}
     {summary ? <p className={styles.settlement} aria-live="polite">{t("체결금액", "Execution amount")} <strong>{summary}</strong></p> : null}
     <details><summary>{t("주문가·수수료·세금 (선택)", "Order price, fees & tax (optional)")}</summary>

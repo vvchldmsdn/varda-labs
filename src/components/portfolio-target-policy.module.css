@@ -117,3 +117,36 @@
   .save { min-height: 50px; }
 }
 @media (prefers-reduced-motion: reduce) { .tracks span, .totalTrack span { transition: none; } .spinner { animation: none; } }
+
+/* Editing leads; secondary valuation information stays in a disclosure. */
+.heading { padding:12px 0 16px; }
+.heading h1 { font-size:28px; }
+.heading p:last-child { font-size:12px; margin-top:8px; }
+.context { padding:12px 0; }
+.notice { margin-bottom:16px; padding-block:6px; }
+.columns { display:grid; grid-template-columns:minmax(0,1fr) 80px 90px; gap:16px; padding:0 0 10px; color:var(--muted); font-size:11px; }
+.columns > span:not(:first-child) { text-align:right; }
+.row { grid-template-columns:minmax(0,1fr) 80px 90px; gap:0 16px; padding:12px 0 4px; align-items:center; }
+.identity { gap:8px; }
+.rowNumber { display:none; }
+.identity label { font-size:13px; }
+.identity p { margin-top:2px; }
+.weightInput { grid-column:3; grid-row:1; }
+.weightInput > label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.weightInput input { min-height:44px; font-size:16px; background:transparent; }
+.comparison { grid-column:2; grid-row:1; margin:0; justify-content:flex-end; }
+.comparison .tracks { display:none; }
+.comparison > span { min-width:0; font-size:12px; text-align:right; }
+.rowDetails { grid-column:1 / -1; margin:0; }
+.rowDetails summary { min-height:32px; font-size:10px; width:fit-content; gap:8px; }
+.fieldError,.restriction { margin-left:0; }
+@media(max-width:760px) {
+ .heading { padding:10px 0 12px; }
+ .heading h1 { font-size:25px; }
+ .heading p:last-child { margin-top:7px; }
+ .editorHeading { padding-bottom:12px; }
+ .columns,.row { grid-template-columns:minmax(0,1fr) 54px 70px; column-gap:10px; }
+ .comparison > span { font-size:11px; }
+ .mobileTotal { min-height:48px; }
+ .form { gap:16px; }
+}

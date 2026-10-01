@@ -74,7 +74,7 @@
 .chartRanges { display: flex; align-items: center; gap: 6px; }
 .rangeButton { min-width: 40px; min-height: 34px; border-radius: 999px; padding: 5px 11px; font-size: 11px; color: var(--muted); cursor: pointer; transition: color 160ms, background 160ms; }
 .rangeButton:hover { background: var(--wash); color: var(--ink); }
-.rangeButton[aria-pressed='true'] { color: var(--paper); background: var(--ink); }
+.rangeButton[aria-pressed='true'] { color: var(--ink); background: transparent; box-shadow:inset 0 -2px var(--brand); }
 .rangeButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .chartReadout { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 24px 0 6px; }
 .chartReadout span { font-size: 10px; color: var(--muted); }
@@ -385,4 +385,19 @@
   .mobileMovementRow { border:0; }
   .stageContribution .contributionHeader .evidenceIntro { display:none; }
   .stageRefresh .targetEntry { min-width:44px; min-height:44px; font-size:0; gap:0; justify-content:center; }
+}
+
+@media(max-width:760px) {
+ .stage { gap:16px; }
+ .stageHeader { gap:8px; }
+ .secondaryRefresh { display:none; }
+ .homeStageMain,.todayStageMain { gap:18px; }
+ .stageSummary,.todayStageMain > .stageSummary { gap:16px 14px; }
+ .stageSummary .balance { padding:6px 0; }
+ .stageSummary .balance > strong { margin-top:8px; }
+ .stageSummary .balance p { margin-top:6px; }
+ .stageSummary .summaryMetric { gap:5px; }
+ .stageSummary .stageNote { font-size:11px; line-height:1.65; }
+ .stageNote > strong { font-size:13px; }
+ .stageFooter { padding-top:8px; }
 }

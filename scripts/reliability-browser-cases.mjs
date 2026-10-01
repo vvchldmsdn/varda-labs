@@ -68,7 +68,7 @@ export async function runBrowserCases({admin,worker,tenant,report,output}) {
   await check('browser-historical-entry-and-mobile',async()=>{
    await page.getByText('과거 거래 추가·정정',{exact:true}).click();await page.getByLabel('시작 잔액 이후 거래를 다시 계산',{exact:true}).check();
    await page.getByLabel('수량',{exact:true}).fill('1');await page.getByLabel('체결 총액',{exact:true}).fill('100');
-   await page.locator('input[name="at"]').fill('2026-08-02T12:00');await page.getByLabel('변경 이유',{exact:true}).fill('Synthetic missing transaction');
+   await page.getByText('초 단위 시각 확인·수정',{exact:true}).click();await page.locator('input[name="at"]').fill('2026-08-02T12:00');await page.getByLabel('변경 이유',{exact:true}).fill('Synthetic missing transaction');
    await page.getByLabel('시작 잔액에 이미 포함된 거래가 아닙니다.',{exact:true}).check();
    await page.getByRole('button',{name:'매수 기록 저장',exact:true}).click();
    await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.',{exact:true})).toBeVisible();

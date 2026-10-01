@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { importUiWithPorts } from './helpers/import-ui-with-ports.mjs';
-import { observeNativeLedgerClock, nativeLedgerNow, nativeLedgerLocalTime } from '../src/lib/native-ledger-clock.ts';
+import { observeNativeLedgerClock, nativeLedgerNow, nativeLedgerLocalTime, updateNativeLedgerLocalMinute } from '../src/lib/native-ledger-clock.ts';
 
 const SERVER = '2026-09-27T07:16:48.000Z', serverMs = Date.parse(SERVER);
 const accountId = '11111111-1111-4111-8111-111111111111', assetId = '44444444-4444-4444-8444-444444444444';
@@ -57,7 +57,7 @@ async function harness(t,offset) {
   const h=hooks();const [view]=await importUiWithPorts(['src/components/native-ledger-view.tsx'],{...ports,react:h.react});
   const render=()=>{h.begin();return elements(view.NativeLedgerView({compact:true,initialSelection:{accountId,assetId,action:'buy'}}));};
   render();h.effect();await new Promise(resolve=>setImmediate(resolve));
-  const findTime=()=>render().find(e=>e.type==='input'&&e.props.name==='at');
+  const findTime=()=>render().find(e=>e.props?.name==='at');
   const trade=render().find(e=>typeof e.props?.edit==='function');trade.props.edit('quantity','1');trade.props.edit('total','100');
   return {render,findTime,sent,advance(){monotonic+=5000;serverNow='2026-09-27T07:16:53.000Z';},
     submit:()=>render().find(e=>e.type==='form').props.onSubmit({preventDefault(){}})};
@@ -74,11 +74,17 @@ for(const offset of [60_000,-60_000]) it(`uses server-backed defaults and valida
 it('retains a manually entered time through server resync and conflict retry',async t=>{
   const h=await harness(t,-60_000),manual='2026-09-27T07:16:40.123Z';
   const local=nativeLedgerLocalTime(Date.parse(manual));
-  h.findTime().props.onChange({target:{value:local}});
+  h.findTime().props.onChange(local);
   await h.submit();h.advance();
   h.render().find(e=>e.type==='button'&&e.props.children==='Review latest holdings').props.onClick();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(h.findTime().props.value,local);
   await h.submit();
   assert.deepEqual(h.sent.map(row=>row.mutation.event.at),[manual,manual]);
+});
+
+it('minute/date edits preserve retained event seconds and milliseconds',()=>{
+  assert.equal(updateNativeLedgerLocalMinute('2026-09-28T11:19:18.123','2026-09-29T12:20'),'2026-09-29T12:20:18.123');
+  assert.equal(updateNativeLedgerLocalMinute('2026-09-28T11:19','2026-09-29T12:20'),'2026-09-29T12:20:00');
+  assert.equal(updateNativeLedgerLocalMinute('2026-09-28T11:19:18.123',''),'2026-09-28T11:19:18.123');
 });

@@ -14,6 +14,7 @@ import "./modern.css";
 import "./motion.css";
 import "./stage.css";
 import "./locale.css";
+import "./controls.css";
 
 const geist = Geist({
   display: "swap",
