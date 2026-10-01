@@ -20,3 +20,9 @@ export function nativeLedgerLocalTime(nowMs: number): string {
   const now = new Date(nowMs);
   return new Date(nowMs - now.getTimezoneOffset() * 60000).toISOString().slice(0, -1);
 }
+
+export function updateNativeLedgerLocalMinute(previous: string, minute: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(minute)) return previous;
+  // The full value remains the writer input, including precision from the server or user.
+  return minute + (/^:\d{2}(?:\.\d{1,3})?$/.test(previous.slice(16)) ? previous.slice(16) : ":00");
+}

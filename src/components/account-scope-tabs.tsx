@@ -26,7 +26,7 @@ export function AccountScopeTabs({
   return (
     <ManagementElement as="nav"
       aria-label="계좌 범위"
-      className="flex w-fit max-w-full overflow-x-auto rounded-md border border-[var(--line)] bg-white p-1"
+      className="cairn-tabs w-fit max-w-full overflow-x-auto"
     >
       {ACCOUNT_TABS.map((tab) => {
         const selected = tab.account === selectedAccount;
@@ -34,11 +34,7 @@ export function AccountScopeTabs({
           <Link
             key={tab.account}
             aria-current={selected ? "page" : undefined}
-            className={`min-w-14 rounded px-3 py-2 text-center text-sm font-semibold whitespace-nowrap ${
-              selected
-                ? "bg-[var(--ink)] text-white"
-                : "text-[var(--muted)] hover:bg-[var(--wash)]"
-            }`}
+            className="min-w-14 text-center font-medium whitespace-nowrap"
             href={buildPortfolioAccountScopeHref(
               basePath,
               tab.account,

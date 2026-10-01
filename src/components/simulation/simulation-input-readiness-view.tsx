@@ -118,7 +118,7 @@ function ResearchHorizonSelector({
       className="flex items-center gap-3"
       data-simulation-research-horizon={selectedHorizon ?? "invalid"} as="section" en={{"aria-label": simulationEnglish("연구 기간 선택")}}
     >
-      <nav className={styles.textTabs}>
+      <nav className={`cairn-tabs ${styles.textTabs}`}>
         {SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons.map((horizon) => {
           const selected = horizon === selectedHorizon;
           return (

@@ -114,7 +114,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         {links}
         <div className="varda-sidebar-bottom">
           {!preview ? <Link href="/portfolio/reporting" className="varda-sidebar-account"><span aria-hidden="true">$</span><span>{t("통화별 평가", "Currency valuation")}</span></Link> : null}
-          <Link href="/plans" className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
+          <Link href={hrefFor("/plans")} className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
           {preview ? <span className="varda-preview-label" title={t("디자인 미리보기 · 예시 데이터", "Design preview · Demo data")}><i />{t("예시")}</span> : null}
           <Link href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
             <UserRound size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계정")}</span>
@@ -125,7 +125,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         <div className="varda-topbar-location">
           <span className="varda-mobile-brand"><BrandLogo /></span>
           <span className="varda-breadcrumb">PORTFOLIO</span><span className="varda-breadcrumb-slash">/</span>
-          <strong>{t(currentItem?.label ?? "관리")}</strong>
+          <strong>{currentPath === "/plans" ? t("내 계획", "My plans") : t(currentItem?.label ?? "관리")}</strong>
         </div>
         <div className="varda-topbar-actions">
           <nav className="varda-scene-pager" aria-label={t("화면 순서 이동", "Previous and next page")}>
@@ -161,8 +161,9 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           </div>
           {links}
           <div className="varda-menu-language"><LanguageSwitch /></div>
+          <Link className="varda-menu-account" href={hrefFor("/portfolio/holdings/new")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
           {!preview ? <TradeRecordLinks variant="menu" accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
-          <Link className="varda-menu-account" href="/plans" onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
+          <Link className="varda-menu-account" href={hrefFor("/plans")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
           {!preview ? <Link className="varda-menu-account" href="/portfolio/reporting" onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
             <UserRound size={18} />{t("내 계정")}<ArrowUpRight size={15} />

@@ -31,7 +31,7 @@ export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, 
     <div className={styles.content} id="varda-main-content" tabIndex={-1}>
       <Link className={styles.back} href={navigation.returnHref}><ArrowLeft size={15} aria-hidden="true" /><T {...navigation.returnLabel} /></Link>
       <header className={styles.heading}>
-        <div><p className={styles.eyebrow}>MY PORTFOLIO · MY PLAN</p><h1><T ko="나만의 균형을 정해요." en="Set your own balance." /></h1><p><T ko="목표비중은 각 종목을 얼마나 담고 싶은지 정하는 기준입니다. 선택한 범위 안에서 원하는 비율을 입력하세요." en="Target weights describe how much of each holding you want in your portfolio. Set your preferred shares within the selected scope." /></p></div>
+        <div><h1><T ko="목표 비중" en="Target weights" /></h1><details className="cairn-details"><summary><T ko="목표비중 안내" en="About target weights" /></summary><p><T ko="선택한 범위에서 종목별 비중을 정합니다. 합계를 100%로 맞추세요." en="Set each holding’s share within this scope. The total must be 100%." /></p></details></div>
         {isDesignPreview ? <span className={styles.headingBadge}><T ko="예시 · 저장 불가" en="Demo · No saving" /></span> : null}
       </header>
       <div className={styles.scope}><PortfolioAnalysisScopeTabs basePath="/portfolio/targets" query={navigation.contextQuery} scopes={scopes} selectedScopeKey={selectedScope.key} variant="underline" /></div>

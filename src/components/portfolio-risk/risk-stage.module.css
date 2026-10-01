@@ -100,3 +100,14 @@
   .compactMatrix th { height:44px; min-width:66px; }
   .compactMatrix td > button { width:100%; }
 }
+
+/* Unknown Sharpe stays available as a status, rather than a third hero number. */
+.coreMetric[data-unavailable="true"] { order:1; }
+.coreMetric[data-unavailable="true"] dd { margin-top:4px; font-size:14px; letter-spacing:0; }
+.coreMetric[data-unavailable="true"] small { margin-top:4px; line-height:1.4; }
+@media(max-width:760px) {
+ .coreSummary { gap:16px; }
+ .coreMetric[data-unavailable="true"] { grid-column:1 / -1; display:flex; align-items:baseline; gap:10px; }
+ .coreMetric[data-unavailable="true"] dd { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; margin:0; }
+ .coreMetric[data-unavailable="true"] small { margin:0; }
+}

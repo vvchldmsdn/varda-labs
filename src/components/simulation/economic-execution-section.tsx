@@ -6,7 +6,7 @@ import { InvestmentLabDialog } from "@/components/investment-lab/investment-lab-
 import { economicCalculationGuide } from "./economic-calculation-guide";
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationText } from "./simulation-text";
-import { simulationReturnLabel } from "./simulation-presentation";
+import { simulationReturnLabel, simulationReturnTone } from "./simulation-presentation";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 import styles from "./simulation-workspace.module.css";
 
@@ -50,7 +50,7 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
     </div> : <>
       <div className={styles.resultLayout}>
         <dl className={styles.resultSummary}>
-          <div><dt><SimulationText ko="마지막 수익률 중간값" en="Median final return" /></dt><dd>{simulationReturnLabel(100 + result.terminal.p50ReturnPct)}</dd><p>{result.assumptions.horizon}<SimulationText ko={`단계 · ${result.assumptions.pathCount.toLocaleString("ko-KR")}개 공동 경로`} en={` steps · ${result.assumptions.pathCount.toLocaleString("en-US")} joint paths`} /></p></div>
+          <div><dt><SimulationText ko="마지막 수익률 중간값" en="Median final return" /></dt><dd data-value-tone={simulationReturnTone(result.terminal.p50ReturnPct)}>{simulationReturnLabel(100 + result.terminal.p50ReturnPct)}</dd><p>{result.assumptions.horizon}<SimulationText ko={`단계 · ${result.assumptions.pathCount.toLocaleString("ko-KR")}개 공동 경로`} en={` steps · ${result.assumptions.pathCount.toLocaleString("en-US")} joint paths`} /></p></div>
           <div><dt><SimulationText ko="손실로 끝난 경로" en="Paths ending in loss" /></dt><dd>{result.terminal.lossProbabilityPct.toFixed(1)}%</dd><p><SimulationText ko="이 모형의 가정 안에서 계산한 비율" en="Frequency under this model's assumptions" /></p></div>
           <div><dt><SimulationText ko="중간 최대 하락 · P90 MDD" en="Largest drop · P90 MDD" /></dt><dd>{result.terminal.maxDrawdownP90Pct.toFixed(1)}%</dd><p><SimulationText ko="약 10% 경로는 이보다 더 하락" en="About 10% of paths fell further" /></p></div>
         </dl>

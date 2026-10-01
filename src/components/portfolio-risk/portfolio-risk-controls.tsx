@@ -63,7 +63,7 @@ function RiskOptionGroup({
   return (
     <div>
       <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
-      <div className={styles.periodOptions}>
+      <div className={`cairn-tabs ${styles.periodOptions}`}>
         {children}
       </div>
     </div>

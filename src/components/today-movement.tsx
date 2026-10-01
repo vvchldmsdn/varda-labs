@@ -156,7 +156,7 @@ export function TodayMovement({
             </div>
           )}
           {freshness.staleQuoteCount + freshness.missingQuoteCount > 0 || freshness.fxNeedsRefresh ? <p className="text-[var(--warning)]"><T ko="일부 시세·환율 갱신 대기" en="Some quotes or FX await a refresh"/></p> : null}
-          <details className={styles.quoteDetails} data-today-quote-freshness>
+          <details className={`cairn-details ${styles.quoteDetails}`} data-today-quote-freshness>
             <summary><T ko="시세·비교 기준" en="Quote & baseline details"/></summary>
             <div>
               <p><T ko="시세 조회" en="Quotes retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange(freshness.fetched, data.generatedAt)}</span></p>

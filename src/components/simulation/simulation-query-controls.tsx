@@ -94,7 +94,7 @@ export function SimulationContextFields() {
 export function SimulationModelSelector() {
   const params = useSearchParams();
   const selected = params.get("model") ?? "economic";
-  return <nav aria-label="Simulation model" className={styles.textTabs} data-simulation-model-selector>
+  return <nav aria-label="Simulation model" className={`cairn-tabs ${styles.textTabs}`} data-simulation-model-selector>
     {(["economic", "bootstrap"] as const).map((model) => {
       const next = new URLSearchParams(params.toString());
       next.set("model", model);

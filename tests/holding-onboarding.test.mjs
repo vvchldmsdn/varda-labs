@@ -48,6 +48,16 @@ describe("holding onboarding contract", () => {
       assert.equal(formNode.props.initialAccountId, expected);
       assert.equal(formNode.key, expected, "changing the selected account remounts the form with that account");
     }
+    for (const [params, expected] of [
+      [{ scope: `account:${newAccountId}` }, newAccountId],
+      [{ scope: "account:foreign" }, ""],
+      [{ scope: [ `account:${ACCOUNT_ID}`, `account:${newAccountId}` ] }, ""],
+      [{ scope: `account:${ACCOUNT_ID}`, accountId: newAccountId }, newAccountId],
+      [{ scope: `account:${ACCOUNT_ID}`, accountId: "foreign" }, ""],
+    ]) {
+      const tree = await page.default({ searchParams: Promise.resolve(params) });
+      assert.equal(elements(tree).find(node => node.type === HoldingOnboardingForm).props.initialAccountId, expected);
+    }
   });
 
   it("normalizes a Korean ETF with direct average cost authority", () => {

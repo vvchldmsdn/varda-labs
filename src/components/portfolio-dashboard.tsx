@@ -93,7 +93,7 @@ export function PortfolioDashboard({
               <LocalizedLink href={targetNavigation.settingsHref} className={styles.targetEntry} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }}>
                 <Target size={17} strokeWidth={1.6} aria-hidden="true" /><T ko="목표비중" en="Targets" />
               </LocalizedLink>
-              <PortfolioRefreshButton autoSync={liveSyncEnabled} designPreview={designPreview} />
+              <span className={styles.secondaryRefresh}><PortfolioRefreshButton autoSync={liveSyncEnabled} designPreview={designPreview} /></span>
             </div>
           </header>
 

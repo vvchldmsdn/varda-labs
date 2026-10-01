@@ -353,3 +353,25 @@
   .stageFan .fanReadout dd { font-size:14px; }
   .fanPlot { height:320px; min-height:320px; }
 }
+
+.resultSummary dd[data-value-tone="positive"] { color:var(--brand); }
+.resultSummary dd[data-value-tone="negative"] { color:var(--negative); }
+.resultSummary dd[data-value-tone="neutral"] { color:var(--ink); }
+
+.graphSettings { align-self:flex-end; max-width:100%; }
+.graphSettings > summary { justify-content:flex-end; gap:12px; }
+.graphSettings[open] { align-self:stretch; }
+.graphSettings .fanControls { padding:0 0 8px; }
+.toolbar > div { align-items:center; justify-content:space-between; gap:18px; }
+.fanPlot { min-height:270px; }
+@media(min-width:761px) { .resultLayout { grid-template-columns:minmax(160px,20%) minmax(0,1fr); gap:24px; } .resultSummary { gap:22px; } }
+@media(max-width:760px) {
+ .stageHeader { margin-bottom:10px; gap:8px; }
+ .toolbar > div { gap:8px 18px; }
+ .stageFan { min-height:390px; }
+ .resultLayout { gap:18px; }
+ .resultSummary { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+ .resultSummary dt { font-size:10px; }
+ .resultSummary p { font-size:10px; line-height:1.6; margin-top:5px; }
+ .resultSummary dd,.resultSummary > div:first-child dd { font-size:26px; margin-top:6px; }
+}

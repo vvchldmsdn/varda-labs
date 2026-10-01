@@ -41,12 +41,12 @@ export function PortfolioAnalysisScopeTabs({
       viewportClassName={
         underline
           ? "max-w-full pb-1 text-sm"
-          : "max-w-full rounded-md border border-[var(--line)] bg-white p-1"
+          : "max-w-full"
       }
       contentClassName={
         underline
           ? "flex w-max min-w-full items-center gap-7 sm:gap-10"
-          : "flex w-max min-w-full gap-1"
+          : "cairn-tabs w-max min-w-full"
       }
     >
       {scopes.map((scope) => {
@@ -63,11 +63,7 @@ export function PortfolioAnalysisScopeTabs({
                       ? "border-[var(--ink)] text-[var(--ink)]"
                       : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
                   }`
-                : `min-w-16 rounded px-3 py-2 text-center text-sm font-semibold whitespace-nowrap ${
-                    selected
-                      ? "bg-[var(--ink)] text-white"
-                      : "text-[var(--muted)] hover:bg-[var(--wash)]"
-                  }`
+                : "min-w-16 text-center font-medium whitespace-nowrap"
             }
             href={buildPortfolioAnalysisScopeHref(basePath, scope.key, query)}
           >

@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useI18n } from "./locale-provider";
 
 const pageNames: Record<string, [string, string]> = {
+  "/plans": ["내 투자계획", "My investment plans"], "/start": ["시작하기", "Get started"],
+  "/try": ["서비스 둘러보기", "Explore Cairn"], "/portfolio/ledger": ["거래 기록", "Transactions"],
   "/": ["홈", "Home"], "/today": ["오늘 변동", "Today"], "/history": ["히스토리", "History"],
   "/additional-contribution": ["추가 투입", "Contribute"], "/portfolio/structure": ["포트 구조", "Allocation"],
   "/portfolio/risk": ["위험 분석", "Risk analysis"], "/investment-lab": ["투자 랩", "Investment Lab"],

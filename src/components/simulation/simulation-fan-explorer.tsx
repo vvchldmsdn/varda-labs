@@ -177,11 +177,11 @@ export function SimulationFanExplorer({
       data-fan-mode={mode}
       data-fan-path-coverage={source.kind}
     >
-      <div
+      <details className={`cairn-details ${styles.graphSettings}`}><summary>{pt("그래프 설정", "Chart settings")}</summary><div
         className={`${styles.fanControls} flex flex-wrap items-center justify-between gap-3 text-xs ${compact ? "py-1.5" : "py-3"}`}
       >
         <div
-          className="flex gap-1"
+          className="cairn-tabs"
           role="group"
           aria-label={pt("경로 표시")}
         >
@@ -196,7 +196,7 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={mode === key}
               onClick={() => setMode(key)}
-              className={`flex items-center gap-2 rounded-full px-4 focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${compact ? "min-h-9" : "min-h-10"} ${mode === key ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              className="flex items-center gap-2"
             >
               <Icon size={14} aria-hidden="true" />
               <SimulationText ko={label} en={en} />
@@ -204,7 +204,7 @@ export function SimulationFanExplorer({
           ))}
         </div>
         <div
-          className="flex items-center gap-3"
+          className="cairn-tabs"
           role="group"
           aria-label={pt("차트 단위")}
         >
@@ -226,6 +226,7 @@ export function SimulationFanExplorer({
           ))}
         </div>
       </div>
+      </details>
       {band && !compact ? <div className={styles.fanReadout} data-fan-readout>
         <p><SimulationText ko={displayedStep === 0 ? "현재" : `${displayedStep}단계`} /><span>{pathPoint && focusedIdentity !== null && focusedIdentity !== undefined ? pt(`${source.kind === "all" ? "경로" : "표본"} ${focusedIdentity + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}`, `${source.kind === "all" ? "Path" : "Sample"} ${focusedIdentity + 1}${selectedPath === focusedPath ? " · Selected" : ""}`) : pt("분포의 세 지점")}</span></p>
         {pathPoint ? <strong>{format(pathPoint.indexValue)}</strong> : <dl><div><dt>P10</dt><dd>{format(band.p10)}</dd></div><div><dt>P50</dt><dd>{format(band.p50)}</dd></div><div><dt>P90</dt><dd>{format(band.p90)}</dd></div></dl>}

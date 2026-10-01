@@ -65,6 +65,15 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
     : error === "limit" ? t("한 번에 12종목까지 가능합니다. 먼저 목록을 저장해 주세요.", "Add up to 12 holdings at a time. Save this list first.")
     : error === "ticker" ? t("티커를 확인해 주세요. 영문, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다.", "Check the ticker. Use letters, numbers, dots, underscores or hyphens.") : null;
 
+  function selectAccount(next: string) {
+    setAccountId(next);
+    // Persist only the explicit account context, without remounting queued inputs.
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("accountId", next);
+    url.searchParams.set("scope", `account:${next}`);
+    window.history.replaceState(null, "", url);
+  }
   function addDrafts(drafts: HoldingDraft[]) {
     if (unsaved.length + drafts.length > MAX_HOLDING_BATCH) { setError("limit"); return false; }
     const seen = new Set([...rows.map(identity), ...Object.values(saved)]);
@@ -87,7 +96,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
   }
 
   if (nativeAccountIds.includes(accountId)) return <div className="varda-holding-onboarding">
-    <label>{t("담을 계좌", "Add to account")}<select value={accountId} onChange={event => setAccountId(event.target.value)} aria-label={t("보유 계좌", "Holding account")}>{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+    <label>{t("담을 계좌", "Add to account")}<select className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} aria-label={t("보유 계좌", "Holding account")}>{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
     <NativeLedgerNotice accountId={accountId} action="buy" />
   </div>;
   // Action completion requests a native reset; retain React-managed account and retry selections.
@@ -96,7 +105,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
     <input type="hidden" name="accountId" value={accountId} />
     <input type="hidden" name="portfolioGroupId" value={groupId} />
     <input type="hidden" name="newPortfolioGroupName" value={groupId ? "" : groupName} />
-    <div className="varda-onboarding-account-line"><label>{t("담을 계좌", "Add to account")}<select value={accountId} onChange={event => setAccountId(event.target.value)} disabled={pending || hasSaved} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><span>{t("계좌 비밀번호나 거래 권한은 필요하지 않아요.", "No brokerage password or trading access needed.")}</span></div>
+    <div className="varda-onboarding-account-line"><label>{t("담을 계좌", "Add to account")}<select className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} disabled={pending || hasSaved} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><span>{t("계좌 비밀번호나 거래 권한은 필요하지 않아요.", "No brokerage password or trading access needed.")}</span></div>
     <div className="varda-onboarding-workspace">
       <section className="varda-onboarding-compose" aria-labelledby="holding-add-heading" onKeyDown={event => {
         if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
@@ -114,7 +123,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
         {errorText ? <p role="alert" className="varda-onboarding-error">{errorText}</p> : null}
         <details className="varda-onboarding-disclosure"><summary>{t("검색되지 않는 종목 직접 입력", "Enter an unlisted ticker manually")}</summary>
           <p>{t("검색 목록은 모든 종목을 포함하지 않습니다. 정확한 상장 시장과 티커를 확인해 주세요.", "The catalog is not exhaustive. Enter the exact listing market and ticker.")}</p>
-          <div className="varda-onboarding-fields"><label>{t("상장 시장", "Market")}<select value={manualMarket} disabled={pending} onChange={event => setManualMarket(event.target.value as "korea" | "us")}><option value="korea">{t("한국 · KRW", "Korea · KRW")}</option><option value="us">{t("미국 · USD", "US · USD")}</option></select></label><label>{t("유형", "Type")}<select value={manualType} disabled={pending} onChange={event => setManualType(event.target.value as "etf" | "stock")}><option value="etf">ETF</option><option value="stock">{t("주식", "Stock")}</option></select></label><label>{t("티커", "Ticker")}<input value={manualTicker} onChange={event => setManualTicker(event.target.value.toUpperCase())} disabled={pending} maxLength={50} autoCapitalize="characters" autoComplete="off" placeholder={manualMarket === "korea" ? "069500" : "AAPL"} /></label><label>{t("이름 (선택)", "Name (optional)")}<input value={manualName} onChange={event => setManualName(event.target.value)} disabled={pending} maxLength={255} /></label></div>
+          <div className="varda-onboarding-fields"><label>{t("상장 시장", "Market")}<select className="cairn-form-select" value={manualMarket} disabled={pending} onChange={event => setManualMarket(event.target.value as "korea" | "us")}><option value="korea">{t("한국 · KRW", "Korea · KRW")}</option><option value="us">{t("미국 · USD", "US · USD")}</option></select></label><label>{t("유형", "Type")}<select className="cairn-form-select" value={manualType} disabled={pending} onChange={event => setManualType(event.target.value as "etf" | "stock")}><option value="etf">ETF</option><option value="stock">{t("주식", "Stock")}</option></select></label><label>{t("티커", "Ticker")}<input value={manualTicker} onChange={event => setManualTicker(event.target.value.toUpperCase())} disabled={pending} maxLength={50} autoCapitalize="characters" autoComplete="off" placeholder={manualMarket === "korea" ? "069500" : "AAPL"} /></label><label>{t("이름 (선택)", "Name (optional)")}<input value={manualName} onChange={event => setManualName(event.target.value)} disabled={pending} maxLength={255} /></label></div>
           <button type="button" className="varda-onboarding-text-button" disabled={pending} onClick={() => {
             const ticker = manualTicker.trim().toUpperCase();
             if (!/^[A-Z0-9][A-Z0-9._-]{0,49}$/.test(ticker)) { setError("ticker"); return; }
@@ -135,7 +144,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
             {result && !isSaved && result.message ? <p role="status" className="varda-onboarding-error"><ManagementText>{result.message}</ManagementText></p> : null}
           </li>;
         })}</ol>}
-        <details className="varda-onboarding-disclosure"><summary>{t("분석 그룹 설정 (선택)", "Analysis group (optional)")}</summary><p>{t("비워 두면 기본 그룹으로 정리됩니다. 나중에 관리 화면에서 바꿀 수 있어요.", "Leave blank to use a default group. You can change it later in Manage.")}</p><label>{t("기존 그룹", "Existing group")}<select value={groupId} disabled={pending || hasSaved} onChange={event => setGroupId(event.target.value)}><option value="">{t("기본 그룹 사용", "Use default group")}</option>{options.portfolioGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>{!groupId ? <label>{t("새 그룹 이름 (선택)", "New group name (optional)")}<input maxLength={100} value={groupName} disabled={pending || hasSaved} onChange={event => setGroupName(event.target.value)} /></label> : null}</details>
+        <details className="varda-onboarding-disclosure"><summary>{t("분석 그룹 설정 (선택)", "Analysis group (optional)")}</summary><p>{t("비워 두면 기본 그룹으로 정리됩니다. 나중에 관리 화면에서 바꿀 수 있어요.", "Leave blank to use a default group. You can change it later in Manage.")}</p><label>{t("기존 그룹", "Existing group")}<select className="cairn-form-select" value={groupId} disabled={pending || hasSaved} onChange={event => setGroupId(event.target.value)}><option value="">{t("기본 그룹 사용", "Use default group")}</option>{options.portfolioGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>{!groupId ? <label>{t("새 그룹 이름 (선택)", "New group name (optional)")}<input maxLength={100} value={groupName} disabled={pending || hasSaved} onChange={event => setGroupName(event.target.value)} /></label> : null}</details>
         <div className="varda-onboarding-save">
           {state.results.some(item => item.result.message === NATIVE_LEDGER_REQUIRED_MESSAGE) ? <NativeLedgerNotice accountId={accountId} action="buy" /> : null}
           {state.status === "invalid" && state.results.length === 0 ? <p role="alert" className="varda-onboarding-error">{t("입력한 목록을 확인한 뒤 다시 저장해 주세요.", "Check the holding list and try saving again.")}</p> : null}

@@ -3,6 +3,7 @@
   "buildCommand": "npm run build:vercel",
   "git": {
     "deploymentEnabled": {
+      "codex/ui-convergence-release": false,
       "codex/cutoff-release-20260928": false,
       "codex/bc-production-release-20260920": false,
       "codex/trade-entry-hotfix-20260924": false,
