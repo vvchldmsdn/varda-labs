@@ -24,7 +24,7 @@ export function buildHoldingConnectionGraph(
   history: PortfolioDashboardHoldingHistory,
 ) {
   const rows = [...history.rows]
-    .filter((row) => row.cells.some((cell) => cell.basis !== "live_price" && cell.changePct !== null))
+    .filter((row) => row.cells.some((cell) => isRecordedCell(cell) && cell.changePct !== null))
     .toSorted((left, right) => right.currentWeight - left.currentWeight)
     .slice(0, 7);
   const maxWeight = Math.max(...rows.map((row) => row.currentWeight), 1);
@@ -82,9 +82,9 @@ function pairwiseCorrelation(
   left: readonly PortfolioDashboardHeatmapCell[],
   right: readonly PortfolioDashboardHeatmapCell[],
 ) {
-  // Live native-price changes have a different basis from saved KRW unit-value changes.
-  const rightByDate = new Map(right.filter(cell => cell.basis !== "live_price").map((cell) => [cell.date, cell.changePct]));
-  const pairs = left.filter(cell => cell.basis !== "live_price").flatMap((cell) => {
+  // An unfinished live day must not alter correlation of recorded daily changes.
+  const rightByDate = new Map(right.filter(isRecordedCell).map((cell) => [cell.date, cell.changePct]));
+  const pairs = left.filter(isRecordedCell).flatMap((cell) => {
     const rightValue = rightByDate.get(cell.date);
     return cell.changePct !== null && rightValue !== null && rightValue !== undefined
       ? [[cell.changePct, rightValue] as const]
@@ -111,4 +111,8 @@ function pairwiseCorrelation(
     correlation: Math.max(-1, Math.min(1, covariance / denominator)),
     observations: pairs.length,
   };
+}
+
+function isRecordedCell(cell: PortfolioDashboardHeatmapCell) {
+  return cell.basis !== "live_price" && cell.basis !== "live_movement";
 }

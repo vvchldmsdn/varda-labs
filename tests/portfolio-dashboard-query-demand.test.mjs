@@ -185,7 +185,9 @@ describe("dashboard query demand and independent market reads", () => {
     assert.deepEqual(today.todayMovement, home.todayMovement);
     const cell = home.holdingHistory.rows[0].cells.at(-1);
     assert.equal(cell.date, "2026-09-10");
-    assert.equal(cell.changePct, 0, "the separately evidenced unchanged unit price stays available");
+    assert.equal(cell.changePct, null, "missing valuation movement must not be replaced by native price return");
+    assert.equal(cell.basis, "missing");
+    assert.equal(cell.priceReturnEvidence.changePct, 0, "the separately evidenced unchanged unit price stays available in details");
     assert.equal(cell.marketValueKrw, 1100);
     assert.equal(cell.changeKrw, null, "the stale portfolio movement cannot leak into today's heatmap detail");
 
@@ -236,7 +238,7 @@ describe("dashboard query demand and independent market reads", () => {
     });
   }
 
-  it("connects today's KST heatmap to native price return while preserving separate FX movement", async (t) => {
+  it("connects today's KST heatmap to Today valuation return while preserving separate native price evidence", async (t) => {
     t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-08T15:20:00Z") });
     const f = await fixture({ assetRows: [baseAsset], eventRows: [],
       baselineRows: [{ id: "snapshot-fixture", snapshotDate: "2026-09-08", assetId, legacyAssetId: null, account: "brokerage", ticker: "QQQ", assetName: "QQQ", assetType: "etf", currency: "USD", quantity: "10", unitPrice: "100", marketValueKrw: "1000000", fxRate: "1000" }],
@@ -247,8 +249,11 @@ describe("dashboard query demand and independent market reads", () => {
     assert.equal(home.holdingHistory.dates.at(-1), "2026-09-09");
     const cell = home.holdingHistory.rows[0].cells.at(-1);
     assert.equal(home.holdings[0].dailyPriceReturn.changePct, 3);
-    assert.equal(cell.changePct, 3);
-    assert.equal(cell.basis, "live_price");
+    assert.equal(cell.changePct, 44.2);
+    assert.equal(cell.basis, "live_movement");
+    assert.equal(cell.priceReturnEvidence.changePct, 3);
+    assert.equal(cell.changePct, home.todayMovement.contributionRows[0].returnPct);
+    assert.equal(cell.changeKrw, home.todayMovement.contributionRows[0].changeKrw);
     assert.equal(cell.changeKrw, 442_000);
     assert.equal(cell.priceChangeKrw, 30_000);
     assert.equal(cell.fxChangeKrw, 412_000);

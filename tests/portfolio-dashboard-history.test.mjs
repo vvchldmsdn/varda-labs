@@ -168,7 +168,7 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[2]?.cells.every((cell) => cell.basis === "missing"), true);
   });
 
-  it("uses native price return for today while retaining separate KRW movement and unchanged history", () => {
+  it("uses the same valuation return and amount as Today while preserving native price evidence and history", () => {
     const currentHoldings = [
       {
         ...holdings[0],
@@ -211,16 +211,16 @@ describe("portfolio dashboard holding history", () => {
     assert.equal(result.rows[0]?.cells[0]?.changePct, -1);
     assert.deepEqual(result.rows[0]?.cells[1], {
       date: "2026-08-24",
-      changePct: 3,
+      changePct: 2.3622,
       marketValueKrw: 1_300_000,
       changeKrw: 30_000,
       priceChangeKrw: 24_000,
       fxChangeKrw: 6_000,
-      basis: "live_price",
+      basis: "live_movement",
       priceReturnEvidence: priceReturn(3),
     });
     assert.equal(result.rows[1]?.cells[1]?.changePct, 0);
-    assert.equal(result.rows[1]?.cells[1]?.basis, "live_price");
+    assert.equal(result.rows[1]?.cells[1]?.basis, "live_movement");
   });
 
   it("preserves Friday, weekend, Monday and today's live movement on separate service days", () => {
@@ -267,29 +267,43 @@ describe("portfolio dashboard holding history", () => {
   });
 
   for (const dailyPriceReturn of [undefined, { ...priceReturn(null), reason: "missing_previous_close" }]) {
-    it("does not use portfolio returns or a stored zero when today's price evidence is unavailable", () => {
+    it("keeps the valuation movement when separate price-return evidence is unavailable", () => {
       const result = buildPortfolioDashboardHoldingHistory({
         currentDate: "2026-09-08",
         holdings: [{ ...holdings[0], valueKrw: 1000, dailyReturnPct: 1, dailyChangeKrw: 10, dailyPriceReturn }],
         rows: [row({ snapshotDate: "2026-09-08", assetId: "asset-kodex", unitValueChangePct: 0, marketValueChangeKrw: 0, marketValueKrw: 1000 })],
       });
-      assert.equal(result.rows[0].cells[0].basis, "missing");
-      assert.equal(result.rows[0].cells[0].changePct, null);
+      assert.equal(result.rows[0].cells[0].basis, "live_movement");
+      assert.equal(result.rows[0].cells[0].changePct, 1);
       assert.equal(result.rows[0].cells[0].changeKrw, 10, "available money movement is independent from missing price-return evidence");
-      assert.equal(result.observedCellCount, 0);
-      assert.equal(result.coveragePct, 0);
+      assert.equal(result.observedCellCount, 1);
+      assert.equal(result.coveragePct, 100);
     });
   }
   for (const missing of ["dailyReturnPct", "dailyChangeKrw", "valueKrw"]) {
-    it(`retains native price change when portfolio ${missing} is missing`, () => {
+    it(`does not substitute native price return when portfolio ${missing} is missing`, () => {
       const result = buildPortfolioDashboardHoldingHistory({ currentDate: "2026-09-09", rows: [],
         holdings: [{ ...holdings[0], valueKrw: 1000, dailyReturnPct: 1, dailyChangeKrw: 10, dailyPriceReturn: priceReturn(3), [missing]: null }] });
-      assert.equal(result.rows[0].cells.at(-1).changePct, 3);
-      assert.equal(result.rows[0].cells.at(-1).basis, "live_price");
+      assert.equal(result.rows[0].cells.at(-1).changePct, missing === "dailyReturnPct" ? null : 1);
+      assert.equal(result.rows[0].cells.at(-1).basis, missing === "dailyReturnPct" ? "missing" : "live_movement");
+      assert.equal(result.rows[0].cells.at(-1).priceReturnEvidence.changePct, 3);
       if (missing === "dailyChangeKrw") assert.equal(result.rows[0].cells.at(-1).changeKrw, null);
       if (missing === "valueKrw") assert.equal(result.rows[0].cells.at(-1).marketValueKrw, null);
     });
   }
+  it("keeps FX-driven gains and losses aligned with Today even when native price moves the other way", () => {
+    for (const sign of [1, -1]) {
+      const result = buildPortfolioDashboardHoldingHistory({ currentDate: "2026-10-01", rows: [], holdings: [{
+        ...holdings[0], valueKrw: 1000800, dailyChangeKrw: sign * 800, dailyReturnPct: sign * 0.08,
+        dailyPriceReturn: priceReturn(sign * -0.26), priceDailyChangeKrw: 0, fxDailyChangeKrw: sign * 800,
+      }] });
+      const cell = result.rows[0].cells[0];
+      assert.equal(cell.changePct, sign * 0.08);
+      assert.equal(cell.changeKrw, sign * 800);
+      assert.equal(cell.fxChangeKrw, sign * 800);
+      assert.equal(cell.priceReturnEvidence.changePct, sign * -0.26);
+    }
+  });
 });
 
 function priceReturn(changePct) {
