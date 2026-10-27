@@ -1,0 +1,1429 @@
+:root {
+  --paper: #f7f7f5;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --ink: #20211f;
+  --muted: #6c6d68;
+  --faint: #6f706b;
+  --line: #e1e1dc;
+  --wash: #eeeee9;
+  --accent: #ef5a32;
+  --brand: #c64623;
+  --brand-mid: #ef5a32;
+  --brand-soft: #f3d3c6;
+  --brand-wash: #fbefea;
+  --negative: #3568ae;
+  --negative-mid: #7498c0;
+  --negative-soft: #dce5ef;
+  --warning: #8b681e;
+  --warning-soft: #e4d8b6;
+  --warning-wash: #f7f2e6;
+  --secondary: #6b6593;
+  --secondary-soft: #e8e5ee;
+  --chart-teal: #707d77;
+  --brand-contrast: #ffffff;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --dialog-shadow: 0 24px 80px #20211f1f;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    scrollbar-gutter: stable;
+  }
+  body {
+    letter-spacing: 0;
+  }
+  ::selection {
+    background: var(--brand-soft);
+    color: var(--ink);
+  }
+  :where(button, a, summary, input, select, textarea):focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 4px;
+  }
+  :where(button, summary, select) {
+    cursor: pointer;
+  }
+  :where(button:disabled) {
+    cursor: not-allowed;
+  }
+  :where(input, select, textarea) {
+    accent-color: var(--brand);
+  }
+  :where(
+    input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(
+        [type="hidden"]
+      ),
+    select,
+    textarea
+  ) {
+    border-radius: 4px;
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  :where(h1, h2, h3, p, dt, dd, label, th, td) {
+    overflow-wrap: anywhere;
+  }
+  :where(table) {
+    font-variant-numeric: tabular-nums;
+  }
+  :where(thead th) {
+    font-weight: 500;
+  }
+  :where(dialog, [role="dialog"]) {
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--dialog-shadow);
+  }
+  dialog::backdrop {
+    background: #172b2955;
+    backdrop-filter: blur(3px);
+  }
+  :where([role="tooltip"]) {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    box-shadow: 0 8px 32px #191b2010;
+  }
+  :where(svg[role="img"]) {
+    overflow: visible;
+  }
+  :where(svg[role="img"] text) {
+    letter-spacing: 0;
+  }
+}
+
+.varda-navigation {
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+  position: relative;
+  z-index: 40;
+}
+.varda-scroll-rail {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.varda-scroll-rail::-webkit-scrollbar {
+  display: none;
+}
+.varda-scroll-rail > div > a {
+  scroll-snap-align: center;
+}
+.varda-scroll-rail[data-at-start="true"][data-at-end="false"] {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+}
+.varda-scroll-rail[data-at-start="false"][data-at-end="true"] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 100%);
+}
+.varda-scroll-rail[data-at-start="false"][data-at-end="false"] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+}
+.varda-navigation-inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 36px;
+  min-height: 72px;
+  max-width: 1680px;
+  padding: 0 36px;
+  margin: 0 auto;
+}
+.varda-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.varda-wordmark img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.varda-main-menu {
+  min-width: 0;
+}
+.varda-main-menu > div {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  min-width: max-content;
+}
+.varda-main-menu a {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  min-height: 72px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 160ms;
+}
+.varda-main-menu a:hover,
+.varda-main-menu a[aria-current="page"] {
+  color: var(--ink);
+}
+.varda-main-menu a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand);
+}
+.varda-navigation-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.varda-content {
+  max-width: 1680px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 18px 36px 24px;
+}
+.varda-presentation-page {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.varda-presentation-page > .varda-navigation {
+  flex: 0 0 auto;
+}
+.varda-presentation-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 18px;
+  padding-bottom: 20px;
+  overflow: hidden;
+}
+.varda-presentation-deck {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 54px;
+  height: 100%;
+  min-height: 0;
+}
+.varda-presentation-stage {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: pan-y pinch-zoom;
+}
+.varda-presentation-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transform: translate3d(var(--varda-scene-offset), 0, 0);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.varda-presentation-scene {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0.22;
+  transition: opacity 300ms ease;
+}
+.varda-presentation-scene[data-state="active"] {
+  opacity: 1;
+}
+.varda-presentation-scene-inner {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.varda-presentation-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.varda-presentation-grow {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.varda-presentation-controls {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+}
+.varda-presentation-tabs {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+  gap: 34px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.varda-presentation-tabs::-webkit-scrollbar {
+  display: none;
+}
+.varda-presentation-tab {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+.varda-presentation-tab::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: var(--brand);
+  transition: transform 220ms ease;
+}
+.varda-presentation-tab[aria-selected="true"] {
+  color: var(--ink);
+}
+.varda-presentation-tab[aria-selected="true"]::before {
+  transform: scaleX(1);
+}
+.varda-presentation-tab-index {
+  color: var(--brand);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.varda-presentation-arrow {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--ink);
+  border-radius: 50%;
+}
+.varda-presentation-arrow:hover:not(:disabled) {
+  color: var(--brand);
+  background: var(--brand-wash);
+}
+.varda-presentation-arrow:disabled {
+  color: var(--line);
+}
+.varda-presentation-detail-trigger {
+  display: inline-flex;
+  min-height: 40px;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.varda-presentation-detail-trigger:hover {
+  color: var(--brand);
+  border-color: var(--brand-mid);
+}
+.varda-presentation-dialog {
+  position: fixed;
+  inset: 0;
+  width: calc(100% - 32px);
+  max-width: 820px;
+  max-height: min(88dvh, 860px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+}
+.varda-presentation-dialog-wide {
+  max-width: 1320px;
+}
+.varda-presentation-dialog-shell {
+  display: flex;
+  max-height: min(88dvh, 860px);
+  flex-direction: column;
+}
+.varda-presentation-dialog-content {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.varda-workspace-deck {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.varda-workspace-tabs {
+  flex: 0 0 auto;
+}
+.varda-workspace-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100% - 50px);
+  overflow: hidden;
+}
+.varda-workspace-panel[hidden] {
+  display: none;
+}
+.varda-workspace-panel > :first-child {
+  max-height: 100%;
+}
+.varda-workspace-panel [data-lab-comparison="interactive"] > .grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.varda-workspace-panel [data-lab-comparison="interactive"] > .grid > section {
+  padding-top: 10px;
+  padding-right: 0;
+  padding-bottom: 6px;
+}
+.varda-workspace-panel [data-lab-comparison="interactive"] > .grid > aside,
+.varda-workspace-panel [data-lab-metrics],
+.varda-workspace-panel [data-lab-comparison="interactive"] > div:last-child {
+  display: none;
+}
+.varda-presentation-page .varda-history-heading {
+  gap: 22px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.varda-presentation-page .varda-history-heading .varda-primary-number {
+  margin-top: 8px;
+  font-size: 42px;
+}
+.varda-presentation-page .varda-history-controls {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.varda-presentation-page .varda-history-canvas {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.varda-presentation-page .varda-history-canvas > aside {
+  display: none;
+}
+.varda-presentation-page .varda-history-chart {
+  height: 220px;
+}
+.varda-page-title {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.3;
+  margin-top: 8px;
+}
+.varda-kicker {
+  font-size: 10px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.varda-primary-number {
+  font-size: 76px;
+  line-height: 1.12;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.varda-summary-stage {
+  text-align: center;
+  padding: 50px 0 42px;
+}
+.varda-contribution-controls {
+  padding-top: 30px;
+  padding-bottom: 28px;
+}
+.varda-section {
+  padding-top: 40px;
+  padding-bottom: 40px;
+  border-top: 1px solid var(--line);
+}
+.varda-section-heading {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.varda-icon-button {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+}
+.varda-icon-button:hover {
+  color: var(--brand);
+  background: var(--brand-wash);
+}
+.varda-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 4px;
+  background: var(--brand);
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+}
+.varda-action:hover {
+  filter: brightness(0.94);
+}
+.varda-dialog {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--dialog-shadow);
+}
+.varda-dialog-header {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-dialog-content {
+  padding: 28px 32px;
+}
+
+/* Integrated presentation surfaces */
+.varda-page {
+  background: var(--paper);
+  color: var(--ink);
+}
+.varda-page [class~="bg-white"],
+.varda-secondary-page [class~="bg-white"] {
+  background-color: var(--surface) !important;
+}
+.varda-page [class*="bg-white/"],
+.varda-secondary-page [class*="bg-white/"] {
+  background-color: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+}
+.varda-screen {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.varda-screen-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px 36px;
+  flex: 0 0 auto;
+}
+.varda-screen-heading {
+  min-width: 0;
+}
+.varda-screen-title-row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.varda-screen-scope {
+  min-width: 0;
+  overflow: hidden;
+}
+.varda-screen-scope nav {
+  max-width: 100%;
+}
+.varda-hero-strip {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.4fr);
+  min-height: 118px;
+  flex: 0 0 auto;
+  border-block: 1px solid var(--line);
+}
+.varda-hero-value {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 18px 26px 18px 0;
+}
+.varda-hero-value strong {
+  margin-top: 7px;
+  font-size: clamp(34px, 4vw, 62px);
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.varda-hero-metrics {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-left: 1px solid var(--line);
+}
+.varda-hero-metric {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 18px 22px;
+  border-right: 1px solid var(--line);
+}
+.varda-hero-metric:last-child {
+  border-right: 0;
+}
+.varda-hero-metric dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.varda-hero-metric dd {
+  margin-top: 10px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.varda-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 0.31fr);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.varda-main-visual {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 18px 26px 16px 0;
+}
+.varda-context-rail {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+}
+.varda-rail-section {
+  min-width: 0;
+  padding: 18px 0 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-rail-section:last-child {
+  border-bottom: 0;
+}
+.varda-rail-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.varda-rail-metric {
+  min-width: 0;
+  padding: 12px 12px 14px 0;
+  border-bottom: 1px solid var(--wash);
+}
+.varda-rail-metric:nth-child(odd) {
+  border-right: 1px solid var(--wash);
+}
+.varda-rail-metric:nth-child(even) {
+  padding-left: 14px;
+}
+.varda-rail-metric dt {
+  color: var(--faint);
+  font-size: 10px;
+}
+.varda-rail-metric dd {
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.varda-screen-footer {
+  display: flex;
+  min-height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--faint);
+  font-size: 10px;
+}
+.varda-inline-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.varda-inline-action {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.varda-inline-action:hover {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.varda-overlay-surface {
+  animation: varda-overlay-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.varda-detail-drawer-backdrop {
+  position: fixed;
+  inset: 72px 0 0;
+  z-index: 44;
+  background: #050607a6;
+  backdrop-filter: blur(7px);
+  animation: varda-fade-in 150ms ease-out;
+}
+.varda-detail-drawer {
+  position: fixed;
+  top: 88px;
+  right: 20px;
+  bottom: 20px;
+  z-index: 45;
+  width: min(860px, calc(100vw - 40px));
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--dialog-shadow);
+  overscroll-behavior: contain;
+  animation: varda-drawer-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.varda-detail-drawer > section {
+  border: 0;
+  padding: 0 26px 26px;
+}
+.varda-dialog[open] {
+  animation: varda-dialog-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.varda-dialog[open]::backdrop {
+  animation: varda-fade-in 160ms ease-out;
+}
+.varda-dialog .varda-dialog-header {
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  backdrop-filter: blur(18px);
+}
+.varda-dialog .varda-dialog-content {
+  background: var(--surface);
+}
+.varda-home-main {
+  position: relative;
+}
+.varda-home-main > section {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+.varda-home-main [data-heatmap-grid] {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.varda-home-history .varda-home-chart {
+  height: 145px;
+  min-height: 120px;
+}
+.varda-home-history details {
+  display: none;
+}
+.varda-home-history section > div:first-child {
+  margin-bottom: 8px;
+}
+.varda-home-history section > div:first-child h2 {
+  font-size: 13px;
+}
+.varda-home-history section > div:first-child p:first-child {
+  display: none;
+}
+.varda-home-history [aria-label="조회 기간"] {
+  gap: 10px;
+}
+.varda-home-history [aria-label="조회 기간"] button {
+  min-height: 28px;
+  font-size: 10px;
+}
+.varda-compact-fx > div {
+  border: 0;
+}
+.varda-compact-fx > div > button {
+  min-height: 40px;
+  padding: 9px 0 0;
+}
+.varda-compact-fx > div > button > span:nth-child(2) {
+  margin-top: 5px;
+  font-size: 14px;
+}
+.varda-compact-fx > div > button > span:nth-child(3) {
+  margin-top: 2px;
+  font-size: 10px;
+}
+.varda-heatmap-popover {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 12;
+  width: min(540px, calc(100% - 36px));
+  border: 1px solid var(--brand-soft);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  padding: 16px;
+  box-shadow: 0 18px 60px #00000070;
+  backdrop-filter: blur(16px);
+  animation: varda-cell-detail-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.varda-today-main > section,
+.varda-structure-main > section,
+.varda-history-main > section {
+  min-height: 0;
+}
+.varda-today-main > section {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+.varda-today-main > section > div:last-child {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.varda-today-main > section > div:last-child > div:first-child {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.varda-bridge-compact {
+  padding-top: 14px;
+}
+.varda-bridge-compact .varda-value-bridge > div {
+  min-height: 78px;
+  padding-block: 13px;
+}
+.varda-bridge-compact .varda-value-bridge > div > p + p {
+  margin-top: 8px;
+  font-size: 15px;
+}
+.varda-contribution-main {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.varda-contribution-main [aria-labelledby="allocation-flow-title"] > div:nth-child(2) {
+  min-height: 285px;
+}
+.varda-contribution-main [aria-labelledby="allocation-flow-title"] svg {
+  height: 278px;
+}
+.varda-contribution-main [aria-label="배분 요약"] {
+  margin-top: 10px;
+}
+.varda-structure-main {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.varda-structure-main [data-section="allocation-explorer"] {
+  border: 0;
+  padding-top: 0;
+}
+.varda-structure-main .varda-allocation-ring {
+  max-width: 390px;
+}
+.varda-history-main {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.varda-history-main .varda-history-heading {
+  grid-template-columns: minmax(0, 0.72fr) minmax(420px, 1.28fr);
+  gap: 24px;
+  padding: 8px 0 10px;
+}
+.varda-history-main .varda-history-heading .varda-primary-number {
+  margin-top: 10px;
+  font-size: 38px;
+}
+.varda-history-main .varda-history-controls {
+  padding-block: 8px;
+}
+.varda-history-main .varda-history-canvas {
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 20px;
+  padding: 10px 0 0;
+  border-bottom: 0;
+}
+.varda-history-main .varda-history-chart {
+  height: 240px;
+}
+.varda-workspace-main {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.varda-workspace-commandbar {
+  display: flex;
+  min-height: 48px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-workspace-commandbar > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.varda-workspace-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@keyframes varda-dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes varda-drawer-in {
+  from { opacity: 0; transform: translateX(24px) scale(0.99); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes varda-cell-detail-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes varda-overlay-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes varda-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.varda-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 5px;
+  background: var(--wash);
+}
+.varda-segmented button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.varda-segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: 0 1px 4px #191b2008;
+}
+.varda-palette-line {
+  height: 2px;
+  background: var(--brand);
+  width: 28px;
+}
+.varda-allocation-ring {
+  width: 100%;
+  max-width: 570px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+.varda-allocation-ring circle[role="button"] {
+  cursor: pointer;
+  transition:
+    opacity 150ms,
+    stroke-width 150ms;
+}
+.varda-allocation-ring circle[role="button"]:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 3px var(--brand));
+}
+.varda-allocation-ring text {
+  pointer-events: none;
+}
+.varda-home-chart {
+  height: 350px;
+  min-height: 270px;
+}
+.varda-history-chart {
+  height: 390px;
+}
+.varda-compact-summary {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 30px 0;
+}
+.varda-compact-summary .varda-primary-number {
+  font-size: 38px;
+}
+.varda-history-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(480px, 1.1fr);
+  align-items: end;
+  gap: 40px;
+  padding: 34px 0 28px;
+}
+.varda-history-heading .varda-primary-number {
+  font-size: 62px;
+}
+.varda-history-canvas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 270px;
+  gap: 40px;
+  padding: 24px 0 32px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-page :where(details) {
+  scroll-margin-top: 20px;
+}
+.varda-page nav[data-scope-rail] {
+  scrollbar-width: none;
+}
+.varda-page :where(summary) {
+  min-height: 48px;
+  align-content: center;
+}
+.varda-page :where([role="tablist"]) {
+  gap: 12px;
+}
+.varda-page :where([role="tab"][aria-selected="true"]) {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+.varda-secondary-page {
+  display: flex;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 28px 20px;
+}
+.varda-secondary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88px;
+  max-width: 1380px;
+  flex: 0 0 auto;
+  margin: 0 auto 18px;
+  border-bottom: 1px solid var(--line);
+}
+.varda-secondary-page > :not(.varda-secondary-header) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.varda-secondary-page section {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  box-shadow: none;
+  padding-top: 24px;
+  padding-bottom: 28px;
+}
+.varda-secondary-page h1 {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.varda-secondary-page h2 {
+  font-weight: 500;
+}
+.varda-secondary-page dl > div {
+  border-radius: 0;
+  background: transparent;
+  border-color: var(--line);
+}
+.varda-secondary-page :where(table) {
+  background: transparent;
+}
+
+@media (max-width: 1100px) {
+  .varda-navigation-inner {
+    gap: 24px;
+    padding: 0 28px;
+  }
+  .varda-main-menu > div {
+    gap: 20px;
+  }
+  .varda-navigation-actions > span {
+    display: none;
+  }
+  .varda-content {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .varda-history-heading {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .varda-history-canvas {
+    grid-template-columns: minmax(0, 1fr) 235px;
+    gap: 24px;
+  }
+  .varda-workspace-grid {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+  .varda-hero-strip {
+    grid-template-columns: minmax(240px, 0.82fr) minmax(0, 1.18fr);
+  }
+  .varda-hero-metric {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 760px) {
+  .varda-value-bridge {
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+  .varda-value-bridge > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 78px;
+    padding: 16px 0;
+    border-left: 0;
+  }
+  .varda-value-bridge > div + div {
+    border-top: 1px solid var(--line);
+  }
+  .varda-value-bridge > div > p + p {
+    margin-top: 0;
+    font-size: 18px;
+  }
+  .varda-value-bridge > div > span {
+    display: none;
+  }
+  .varda-navigation-inner {
+    grid-template-columns: 1fr auto;
+    gap: 0 20px;
+    padding: 0 20px;
+    min-height: 0;
+  }
+  .varda-wordmark {
+    min-height: 60px;
+  }
+  .varda-main-menu {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .varda-main-menu > div {
+    justify-content: flex-start;
+    gap: 24px;
+  }
+  .varda-main-menu a {
+    min-height: 45px;
+    font-size: 12px;
+  }
+  .varda-main-menu a[aria-current="page"]::after {
+    bottom: 0;
+  }
+  .varda-content {
+    padding: 24px 20px 44px;
+  }
+  .varda-presentation-content {
+    padding-top: 16px;
+    padding-bottom: 10px;
+  }
+  .varda-presentation-deck {
+    grid-template-rows: minmax(0, 1fr) 48px;
+  }
+  .varda-presentation-controls {
+    grid-template-columns: 34px minmax(0, 1fr) 34px;
+    gap: 8px;
+  }
+  .varda-presentation-tabs {
+    justify-content: flex-start;
+    gap: 24px;
+    scroll-snap-type: x mandatory;
+  }
+  .varda-presentation-tab {
+    min-height: 46px;
+    scroll-snap-align: center;
+  }
+  .varda-presentation-tab-label {
+    font-size: 11px;
+  }
+  .varda-presentation-tab-index {
+    display: none;
+  }
+  .varda-secondary-page {
+    padding: 0 20px 12px;
+  }
+  .varda-secondary-header {
+    min-height: 64px;
+    margin-bottom: 16px;
+  }
+  .varda-page-title {
+    font-size: 22px;
+  }
+  .varda-summary-stage {
+    padding: 34px 0;
+  }
+  .varda-primary-number {
+    font-size: 42px;
+  }
+  .varda-section {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+  .varda-dialog-header {
+    padding: 18px 20px;
+  }
+  .varda-dialog-content {
+    padding: 22px 20px;
+  }
+  .varda-compact-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 26px 0;
+  }
+  .varda-compact-summary .varda-primary-number {
+    font-size: 32px;
+  }
+  .varda-history-heading {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 28px 0 20px;
+  }
+  .varda-history-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 0;
+  }
+  .varda-history-controls [aria-label="그래프 지표"] button {
+    min-width: 60px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .varda-history-controls [aria-label="조회 기간"] {
+    gap: 12px;
+  }
+  .varda-history-controls [aria-label="조회 기간"] button {
+    font-size: 12px;
+  }
+  .varda-history-heading .varda-primary-number {
+    font-size: 44px;
+  }
+  .varda-history-canvas {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .varda-home-chart {
+    height: 280px;
+  }
+  .varda-history-chart {
+    height: 310px;
+  }
+  .varda-presentation-page {
+    height: 100dvh;
+  }
+  .varda-presentation-content {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 14px;
+    padding-bottom: 18px;
+  }
+  .varda-screen {
+    min-height: max-content;
+    overflow: visible;
+  }
+  .varda-screen-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 12px;
+  }
+  .varda-screen-title-row {
+    align-items: start;
+  }
+  .varda-hero-strip {
+    grid-template-columns: 1fr;
+  }
+  .varda-hero-value {
+    min-height: 108px;
+    padding: 16px 0;
+  }
+  .varda-hero-value strong {
+    font-size: 38px;
+  }
+  .varda-hero-metrics {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .varda-hero-metric {
+    min-height: 74px;
+    padding: 12px 10px;
+  }
+  .varda-hero-metric:first-child {
+    padding-left: 0;
+  }
+  .varda-hero-metric dd {
+    font-size: 15px;
+  }
+  .varda-workspace-grid {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .varda-main-visual {
+    overflow: visible;
+    padding: 16px 0 22px;
+  }
+  .varda-context-rail {
+    overflow: visible;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .varda-rail-section {
+    padding: 18px 0;
+  }
+  .varda-screen-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: 4px;
+  }
+  .varda-inline-actions {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .varda-inline-actions > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .varda-inline-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .varda-heatmap-popover {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    margin-top: 14px;
+  }
+  .varda-detail-drawer-backdrop {
+    inset: 105px 0 0;
+  }
+  .varda-detail-drawer {
+    top: 116px;
+    right: 10px;
+    bottom: 10px;
+    width: calc(100vw - 20px);
+  }
+  .varda-history-main {
+    overflow: visible;
+  }
+  .varda-history-main .varda-history-heading {
+    grid-template-columns: 1fr;
+  }
+  .varda-history-main .varda-history-canvas {
+    grid-template-columns: 1fr;
+  }
+  .varda-history-main .varda-history-chart {
+    height: 280px;
+  }
+  .varda-workspace-commandbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 8px;
+  }
+  .varda-workspace-commandbar > div:last-child {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .varda-workspace-commandbar > div:last-child > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .varda-workspace-commandbar > div:last-child::-webkit-scrollbar {
+    display: none;
+  }
+  .varda-workspace-shell {
+    flex: none;
+    overflow: visible;
+  }
+  .varda-workspace-main {
+    height: auto;
+    overflow: visible;
+  }
+  .varda-workspace-canvas {
+    overflow: visible;
+  }
+}
+
+@media (max-height: 560px) {
+  .varda-presentation-content,
+  .varda-presentation-scene-inner,
+  .varda-workspace-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

@@ -1,4 +1,5 @@
 import "server-only";
+import { loadNativeLegacyTrades } from "./native-legacy-trades";
 
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import { HISTORY_EVENT_QUERY_LIMIT } from "@/lib/history-event-timeline";
@@ -36,7 +37,11 @@ export async function getReadOnlyTenantEvents({
         ]),
       ],
     );
-    const rows = sqlRows.map(projectTenantEventSqlRow);
+    const nativeRows = await loadNativeLegacyTrades(tenantContext);
+    const rows = [...sqlRows.map(projectTenantEventSqlRow), ...nativeRows.filter(row => row.account !== null && isNamedPortfolioAccount(row.account) && (scope === "all" || row.account === scope)).map(row => projectTenantEventSqlRow({
+      ...row, internalId: row.id, eventAccountId: row.accountId, ownedAccountId: row.accountId, accountCode: row.account,
+      recordedAt: row.recordedAt?.toISOString() ?? null,
+    }))];
 
     return projectTenantEventLedgerRows(rows, scope);
   } catch {
@@ -70,14 +75,25 @@ const TENANT_EVENT_ROWS_SQL = `
     event.amount_krw::text as "amountKrw",
     event.quantity_delta::text as "quantityDelta",
     event.price::text as price,
-    event.fx_rate::text as "fxRate"
+    event.fx_rate::text as "fxRate",
+    event.broker_recovery_data as "brokerRecoveryData"
   from public.event_ledger_entries as event
   inner join public.accounts as account on event.account_id = account.id
   where account.is_active = true
     and account.code = any($2::text[])
     and event.account = account.code
     and event.is_sample = false
+    and event.native_data is null
     and ($1::text is null or account.code = $1::text)
+    and (
+      event.source is distinct from 'broker_recovery_v1'
+      or exists (
+        select 1 from public.assets as asset
+        where asset.id = event.asset_id
+          and asset.account_id = account.id
+          and asset.account = account.code
+      )
+    )
   order by
     event.event_date desc,
     event.recorded_at desc nulls last,
@@ -112,7 +128,7 @@ function projectTenantEventSqlRow(
     ruleVersion: nullableString(row.ruleVersion),
     account: nullableString(row.account),
     assetId: nullableString(row.assetId),
-    legacyAssetId: requiredString(row.legacyAssetId),
+    legacyAssetId: nullableString(row.legacyAssetId),
     ticker: nullableString(row.ticker),
     assetName: requiredString(row.assetName),
     groupName: nullableString(row.groupName),
@@ -122,6 +138,7 @@ function projectTenantEventSqlRow(
     quantityDelta: nullableString(row.quantityDelta),
     price: nullableString(row.price),
     fxRate: nullableString(row.fxRate),
+    brokerRecoveryData: row.brokerRecoveryData,
   });
 }
 

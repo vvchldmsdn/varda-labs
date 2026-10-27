@@ -29,6 +29,14 @@ export type ManualKrxGoldPriceActionState = Readonly<{
   message: string | null;
 }>;
 
+type KrxGoldManualInstrumentCandidate = Readonly<{
+  name?: string | null;
+  ticker?: string | null;
+  assetType?: string | null;
+  market?: string | null;
+  currency?: string | null;
+}>;
+
 export function parseManualAssetPriceInput(
   input: unknown,
 ): ManualAssetPriceInputResult {
@@ -59,6 +67,14 @@ export function isKrxGoldManualAssetCandidate(input: {
 }) {
   return (
     input.accountCode === KRX_GOLD_MANUAL_ASSET_BINDING.account &&
+    isKrxGoldManualInstrumentCandidate(input)
+  );
+}
+
+export function isKrxGoldManualInstrumentCandidate(
+  input: KrxGoldManualInstrumentCandidate,
+) {
+  return (
     input.name === KRX_GOLD_MANUAL_ASSET_BINDING.name &&
     input.ticker === KRX_GOLD_MANUAL_ASSET_BINDING.ticker &&
     input.assetType === KRX_GOLD_MANUAL_ASSET_BINDING.assetType &&

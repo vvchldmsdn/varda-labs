@@ -235,6 +235,7 @@ function toPublicEvent(event: InternalTenantEvent): TenantEventLedgerDto {
     quantityDelta: event.quantityDelta,
     price: event.price,
     fxRate: event.fxRate,
+    ...(event.brokerEvidence ? { brokerEvidence: event.brokerEvidence } : {}),
   });
 }
 

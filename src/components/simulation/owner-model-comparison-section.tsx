@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerModelComparisonResult } from "@/lib/simulation-owner-model-comparison";
 
 import {
@@ -19,7 +20,7 @@ export function OwnerModelComparisonSection({
   return (
     <section
       aria-labelledby="owner-model-comparison-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-model-comparison
       data-owner-model-comparison-account={result.account}
       data-owner-model-comparison-combination="forbidden"
@@ -27,21 +28,15 @@ export function OwnerModelComparisonSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
-            같은 보유 비중 · 다른 확률 가정
-          </p>
+          <p className="text-xs font-semibold text-[var(--muted)]">
+            <SimulationText ko={"같은 보유 비중 · 다른 확률 가정"} />{" "}</p>
           <h2 className="mt-1 text-lg font-semibold" id="owner-model-comparison-title">
-            두 확률모형 비교
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            과거 수익률 구간을 다시 뽑는 모형과 환율·금리 관계를 추정하는
-            모형을 같은 계정·기준일·기간에서 나란히 봅니다. 어느 한쪽을
-            정답으로 고르거나 두 확률을 평균내지 않습니다.
-          </p>
+            <SimulationText ko={"두 확률모형 비교"} />{" "}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+            <SimulationText ko={"과거 수익률 구간을 다시 뽑는 모형과 환율·금리 관계를 추정하는 모형을 같은 계정·기준일·기간에서 나란히 봅니다. 어느 한쪽을 정답으로 고르거나 두 확률을 평균내지 않습니다."} />{" "}</p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
-          조회 시 계산 · 저장 안 함
-        </span>
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
+          <SimulationText ko={"조회 시 계산 · 저장 안 함"} />{" "}</span>
       </div>
 
       {result.status === "ready" ? (
@@ -105,22 +100,19 @@ function ReadyModelComparison({ result }: { result: ReadyComparison }) {
         />
       </dl>
 
-      <div className="mt-4 rounded-md border border-[#d7ddcf] bg-[#f6f8f2] px-4 py-3">
-        <p className="font-semibold">{agreementTitle(result.agreement.code)}</p>
-        <p className="mt-1 text-sm leading-6 text-[#596158]">
-          {agreementDetail(result.agreement.code)} 예상 범위 겹침은 확률의
-          정확도를 뜻하지 않고, 서로 다른 가정에서 나온 분포가 얼마나
-          비슷한 영역을 가리키는지만 보여줍니다.
-        </p>
+      <div className="mt-4 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+        <p className="font-semibold"><SimulationText ko={agreementTitle(result.agreement.code)} /></p>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+          <SimulationText ko={agreementDetail(result.agreement.code)} /> {" "}<SimulationText ko={"예상 범위 겹침은 확률의 정확도를 뜻하지 않고, 서로 다른 가정에서 나온 분포가 얼마나 비슷한 영역을 가리키는지만 보여줍니다."} />{" "}</p>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         {models.map((model) => (
           <article
-            className="overflow-hidden rounded-md border border-[#d7ddcf] bg-[#fbfcf7]"
+            className="overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]"
             key={model.id}
           >
-            <h3 className="border-b border-[#e1e5da] px-4 py-3 font-semibold">
+            <h3 className="border-b border-[var(--line)] px-4 py-3 font-semibold">
               {model.name}
             </h3>
             <SimulationTerminalRiskMetrics compact terminal={model.terminal} />
@@ -129,13 +121,9 @@ function ReadyModelComparison({ result }: { result: ReadyComparison }) {
         ))}
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
-        재표본모형은 저장된 공동 수익률 {result.pairing.bootstrapObservationCount}개를
-        사용하고, 요인모형은 그중 환율·금리 자료가 맞물린 {" "}
-        {result.pairing.factorAlignedObservationCount}개만 사용했습니다. 두 결과의
-        차이는 오류가 아니라 표본과 가정에 대한 민감도일 수 있습니다. 정확한
-        경제지표 공개 시각·개정 이력이 없으므로 요인모형은 회고적 연구입니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+        <SimulationText ko={"재표본모형은 저장된 공동 수익률"} />{" "}{result.pairing.bootstrapObservationCount}<SimulationText ko={"개를 사용하고, 요인모형은 그중 환율·금리 자료가 맞물린"} />{" "}{" "}
+        {result.pairing.factorAlignedObservationCount}<SimulationText ko={"개만 사용했습니다. 두 결과의 차이는 오류가 아니라 표본과 가정에 대한 민감도일 수 있습니다. 정확한 경제지표 공개 시각·개정 이력이 없으므로 요인모형은 회고적 연구입니다."} />{" "}</p>
     </div>
   );
 }
@@ -147,14 +135,12 @@ function UnavailableComparison({
 }) {
   return (
     <div
-      className="mt-4 rounded-md border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+      className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
       data-owner-model-comparison-unavailable-reason={result.reason}
     >
-      <p className="font-semibold">두 모형의 직접 비교만 보류했습니다.</p>
-      <p className="mt-1 text-sm leading-6 text-[#6b6044]">
-        {unavailableReasonLabel(result.reason)} 준비된 개별 모형 결과와 입력
-        진단은 위 영역에서 계속 확인할 수 있습니다.
-      </p>
+      <p className="font-semibold"><SimulationText ko={"두 모형의 직접 비교만 보류했습니다."} /></p>
+      <p className="mt-1 text-sm leading-6 text-[var(--warning)]">
+        <SimulationText ko={unavailableReasonLabel(result.reason)} /> {" "}<SimulationText ko={"준비된 개별 모형 결과와 입력 진단은 위 영역에서 계속 확인할 수 있습니다."} />{" "}</p>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">
         <Status label="과거 구간 재표본" status={result.modelStatuses.bootstrap.status} />
         <Status label="환율·금리 요인" status={result.modelStatuses.factor.status} />
@@ -165,19 +151,19 @@ function UnavailableComparison({
 
 function Metric({ detail, label, value }: { detail: string; label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs leading-5 text-[#7a8175]">{detail}</dd>
+    <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
+      <dd className="mt-1 text-xs leading-5 text-[var(--muted)]"><SimulationText ko={detail} /></dd>
     </div>
   );
 }
 
 function Status({ label, status }: { label: string; status: "ready" | "unavailable" }) {
   return (
-    <div className="rounded-md border border-[#e6d8ae] bg-white px-3 py-3">
-      <dt className="text-xs text-[#7a6d4f]">{label}</dt>
-      <dd className="mt-1 font-semibold">{status === "ready" ? "계산 완료" : "준비 안 됨"}</dd>
+    <div className="rounded-md border border-[var(--warning-soft)] bg-white px-3 py-3">
+      <dt className="text-xs text-[var(--warning)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 font-semibold"><SimulationText ko={status === "ready" ? "계산 완료" : "준비 안 됨"} /></dd>
     </div>
   );
 }

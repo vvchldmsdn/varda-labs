@@ -15,7 +15,7 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
   const options = parseArgs(process.argv.slice(2));
-  const [{ and, asc, eq, gt, inArray, isNotNull }, client, schema] =
+  const [{ and, asc, eq, gt, inArray, isNotNull, isNull }, client, schema] =
     await Promise.all([
       import("drizzle-orm"),
       import("../src/db/client.ts"),
@@ -37,8 +37,9 @@ async function main() {
       and(
         eq(assets.accountId, accounts.id),
         eq(accounts.isActive, true),
-        inArray(accounts.code, ["brokerage", "isa", "irp"]),
         isNotNull(accounts.canonicalOwnerUserId),
+        eq(assets.canonicalOwnerUserId, accounts.canonicalOwnerUserId),
+        eq(assets.account, accounts.code),
       ),
     )
     .innerJoin(
@@ -49,7 +50,7 @@ async function main() {
         inArray(appUsers.role, ["user", "admin"]),
       ),
     )
-    .where(gt(assets.quantity, "0"))
+    .where(and(gt(assets.quantity, "0"), isNull(assets.archivedAt)))
     .orderBy(asc(accounts.code), asc(assets.market), asc(assets.ticker));
 
   const plan = planSimulationHistoryCompletion({

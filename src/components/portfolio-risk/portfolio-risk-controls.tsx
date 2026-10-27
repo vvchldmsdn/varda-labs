@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import Link from "next/link";
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -7,6 +8,7 @@ import type {
   PortfolioRiskWindow,
 } from "@/lib/portfolio-risk-read-model-types";
 import { buildPortfolioRiskHref } from "@/lib/portfolio-risk-route";
+import styles from "./risk-workspace.module.css";
 
 const WINDOWS: PortfolioRiskWindow[] = [30, 90, 252];
 
@@ -14,18 +16,21 @@ export function PortfolioRiskControls({
   scopes,
   selectedScope,
   selection,
+  isDesignPreview = false,
 }: {
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
   selection: PortfolioRiskSelection;
+  isDesignPreview?: boolean;
 }) {
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-2">
       <div>
-        <p className="mb-1 text-xs font-semibold text-[#687064]">분석 범위</p>
+        <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={"분석 범위"} /></p>
         <PortfolioAnalysisScopeTabs
           basePath="/portfolio/risk"
           query={{
+            ...(isDesignPreview ? { preview: "design" } : {}),
             window:
               selection.window === 90 ? null : String(selection.window),
           }}
@@ -34,13 +39,13 @@ export function PortfolioRiskControls({
         />
       </div>
       <RiskOptionGroup label="기간">
-        {WINDOWS.map((window) => (
+        {(isDesignPreview ? [selection.window] : WINDOWS).map((window) => (
           <RiskOptionLink
             key={window}
-            href={buildPortfolioRiskHref(selectedScope.key, window)}
+            href={`${buildPortfolioRiskHref(selectedScope.key, window)}${isDesignPreview ? "&preview=design" : ""}`}
             active={selection.window === window}
           >
-            {window}일
+            {window}<PortfolioText ko={"일"} />{isDesignPreview ? <> <PortfolioText ko="예시" /></> : null}
           </RiskOptionLink>
         ))}
       </RiskOptionGroup>
@@ -57,8 +62,8 @@ function RiskOptionGroup({
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-semibold text-[#687064]">{label}</p>
-      <div className="flex min-h-10 flex-wrap gap-1 rounded-md border border-[#d8ddcf] bg-white p-1">
+      <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
+      <div className={`cairn-tabs ${styles.periodOptions}`}>
         {children}
       </div>
     </div>
@@ -78,11 +83,7 @@ function RiskOptionLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`min-w-16 rounded px-3 py-2 text-center text-sm font-semibold ${
-        active
-          ? "bg-[#1e3a34] text-white"
-          : "text-[#526057] hover:bg-[#edf1e8]"
-      }`}
+      className={styles.periodOption}
     >
       {children}
     </Link>

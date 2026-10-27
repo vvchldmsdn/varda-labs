@@ -436,6 +436,8 @@ function issueLabel(code: string) {
     invalid_price_identity: "가격 행의 종목 식별 정보가 일치하지 않습니다.",
     invalid_return_value: "수익률 계산 결과가 유효하지 않습니다.",
     missing_price: "일부 기준일의 가격 증거가 없습니다.",
+    missing_trading_day_price: "거래일의 종가 근거가 누락되었습니다.",
+    market_calendar_unavailable: "이 기간의 거래일 달력이 확인되지 않았습니다.",
     stale_price: "일부 가격 증거가 허용 기간보다 오래되었습니다.",
     missing_fx: "일부 기준일의 환율 증거가 없습니다.",
     stale_fx: "일부 환율 증거가 허용 기간보다 오래되었습니다.",

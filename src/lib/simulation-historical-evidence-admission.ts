@@ -190,7 +190,7 @@ export function admitSimulationHistoricalEvidence(input: {
         ]),
       ),
     );
-    if (missingReasons.has("missing_price") || missingReasons.has("stale_price")) {
+    if (missingReasons.has("missing_price") || missingReasons.has("stale_price") || missingReasons.has("missing_trading_day_price") || missingReasons.has("market_calendar_unavailable")) {
       issues.add("price_history_incomplete");
     }
     if (missingReasons.has("missing_fx") || missingReasons.has("stale_fx")) {

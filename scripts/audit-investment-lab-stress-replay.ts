@@ -1,22 +1,29 @@
 import { config } from "dotenv";
 
+import { guardProductionDatabaseTarget } from "../src/lib/deployment/production-database-target.ts";
+import {
+  buildAuditTenantContext,
+  parseAuditOwnerUserId,
+} from "./lib/audit-tenant-selector.ts";
+
 async function main() {
   config({ path: ".env.local", quiet: true });
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
+  const ownerUserId = parseAuditOwnerUserId(process.argv.slice(2));
+  guardProductionDatabaseTarget(process.env);
 
-  const [ownerModule, structureModule, stressModule] = await Promise.all([
-    import("../src/db/queries/active-portfolio-owners.ts"),
+  const [{ eq }, client, schema, structureModule, stressModule] = await Promise.all([
+    import("drizzle-orm"),
+    import("../src/db/client.ts"),
+    import("../src/db/schema.ts"),
     import("../src/db/queries/portfolio-structure.ts"),
     import("../src/db/queries/investment-lab-stress-replay.ts"),
   ]);
-  const ownerUserIds = await ownerModule.getActivePortfolioOwnerUserIds();
-  if (ownerUserIds.length !== 1) {
-    throw new Error("Stress replay audit requires exactly one active portfolio owner");
-  }
-  const tenantContext = Object.freeze({
-    ownerUserId: ownerUserIds[0],
-    role: "user" as const,
-  });
+  const userRows = await client.db
+    .select({ role: schema.appUsers.role, status: schema.appUsers.status })
+    .from(schema.appUsers)
+    .where(eq(schema.appUsers.id, ownerUserId))
+    .limit(2);
+  const tenantContext = buildAuditTenantContext(ownerUserId, userRows);
 
   const scopes = ["all", "brokerage", "isa", "irp"] as const;
   const summaries = [];
@@ -29,7 +36,6 @@ async function main() {
     const model = await stressModule.getReadOnlyTenantInvestmentLabStressReplay({
       account,
       portfolioStructurePromise,
-      tenantContext,
     });
     summaries.push({
       account,
@@ -58,7 +64,7 @@ async function main() {
         databaseMode: "select_only",
         providerCalls: 0,
         databaseWrites: 0,
-        activeOwnerCount: ownerUserIds.length,
+        tenantSelection: "explicit_active_owner",
         scopes: summaries,
       },
       null,

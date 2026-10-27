@@ -1,0 +1,1 @@
+ALTER TABLE "holding_state_corrections" ALTER COLUMN "corrected_average_cost" DROP NOT NULL;

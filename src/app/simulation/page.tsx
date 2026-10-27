@@ -1,76 +1,68 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { registerTenantSimulationPath } from "@/lib/server/simulation-path-details";
+import type { TenantContext } from "@/lib/session-resolver-contract";
+import { bootstrapPathSnapshot, economicPathSnapshot } from "@/lib/simulation-path-snapshot";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
+import { admitNativeKrwEconomic } from "@/lib/native-economic-admission";
+import { getOwnedCurrencyResearchInput } from "@/db/queries/currency-research";
+import { SimulationText } from "@/components/simulation/simulation-text";
 import { Suspense } from "react";
-
-import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
-import { DownsideOutcomeValidationSection } from "@/components/simulation/downside-outcome-validation-section";
-import { FanBandValidationSection } from "@/components/simulation/fan-band-validation-section";
-import { OwnerInputPreflightSection } from "@/components/simulation/owner-input-preflight-section";
-import { OwnerModelCalibrationSection } from "@/components/simulation/owner-model-calibration-section";
-import { OwnerModelComparisonSection } from "@/components/simulation/owner-model-comparison-section";
-import { OwnerParametricFactorSection } from "@/components/simulation/owner-parametric-factor-section";
-import { OwnerHistoricalOutcomeValidationSection } from "@/components/simulation/owner-historical-outcome-validation-section";
-import { OwnerCandidateComparisonSection } from "@/components/simulation/owner-candidate-comparison-section";
-import { OwnerWalkForwardValidationSection } from "@/components/simulation/owner-walk-forward-validation-section";
-import { OwnerResearchExecutionSection } from "@/components/simulation/owner-research-execution-section";
-import { RegimeBootstrapResearchSection } from "@/components/simulation/regime-bootstrap-research-section";
-import { RegimeHistoricalOutcomeValidationSection } from "@/components/simulation/regime-historical-outcome-validation-section";
-import { RegimeReadinessHistoryPanel } from "@/components/simulation/regime-readiness-history-panel";
-import { ResearchUniversePreflightSection } from "@/components/simulation/research-universe-preflight-section";
+import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { SimulationInputReadinessView } from "@/components/simulation/simulation-input-readiness-view";
+import { OwnerResearchExecutionSection } from "@/components/simulation/owner-research-execution-section";
 import { SimulationSectionErrorBoundary } from "@/components/simulation/simulation-section-error-boundary";
-import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
-import { getReadOnlySimulationHistoricalOutcomeValidation } from "@/db/queries/simulation-historical-outcome-validation";
-import { getReadOnlySimulationInputReadiness } from "@/db/queries/simulation-input-readiness";
-import { getReadOnlyTenantSimulationOwnerParametricFactorResearch } from "@/db/queries/simulation-owner-parametric-factor";
-import { getReadOnlyTenantSimulationOwnerModelCalibration } from "@/db/queries/simulation-owner-model-calibration";
-import { getReadOnlyTenantSimulationOwnerModelComparison } from "@/db/queries/simulation-owner-model-comparison";
-import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulation-owner-research";
-import { getReadOnlySimulationRegimeBootstrap } from "@/db/queries/simulation-regime-bootstrap";
-import { getReadOnlySimulationRegimeHistoricalOutcomeValidation } from "@/db/queries/simulation-regime-historical-outcome-validation";
-import { getReadOnlySimulationResearchUniversePreflight } from "@/db/queries/simulation-research-universe-preflight";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
-import type {
-  PortfolioAnalysisScope,
-  PortfolioAnalysisScopeKey,
-} from "@/lib/portfolio-analysis-scope";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { buildSimulationPageControls } from "@/lib/simulation-page-controls";
+import { getReadOnlyTenantSimulationOwnerResearch } from "@/db/queries/simulation-owner-research";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
-
+import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import { resolveSimulationPathModel } from "@/lib/simulation-model-selection";
+import { getReadOnlyTenantSimulationOwnerEconomicResearch, economicResearchPresentation } from "@/db/queries/simulation-owner-economic";
+import { EconomicExecutionSection } from "@/components/simulation/economic-execution-section";
+import { SimulationLoading } from "@/components/simulation/simulation-loading";
 export const dynamic = "force-dynamic";
-
+export async function generateMetadata() {
+  return localizedMetadata({ title: "시뮬레이션 | CAIRN LABS" }, "Simulation | CAIRN LABS");
+}
 type SimulationPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     end?: string | string[];
     horizon?: string | string[];
+    model?: string | string[];
     kodexWeight?: string | string[];
     researchUniverse?: string | string[];
+    view?: string | string[];
+    preview?: string | string[];
+    previewState?: string | string[];
   }>;
 };
-
-type SimulationPreservedQuery = Readonly<{
-  scope: PortfolioAnalysisScopeKey;
-  end: string | null;
-  horizon: string | null;
-  kodexWeight: string | null;
-  researchUniverse: string | null;
-}>;
 
 export default async function SimulationPage({
   searchParams,
 }: SimulationPageProps) {
-  const [params, resolution] = await Promise.all([
-    searchParams,
-    resolveCurrentTenantContext(),
-  ]);
+  const previewParams = process.env.NODE_ENV === "development" ? await searchParams : null;
+  if (process.env.NODE_ENV === "development" && previewParams?.preview === "design") {
+    const { SimulationDesignPreview } = await import("@/components/simulation/simulation-design-preview");
+    return <SimulationDesignPreview query={previewParams} />;
+  }
+  const [params, resolution] = await Promise.all([searchParams, resolveCurrentTenantContext()]);
 
   if (!resolution.ok) {
     return (
       <PortfolioReadAccessBoundary
-        closedMessage="Simulation research remains closed until the session and user link are available."
-        description="This view reads shared market research only after the signed-in user is resolved on the server."
+        closedMessage="로그인과 사용자 연결이 확인된 뒤에 시뮬레이션을 읽습니다."
+        closedMessageEn="Simulation research remains closed until the session and user link are available."
+        description="서버에서 로그인한 사용자를 확인한 뒤에 시장 연구 데이터를 읽습니다."
+        descriptionEn="This view reads shared market research only after the signed-in user is resolved on the server."
         resolution={resolution}
-        title="Simulation validation"
+        title="시뮬레이션 검증" titleEn="Simulation validation"
       />
     );
   }
@@ -88,240 +80,52 @@ export default async function SimulationPage({
       <PortfolioAnalysisScopeBoundary
         basePath="/simulation"
         context={scopeContext}
-        title="Simulation validation"
+        title="시뮬레이션 검증" titleEn="Simulation validation"
       />
     );
   }
 
   const selectedScope = scopeContext.resolution.scope;
-  const modelPromise = getReadOnlySimulationInputReadiness({
+  const now = new Date();
+  const pathModel = resolveSimulationPathModel(params.model);
+  const model = buildSimulationPageControls({ endServiceDate: params.end, horizon: params.horizon, kodexWeight: params.kodexWeight, now });
+  let admittedNativeResearch: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch> | undefined;
+  if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    // The economic model is calibrated to KRW returns. Never relabel it or
+    // silently substitute a historical model when the user selected economic.
+    const historical = pathModel === "bootstrap";
+    const invalidReason = pathModel === null ? "invalid_model" : model.researchHorizonSelection.status !== "valid" ? "invalid_horizon" : model.endServiceDateSelection.status !== "valid" || (typeof params.end === "string" && params.end > resolveSnapshotCycle(now).snapshotDate) ? "invalid_end_date" : undefined;
+    if (invalidReason) return <CurrencyPortfolioSurface surface="simulation" reporting={reporting} economicUnsupported={!historical} researchUnavailableReason={invalidReason} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+    if (historical || reporting === "USD" || pathModel !== "economic") {
+      const research = historical ? await getOwnedCurrencyResearchInput(resolution.tenantContext, selectedScope, reporting, { horizon: model.researchHorizonSelection.horizon!, ...(typeof params.end === "string" ? { endServiceDate: params.end } : {}) }) : null;
+      return <CurrencyPortfolioSurface surface="simulation" reporting={reporting} research={research} economicUnsupported={!historical} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+    }
+    const candidate = getReadOnlyTenantSimulationOwnerResearch({ includeDisplayPaths: false, endServiceDate: params.end, horizon: params.horizon, scope: selectedScope, serviceDate: resolveSnapshotCycle(now).snapshotDate, tenantContext: resolution.tenantContext });
+    const [native, research] = await Promise.all([getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, "KRW"), candidate]);
+    const admission = admitNativeKrwEconomic(native, research);
+    if (!admission.ready) return <CurrencyPortfolioSurface surface="simulation" reporting="KRW" economicUnsupported researchUnavailableReason={admission.reason} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} />;
+    admittedNativeResearch = candidate;
+  }
+  const ownerResearchPromise = admittedNativeResearch ?? getReadOnlyTenantSimulationOwnerResearch({
+    includeDisplayPaths: pathModel === "bootstrap",
     endServiceDate: params.end,
     horizon: params.horizon,
-    kodexWeight: params.kodexWeight,
+    scope: selectedScope,
+    serviceDate: resolveSnapshotCycle(now).snapshotDate,
+    tenantContext: resolution.tenantContext,
   });
-  const ownerResearchPromise =
-    getReadOnlyTenantSimulationOwnerResearch({
-      endServiceDate: params.end,
-      horizon: params.horizon,
-      scope: selectedScope,
-      serviceDate: resolveSnapshotCycle(new Date()).snapshotDate,
-      tenantContext: resolution.tenantContext,
-    });
-  const ownerParametricFactorPromise =
-    getReadOnlyTenantSimulationOwnerParametricFactorResearch({
-      ownerResearchPromise,
-    });
-  const ownerModelComparisonPromise =
-    getReadOnlyTenantSimulationOwnerModelComparison({
-      ownerResearchPromise,
-      parametricFactorPromise: ownerParametricFactorPromise,
-    });
-  const ownerModelCalibrationPromise =
-    getReadOnlyTenantSimulationOwnerModelCalibration({
-      ownerResearchPromise,
-    });
-  const historicalOutcomeValidationPromise =
-    getReadOnlySimulationHistoricalOutcomeValidation({
-      endServiceDate: params.end,
-      horizon: params.horizon,
-    });
-  const regimePromise = getReadOnlySimulationRegimeBootstrap({
-    endServiceDate: params.end,
-    kodexWeight: params.kodexWeight,
-  });
-  const regimeHistoricalOutcomeValidationPromise =
-    getReadOnlySimulationRegimeHistoricalOutcomeValidation({
-      endServiceDate: params.end,
-    });
-  const researchUniversePreflightPromise =
-    getReadOnlySimulationResearchUniversePreflight({
-      endServiceDate: params.end,
-      researchUniverse: params.researchUniverse,
-    });
-  const preservedQuery = Object.freeze({
-    scope: selectedScope.key,
-    end: singleQueryValue(params.end),
-    horizon: singleQueryValue(params.horizon),
-    kodexWeight: singleQueryValue(params.kodexWeight),
-    researchUniverse: singleQueryValue(params.researchUniverse),
-  });
-
-  return (
-    <Suspense fallback={<SimulationSkeleton />}>
-      <SimulationContent
-        historicalOutcomeValidationPromise={
-          historicalOutcomeValidationPromise
-        }
-        modelPromise={modelPromise}
-        ownerResearchPromise={ownerResearchPromise}
-        ownerParametricFactorPromise={ownerParametricFactorPromise}
-        ownerModelCalibrationPromise={ownerModelCalibrationPromise}
-        ownerModelComparisonPromise={ownerModelComparisonPromise}
-        regimePromise={regimePromise}
-        regimeHistoricalOutcomeValidationPromise={
-          regimeHistoricalOutcomeValidationPromise
-        }
-        researchUniversePreflightPromise={
-          researchUniversePreflightPromise
-        }
-        preservedQuery={preservedQuery}
-        scopeCatalog={scopeContext.catalog.scopes}
-        selectedScope={selectedScope}
-      />
-    </Suspense>
-  );
-}
-
-async function SimulationContent({
-  historicalOutcomeValidationPromise,
-  modelPromise,
-  ownerResearchPromise,
-  ownerParametricFactorPromise,
-  ownerModelCalibrationPromise,
-  ownerModelComparisonPromise,
-  regimePromise,
-  regimeHistoricalOutcomeValidationPromise,
-  researchUniversePreflightPromise,
-  preservedQuery,
-  scopeCatalog,
-  selectedScope,
-}: {
-  historicalOutcomeValidationPromise: ReturnType<
-    typeof getReadOnlySimulationHistoricalOutcomeValidation
-  >;
-  modelPromise: ReturnType<typeof getReadOnlySimulationInputReadiness>;
-  ownerResearchPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerResearch
-  >;
-  ownerParametricFactorPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerParametricFactorResearch
-  >;
-  ownerModelCalibrationPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerModelCalibration
-  >;
-  ownerModelComparisonPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerModelComparison
-  >;
-  regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
-  regimeHistoricalOutcomeValidationPromise: ReturnType<
-    typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
-  >;
-  researchUniversePreflightPromise: ReturnType<
-    typeof getReadOnlySimulationResearchUniversePreflight
-  >;
-  preservedQuery: SimulationPreservedQuery;
-  scopeCatalog: readonly PortfolioAnalysisScope[];
-  selectedScope: PortfolioAnalysisScope;
-}) {
-  const model = await modelPromise;
   return (
     <SimulationInputReadinessView
-      historicalOutcomeValidation={
-        <SimulationSectionErrorBoundary
-          section="historical-outcome-validation"
-          title="과거 결과 검증"
-        >
-          <Suspense fallback={<HistoricalOutcomeValidationSkeleton />}>
-            <HistoricalOutcomeValidationContent
-              historicalOutcomeValidationPromise={
-                historicalOutcomeValidationPromise
-              }
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
       model={model}
-      ownerInputPreflight={
-        <SimulationSectionErrorBoundary
-          section="owner-input-preflight"
-          title="내 포트폴리오 입력 점검"
-        >
-          <Suspense fallback={<OwnerInputPreflightSkeleton />}>
-            <OwnerInputPreflightContent
-              preservedQuery={preservedQuery}
-              resultPromise={ownerResearchPromise}
-              scopeCatalog={scopeCatalog}
-              selectedScope={selectedScope}
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
-      ownerParametricFactor={
-        <SimulationSectionErrorBoundary
-          section="owner-parametric-factor"
-          title="환율·금리 요인 확률모형"
-        >
-          <Suspense fallback={<OwnerParametricFactorSkeleton />}>
-            <OwnerParametricFactorContent
-              resultPromise={ownerParametricFactorPromise}
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
-      ownerModelComparison={
-        <SimulationSectionErrorBoundary
-          section="owner-model-comparison"
-          title="두 확률모형 비교"
-        >
-          <Suspense fallback={<OwnerModelComparisonSkeleton />}>
-            <OwnerModelComparisonContent
-              resultPromise={ownerModelComparisonPromise}
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
-      ownerModelCalibration={
-        <SimulationSectionErrorBoundary
-          section="owner-model-calibration"
-          title="과거 결과 모형 점검"
-        >
-          <Suspense fallback={<OwnerModelCalibrationSkeleton />}>
-            <OwnerModelCalibrationContent
-              resultPromise={ownerModelCalibrationPromise}
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
-      researchUniverse={preservedQuery.researchUniverse}
-      selectedScopeKey={preservedQuery.scope}
-      researchUniversePreflight={
-        <SimulationSectionErrorBoundary
-          section="research-universe-preflight"
-          title="연구 종목 데이터 점검"
-        >
-          <Suspense fallback={<ResearchUniversePreflightSkeleton />}>
-            <ResearchUniversePreflightContent
-              preservedQuery={preservedQuery}
-              resultPromise={researchUniversePreflightPromise}
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
-      regimeHistoricalOutcomeValidation={
-        <SimulationSectionErrorBoundary
-          section="regime-historical-outcome-validation"
-          title="시장 국면 모델 과거 결과 대조"
-        >
-          <Suspense
-            fallback={
-              <RegimeHistoricalOutcomeValidationSkeleton />
-            }
-          >
-            <RegimeHistoricalOutcomeValidationContent
-              resultPromise={
-                regimeHistoricalOutcomeValidationPromise
-              }
-            />
-          </Suspense>
-        </SimulationSectionErrorBoundary>
-      }
-      regimeBootstrap={
-        <SimulationSectionErrorBoundary
-          section="regime-bootstrap"
-          title="시장 국면 사후 연구"
-        >
-          <Suspense fallback={<RegimeBootstrapSkeleton />}>
-            <RegimeBootstrapContent regimePromise={regimePromise} />
+      pathModel={pathModel}
+      scopeCatalog={scopeContext.catalog.scopes}
+      selectedScopeKey={selectedScope.key}
+      researchUniverse={typeof params.researchUniverse === "string" ? params.researchUniverse : null}
+      ownerResearchExecution={
+        <SimulationSectionErrorBoundary section="owner-research-execution" title="내 포트폴리오 확률 경로">
+          <Suspense key={`${selectedScope.key}:${pathModel}:${model.requestedEndServiceDate}:${model.researchHorizonSelection.horizon}`} fallback={<SimulationLoading />}>
+            <OwnerResearchExecutionContent tenantContext={resolution.tenantContext} resultPromise={ownerResearchPromise} selectedScopeKey={selectedScope.key} pathModel={pathModel} stateAsOfServiceDate={typeof params.end === "string" && model.endServiceDateSelection.status === "valid" ? params.end : resolveSnapshotCycle(now).snapshotDate} />
           </Suspense>
         </SimulationSectionErrorBoundary>
       }
@@ -329,252 +133,20 @@ async function SimulationContent({
   );
 }
 
-async function OwnerInputPreflightContent({
-  preservedQuery,
-  resultPromise,
-  scopeCatalog,
-  selectedScope,
-}: {
-  preservedQuery: SimulationPreservedQuery;
-  resultPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerResearch
-  >;
-  scopeCatalog: readonly PortfolioAnalysisScope[];
-  selectedScope: PortfolioAnalysisScope;
+async function OwnerResearchExecutionContent({ tenantContext, resultPromise, selectedScopeKey, pathModel, stateAsOfServiceDate }: {
+  tenantContext: TenantContext;
+  pathModel: ReturnType<typeof resolveSimulationPathModel>;
+  stateAsOfServiceDate: string;
+  resultPromise: ReturnType<typeof getReadOnlyTenantSimulationOwnerResearch>;
+  selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   const result = await resultPromise;
-  return (
-    <>
-      <OwnerInputPreflightSection
-        model={result.inputPreflight}
-        preservedQuery={preservedQuery}
-        scopes={scopeCatalog}
-        selectedScope={selectedScope}
-      />
-      <OwnerResearchExecutionSection execution={result.execution} />
-      <OwnerCandidateComparisonSection
-        comparison={result.candidateComparison}
-      />
-      <OwnerWalkForwardValidationSection
-        result={result.walkForwardValidation}
-      />
-      <OwnerHistoricalOutcomeValidationSection
-        result={result.historicalValidation}
-      />
-    </>
-  );
-}
-
-async function OwnerParametricFactorContent({
-  resultPromise,
-}: {
-  resultPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerParametricFactorResearch
-  >;
-}) {
-  const result = await resultPromise;
-  return <OwnerParametricFactorSection result={result} />;
-}
-
-async function OwnerModelComparisonContent({
-  resultPromise,
-}: {
-  resultPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerModelComparison
-  >;
-}) {
-  const result = await resultPromise;
-  return <OwnerModelComparisonSection result={result} />;
-}
-
-async function OwnerModelCalibrationContent({
-  resultPromise,
-}: {
-  resultPromise: ReturnType<
-    typeof getReadOnlyTenantSimulationOwnerModelCalibration
-  >;
-}) {
-  const result = await resultPromise;
-  return <OwnerModelCalibrationSection result={result} />;
-}
-
-async function ResearchUniversePreflightContent({
-  preservedQuery,
-  resultPromise,
-}: {
-  preservedQuery: SimulationPreservedQuery;
-  resultPromise: ReturnType<
-    typeof getReadOnlySimulationResearchUniversePreflight
-  >;
-}) {
-  const model = await resultPromise;
-  return (
-    <ResearchUniversePreflightSection
-      model={model}
-      preservedQuery={preservedQuery}
-    />
-  );
-}
-
-async function HistoricalOutcomeValidationContent({
-  historicalOutcomeValidationPromise,
-}: {
-  historicalOutcomeValidationPromise: ReturnType<
-    typeof getReadOnlySimulationHistoricalOutcomeValidation
-  >;
-}) {
-  const result = await historicalOutcomeValidationPromise;
-  return (
-    <>
-      <FanBandValidationSection result={result} />
-      <DownsideOutcomeValidationSection result={result} />
-    </>
-  );
-}
-
-async function RegimeBootstrapContent({
-  regimePromise,
-}: {
-  regimePromise: ReturnType<typeof getReadOnlySimulationRegimeBootstrap>;
-}) {
-  const model = await regimePromise;
-  return (
-    <>
-      <RegimeReadinessHistoryPanel model={model.readinessHistory} />
-      <RegimeBootstrapResearchSection model={model.research} />
-    </>
-  );
-}
-
-async function RegimeHistoricalOutcomeValidationContent({
-  resultPromise,
-}: {
-  resultPromise: ReturnType<
-    typeof getReadOnlySimulationRegimeHistoricalOutcomeValidation
-  >;
-}) {
-  const result = await resultPromise;
-  return <RegimeHistoricalOutcomeValidationSection result={result} />;
-}
-
-function SimulationSkeleton() {
-  return (
-    <main className="min-h-screen bg-[#f3f4ef] p-4 text-[#171916]">
-      <div className="mx-auto w-full max-w-[1400px] space-y-4">
-        <div className="h-36 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-96 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-          <div className="h-96 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function RegimeBootstrapSkeleton() {
-  return (
-    <section
-      aria-label="시장 국면 조건부 연구 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-regime-bootstrap-loading
-    >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function HistoricalOutcomeValidationSkeleton() {
-  return (
-    <section
-      aria-label="과거 시뮬레이션 결과 검증 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-historical-outcome-validation-loading
-    >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function RegimeHistoricalOutcomeValidationSkeleton() {
-  return (
-    <section
-      aria-label="시장 국면 모델 과거 결과 대조 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-regime-historical-outcome-validation-loading
-    >
-      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function ResearchUniversePreflightSkeleton() {
-  return (
-    <section
-      aria-label="연구 종목 데이터 점검 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-research-universe-preflight-loading
-    >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-28 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function OwnerInputPreflightSkeleton() {
-  return (
-    <section
-      aria-label="내 포트폴리오 입력 점검 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-owner-simulation-preflight-loading
-    >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-40 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function OwnerParametricFactorSkeleton() {
-  return (
-    <section
-      aria-label="환율·금리 요인 확률모형 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-owner-parametric-factor-loading
-    >
-      <div className="h-8 w-64 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function OwnerModelComparisonSkeleton() {
-  return (
-    <section
-      aria-label="두 확률모형 비교 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-owner-model-comparison-loading
-    >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function OwnerModelCalibrationSkeleton() {
-  return (
-    <section
-      aria-label="과거 결과 모형 점검 로딩"
-      className="border-b border-[#d7ddcf] py-5"
-      data-owner-model-calibration-loading
-    >
-      <div className="h-8 w-56 rounded bg-[#e3e6dd]" />
-      <div className="mt-4 h-52 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]" />
-    </section>
-  );
-}
-
-function singleQueryValue(value: string | string[] | undefined) {
-  return typeof value === "string" ? value : null;
+  if (pathModel === null) return <p role="alert"><SimulationText ko="계산 모형을 확인해 주세요. 경제지표 또는 과거 수익률 경로를 선택할 수 있습니다." en="Choose Economic paths or Historical paths to run a model." /></p>;
+  if (pathModel === "economic") {
+    const economic = await getReadOnlyTenantSimulationOwnerEconomicResearch({ ownerResearchPromise: resultPromise, stateAsOfServiceDate, includeDisplayPaths: true });
+    const registration = await registerTenantSimulationPath(tenantContext, economicPathSnapshot(economic, result.execution));
+    return <EconomicExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} result={economicResearchPresentation(economic)} baseline={result.execution} />;
+  }
+  const registration = await registerTenantSimulationPath(tenantContext, bootstrapPathSnapshot(result.execution, result.preparedPaths));
+  return <OwnerResearchExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} execution={result.execution} selectedScopeKey={selectedScopeKey} />;
 }

@@ -1,9 +1,11 @@
 import "server-only";
+import { cache } from "react";
 
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type TenantPortfolioSettingsRow = Readonly<{
+  minExecutionRatioPct: string | null;
   trimDriftThreshold: string | null;
   usdKrwRate: string | null;
   useTrendFilter: boolean;
@@ -12,16 +14,23 @@ export type TenantPortfolioSettingsRow = Readonly<{
 export async function loadLatestTenantPortfolioSettingsRows(
   tenantContext: TenantContext,
 ): Promise<readonly TenantPortfolioSettingsRow[]> {
+  return loadLatestTenantPortfolioSettingsByOwner(tenantContext.ownerUserId);
+}
+
+const loadLatestTenantPortfolioSettingsByOwner = cache(async (
+  ownerUserId: string,
+): Promise<readonly TenantPortfolioSettingsRow[]> => {
   const [rows] = await runTenantReadTransaction(
-    tenantContext.ownerUserId,
+    ownerUserId,
     (transaction) => [transaction.query(LATEST_TENANT_SETTINGS_SQL)],
   );
 
   return Object.freeze(rows.map(projectTenantPortfolioSettingsRow));
-}
+});
 
 const LATEST_TENANT_SETTINGS_SQL = `
   select
+    min_execution_ratio_pct::text as min_execution_ratio_pct,
     trim_drift_threshold::text as trim_drift_threshold,
     usd_krw_rate::text as usd_krw_rate,
     use_trend_filter
@@ -35,6 +44,7 @@ function projectTenantPortfolioSettingsRow(
   row: Readonly<Record<string, unknown>>,
 ): TenantPortfolioSettingsRow {
   return Object.freeze({
+    minExecutionRatioPct: nullableString(row.min_execution_ratio_pct),
     trimDriftThreshold: nullableString(row.trim_drift_threshold),
     usdKrwRate: nullableString(row.usd_krw_rate),
     useTrendFilter: requiredBoolean(row.use_trend_filter),

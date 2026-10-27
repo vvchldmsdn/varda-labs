@@ -5,16 +5,26 @@ import { getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfo
 import { getReadOnlyTenantPortfolioStructure } from "@/db/queries/portfolio-structure";
 import { getReadOnlyTenantApprovedTargetPolicy } from "@/db/queries/target-policy";
 import { getReadOnlyTenantTargetPolicyHoldingUniverse } from "@/db/queries/target-policy-holding-universe";
+import { loadLatestTenantPortfolioSettingsRows } from "@/db/queries/tenant-settings";
+import { readAdditionalContributionModifiers, type ContributionModifierRead } from '@/db/queries/additional-contribution-modifiers';
 import {
   additionalContributionMa120ReadFailure,
   attachAdditionalContributionMa120Evidence,
   buildAdditionalContributionPreview,
   type AdditionalContributionMa120ReadPort,
 } from "@/lib/additional-contribution-preview";
+import type { AdditionalContributionMa120OverlayMode } from "@/lib/additional-contribution-ma120-overlay";
+import { calculateExplainableAdditionalContribution } from "@/lib/additional-contribution-policy-engine";
+import {
+  additionalContributionInstrumentKey as instrumentKey,
+  additionalContributionMaAssetClass,
+  matchLegacyAdditionalContributionTargets,
+  resolveAdditionalContributionPolicyParameters as resolvePolicyParameters,
+} from "@/lib/additional-contribution-policy-input";
+import type { AdditionalContributionMa120EvidenceView } from "@/lib/additional-contribution-view";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import type { TenantContext } from "@/lib/session-resolver-contract";
-import { allocateTargetDeficits } from "@/lib/target-deficit-allocation";
 
 const LEGACY_TARGET_POLICY_ACCOUNTS = new Set(["brokerage", "isa", "irp"]);
 
@@ -22,19 +32,57 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
   account,
   cashAmountKrw,
   tenantContext,
+  ma120Mode,
   now = new Date(),
 }: {
   account: string;
   cashAmountKrw: number;
   tenantContext: TenantContext;
+  ma120Mode?: AdditionalContributionMa120OverlayMode;
   now?: Date;
 }) {
-  const [approvedPolicyRead, currentUniverse, structure] = await Promise.all([
+  const [approvedPolicyRead, currentUniverse, structure, settingsRows] = await Promise.all([
     getReadOnlyTenantApprovedTargetPolicy({ account, tenantContext }),
     getReadOnlyTenantTargetPolicyHoldingUniverse({ account, tenantContext }),
     getReadOnlyTenantPortfolioStructure({ account, tenantContext }),
+    ma120Mode
+      ? Promise.resolve(null)
+      : loadLatestTenantPortfolioSettingsRows(tenantContext),
   ]);
+  const resolvedMa120Mode =
+    ma120Mode ?? resolveMa120Mode(settingsRows?.[0]?.useTrendFilter ?? false);
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
+  return buildLegacyPreviewFromEvidence({
+    account,
+    cashAmountKrw,
+    serviceDate,
+    approvedPolicyRead,
+    currentUniverse,
+    structure,
+    ma120Mode: resolvedMa120Mode,
+    now,
+  });
+}
+
+async function buildLegacyPreviewFromEvidence({
+  account,
+  cashAmountKrw,
+  serviceDate,
+  approvedPolicyRead,
+  currentUniverse,
+  structure,
+  ma120Mode,
+  now,
+}: {
+  account: string;
+  cashAmountKrw: number;
+  serviceDate: string;
+  approvedPolicyRead: Awaited<ReturnType<typeof getReadOnlyTenantApprovedTargetPolicy>>;
+  currentUniverse: Awaited<ReturnType<typeof getReadOnlyTenantTargetPolicyHoldingUniverse>>;
+  structure: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioStructure>>;
+  ma120Mode: AdditionalContributionMa120OverlayMode;
+  now: Date;
+}) {
   const preview = buildAdditionalContributionPreview({
     account,
     cashAmountKrw,
@@ -50,7 +98,7 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
     ma120Read = await getReadOnlyTenantAdditionalContributionMa120Evidence({
       holdings: structure.holdingRows,
       serviceDate,
-      tenantContext,
+      now,
     });
   } catch {
     ma120Read = additionalContributionMa120ReadFailure(
@@ -58,72 +106,106 @@ export async function getReadOnlyTenantAdditionalContributionPreview({
     );
   }
 
-  return attachAdditionalContributionMa120Evidence({ preview, ma120Read });
+  return attachAdditionalContributionMa120Evidence({
+    preview,
+    ma120Read,
+    mode: ma120Mode,
+  });
 }
 
 export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
+  excludedSellKeys,
   cashAmountKrw,
   scope,
   tenantContext,
   now = new Date(),
 }: {
+  excludedSellKeys?: readonly string[];
   cashAmountKrw: number;
   scope: PortfolioAnalysisScope;
   tenantContext: TenantContext;
   now?: Date;
 }) {
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
-  const model = await getReadOnlyTenantPortfolioTargetPolicyModel({
-    scope,
-    serviceDate,
-    tenantContext,
-  });
+  const [model, settingsRows] = await Promise.all([
+    getReadOnlyTenantPortfolioTargetPolicyModel({
+      scope,
+      serviceDate,
+      tenantContext,
+    }),
+    loadLatestTenantPortfolioSettingsRows(tenantContext),
+  ]);
+  const ma120Mode = resolveMa120Mode(
+    settingsRows[0]?.useTrendFilter ?? false,
+  );
+  const policyParameters = resolvePolicyParameters(settingsRows[0]);
+
+  if (model.status !== "ready") {
+    return scopedBlocked(scope, serviceDate, ["valuation_universe_invalid"]);
+  }
+  if (scope.kind === "account" && model.rows.some((row) => row.accountId !== scope.accountId || row.accountCode.toLowerCase() !== scope.accountCode.toLowerCase())) {
+    return scopedBlocked(scope, serviceDate, ["valuation_account_mismatch"]);
+  }
+  if (model.rows.some((row) => row.currentValueKrw === null)) {
+    return scopedBlocked(scope, serviceDate, ["valuation_identity_missing"]);
+  }
+  const modifierRead = await readAdditionalContributionModifiers({ tenantContext, scope, now, rows:model.rows.map(row=>({key:`${row.accountId}:${row.assetId}`,assetId:row.assetId,currentValue:row.currentValueKrw!,market:row.market,currency:row.currency,ticker:row.ticker,name:row.assetName})) });
 
   if (
     model.policyValidation.status === "missing" &&
     scope.kind === "account" &&
     LEGACY_TARGET_POLICY_ACCOUNTS.has(scope.accountCode.toLowerCase())
   ) {
-    const legacyPreview = await getReadOnlyTenantAdditionalContributionPreview({
-      account: scope.accountCode,
-      cashAmountKrw,
+    const account = scope.accountCode.toLowerCase();
+    const approvedPolicyRead = await getReadOnlyTenantApprovedTargetPolicy({
+      account,
       tenantContext,
+    });
+    if (approvedPolicyRead.status !== "available") {
+      return Object.freeze({
+        ...scopedBlocked(scope, serviceDate, [
+          approvedPolicyRead.status === "conflict"
+            ? "target_policy_conflict"
+            : "target_policy_missing",
+        ]),
+        source: "legacy_account_policy" as const,
+      });
+    }
+    // The legacy universe includes all current holdings, including instruments
+    // excluded by the scoped investment model. Keep its independent hash check,
+    // but reuse the valuation already authorized for this exact account UUID.
+    const currentUniverse = await getReadOnlyTenantTargetPolicyHoldingUniverse({
+      account,
+      tenantContext,
+    });
+    const legacyPreview = await buildLegacyPreviewFromEvidence({
+      account,
+      cashAmountKrw,
+      serviceDate,
+      approvedPolicyRead,
+      currentUniverse,
+      structure: {
+        ...model.structure,
+        selectedAccount: account as "brokerage" | "isa" | "irp",
+        holdingRows: [...model.structure.holdingRows],
+      },
+      ma120Mode,
       now,
     });
-    return adaptLegacyPreview({ preview: legacyPreview, scope });
+    return adaptLegacyPreview({
+    excludedSellKeys,
+      model,
+      policyParameters,
+      preview: legacyPreview,
+      modifierRead,
+      scope,
+    });
   }
 
-  if (model.status !== "ready") {
-    return scopedBlocked(scope, serviceDate, ["valuation_universe_invalid"]);
-  }
   if (model.policyValidation.status !== "available") {
     return scopedBlocked(scope, serviceDate, [
       scopedPolicyBlocker(model.policyValidation.status),
     ]);
-  }
-  if (model.rows.some((row) => row.currentValueKrw === null)) {
-    return scopedBlocked(scope, serviceDate, ["valuation_identity_missing"]);
-  }
-
-  const allocation = allocateTargetDeficits({
-    cashAmountKrw,
-    rows: model.rows.map((row) => ({
-      allocationKey: `${row.accountId}:${row.assetId}`,
-      buyable: row.buyability === "buyable",
-      currentValueKrw: row.currentValueKrw!,
-      targetWeightBps: row.targetWeightBps,
-      metadata: Object.freeze({
-        accountCode: row.accountCode,
-        accountName: row.accountName,
-        assetName: row.assetName,
-        market: row.market,
-        currency: row.currency,
-        ticker: row.ticker,
-      }),
-    })),
-  });
-  if (allocation.status !== "ready") {
-    return scopedBlocked(scope, serviceDate, allocation.blockers);
   }
 
   let ma120Read;
@@ -131,83 +213,57 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     ma120Read = await getReadOnlyTenantAdditionalContributionMa120Evidence({
       holdings: model.ma120HoldingRows,
       serviceDate,
-      tenantContext,
+      now,
     });
   } catch {
     ma120Read = additionalContributionMa120ReadFailure(model.rows.length);
   }
-  const ma120ByInstrument = new Map(
-    ma120Read.rows.map((row) => [row.instrumentKey, row] as const),
-  );
+  const result = calculateExplainableAdditionalContribution({
+    excludedSellKeys,
+    cashAmountKrw,
+    minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
+    trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
+    modifiers:modifierRead.modifiers,
+    rows: buildPolicyRows({
+      ma120Read,
+      modelRows: model.rows,
+      useTrendFilter: policyParameters.useTrendFilter,
+      modifierRead,
+    }),
+  });
+  if (result.status !== "ready") {
+    return scopedBlocked(scope, serviceDate, result.blockers);
+  }
 
-  return Object.freeze({
-    status: "ready" as const,
-    source: "portfolio_target_policy" as const,
+  return mapPolicyResult({
+    effectiveServiceDate: model.approvedPolicy.policy!.effectiveServiceDate,
+    ma120Read,
+    mode: ma120Mode,
+    policyLabel: "사용자 목표비중",
+    policyVersion: model.approvedPolicy.policy!.policyVersion,
+    result,
     scopeKey: scope.key,
     serviceDate,
-    policyVersion: model.approvedPolicy.policy!.policyVersion,
-    policyLabel: "사용자 목표비중",
-    effectiveServiceDate:
-      model.approvedPolicy.policy!.effectiveServiceDate,
-    cashAmountKrw: allocation.cashAmountKrw,
-    currentPortfolioTotalKrw: allocation.currentPortfolioTotalKrw,
-    postTopupTotalKrw: allocation.postTopupTotalKrw,
-    totalAllocatedKrw: allocation.totalAllocatedKrw,
-    residualCashKrw: allocation.residualCashKrw,
-    ma120Evidence: Object.freeze({
-      policyVersion: ma120Read.policyVersion,
-      allocationEffect: ma120Read.allocationEffect,
-      status: ma120Read.status,
-      suppliedHoldingCount: ma120Read.suppliedHoldingCount,
-      evaluatedHoldingCount: ma120Read.evaluatedHoldingCount,
-      usableCount: ma120Read.usableCount,
-      unavailableCount: ma120Read.unavailableCount,
-    }),
-    rows: Object.freeze(
-      allocation.rows.map((row) => {
-        const evidence = ma120ByInstrument.get(
-          instrumentKey(row.metadata) ?? "",
-        );
-        return Object.freeze({
-          accountCode: row.metadata.accountCode,
-          accountName: row.metadata.accountName,
-          name: row.metadata.assetName,
-          market: row.metadata.market,
-          currency: row.metadata.currency,
-          ticker: row.metadata.ticker,
-          currentValueKrw: row.currentValueKrw,
-          currentWeightPct:
-            allocation.currentPortfolioTotalKrw > 0
-              ? (row.currentValueKrw /
-                  allocation.currentPortfolioTotalKrw) *
-                100
-              : 0,
-          targetWeightPct: row.targetWeightBps / 100,
-          allocationKrw: row.allocationKrw,
-          postTopupValueKrw: row.currentValueKrw + row.allocationKrw,
-          postTopupWeightPct:
-            allocation.postTopupTotalKrw > 0
-              ? ((row.currentValueKrw + row.allocationKrw) /
-                  allocation.postTopupTotalKrw) *
-                100
-              : 0,
-          allocationStatus: row.allocationStatus,
-          ma120Evidence: compactMa120Evidence(evidence),
-        });
-      }),
-    ),
-    blockers: Object.freeze([] as string[]),
+    source: "portfolio_target_policy",
   });
 }
 
 function adaptLegacyPreview({
+  excludedSellKeys,
+  model,
+  policyParameters,
   preview,
   scope,
+  modifierRead,
 }: {
+  excludedSellKeys?: readonly string[];
+  model: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>;
+  policyParameters: ReturnType<typeof resolvePolicyParameters>;
   preview: Awaited<
     ReturnType<typeof getReadOnlyTenantAdditionalContributionPreview>
   >;
   scope: Extract<PortfolioAnalysisScope, { kind: "account" }>;
+  modifierRead:ContributionModifierRead;
 }) {
   if (preview.status !== "ready") {
     return Object.freeze({
@@ -216,20 +272,239 @@ function adaptLegacyPreview({
       scopeKey: scope.key,
     });
   }
-  return Object.freeze({
-    ...preview,
-    source: "legacy_account_policy" as const,
-    scopeKey: scope.key,
-    policyLabel: "기존 계좌 목표비중",
-    rows: Object.freeze(
-      preview.rows.map((row) =>
-        Object.freeze({
-          ...row,
-          accountCode: scope.accountCode,
-          accountName: scope.label,
+  const match = matchLegacyAdditionalContributionTargets({
+    modelRows: model.rows,
+    legacyRows: preview.rows,
+    accountId: scope.accountId,
+    accountCode: scope.accountCode,
+  });
+  if (match.status !== "ready") return scopedBlocked(scope, preview.serviceDate, match.blockers);
+  const result = calculateExplainableAdditionalContribution({
+    excludedSellKeys,
+    cashAmountKrw: preview.cashAmountKrw,
+    minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
+    trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
+    modifiers:modifierRead.modifiers,
+    rows: model.rows.map((row) => {
+      const target = match.targetsByAsset.get(row.assetId)!;
+      const evidence = target.ma120Evidence;
+      return Object.freeze({
+        allocationKey: `${row.accountId}:${row.assetId}`,
+        ...modifierRead.rows[`${row.accountId}:${row.assetId}`],
+        assetType: row.assetType ?? null,
+        buyable: row.buyability === "buyable",
+        // Legacy foreign average costs have no acquisition-FX evidence. Native
+        // plans use dated cost lots; this path cannot infer a KRW sale profit.
+        costBasisKrw: row.currency === 'KRW' ? row.costBasisKrw ?? null : null,
+        currentValueKrw: row.currentValueKrw ?? Number.NaN,
+        ma120Evidence: Object.freeze({
+          distanceFromMaPct: evidence.distanceFromMaPct,
+          status: evidence.status,
         }),
-      ),
-    ),
+        maAssetClass: additionalContributionMaAssetClass({ ...row, maAssetClass: row.maAssetClass ?? null }),
+        maRuleEnabled: policyParameters.useTrendFilter && (row.maRuleEnabled ?? true),
+        metadata: Object.freeze({
+          accountCode: row.accountCode,
+          accountName: row.accountName,
+          assetName: row.assetName,
+          currency: row.currency,
+          ma120Evidence: evidence,
+          market: row.market,
+          ticker: row.ticker,
+        }),
+        targetWeightBps: Math.round(target.targetWeightPct * 100),
+      });
+    }),
+  });
+  if (result.status !== "ready") {
+    return scopedBlocked(scope, preview.serviceDate, result.blockers);
+  }
+  return mapPolicyResult({
+    effectiveServiceDate: preview.effectiveServiceDate,
+    ma120Read: {
+      status: preview.ma120Evidence.status,
+      usableCount: preview.ma120Evidence.usableCount,
+    },
+    mode: policyParameters.useTrendFilter ? "enabled" : "off",
+    policyLabel: "기존 계좌 목표비중",
+    policyVersion: preview.policyVersion,
+    result,
+    scopeKey: scope.key,
+    serviceDate: preview.serviceDate,
+    source: "legacy_account_policy",
+  });
+}
+
+function buildPolicyRows({
+  ma120Read,
+  modelRows,
+  useTrendFilter,
+  modifierRead,
+}: {
+  ma120Read: AdditionalContributionMa120ReadPort;
+  modelRows: Awaited<
+    ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>
+  >["rows"];
+  useTrendFilter: boolean;
+  modifierRead:ContributionModifierRead;
+}) {
+  const evidenceByKey = new Map(
+    ma120Read.rows.map((row) => [row.instrumentKey, compactMa120Evidence(row)]),
+  );
+  return modelRows.map((row) => {
+    const key = instrumentKey(row);
+    const evidence = (key ? evidenceByKey.get(key) : null) ?? unavailableMa120Evidence();
+    return Object.freeze({
+      allocationKey: `${row.accountId}:${row.assetId}`,
+      ...modifierRead.rows[`${row.accountId}:${row.assetId}`],
+      assetType: row.assetType ?? null,
+      buyable: row.buyability === "buyable",
+      costBasisKrw: row.currency === 'KRW' ? row.costBasisKrw ?? null : null,
+      currentValueKrw: row.currentValueKrw ?? Number.NaN,
+      ma120Evidence: Object.freeze({
+        distanceFromMaPct: evidence.distanceFromMaPct,
+        status: evidence.status,
+      }),
+      maAssetClass: additionalContributionMaAssetClass({ ...row, maAssetClass: row.maAssetClass ?? null }),
+      maRuleEnabled: useTrendFilter && (row.maRuleEnabled ?? true),
+      metadata: Object.freeze({
+        accountCode: row.accountCode,
+        accountName: row.accountName,
+        assetName: row.assetName,
+        currency: row.currency,
+        ma120Evidence: evidence,
+        market: row.market,
+        ticker: row.ticker,
+      }),
+      targetWeightBps: row.targetWeightBps,
+    });
+  });
+}
+
+function mapPolicyResult<T extends Readonly<{
+  accountCode: string;
+  accountName: string;
+  assetName: string;
+  currency: string | null;
+  ma120Evidence: AdditionalContributionMa120EvidenceView;
+  market: string | null;
+  ticker: string | null;
+}>>({
+  effectiveServiceDate,
+  ma120Read,
+  mode,
+  policyLabel,
+  policyVersion,
+  result,
+  scopeKey,
+  serviceDate,
+  source,
+}: {
+  effectiveServiceDate: string | null;
+  ma120Read: Readonly<{ status: "ready" | "partial" | "unavailable" | "read_failed"; usableCount: number }>;
+  mode: AdditionalContributionMa120OverlayMode;
+  policyLabel: string;
+  policyVersion: string | null;
+  result: Extract<ReturnType<typeof calculateExplainableAdditionalContribution<T>>, { status: "ready" }>;
+  scopeKey: string;
+  serviceDate: string;
+  source: "portfolio_target_policy" | "legacy_account_policy";
+}) {
+  const totalReductionKrw = result.rows.reduce(
+    (total, row) => total + Math.max(0, row.strategicAllocationKrw - row.allocationKrw),
+    0,
+  );
+  return Object.freeze({
+    status: "ready" as const,
+    source,
+    scopeKey,
+    serviceDate,
+    policyVersion,
+    policyLabel,
+    effectiveServiceDate,
+    cashAmountKrw: result.cashAmountKrw,
+    currentPortfolioTotalKrw: result.currentPortfolioTotalKrw,
+    postTopupTotalKrw: result.postContributionTotalKrw,
+    totalAllocatedKrw: result.totalAllocatedKrw,
+    residualCashKrw: result.residualCashKrw,
+    totalTrimProceedsKrw: result.totalTrimProceedsKrw,
+    totalAvailableFundsKrw: result.totalAvailableFundsKrw,
+    totalBaseNeedKrw: result.totalBaseNeedKrw,
+    minimumExecutionTargetKrw: result.minimumExecutionTargetKrw,
+    minimumExecutionSatisfied: result.minimumExecutionSatisfied,
+    calculationPolicy: result.policy,
+    modifierEvidence:result.modifierEvidence,
+    minimumExecutionEvidenceAvailable:result.minimumExecutionEvidenceAvailable,
+    calculationParameters: result.parameters,
+    ma120Evidence: Object.freeze({
+      mode,
+      status: mode === "off" ? ("ready" as const) : ma120Read.status,
+      usableCount: mode === "off" ? 0 : ma120Read.usableCount,
+      totalReductionKrw,
+    }),
+    rows: Object.freeze(result.rows.map((row) => Object.freeze({
+      accountCode: row.metadata.accountCode,
+      accountName: row.metadata.accountName,
+      allocationKey: row.allocationKey,
+      action: row.action,
+      allocationKrw: row.allocationKrw,
+      rawAllocationKrw:row.rawAllocationKrw,
+      modifierBreakdown:row.modifierBreakdown,
+      baseNeedKrw: row.baseNeedKrw,
+      costBasisKrw: row.costBasisKrw,
+      currentValueKrw: row.currentValueKrw,
+      currentWeightPct: row.currentWeightPct,
+      currency: row.metadata.currency,
+      driftRatioPct: row.driftRatioPct,
+      effectiveTargetWeightPct: row.effectiveTargetWeightBps / 100,
+      ma120Evidence: row.metadata.ma120Evidence,
+      ma120ReductionKrw: Math.max(0, row.strategicAllocationKrw - row.allocationKrw),
+      maAdjustmentReason: row.maAdjustmentReason,
+      maEffectiveMultiplier: row.maEffectiveMultiplier,
+      market: row.metadata.market,
+      name: row.metadata.assetName,
+      postTopupValueKrw: row.postTradeValueKrw,
+      postTopupWeightPct: row.postTradeWeightPct,
+      postTrimValueKrw: row.postTrimValueKrw,
+      strategicAllocationKrw: row.strategicAllocationKrw,
+      targetWeightPct: row.targetWeightBps / 100,
+      ticker: row.metadata.ticker,
+      trimAmountKrw: row.trimAmountKrw,
+      trimReason: row.trimReason,
+      unrealizedReturnPct: row.unrealizedReturnPct,
+    }))),
+    blockers: Object.freeze([] as string[]),
+  });
+}
+
+function compactMa120Evidence(
+  row: AdditionalContributionMa120ReadPort["rows"][number],
+) {
+  return Object.freeze({
+    status: row.status,
+    priceBasis: row.priceBasis,
+    availableObservationCount: row.evidence?.availableObservationCount ?? 0,
+    latestWindowPriceDate: row.evidence?.latestWindowPriceDate ?? null,
+    ma120: row.evidence?.ma120 ?? null,
+    distanceFromMaPct: row.evidence?.distanceFromMaPct ?? null,
+    unavailableReason: row.unavailableReason,
+    blockers: row.evidence?.blockers ?? Object.freeze([]),
+    comparisonPriceAsOf: row.evidence?.comparisonPriceAsOf ?? null,
+    comparisonPriceAgeHours: row.evidence?.comparisonPriceAgeHours ?? null,
+    historyAgeCalendarDays: row.evidence?.historyAgeCalendarDays ?? null,
+    evaluatedAt: row.evidence?.evaluatedAt ?? null,
+  });
+}
+
+function unavailableMa120Evidence() {
+  return Object.freeze({
+    status: "unavailable" as const,
+    priceBasis: null,
+    availableObservationCount: 0,
+    latestWindowPriceDate: null,
+    ma120: null,
+    distanceFromMaPct: null,
+    unavailableReason: "evidence_row_missing",
   });
 }
 
@@ -268,29 +543,8 @@ function scopedPolicyBlocker(status: string) {
   return "portfolio_target_policy_integrity_error";
 }
 
-function compactMa120Evidence(
-  row: AdditionalContributionMa120ReadPort["rows"][number] | undefined,
-) {
-  return Object.freeze({
-    status: row?.status ?? ("unavailable" as const),
-    priceBasis: row?.priceBasis ?? null,
-    availableObservationCount: row?.evidence?.availableObservationCount ?? 0,
-    latestWindowPriceDate: row?.evidence?.latestWindowPriceDate ?? null,
-    ma120: row?.evidence?.ma120 ?? null,
-    distanceFromMaPct: row?.evidence?.distanceFromMaPct ?? null,
-    unavailableReason: row?.unavailableReason ?? "evidence_row_missing",
-  });
-}
-
-function instrumentKey(row: {
-  market: string | null;
-  currency: string | null;
-  ticker: string | null;
-}) {
-  const market = row.market?.trim().toLowerCase();
-  const currency = row.currency?.trim().toUpperCase();
-  const ticker = row.ticker?.trim().toUpperCase();
-  return market && currency && ticker
-    ? `${market}:${currency}:${ticker}`
-    : null;
+function resolveMa120Mode(
+  useTrendFilter: boolean,
+): AdditionalContributionMa120OverlayMode {
+  return useTrendFilter ? "enabled" : "off";
 }

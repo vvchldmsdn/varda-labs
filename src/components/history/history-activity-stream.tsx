@@ -1,0 +1,101 @@
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
+import { BrokerEvidenceDetails } from "@/components/events/broker-evidence-details";
+
+import { formatHistoryKrw } from "./history-format";
+
+export function HistoryActivityStream({
+  result,
+  supported,
+}: {
+  result: TenantEventLedgerQueryResult | null;
+  supported: boolean;
+}) {
+  const events =
+    result?.state === "ready" || result?.state === "partial"
+      ? result.events.slice(0, 8)
+      : [];
+
+  return (
+    <section className="border-b border-[var(--line)] py-8" aria-labelledby="history-activity-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-medium text-[var(--muted)]">ACTIVITY TAPE</p>
+          <h2 id="history-activity-title" className="mt-1 text-xl font-semibold"><T ko="기록된 활동" en="Recorded activity"/></h2>
+        </div>
+        <p className="text-xs text-[var(--muted)]">
+          {<T ko={events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준"} en={translateHomeHistory(events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준")}/>}
+        </p>
+      </div>
+
+      {events.length > 0 ? (
+        <ol className="mt-6 divide-y divide-[var(--wash)] border-y border-[var(--wash)]">
+          {events.map((event, index) => (
+            <li
+              key={`${event.eventDate}:${event.eventType}:${event.assetName}:${index}`}
+              className="grid gap-3 py-4 sm:grid-cols-[110px_1fr_auto] sm:items-center"
+            >
+              <time className="text-xs tabular-nums text-[var(--muted)]">
+                {event.eventDate.replaceAll("-", ".")}
+              </time>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {event.assetName}
+                </p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {<T ko={eventTypeLabel(event.eventType)} en={translateHomeHistory(eventTypeLabel(event.eventType))}/>} · {event.accountName}
+                  {event.groupName ? ` · ${event.groupName}` : ""}
+                </p>
+                {event.brokerEvidence ? <BrokerEvidenceDetails evidence={event.brokerEvidence} /> : null}
+              </div>
+              <p className="text-sm font-semibold tabular-nums sm:text-right">
+                {<T ko={event.amountKrw === null
+                  ? quantityLabel(event.quantityDelta)
+                  : signedKrw(event.amountKrw)} en={translateHomeHistory(event.amountKrw === null
+                  ? quantityLabel(event.quantityDelta)
+                  : signedKrw(event.amountKrw))}/>}
+              </p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-6 border-y border-[var(--wash)] py-8 text-sm leading-6 text-[var(--muted)]">
+          {<T ko={!supported
+            ? "이 자산그룹의 이벤트 포함 규칙은 아직 정의되지 않아 계좌 이벤트를 임의로 합산하지 않습니다."
+            : result?.state === "integrity_error"
+              ? "이벤트와 계정 소유권 관계가 일치하지 않아 활동 표시를 차단했습니다."
+              : result?.state === "unavailable"
+                ? "이벤트 기록을 현재 읽을 수 없습니다."
+                : "이 범위에 연결된 저장 이벤트가 없습니다."} en={translateHomeHistory(!supported
+            ? "이 자산그룹의 이벤트 포함 규칙은 아직 정의되지 않아 계좌 이벤트를 임의로 합산하지 않습니다."
+            : result?.state === "integrity_error"
+              ? "이벤트와 계정 소유권 관계가 일치하지 않아 활동 표시를 차단했습니다."
+              : result?.state === "unavailable"
+                ? "이벤트 기록을 현재 읽을 수 없습니다."
+                : "이 범위에 연결된 저장 이벤트가 없습니다.")}/>}
+        </p>
+      )}
+      <p className="mt-3 text-xs leading-5 text-[var(--faint)]"><T ko="이벤트는 활동 맥락으로 표시하며 같은 날의 평가액 변화에 자동 귀속하지 않습니다." en="Events provide activity context and are not automatically attributed to same-day value changes."/></p>
+    </section>
+  );
+}
+
+function eventTypeLabel(eventType: string) {
+  if (eventType === "buy") return "매수";
+  if (eventType === "sell") return "매도";
+  if (eventType === "asset_added") return "자산 추가";
+  if (eventType === "asset_removed") return "자산 제외";
+  return eventType;
+}
+
+function signedKrw(value: number) {
+  if (value === 0) return "₩0";
+  return `${value > 0 ? "+" : "-"}${formatHistoryKrw(Math.abs(value))}`;
+}
+
+function quantityLabel(value: number | null) {
+  if (value === null) return "금액 기록 없음";
+  return `${value > 0 ? "+" : ""}${value.toLocaleString("ko-KR")}주`;
+}

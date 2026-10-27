@@ -19,8 +19,8 @@ export type SimulationTerminalDownsideTailReadyResult = Readonly<{
   summaryStatus: "ready";
   runtimeTrustStatus: "not_established";
   policy: SimulationTerminalDownsideTailPolicy;
-  pathCount: 500;
-  tailPathCount: 25;
+  pathCount: number;
+  tailPathCount: number;
   p5TerminalReturn: number;
   lowerTailMeanTerminalReturn: number;
   blockers: readonly [];

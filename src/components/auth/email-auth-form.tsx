@@ -1,0 +1,190 @@
+"use client";
+
+import { AuthElement, AuthText } from "./auth-localized";
+import Link from "next/link";
+import { useState, type FormEvent } from "react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
+import { authClient } from "@/lib/auth/auth-client";
+import { authErrorMessage } from "@/lib/auth/auth-error-message";
+import { AUTH_EMAIL_VERIFIED_PATH } from "@/lib/auth/auth-methods";
+import { AUTH_TRANSPORT_SESSION_PATH } from "@/lib/auth/auth-transport-routes";
+import { AuthPasswordField } from "./auth-password-field";
+import { EmailVerificationForm } from "./email-verification-form";
+import styles from "./auth-experience.module.css";
+
+export function EmailAuthForm({
+  mode,
+  enabled,
+  preview = false,
+}: {
+  mode: "sign-in" | "sign-up";
+  enabled: boolean;
+  preview?: boolean;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const signingUp = mode === "sign-up";
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending || (!enabled && !preview)) return;
+    const data = new FormData(event.currentTarget);
+    const email = String(data.get("email") ?? "").trim();
+    const password = String(data.get("password") ?? "");
+    setError("");
+    if (signingUp && password !== String(data.get("password-confirm") ?? "")) {
+      setError("비밀번호가 서로 다릅니다. 다시 확인해 주세요.");
+      return;
+    }
+    if (preview) {
+      if (signingUp) {
+        setVerificationEmail(email);
+        return;
+      }
+      setNotice(
+        "화면 미리보기입니다. 입력한 정보는 전송하거나 저장하지 않습니다.",
+      );
+      return;
+    }
+    setPending(true);
+    try {
+      if (signingUp) {
+        const result = await authClient.signUp.email({
+          name: String(data.get("name") ?? "").trim(),
+          email,
+          password,
+          callbackURL: AUTH_EMAIL_VERIFIED_PATH,
+        });
+        if (result.error) setError(authErrorMessage(result.error));
+        else setVerificationEmail(email);
+      } else {
+        const result = await authClient.signIn.email({
+          email,
+          password,
+          callbackURL: AUTH_TRANSPORT_SESSION_PATH,
+        });
+        if (result.error?.code === "EMAIL_NOT_VERIFIED")
+          setVerificationEmail(email);
+        else if (result.error) setError(authErrorMessage(result.error));
+        else if (result.data?.user.emailVerified !== true)
+          setVerificationEmail(email);
+        else window.location.replace(AUTH_TRANSPORT_SESSION_PATH);
+      }
+    } catch {
+      setError(authErrorMessage(null));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (verificationEmail) {
+    return (
+      <EmailVerificationForm
+        initialEmail={verificationEmail}
+        initialCooldownSeconds={signingUp ? 60 : 0}
+        enabled={enabled}
+        preview={preview}
+        onBack={() => setVerificationEmail("")}
+      />
+    );
+  }
+  return (
+    <AuthElement as="form"
+      onSubmit={submit}
+      className={styles.emailForm}
+      aria-label={signingUp ? "이메일 회원가입" : "이메일 로그인"}
+    >
+      <fieldset
+        className={styles.form}
+        disabled={pending || (!enabled && !preview)}
+      >
+        {signingUp ? (
+          <div className={styles.field}>
+            <label htmlFor="auth-name"><AuthText>{"이름"}</AuthText></label>
+            <AuthElement as="input"
+              id="auth-name"
+              name="name"
+              type="text"
+              autoComplete="nickname"
+              maxLength={80}
+              required
+              className={styles.input}
+              placeholder="사용할 이름"
+            />
+          </div>
+        ) : null}
+        <div className={styles.field}>
+          <label htmlFor="auth-email"><AuthText>{"이메일"}</AuthText></label>
+          <AuthElement as="input"
+            id="auth-email"
+            name="email"
+            type="email"
+            autoComplete="username"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={254}
+            required
+            className={styles.input}
+            placeholder="name@example.com"
+          />
+        </div>
+        <AuthPasswordField id="password" newPassword={signingUp} />
+        {signingUp ? (
+          <AuthPasswordField
+            id="password-confirm"
+            label="비밀번호 확인"
+            newPassword
+          />
+        ) : null}
+        {error ? (
+          <p role="alert" className={styles.error}>
+            <AuthText>{error}</AuthText>
+          </p>
+        ) : null}
+        {notice ? (
+          <p role="status" className={styles.notice}>
+            <AuthText>{notice}</AuthText>
+          </p>
+        ) : null}
+        <button
+          className={styles.primaryButton}
+          type="submit"
+          aria-busy={pending}
+        >
+          <span className={styles.buttonLabel}>
+            <AuthText>{pending
+              ? "확인 중"
+              : signingUp
+                ? "이메일로 가입하기"
+                : "이메일로 로그인"}</AuthText>
+          </span>
+          {pending ? (
+            <LoaderCircle
+              size={17}
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <ArrowRight size={17} aria-hidden="true" />
+          )}
+        </button>
+      </fieldset>
+      {!enabled && !preview ? (
+        <p className={styles.note}><AuthText>{"이메일 로그인은 준비 중입니다."}</AuthText></p>
+      ) : null}
+      {!signingUp ? <div className={styles.recoveryLinks}>
+        <Link
+          href={`/auth/forgot-password${preview ? "?preview=design" : ""}`}
+          className={styles.textLink}
+        ><AuthText>{"비밀번호 찾기"}</AuthText></Link>
+        <Link
+          href={`/auth/verify-email${preview ? "?preview=design" : ""}`}
+          className={styles.textLink}
+        ><AuthText>{"인증 메일 재전송"}</AuthText></Link>
+      </div> : null}
+    </AuthElement>
+  );
+}

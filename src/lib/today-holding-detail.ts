@@ -28,6 +28,7 @@ export type TodayHoldingDetailHolding = {
   dailyReturnPct: number | null;
   dailySource: string | null;
   previousCloseValueKrw: number | null;
+  priceDailyChangeKrw: number | null;
   fxDailyChangeKrw: number | null;
 };
 
@@ -36,7 +37,12 @@ export type TodayHoldingDetailContribution = {
   changeKrw: number;
   returnPct: number | null;
   tradeFlowKrw: number;
-  fxChangeKrw: number;
+  priceChangeKrw: number | null;
+  fxChangeKrw: number | null;
+  previousPrice: number;
+  currentPrice: number;
+  previousFxRate: number;
+  currentFxRate: number;
   source: string;
 };
 
@@ -114,9 +120,7 @@ export function selectTodayHoldingDetail(
     return { status: "empty", query };
   }
 
-  const candidates = data.holdings.filter((holding) =>
-    matchesHoldingSelector(holding, query),
-  );
+  const candidates = selectTodayHoldingCandidates(data.holdings, query);
 
   if (candidates.length === 0) {
     return { status: "not_found", query };
@@ -159,8 +163,15 @@ export function todayHoldingDetailHref(
   });
 }
 
+export function selectTodayHoldingCandidates<
+  THolding extends Pick<TodayHoldingDetailHolding, "account" | "ticker" | "market">,
+>(holdings: readonly THolding[], query: TodayHoldingDetailQuery): THolding[] {
+  if (!query.ticker) return [];
+  return holdings.filter((holding) => matchesHoldingSelector(holding, query));
+}
+
 function matchesHoldingSelector(
-  holding: DetailHoldingInput,
+  holding: Pick<TodayHoldingDetailHolding, "account" | "ticker" | "market">,
   query: TodayHoldingDetailQuery,
 ) {
   if (query.holdingAccount && holding.account !== query.holdingAccount) {
@@ -207,6 +218,7 @@ function sanitizeHolding(holding: DetailHoldingInput): TodayHoldingDetailHolding
     dailyReturnPct: holding.dailyReturnPct,
     dailySource: holding.dailySource,
     previousCloseValueKrw: holding.previousCloseValueKrw,
+    priceDailyChangeKrw: holding.priceDailyChangeKrw,
     fxDailyChangeKrw: holding.fxDailyChangeKrw,
   };
 }
@@ -219,7 +231,12 @@ function sanitizeContribution(
     changeKrw: row.changeKrw,
     returnPct: row.returnPct,
     tradeFlowKrw: row.tradeFlowKrw,
+    priceChangeKrw: row.priceChangeKrw,
     fxChangeKrw: row.fxChangeKrw,
+    previousPrice: row.previousPrice,
+    currentPrice: row.currentPrice,
+    previousFxRate: row.previousFxRate,
+    currentFxRate: row.currentFxRate,
     source: row.source,
   };
 }

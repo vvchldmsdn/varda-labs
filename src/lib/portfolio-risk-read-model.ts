@@ -1,4 +1,7 @@
 import { buildPortfolioRiskInput } from "./portfolio-risk-input.ts";
+import {
+  calculatePortfolioRiskPathAnalytics,
+} from "./portfolio-risk-path-analytics.ts";
 import { calculatePortfolioRisk } from "./portfolio-risk.ts";
 import type {
   PortfolioRiskAssetSourceRow,
@@ -61,7 +64,13 @@ export function composePortfolioRiskReadModel({
     inputStatus: input.status,
     instruments: input.instruments,
     returnRows: input.returnRows,
-    annualRiskFreeRate: 0,
+    annualRiskFreeRate: null,
+  });
+  const pathAnalytics = calculatePortfolioRiskPathAnalytics({
+    instruments: input.instruments,
+    returnRows: input.returnRows,
+    // No reviewed native-currency benchmark with exact interval provenance is loaded.
+    benchmarks: [],
   });
   const observations = input.valueRows.flatMap((row) => row.observations);
   const missingEvidence = summarizeMissingEvidence(input.valueRows);
@@ -100,6 +109,7 @@ export function composePortfolioRiskReadModel({
       annualizationFactor: calculation.annualizationFactor,
       annualRiskFreeRate: calculation.annualRiskFreeRate,
       dailyRiskFreeRate: calculation.dailyRiskFreeRate,
+      referenceEvidence: { reportingCurrency: 'KRW' as const, benchmark: null, riskFree: null, reasons: ['matched_benchmark_not_supplied', 'risk_free_evidence_not_supplied'] },
     },
     inputHealth: {
       status: input.status,
@@ -132,6 +142,7 @@ export function composePortfolioRiskReadModel({
       },
     },
     calculation,
+    pathAnalytics,
   };
 }
 

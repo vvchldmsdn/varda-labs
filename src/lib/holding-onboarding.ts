@@ -1,10 +1,13 @@
 export const HOLDING_ONBOARDING_POLICY = Object.freeze({
   version: "holding_onboarding_v1",
   averageCostAuthority: "user_entered_per_unit_in_instrument_currency",
+  missingAverageCost: "unknown_never_zero_or_current_price",
   reportedReturnRole: "reference_only",
   duplicateIdentity:
     "canonical_owner_user_id_account_id_market_currency_ticker",
 } as const);
+
+export const DEFAULT_HOLDING_PORTFOLIO_GROUP_NAME = "기본 포트폴리오";
 
 export const HOLDING_ONBOARDING_MARKETS = Object.freeze([
   Object.freeze({ value: "korea", label: "한국", currency: "KRW" }),
@@ -23,6 +26,7 @@ export type HoldingOnboardingAssetType =
 
 export type HoldingOnboardingInput = Readonly<{
   accountId: string;
+  instrumentId: string | null;
   portfolioGroupId: string | null;
   newPortfolioGroupName: string | null;
   market: HoldingOnboardingMarket;
@@ -31,7 +35,7 @@ export type HoldingOnboardingInput = Readonly<{
   ticker: string;
   name: string | null;
   quantity: string;
-  averageCost: string;
+  averageCost: string | null;
   currentPrice: string | null;
   reportedReturnPct: string | null;
 }>;
@@ -43,9 +47,12 @@ export type HoldingOnboardingActionState = Readonly<{
     | "invalid"
     | "unauthorized"
     | "conflict"
+    | "price_unavailable"
     | "error";
   message: string | null;
   assetId?: string;
+  firstHoldingCreated?: true;
+  retryAfterSeconds?: number;
 }>;
 
 export type HoldingOnboardingParseResult =
@@ -54,6 +61,7 @@ export type HoldingOnboardingParseResult =
       ok: false;
       field:
         | "accountId"
+        | "instrumentId"
         | "portfolioGroup"
         | "market"
         | "assetType"
@@ -72,6 +80,16 @@ const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,49}$/;
 const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 const SIGNED_DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/;
 
+/** Resolve a selection hint only against the session's active account options. */
+export function resolveHoldingOnboardingAccountId(
+  accounts: readonly Readonly<{ id: string }>[],
+  requestedAccountId?: string | string[],
+): string {
+  if (requestedAccountId === undefined) return accounts[0]?.id ?? "";
+  if (typeof requestedAccountId !== "string") return "";
+  return accounts.find((account) => account.id === requestedAccountId)?.id ?? "";
+}
+
 export function parseHoldingOnboardingInput(
   formData: FormData,
 ): HoldingOnboardingParseResult {
@@ -80,29 +98,28 @@ export function parseHoldingOnboardingInput(
     return invalid("accountId", "보유 계좌를 선택해 주세요.");
   }
 
+  const instrumentId = textValue(formData.get("instrumentId"));
+  if (instrumentId && !/^(?:etf|stock|catalog):[0-9a-f-]{36}$/i.test(instrumentId)) {
+    return invalid("instrumentId", "검색 결과에서 종목을 다시 선택해 주세요.");
+  }
+
   const portfolioGroupId = textValue(formData.get("portfolioGroupId"));
   const newPortfolioGroupName = textValue(
     formData.get("newPortfolioGroupName"),
   );
   if (portfolioGroupId && !UUID_PATTERN.test(portfolioGroupId)) {
-    return invalid("portfolioGroup", "자산 그룹 선택이 올바르지 않습니다.");
+    return invalid("portfolioGroup", "분석 범위 선택이 올바르지 않습니다.");
   }
   if (portfolioGroupId && newPortfolioGroupName) {
     return invalid(
       "portfolioGroup",
-      "기존 자산 그룹 선택과 새 그룹 이름 중 하나만 입력해 주세요.",
-    );
-  }
-  if (!portfolioGroupId && !newPortfolioGroupName) {
-    return invalid(
-      "portfolioGroup",
-      "기존 자산 그룹을 선택하거나 새 그룹 이름을 입력해 주세요.",
+      "기존 분석 범위 선택과 새 범위 이름 중 하나만 입력해 주세요.",
     );
   }
   if (newPortfolioGroupName && newPortfolioGroupName.length > 100) {
     return invalid(
       "portfolioGroup",
-      "새 자산 그룹 이름은 100자 이하여야 합니다.",
+      "새 분석 범위 이름은 100자 이하여야 합니다.",
     );
   }
 
@@ -140,8 +157,11 @@ export function parseHoldingOnboardingInput(
     );
   }
 
-  const averageCost = positiveDecimal(formData.get("averageCost"), 4);
-  if (averageCost === null) {
+  const averageCostValue = formData.get("averageCost");
+  const rawAverageCost = textValue(averageCostValue);
+  const averageCost = rawAverageCost === null ? null : positiveDecimal(rawAverageCost, 4);
+  if ((averageCostValue !== null && typeof averageCostValue !== "string") ||
+      (rawAverageCost !== null && averageCost === null)) {
     return invalid(
       "averageCost",
       "1좌당 매입 원가는 0보다 큰 숫자로 소수점 4자리까지 입력해 주세요.",
@@ -174,6 +194,7 @@ export function parseHoldingOnboardingInput(
     ok: true,
     input: Object.freeze({
       accountId,
+      instrumentId,
       portfolioGroupId,
       newPortfolioGroupName,
       market: marketPolicy.value,
@@ -190,7 +211,7 @@ export function parseHoldingOnboardingInput(
 }
 
 export function calculateLocalReturnPct(input: {
-  averageCost: string | number;
+  averageCost: string | number | null;
   currentPrice: string | number;
 }) {
   const averageCost = Number(input.averageCost);

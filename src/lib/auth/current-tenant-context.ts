@@ -5,8 +5,7 @@ import { cache } from "react";
 
 import { db } from "@/db/client";
 import { appUsers, authIdentities } from "@/db/schema";
-import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
-import { isCanonicalSessionProviderSubject } from "@/lib/auth/session-subject-binding";
+import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
 import {
   resolveSessionToAppUser,
   type AppUserRole,
@@ -16,35 +15,21 @@ import {
   type SessionResolverResult,
 } from "@/lib/session-resolver-contract";
 
-const AUTH_PROVIDER = "neon_auth";
-
 export const resolveCurrentTenantContext = cache(
   async (): Promise<SessionResolverResult> => {
-    let runtime: ReturnType<typeof getAuthTransportRuntime>;
+    let session: Awaited<ReturnType<typeof readCurrentSessionSubject>>;
     try {
-      runtime = getAuthTransportRuntime();
+      session = await readCurrentSessionSubject();
     } catch {
       return resolveSessionToAppUser(notStarted("unavailable"));
     }
-    if (runtime.state !== "ready") {
+    if (session.state === "unavailable") {
       return resolveSessionToAppUser(notStarted("unavailable"));
     }
-
-    let providerSubject: unknown;
-    try {
-      const session = await runtime.auth.getSession();
-      if (session.error) {
-        return resolveSessionToAppUser(notStarted("unavailable"));
-      }
-      providerSubject = session.data?.user.id;
-    } catch {
-      return resolveSessionToAppUser(notStarted("unavailable"));
-    }
-
-    if (providerSubject === undefined || providerSubject === null) {
+    if (session.state === "unauthenticated" || session.state === "unverified") {
       return resolveSessionToAppUser(notStarted("unauthenticated"));
     }
-    if (!isCanonicalSessionProviderSubject(providerSubject)) {
+    if (session.state === "invalid") {
       return resolveSessionToAppUser(
         authenticated({ state: "invalid" }),
       );
@@ -52,7 +37,8 @@ export const resolveCurrentTenantContext = cache(
 
     let rows: Awaited<ReturnType<typeof readIdentityMapping>>;
     try {
-      rows = await readIdentityMapping(providerSubject);
+      if (session.state !== "authenticated") return resolveSessionToAppUser(notStarted("unavailable"));
+      rows = await readIdentityMapping(session.provider, session.providerSubject);
     } catch {
       return resolveSessionToAppUser(
         authenticated({ state: "unavailable" }),
@@ -98,7 +84,7 @@ export const resolveCurrentTenantContext = cache(
   },
 );
 
-async function readIdentityMapping(providerSubject: string) {
+async function readIdentityMapping(provider: string, providerSubject: string) {
   return db
     .select({
       appUserId: authIdentities.appUserId,
@@ -111,7 +97,7 @@ async function readIdentityMapping(providerSubject: string) {
     .leftJoin(appUsers, eq(authIdentities.appUserId, appUsers.id))
     .where(
       and(
-        eq(authIdentities.provider, AUTH_PROVIDER),
+        eq(authIdentities.provider, provider),
         eq(authIdentities.providerSubject, providerSubject),
       ),
     )

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { SimulationText } from "@/components/simulation/simulation-text";
+import { SimulationLink as Link } from "./simulation-query-controls";
 
 import type { FixedResearchSimulationResult } from "@/lib/simulation-fixed-research-execution";
 
@@ -28,41 +29,30 @@ export function FixedResearchExecutionSection({
   return (
     <section
       aria-labelledby="fixed-research-execution-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-fixed-research-execution
       data-ready-execution-count={readyCount}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="fixed-research-execution-title" className="text-lg font-semibold">
-            서비스 기준일 수익률 {researchHorizon}단계 연구 시뮬레이션
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            선택한 기준일까지의 90개 수익률을 평균 5단계 블록의 stationary
-            bootstrap으로 재표본해 서비스 기준일 수익률 {researchHorizon}단계
-            경로 500개를
-            계산합니다. 두 종목은 각각 100% 보유한 경우로
-            독립 실행합니다. 두 결과의 차이는 공동 초과확률이나 순위를 뜻하지
-            않습니다.
-          </p>
+            <SimulationText ko={"서비스 기준일 수익률"} />{" "}{researchHorizon}<SimulationText ko={"단계 연구 시뮬레이션"} />{" "}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+            <SimulationText ko={"선택한 기준일까지의 90개 수익률을 평균 5단계 블록의 stationary bootstrap으로 재표본해 서비스 기준일 수익률"} />{" "}{researchHorizon}<SimulationText ko={"단계 경로 500개를 계산합니다. 두 종목은 각각 100% 보유한 경우로 독립 실행합니다. 두 결과의 차이는 공동 초과확률이나 순위를 뜻하지 않습니다."} />{" "}</p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
-          연구용 · 저장 안 함 · 예측 아님
-        </span>
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
+          <SimulationText ko={"연구용 · 저장 안 함 · 예측 아님"} />{" "}</span>
       </div>
 
       {readyCount === 0 && recommendedEndServiceDate && recommendedEndHref ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-[#e6d8ae] bg-[#fff9e9] px-4 py-3 text-sm text-[#62542c] sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--warning)] sm:flex-row sm:items-center sm:justify-between">
           <p>
-            현재 기준일의 완전한 입력이 없습니다. 확인된 최근 관측일을 자동 적용하지
-            않고, 직접 선택하면 그 날짜로 실행합니다.
-          </p>
+            <SimulationText ko={"현재 기준일의 완전한 입력이 없습니다. 확인된 최근 관측일을 자동 적용하지 않고, 직접 선택하면 그 날짜로 실행합니다."} />{" "}</p>
           <Link
             href={recommendedEndHref}
-            className="inline-flex w-fit shrink-0 rounded-md border border-[#cdbf95] bg-white px-3 py-2 font-semibold text-[#4f462c] hover:bg-[#f4efdf]"
+            className="inline-flex w-fit shrink-0 rounded-md border border-[var(--warning)] bg-white px-3 py-2 font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
           >
-            {formatDate(recommendedEndServiceDate)}로 실행
-          </Link>
+            {formatDate(recommendedEndServiceDate)}<SimulationText ko={"로 실행"} />{" "}</Link>
         </div>
       ) : null}
 
@@ -76,14 +66,10 @@ export function FixedResearchExecutionSection({
         )}
       </div>
       <p
-        className="mt-3 text-xs leading-5 text-[#687064]"
+        className="mt-3 text-xs leading-5 text-[var(--muted)]"
         data-research-methodology="stationary-bootstrap-v1"
       >
-        방법: KRW 투자자 기준 수익률 90개 · 평균 블록 5단계 · 서비스 기준일
-        수익률 {researchHorizon}단계 ·
-        500경로. 같은 입력 행렬, 엔진 정책, 고정 seed에서만 결과가 동일합니다.
-        시장 국면을 조건으로 삼는 regime bootstrap 모델은 아닙니다.
-      </p>
+        <SimulationText ko={"방법: KRW 투자자 기준 수익률 90개 · 평균 블록 5단계 · 서비스 기준일 수익률"} />{" "}{researchHorizon}<SimulationText ko={"단계 · 500경로. 같은 입력 행렬, 엔진 정책, 고정 seed에서만 결과가 동일합니다. 시장 국면을 조건으로 삼는 regime bootstrap 모델은 아닙니다."} />{" "}</p>
     </section>
   );
 }
@@ -91,7 +77,7 @@ export function FixedResearchExecutionSection({
 function ResearchExecutionPanel({ execution }: { execution: ReadyExecution }) {
   return (
     <article
-      className="overflow-hidden rounded-lg border border-[#d7ddcf] bg-[#fbfcf7]"
+      className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]"
       data-research-execution={execution.id}
       data-research-execution-status="ready"
       data-research-horizon={execution.assumptions.horizon}
@@ -99,32 +85,29 @@ function ResearchExecutionPanel({ execution }: { execution: ReadyExecution }) {
       data-research-bootstrap-model={execution.policy.bootstrapModel}
       data-research-seed-policy={execution.policy.seedPolicy}
     >
-      <header className="flex items-start justify-between gap-3 border-b border-[#e1e5da] px-4 py-4">
+      <header className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-4">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">단일 종목 100%</p>
+          <p className="text-xs font-semibold text-[var(--muted)]"><SimulationText ko={"단일 종목 100%"} /></p>
           <h3 className="mt-1 text-lg font-semibold">
             {execution.ticker} · {execution.name}
           </h3>
         </div>
-        <span className="rounded-md bg-[#e5f1e6] px-2.5 py-1 text-xs font-semibold text-[#226039]">
-          계산 완료
-        </span>
+        <span className="rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
+          <SimulationText ko={"계산 완료"} />{" "}</span>
       </header>
 
       <SimulationTerminalRiskMetrics terminal={execution.terminal} />
 
       <ResearchFanChart execution={execution} />
 
-      <div className="grid border-t border-[#e1e5da] text-xs text-[#687064] sm:grid-cols-2">
-        <p className="px-4 py-3 sm:border-r sm:border-[#e1e5da]">
-          종료 분포 P10 {execution.terminal.p10Index.toFixed(1)} · P50{" "}
+      <div className="grid border-t border-[var(--line)] text-xs text-[var(--muted)] sm:grid-cols-2">
+        <p className="px-4 py-3 sm:border-r sm:border-[var(--line)]">
+          <SimulationText ko={"종료 분포 P10"} />{" "}{execution.terminal.p10Index.toFixed(1)} · P50{" "}
           {execution.terminal.p50Index.toFixed(1)} · P90{" "}
           {execution.terminal.p90Index.toFixed(1)}
         </p>
         <p className="px-4 py-3">
-          기준일 {formatDate(execution.source.endServiceDate)} · 시작지수 100 ·
-          수수료·세금 미포함
-        </p>
+          <SimulationText ko={"기준일"} />{" "}{formatDate(execution.source.endServiceDate)} {" "}<SimulationText ko={"· 시작지수 100 · 수수료·세금 미포함"} />{" "}</p>
       </div>
     </article>
   );
@@ -137,17 +120,17 @@ function UnavailableExecutionPanel({
 }) {
   return (
     <article
-      className="rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+      className="rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
       data-research-execution={execution.id}
       data-research-execution-status="unavailable"
       data-research-unavailable-reason={execution.reason}
     >
-      <p className="text-xs font-semibold text-[#786b49]">단일 종목 100%</p>
+      <p className="text-xs font-semibold text-[var(--warning)]"><SimulationText ko={"단일 종목 100%"} /></p>
       <h3 className="mt-1 text-lg font-semibold">
         {execution.ticker} · {execution.name}
       </h3>
-      <p className="mt-3 text-sm leading-6 text-[#6b6044]">
-        {unavailableReasonLabel(execution.reason)}
+      <p className="mt-3 text-sm leading-6 text-[var(--warning)]">
+        <SimulationText ko={unavailableReasonLabel(execution.reason)} />
       </p>
     </article>
   );

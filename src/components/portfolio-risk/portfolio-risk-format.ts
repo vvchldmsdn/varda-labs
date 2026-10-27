@@ -77,6 +77,7 @@ export function calculationReasonLabel(
 export function metricReasonLabel(reason: PortfolioRiskMetricReason | null) {
   if (reason === null) return null;
   const labels: Record<PortfolioRiskMetricReason, string> = {
+    risk_free_evidence_not_supplied: "같은 통화·기간의 무위험 수익률 근거 없음",
     insufficient_observations: "관측치 부족",
     zero_variance: "변동성 0",
     zero_portfolio_volatility: "포트폴리오 변동성 0",

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -23,12 +24,12 @@ export type TenantPortfolioGroupMembershipRows = Readonly<{
   assetMemberships: readonly TenantPortfolioGroupMembershipRow[];
 }>;
 
-export type TenantLegacyAssetGroupRows = Readonly<{
-  groups: readonly TenantLegacyAssetGroupRow[];
-  members: readonly TenantLegacyAssetGroupMemberRow[];
+export type TenantAllocationGroupRows = Readonly<{
+  groups: readonly TenantAllocationGroupRow[];
+  members: readonly TenantAllocationGroupMemberRow[];
 }>;
 
-export type TenantLegacyAssetGroupRow = Readonly<{
+export type TenantAllocationGroupRow = Readonly<{
   id: string;
   name: string;
   targetWeight: string | null;
@@ -36,7 +37,7 @@ export type TenantLegacyAssetGroupRow = Readonly<{
   sortOrder: number;
 }>;
 
-export type TenantLegacyAssetGroupMemberRow = Readonly<{
+export type TenantAllocationGroupMemberRow = Readonly<{
   groupId: string;
   assetId: string;
   allocationRatio: string | null;
@@ -49,13 +50,17 @@ type MembershipMode = "all" | "effective" | "open";
 export async function loadActiveTenantPortfolioGroups(
   tenantContext: TenantContext,
 ): Promise<readonly TenantPortfolioGroupRow[]> {
+  return loadActiveTenantPortfolioGroupsByOwner(tenantContext.ownerUserId);
+}
+
+const loadActiveTenantPortfolioGroupsByOwner = cache(async (ownerUserId: string): Promise<readonly TenantPortfolioGroupRow[]> => {
   const [rows] = await runTenantReadTransaction(
-    tenantContext.ownerUserId,
+    ownerUserId,
     (transaction) => [transaction.query(ACTIVE_PORTFOLIO_GROUPS_SQL)],
   );
 
   return Object.freeze(rows.map(projectPortfolioGroupRow));
-}
+});
 
 export async function loadTenantPortfolioGroupMemberships({
   mode,
@@ -68,10 +73,16 @@ export async function loadTenantPortfolioGroupMemberships({
   serviceDate?: string | null;
   tenantContext: TenantContext;
 }): Promise<TenantPortfolioGroupMembershipRows> {
+  return loadMembershipsByOwner(tenantContext.ownerUserId, mode, portfolioGroupId, serviceDate);
+}
+
+const loadMembershipsByOwner = cache(async (
+  ownerUserId: string, mode: MembershipMode, portfolioGroupId: string | null, serviceDate: string | null,
+): Promise<TenantPortfolioGroupMembershipRows> => {
   assertMembershipRequest(mode, serviceDate);
   const parameters = [portfolioGroupId, mode, serviceDate];
   const [accountRows, assetRows] = await runTenantReadTransaction(
-    tenantContext.ownerUserId,
+    ownerUserId,
     (transaction) => [
       transaction.query(PORTFOLIO_GROUP_ACCOUNT_MEMBERSHIPS_SQL, parameters),
       transaction.query(PORTFOLIO_GROUP_ASSET_MEMBERSHIPS_SQL, parameters),
@@ -86,24 +97,32 @@ export async function loadTenantPortfolioGroupMemberships({
       assetRows.map(projectPortfolioGroupMembershipRow),
     ),
   });
+});
+
+export async function loadActiveTenantAllocationGroups(
+  tenantContext: TenantContext,
+): Promise<readonly TenantAllocationGroupRow[]> {
+  return loadActiveTenantAllocationGroupsByOwner(tenantContext.ownerUserId);
 }
 
-export async function loadActiveTenantLegacyAssetGroups(
-  tenantContext: TenantContext,
-): Promise<readonly TenantLegacyAssetGroupRow[]> {
+const loadActiveTenantAllocationGroupsByOwner = cache(async (ownerUserId: string): Promise<readonly TenantAllocationGroupRow[]> => {
   const [groupRows] = await runTenantReadTransaction(
-    tenantContext.ownerUserId,
+    ownerUserId,
     (transaction) => [transaction.query(ACTIVE_LEGACY_ASSET_GROUPS_SQL)],
   );
 
   return Object.freeze(groupRows.map(projectLegacyAssetGroupRow));
+});
+
+export async function loadActiveTenantAllocationGroupBundle(
+  tenantContext: TenantContext,
+): Promise<TenantAllocationGroupRows> {
+  return loadActiveTenantAllocationGroupBundleByOwner(tenantContext.ownerUserId);
 }
 
-export async function loadActiveTenantLegacyAssetGroupBundle(
-  tenantContext: TenantContext,
-): Promise<TenantLegacyAssetGroupRows> {
+const loadActiveTenantAllocationGroupBundleByOwner = cache(async (ownerUserId: string): Promise<TenantAllocationGroupRows> => {
   const [groupRows, memberRows] = await runTenantReadTransaction(
-    tenantContext.ownerUserId,
+    ownerUserId,
     (transaction) => [
       transaction.query(ACTIVE_LEGACY_ASSET_GROUPS_SQL),
       transaction.query(ACTIVE_LEGACY_ASSET_GROUP_MEMBERS_SQL),
@@ -114,7 +133,7 @@ export async function loadActiveTenantLegacyAssetGroupBundle(
     groups: Object.freeze(groupRows.map(projectLegacyAssetGroupRow)),
     members: Object.freeze(memberRows.map(projectLegacyAssetGroupMemberRow)),
   });
-}
+});
 
 const ACTIVE_PORTFOLIO_GROUPS_SQL = `
   select
@@ -226,7 +245,7 @@ function projectPortfolioGroupMembershipRow(
 
 function projectLegacyAssetGroupRow(
   row: Record<string, unknown>,
-): TenantLegacyAssetGroupRow {
+): TenantAllocationGroupRow {
   return Object.freeze({
     id: requiredString(row.id),
     name: requiredString(row.name),
@@ -238,7 +257,7 @@ function projectLegacyAssetGroupRow(
 
 function projectLegacyAssetGroupMemberRow(
   row: Record<string, unknown>,
-): TenantLegacyAssetGroupMemberRow {
+): TenantAllocationGroupMemberRow {
   return Object.freeze({
     groupId: requiredString(row.group_id),
     assetId: requiredString(row.asset_id),

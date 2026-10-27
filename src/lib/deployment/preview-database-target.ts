@@ -17,22 +17,28 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0038_cheerful_micromax",
-    createdAt: 1787017740106,
+    tag: "0041_natural_nitro",
+    createdAt: 1788296591419,
     sha256:
-      "e259c7b95ddc97a919bc4079c5c5ebd5947a20e3f9b8a3daebc6e4b320644be9",
+      "d08216683c44152fb29c51e81693cdc637711c34d786235afeb74c6fcff4afad",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 39,
+    entryCount: 42,
     sha256:
-      "sha256:0853d5f45768a41b468735ac5deeadc5c0dc391b60339c5a725c5aadf222fb69",
+      "sha256:fca9347d8d046ec5375926654ec51d310b77dc2b6d637f75a0d38a16e23ad281",
   }),
   allowedPendingMigrations: Object.freeze([
     Object.freeze({
-      tag: "0038_cheerful_micromax",
-      createdAt: 1787017740106,
+      tag: "0040_noisy_agent_zero",
+      createdAt: 1788294967334,
       sha256:
-        "e259c7b95ddc97a919bc4079c5c5ebd5947a20e3f9b8a3daebc6e4b320644be9",
+        "042b841616312533464000ef4e3bd6b02bf038feca80e036ecd118d2db943f6f",
+    }),
+    Object.freeze({
+      tag: "0041_natural_nitro",
+      createdAt: 1788296591419,
+      sha256:
+        "d08216683c44152fb29c51e81693cdc637711c34d786235afeb74c6fcff4afad",
     }),
   ]),
 });

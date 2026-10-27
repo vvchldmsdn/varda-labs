@@ -1,0 +1,44 @@
+import { createHash } from "node:crypto";
+import { releaseOwnerAllowed } from "@/lib/release-admission";
+import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { isSameOriginAuthRequest, readBoundedAuthBody } from "@/lib/auth/auth-request-validation";
+import { readNativeLedger, readNativeOperation, cancelNativeOperation, validNativeMutation, writeNativeMutation } from "@/db/queries/native-portfolio-ledger";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+const response = (body: object, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" } });
+async function context() {
+  const subject = await readCurrentSessionSubject();
+  if (subject.state !== "authenticated") return response({ error: "sign_in_required" }, 401);
+  const tenant = await resolveCurrentTenantContext();
+  if (!tenant.ok) return response({ error: "account_unavailable" }, tenant.failure.httpStatus);
+  return { tenant: tenant.tenantContext, sessionKey: createHash("sha256").update(`native-ledger\0${subject.provider}\0${subject.providerSubject}`).digest("hex") };
+}
+export async function GET(request: Request) {
+  try {
+    if (new URL(request.url).search) return response({ error: "invalid_request" }, 400);
+    const auth = await context(); if (auth instanceof Response) return auth;
+    const ledger = await readNativeLedger(auth.tenant);
+    return response({ serverNow: new Date(Date.now()).toISOString(), sessionKey: auth.sessionKey, accounts: ledger.accounts, ordering: ledger.entries.slice(-500).map(e=>({id:e.id,accountId:e.accountId,type:e.data.event.type,at:e.data.event.at})), trades: ledger.entries.filter(e => ["buy", "sell"].includes(e.data.event.type)).slice(-100).map(e => ({ id:e.id,accountId:e.accountId,event:e.data.event })), canWrite: releaseOwnerAllowed(process.env, "NATIVE_LEDGER", auth.tenant.ownerUserId) });
+  } catch { return response({ error: "unavailable" }, 503); }
+}
+export async function POST(request: Request) {
+  try {
+    if (new URL(request.url).search || !isSameOriginAuthRequest(request) || request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") return response({ error: "invalid_request" }, 400);
+    let body;
+    try { body = JSON.parse(await readBoundedAuthBody(request) ?? "null"); } catch { return response({ error: "invalid_request" }, 400); }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return response({ error: "invalid_request" }, 400);
+    const lookup = Object.keys(body).every(key => ["sessionKey", "operationId", "action"].includes(key)) && (body.action===undefined || body.action==="cancel") && typeof body.operationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(body.operationId);
+    if (!lookup && (Object.keys(body).some(key => !["sessionKey", "mutation"].includes(key)) || !validNativeMutation(body.mutation))) return response({ error: "invalid_request" }, 400);
+    const auth = await context(); if (auth instanceof Response) return auth;
+    if (body.sessionKey !== auth.sessionKey) return response({ error: "account_changed" }, 409);
+    if (lookup) return response({ status: body.action==="cancel" ? await cancelNativeOperation(auth.tenant,body.operationId) : await readNativeOperation(auth.tenant, body.operationId) });
+    if (!releaseOwnerAllowed(process.env, "NATIVE_LEDGER", auth.tenant.ownerUserId)) return response({ error: "temporarily_unavailable" }, 503);
+    const result = await writeNativeMutation(auth.tenant, body.mutation);
+    if (result.status === "invalid") return response({ error: result.reason }, 400);
+    if (result.status === "conflict" || result.status === "inactive") return response({ error: result.status }, 409);
+    // A trade records an event, not a daily valuation. Only the cutoff job may
+    // capture the service-day baseline; intraday saves cannot claim that slot.
+    return response({ status: result.status, snapshot: "scheduled" }, result.status === "created" ? 201 : 200);
+  } catch { return response({ error: "unavailable" }, 503); }
+}

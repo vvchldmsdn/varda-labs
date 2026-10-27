@@ -1,10 +1,13 @@
+import { LabText } from "./lab-text";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
+import { labEnglish } from "./lab-copy";
 import type { InvestmentLabFixedMixComparisonEntry } from "@/lib/investment-lab-fixed-mix-comparison";
 
 const WIDTH = 1000;
 const HEIGHT = 360;
 const PADDING_X = 48;
 const PADDING_Y = 36;
-const SERIES_COLORS = ["#cb5948", "#527f72", "#b28a3e"] as const;
+const SERIES_COLORS = ["var(--negative)", "var(--brand)", "var(--warning)"] as const;
 
 export function InvestmentLabFixedMixComparisonChart({
   scenarios,
@@ -41,8 +44,8 @@ export function InvestmentLabFixedMixComparisonChart({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-4 text-sm text-[#5f665d]">
-        <Legend color="#1e3a34" label="실제 포트폴리오" />
+      <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--muted)]">
+        <Legend color="var(--ink)" label="실제 포트폴리오" />
         {ready.map((entry, index) => (
           <Legend
             color={SERIES_COLORS[index]}
@@ -57,19 +60,14 @@ export function InvestmentLabFixedMixComparisonChart({
         role="img"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
       >
-        <title id="investment-lab-standard-mix-title">
-          실제 포트폴리오와 세 가지 고정비중 경로 비교
-        </title>
-        <desc id="investment-lab-standard-mix-description">
-          같은 관측 날짜와 외부 현금흐름을 사용한 KODEX 200 및 VOO 고정비중
-          연구 경로입니다.
-        </desc>
+        <LocalizedSvgText as="title" id="investment-lab-standard-mix-title" ko="실제 포트폴리오와 세 가지 고정비중 경로 비교" en={labEnglish("실제 포트폴리오와 세 가지 고정비중 경로 비교")} />
+        <LocalizedSvgText as="desc" id="investment-lab-standard-mix-description" ko="같은 관측 날짜와 외부 현금흐름을 사용한 KODEX 200 및 VOO 고정비중 연구 경로입니다." en={labEnglish("같은 관측 날짜와 외부 현금흐름을 사용한 KODEX 200 및 VOO 고정비중 연구 경로입니다.")} />
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const lineY = PADDING_Y + ratio * (HEIGHT - PADDING_Y * 2);
           return (
             <line
               key={ratio}
-              stroke="#dfe3d8"
+              stroke="var(--line)"
               strokeDasharray="4 6"
               strokeWidth="1"
               x1={PADDING_X}
@@ -82,7 +80,7 @@ export function InvestmentLabFixedMixComparisonChart({
         <polyline
           fill="none"
           points={points(actualRows.map((row) => row.actualMarketValueKrw))}
-          stroke="#1e3a34"
+          stroke="var(--ink)"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
@@ -101,7 +99,7 @@ export function InvestmentLabFixedMixComparisonChart({
           />
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-xs text-[#72786e]">
+      <div className="mt-1 flex justify-between text-xs text-[var(--muted)]">
         <span>{formatDate(actualRows[0]?.serviceDate)}</span>
         <span>{formatDate(actualRows.at(-1)?.serviceDate)}</span>
       </div>
@@ -117,7 +115,7 @@ function Legend({ color, label }: { color: string; label: string }) {
         className="h-1 w-7 rounded-full"
         style={{ backgroundColor: color }}
       />
-      {label}
+      <LabText value={label} />
     </span>
   );
 }

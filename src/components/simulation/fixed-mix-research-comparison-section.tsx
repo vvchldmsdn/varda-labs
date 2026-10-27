@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { FixedMixResearchComparisonResult } from "@/lib/simulation-fixed-mix-research-comparison";
 
 import {
@@ -23,24 +24,19 @@ export function FixedMixResearchComparisonSection({
   return (
     <section
       aria-labelledby="fixed-mix-comparison-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-fixed-mix-research-comparison
       data-fixed-mix-research-comparison-status={comparison.status}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="fixed-mix-comparison-title" className="text-lg font-semibold">
-            고정 비중 3안 공통 경로 비교
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            25:75, 50:50, 75:25가 같은 path별 날짜 행과 블록 순서를
-            사용합니다. 최초 비중만 다르고 입력 행렬과 무작위 표본은 같아,
-            비중 차이만 비교할 수 있습니다.
-          </p>
+            <SimulationText ko={"고정 비중 3안 공통 경로 비교"} />{" "}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+            <SimulationText ko={"25:75, 50:50, 75:25가 같은 path별 날짜 행과 블록 순서를 사용합니다. 최초 비중만 다르고 입력 행렬과 무작위 표본은 같아, 비중 차이만 비교할 수 있습니다."} />{" "}</p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
-          성과 순위·추천 아님
-        </span>
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
+          <SimulationText ko={"성과 순위·추천 아님"} />{" "}</span>
       </div>
 
       {comparison.status === "ready" ? (
@@ -50,14 +46,12 @@ export function FixedMixResearchComparisonSection({
         />
       ) : (
         <div
-          className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+          className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-fixed-mix-comparison-unavailable-reason={comparison.reason}
         >
-          <p className="font-semibold">세 비중의 공통 경로를 계산하지 않았습니다.</p>
-          <p className="mt-2 text-sm leading-6 text-[#6b6044]">
-            {unavailableReasonLabel(comparison.reason)} 준비된 단일 종목 결과와
-            사용자가 선택한 비중 결과는 그대로 유지됩니다.
-          </p>
+          <p className="font-semibold"><SimulationText ko={"세 비중의 공통 경로를 계산하지 않았습니다."} /></p>
+          <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
+            <SimulationText ko={unavailableReasonLabel(comparison.reason)} /> {" "}<SimulationText ko={"준비된 단일 종목 결과와 사용자가 선택한 비중 결과는 그대로 유지됩니다."} />{" "}</p>
         </div>
       )}
     </section>
@@ -84,11 +78,9 @@ function ReadyComparisonGrid({
       data-fixed-mix-comparison-scenario-count={comparison.pairing.scenarioCount}
       data-fixed-mix-comparison-path-count={comparison.pairing.pathCount}
     >
-      <p className="border-y border-[#e1e5da] py-3 text-xs leading-5 text-[#687064]">
-        세 그래프는 같은 세로축을 사용합니다. 각 카드의 위치는 KODEX 200
-        비중 오름차순이며 성과 순위가 아닙니다. 경로 500개 ·{" "}
-        서비스 기준일 수익률 {comparison.pairing.horizon}단계 · 리밸런싱 없음.
-      </p>
+      <p className="border-y border-[var(--line)] py-3 text-xs leading-5 text-[var(--muted)]">
+        <SimulationText ko={"세 그래프는 같은 세로축을 사용합니다. 각 카드의 위치는 KODEX 200 비중 오름차순이며 성과 순위가 아닙니다. 경로 500개 ·"} />{" "}
+        <SimulationText ko={"서비스 기준일 수익률"} />{" "}{comparison.pairing.horizon}<SimulationText ko={"단계 · 리밸런싱 없음."} />{" "}</p>
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         {comparison.scenarios.map((scenario, index) => {
           const execution = chartExecutions[index];
@@ -97,14 +89,14 @@ function ReadyComparisonGrid({
 
           return (
             <article
-              className="overflow-hidden rounded-lg border border-[#d7ddcf] bg-[#fbfcf7]"
+              className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]"
               data-fixed-mix-comparison-scenario={`${scenario.kodexWeightPct}-${scenario.vooWeightPct}`}
               data-fixed-mix-comparison-selected={selected ? "true" : "false"}
               key={scenario.id}
             >
-              <header className="flex items-start justify-between gap-3 border-b border-[#e1e5da] px-4 py-4">
+              <header className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-4">
                 <div>
-                  <p className="text-xs font-semibold text-[#687064]">
+                  <p className="text-xs font-semibold text-[var(--muted)]">
                     KODEX 200 : VOO
                   </p>
                   <h3 className="mt-1 text-lg font-semibold tabular-nums">
@@ -112,9 +104,8 @@ function ReadyComparisonGrid({
                   </h3>
                 </div>
                 {selected ? (
-                  <span className="rounded-md bg-[#e5f1e6] px-2.5 py-1 text-xs font-semibold text-[#226039]">
-                    현재 선택
-                  </span>
+                  <span className="rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
+                    <SimulationText ko={"현재 선택"} />{" "}</span>
                 ) : null}
               </header>
 

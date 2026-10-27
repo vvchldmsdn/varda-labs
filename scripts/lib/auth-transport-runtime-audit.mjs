@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, relative } from "node:path";
 
+import { REVIEWED_AUTH_SDK_VERSIONS } from "./auth-sdk-version-policy.mjs";
+
 const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
   "src/lib/auth/auth-transport-api-contract.ts",
   "src/lib/auth/auth-transport-policy.ts",
@@ -11,8 +13,21 @@ const AUTH_TRANSPORT_RUNTIME_FILES = Object.freeze([
   "src/app/api/auth/[...path]/route.ts",
   "src/app/auth/callback/page.tsx",
   "src/app/auth/sign-in/page.tsx",
+  "src/app/auth/sign-up/page.tsx",
   "src/app/auth/session/page.tsx",
   "src/components/auth/auth-transport-controls.tsx",
+  "src/lib/auth/auth-request-validation.ts",
+  "src/lib/auth/current-session-subject.ts",
+  "src/lib/auth/provider-session-contract.ts",
+  "src/lib/auth/naver-auth-runtime.ts",
+  "src/lib/auth/naver-auth-policy.ts",
+  "src/lib/auth/naver-auth-config.ts",
+  "src/lib/auth/naver-auth-request.ts",
+  "src/app/api/oauth/[...path]/route.ts",
+  "src/app/auth/forgot-password/page.tsx",
+  "src/app/auth/verify-email/page.tsx",
+  "src/app/auth/reset-password/page.tsx",
+  "src/app/auth/layout.tsx",
   "src/proxy.ts",
 ]);
 
@@ -28,7 +43,12 @@ export function auditAuthTransportRuntime(root) {
 
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const authSdkVersion = packageJson.dependencies?.["@neondatabase/auth"];
-  if (authSdkVersion !== "0.4.2-beta") {
+  const naverAuthSdkPinned =
+    packageJson.dependencies?.["@auth/core"] ===
+    REVIEWED_AUTH_SDK_VERSIONS["@auth/core"];
+  if (
+    authSdkVersion !== REVIEWED_AUTH_SDK_VERSIONS["@neondatabase/auth"]
+  ) {
     findings.push("auth_sdk_version_drift");
   }
 
@@ -100,28 +120,53 @@ export function auditAuthTransportRuntime(root) {
   }
   const allowedAuthApiEndpoints =
     (policy.match(/method:\s*"(?:GET|POST)"/g) ?? []).length;
-  const googleSocialProviderRestricted =
-    policy.includes('socialProvider: "google"') &&
+  const socialProvidersRestricted =
+    policy.includes('socialProviders: Object.freeze(["google", "github"])') &&
     route.includes("isAuthTransportApiRequestAllowed") &&
-    route.includes("createReviewedGoogleSocialSignInRequest") &&
+    route.includes("createReviewedAuthRequest") &&
     route.indexOf("isAuthTransportApiRequestAllowed") <
       route.indexOf("runtime.auth.handler()");
-  const strictGoogleSocialSignInBody =
+  const strictAuthRequestBodies =
     apiContract.includes("AUTH_TRANSPORT_GOOGLE_SOCIAL_SIGN_IN_BODY") &&
-    apiContract.includes("Object.getOwnPropertyDescriptors") &&
+    apiContract.includes("z.strictObject") &&
+    apiContract.includes("isSameOriginAuthRequest(request)") &&
+    apiContract.includes("readBoundedAuthBody(request)") &&
     apiContract.includes("AUTH_TRANSPORT_MAX_SOCIAL_SIGN_IN_BODY_BYTES") &&
     route.includes("forwardedRequest") &&
-    route.indexOf("createReviewedGoogleSocialSignInRequest") <
+    route.indexOf("createReviewedAuthRequest") <
       route.indexOf("runtime.auth.handler()");
-  if (allowedAuthApiEndpoints !== 2) {
+  if (allowedAuthApiEndpoints !== 8) {
     findings.push("auth_endpoint_allowlist_drift");
   }
-  if (!googleSocialProviderRestricted) {
+  if (!socialProvidersRestricted) {
     findings.push("auth_social_provider_guard_missing");
   }
-  if (!strictGoogleSocialSignInBody) {
+  if (!strictAuthRequestBodies) {
     findings.push("auth_social_sign_in_body_contract_missing");
   }
+  if (!naverAuthSdkPinned) findings.push("naver_auth_sdk_version_drift");
+
+  const naverRuntime = sources.get("src/lib/auth/naver-auth-runtime.ts") ?? "";
+  const naverConfig = sources.get("src/lib/auth/naver-auth-config.ts") ?? "";
+  const naverRequest = sources.get("src/lib/auth/naver-auth-request.ts") ?? "";
+  const naverIdentityProtected =
+    naverRuntime.includes('import "server-only"') &&
+    naverRuntime.includes("getToken({") &&
+    naverRuntime.includes('token.authProvider !== "naver" || token.aud !== origin') &&
+    naverConfig.includes('checks: ["state"]') &&
+    naverConfig.includes('strategy: "jwt"') &&
+    naverConfig.includes('profile.resultcode !== "00"') &&
+    naverRequest.includes("isSameOriginAuthRequest(request)") &&
+    naverRequest.includes("csrfToken") &&
+    naverRequest.includes("url.origin !== origin");
+  if (!naverIdentityProtected) findings.push("naver_auth_boundary_incomplete");
+  const sessionReader = sources.get("src/lib/auth/current-session-subject.ts") ?? "";
+  const verifiedEmailAndSessionIsolation =
+    sessionReader.includes("emailVerified === true") &&
+    sessionReader.includes('if (!emailVerified) return state("unverified")') &&
+    sessionReader.includes("resolveProviderSessions(neon, naver)") &&
+    route.includes("expireNaverSessionCookies(request, response)");
+  if (!verifiedEmailAndSessionIsolation) findings.push("multi_provider_session_boundary_incomplete");
 
   const sessionPage = sources.get("src/app/auth/session/page.tsx") ?? "";
   if (/\.user\.(?:email|name|image)|provider[_A-Z]?subject/i.test(sessionPage)) {
@@ -223,13 +268,17 @@ export function auditAuthTransportRuntime(root) {
       publicAuthEnvironmentReferences: runtimeSources.filter((source) =>
         PUBLIC_AUTH_ENVIRONMENT.test(source),
       ).length,
-      authSdkPinned: authSdkVersion === "0.4.2-beta",
+      authSdkPinned:
+        authSdkVersion === REVIEWED_AUTH_SDK_VERSIONS["@neondatabase/auth"],
+      naverAuthSdkPinned,
       previewRuntimeDisabled: !previewRuntimeEnabled,
       productionRuntimeEnabled,
       authTargetFingerprintGuardPresent,
       allowedAuthApiEndpoints,
-      googleSocialProviderRestricted,
-      strictGoogleSocialSignInBody,
+      socialProvidersRestricted,
+      strictAuthRequestBodies,
+      naverIdentityProtected,
+      verifiedEmailAndSessionIsolation,
       basicAuthBoundaryIntact,
       oauthCallbackExchangeProxyPresent,
       authEntryOutsideBasicAuthMatcher,

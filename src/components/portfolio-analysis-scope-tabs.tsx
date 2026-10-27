@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import type { ComponentProps, ComponentType } from "react";
+import { useI18n } from "@/components/i18n/locale-provider";
+import { ScrollableNavRail } from "@/components/scrollable-nav-rail";
 
 import {
   buildPortfolioAnalysisScopeHref,
@@ -12,41 +17,71 @@ export function PortfolioAnalysisScopeTabs({
   query,
   scopes,
   selectedScopeKey,
+  variant = "segmented",
+  linkComponent: ScopeLink = Link,
 }: {
   basePath: string;
   query?: PortfolioAnalysisScopeQuery;
   scopes: readonly PortfolioAnalysisScope[];
   selectedScopeKey: PortfolioAnalysisScopeKey | null;
+  variant?: "segmented" | "underline";
+  linkComponent?: typeof Link | ComponentType<ComponentProps<typeof Link>>;
 }) {
+  const {t} = useI18n();
+  const underline = variant === "underline";
+  const labelCounts = new Map<string, number>();
+  for (const scope of scopes) {
+    if (scope.kind !== "all") labelCounts.set(scope.label, (labelCounts.get(scope.label) ?? 0) + 1);
+  }
+
   return (
-    <nav
-      aria-label="자산 분석 범위"
-      className="flex max-w-full gap-1 overflow-x-auto rounded-md border border-[#d8ddd2] bg-white p-1"
+    <ScrollableNavRail
+      ariaLabel={t("자산 분석 범위", "Portfolio scope")}
+      scopeRail
+      viewportClassName={
+        underline
+          ? "max-w-full pb-1 text-sm"
+          : "max-w-full"
+      }
+      contentClassName={
+        underline
+          ? "flex w-max min-w-full items-center gap-7 sm:gap-10"
+          : "cairn-tabs w-max min-w-full"
+      }
     >
       {scopes.map((scope) => {
         const selected = scope.key === selectedScopeKey;
         return (
-          <Link
+          <ScopeLink
             key={scope.key}
             aria-current={selected ? "page" : undefined}
-            aria-label={`${scope.label} ${scopeKindLabel(scope)}`}
-            className={`min-w-16 rounded px-3 py-2 text-center text-sm font-semibold whitespace-nowrap ${
-              selected
-                ? "bg-[#173f38] text-white"
-                : "text-[#48524a] hover:bg-[#edf1eb]"
-            }`}
+            aria-label={`${scope.kind === "all" ? t("전체 자산") : scope.label} ${t(scopeKindLabel(scope))}`}
+            className={
+              underline
+                ? `shrink-0 border-b py-2 font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
+                    selected
+                      ? "border-[var(--ink)] text-[var(--ink)]"
+                      : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`
+                : "min-w-16 text-center font-medium whitespace-nowrap"
+            }
             href={buildPortfolioAnalysisScopeHref(basePath, scope.key, query)}
           >
-            {scope.label}
-          </Link>
+            {scope.kind === "all" ? t(underline ? "전체 자산" : "전체") : scope.label}
+            {scope.kind !== "all" && (labelCounts.get(scope.label) ?? 0) > 1 ? (
+              <span className="ml-1.5 text-[0.75em] font-normal opacity-80">
+                {scope.kind === "account" ? t("계좌", "Account") : t("분석 범위", "Scope")}
+              </span>
+            ) : null}
+          </ScopeLink>
         );
       })}
-    </nav>
+    </ScrollableNavRail>
   );
 }
 
 function scopeKindLabel(scope: PortfolioAnalysisScope) {
-  if (scope.kind === "portfolio_group") return "자산 그룹";
+  if (scope.kind === "portfolio_group") return "분석 범위";
   if (scope.kind === "account") return "계좌";
   return "전체 자산";
 }

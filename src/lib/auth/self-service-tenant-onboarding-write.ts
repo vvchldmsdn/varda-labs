@@ -29,7 +29,10 @@ export async function createCurrentSessionTenant(
   if (!parsed.ok) return state("invalid", parsed.message);
 
   const session = await readCurrentSessionSubject();
-  if (session.state !== "authenticated") {
+  if (
+    session.state !== "authenticated" ||
+    !SELF_SERVICE_TENANT_ONBOARDING_POLICY.providers.includes(session.provider)
+  ) {
     return state(
       "unauthorized",
       session.state === "unauthenticated"

@@ -32,6 +32,8 @@ export type TenantLegacyTargetPolicyRead =
 export type TenantPortfolioTargetPolicyRow = Readonly<{
   accountId: string;
   assetId: string;
+  originAssetId?: string | null;
+  assetType?: string | null;
   assetName: string;
   market: string;
   currency: string;
@@ -149,6 +151,8 @@ const PORTFOLIO_TARGET_POLICY_SQL = `
     revision.approved_at::text as approved_at,
     policy_row.account_id::text as row_account_id,
     policy_row.asset_id::text as row_asset_id,
+    policy_row.origin_asset_id::text as row_origin_asset_id,
+    policy_row.asset_type as row_asset_type,
     policy_row.asset_name as row_asset_name,
     policy_row.market as row_market,
     policy_row.currency as row_currency,
@@ -156,8 +160,13 @@ const PORTFOLIO_TARGET_POLICY_SQL = `
     policy_row.buyability as row_buyability,
     policy_row.target_weight_bps as row_target_weight_bps
   from public.portfolio_target_policy_revisions as revision
-  left join public.portfolio_target_policy_rows as policy_row
-    on policy_row.approval_revision_id = revision.id
+  left join (
+    select approval_revision_id,account_id,asset_id,asset_id as origin_asset_id,null::varchar as asset_type,asset_name,market,currency,ticker,buyability,target_weight_bps
+    from public.portfolio_target_policy_rows
+    union all
+    select approval_revision_id,account_id,plan_row_id as asset_id,origin_asset_id,asset_type,asset_name,market,currency,ticker,buyability,target_weight_bps
+    from public.portfolio_target_plan_rows
+  ) as policy_row on policy_row.approval_revision_id = revision.id
   where revision.scope_kind = $1::varchar
     and revision.scope_account_id is not distinct from $2::uuid
     and revision.scope_portfolio_group_id is not distinct from $3::uuid
@@ -235,6 +244,8 @@ function projectPortfolioPolicy(
       Object.freeze({
         accountId: requiredString(row.row_account_id),
         assetId: requiredString(row.row_asset_id),
+        originAssetId: row.row_origin_asset_id === undefined ? requiredString(row.row_asset_id) : nullableString(row.row_origin_asset_id),
+        assetType: row.row_asset_type == null ? null : requiredString(row.row_asset_type),
         assetName: requiredString(row.row_asset_name),
         market: requiredString(row.row_market),
         currency: requiredString(row.row_currency),

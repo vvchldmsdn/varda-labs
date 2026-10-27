@@ -1,3 +1,4 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type {
   PortfolioHoldingAdjustmentReason,
   PortfolioHoldingClassification,
@@ -14,7 +15,7 @@ export function SpecialHoldingsCoverage({
   return (
     <section
       aria-labelledby="special-holdings-coverage-title"
-      className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="border-t border-[var(--line)] pt-8 lg:pt-10"
       data-adjustable-position-count={model.adjustablePositionCount}
       data-managed-sleeve-count={model.managedSleeveCount}
       data-physical-commodity-count={model.physicalCommodityPositionCount}
@@ -25,23 +26,23 @@ export function SpecialHoldingsCoverage({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
+          <p className="text-[11px] font-medium text-[var(--muted)]">
+            SPECIAL HOLDINGS
+          </p>
           <h2
-            className="text-lg font-semibold tracking-normal"
+            className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="special-holdings-coverage-title"
           >
-            특수 보유자산 커버리지·조정 가능성
-          </h2>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
-            저장된 상품 유형과 상장 식별 근거만 사용합니다. 이름으로 상품
-            유형을 추론하지 않으며, 이 표시는 추천·주문 권한이 아닙니다.
-          </p>
+            <PortfolioText ko={"특수 보유자산 커버리지·조정 가능성"} />{" "}</h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--muted)]">
+            <PortfolioText ko={"저장된 상품 유형과 상장 식별 근거만 사용합니다. 이름으로 상품 유형을 추론하지 않으며, 이 표시는 추천·주문 권한이 아닙니다."} />{" "}</p>
         </div>
-        <p className="text-sm font-semibold text-[#3f4b40]">
-          상태 {statusLabel(model.status)}
+        <p className="text-sm font-medium text-[var(--muted)]">
+          <PortfolioText ko={"상태"} />{" "}<PortfolioText ko={statusLabel(model.status)} />
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-7 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCell
           detail={`평가액 비중 ${formatPercent(model.adjustableValuedWeightPct)}`}
           label="조정 가능"
@@ -70,41 +71,39 @@ export function SpecialHoldingsCoverage({
       </div>
 
       {model.attentionRows.length === 0 ? (
-        <p className="mt-4 rounded-md border border-[#d8e4d2] bg-[#f3faef] px-4 py-3 text-sm text-[#36563a]">
-          현재 선택 범위의 모든 보유자산이 상장 종목 identity와 평가 근거를
-          갖고 있습니다.
-        </p>
+        <p className="mt-6 border-y border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--brand)]">
+          <PortfolioText ko={"현재 선택 범위의 모든 보유자산이 상장 종목 identity와 평가 근거를 갖고 있습니다."} />{" "}</p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left text-sm">
-            <thead className="text-xs uppercase text-[#687064]">
+            <thead className="text-xs uppercase text-[var(--muted)]">
               <tr>
-                <TableHeader>보유자산</TableHeader>
-                <TableHeader>계정</TableHeader>
-                <TableHeader>분류</TableHeader>
-                <TableHeader>평가 상태</TableHeader>
-                <TableHeader align="right">평가액</TableHeader>
-                <TableHeader align="right">평가 비중</TableHeader>
-                <TableHeader>조정 제외 이유</TableHeader>
+                <TableHeader><PortfolioText ko={"보유자산"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"계정"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"분류"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"평가 상태"} /></TableHeader>
+                <TableHeader align="right"><PortfolioText ko={"평가액"} /></TableHeader>
+                <TableHeader align="right"><PortfolioText ko={"평가 비중"} /></TableHeader>
+                <TableHeader><PortfolioText ko={"조정 제외 이유"} /></TableHeader>
               </tr>
             </thead>
             <tbody>
               {model.attentionRows.map((row) => (
                 <tr key={row.key}>
                   <TableCell strong>
-                    <div>{row.ticker ?? "-"}</div>
-                    <div className="text-xs font-normal text-[#687064]">
-                      {row.name}
+                    <div>{row.name}</div>
+                    <div className="text-xs font-normal text-[var(--muted)]">
+                      {row.ticker ?? <PortfolioText ko="종목 코드 없음" />}
                     </div>
                   </TableCell>
                   <TableCell>{row.account}</TableCell>
-                  <TableCell>{classificationLabel(row.classification)}</TableCell>
-                  <TableCell>{valuationLabel(row.valuationStatus)}</TableCell>
+                  <TableCell><PortfolioText ko={classificationLabel(row.classification)} /></TableCell>
+                  <TableCell><PortfolioText ko={valuationLabel(row.valuationStatus)} /></TableCell>
                   <TableCell align="right">{formatKrw(row.currentValueKrw)}</TableCell>
                   <TableCell align="right">
                     {formatPercent(row.currentWeightPct)}
                   </TableCell>
-                  <TableCell>{reasonLabel(row.adjustmentReason)}</TableCell>
+                  <TableCell><PortfolioText ko={reasonLabel(row.adjustmentReason)} /></TableCell>
                 </tr>
               ))}
             </tbody>
@@ -112,10 +111,9 @@ export function SpecialHoldingsCoverage({
         </div>
       )}
 
-      <p className="mt-3 text-xs text-[#73786c]">
-        평가 완료 {model.valuedPositionCount}개 · 평가 제외 {" "}
-        {model.excludedPositionCount}개 · 조정 제외 {model.ineligiblePositionCount}개
-      </p>
+      <p className="mt-3 text-xs text-[var(--muted)]">
+        <PortfolioText ko={"평가 완료"} />{" "}{model.valuedPositionCount}<PortfolioText ko={"개 · 평가 제외"} />{" "}{" "}
+        {model.excludedPositionCount}<PortfolioText ko={"개 · 조정 제외"} />{" "}{model.ineligiblePositionCount}<PortfolioText ko={"개"} />{" "}</p>
     </section>
   );
 }
@@ -130,12 +128,12 @@ function SummaryCell({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-[#e2e6da] bg-white p-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-2 text-xl font-semibold tabular-nums text-[#111411]">
-        {value}
+    <div className="min-w-0 border-b border-[var(--wash)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
+      <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={label} /></p>
+      <p className="mt-3 text-xl font-medium tabular-nums text-[var(--ink)]">
+        <PortfolioText ko={value} />
       </p>
-      <p className="mt-1 text-xs text-[#73786c]">{detail}</p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><PortfolioText ko={detail} /></p>
     </div>
   );
 }
@@ -149,7 +147,7 @@ function TableHeader({
 }) {
   return (
     <th
-      className={`border-b border-[#dfe3d5] px-3 py-2 font-semibold ${
+      className={`border-b border-[var(--line)] px-3 py-2 font-semibold ${
         align === "right" ? "text-right" : "text-left"
       }`}
     >
@@ -169,7 +167,7 @@ function TableCell({
 }) {
   return (
     <td
-      className={`border-b border-[#edf0e7] px-3 py-2 align-top ${
+      className={`border-b border-[var(--wash)] px-3 py-2 align-top ${
         align === "right" ? "text-right" : "text-left"
       } ${strong ? "font-semibold" : ""}`}
     >

@@ -6,6 +6,7 @@ import {
   INVESTMENT_LAB_EXECUTION_POLICY,
   scheduleInvestmentLabBoundaryFlows,
 } from "../../src/lib/investment-lab-execution-schedule.ts";
+import { resolvePreferredInvestmentLabCloseEvidence } from "./investment-lab-close-evidence.mjs";
 
 export function auditInvestmentLabEventFlowEvidence({
   eventRows,
@@ -23,10 +24,8 @@ export function auditInvestmentLabEventFlowEvidence({
   const eligible = classified.filter(
     ({ classification }) => classification.includedInV1,
   );
-  const closes = closeRows.map((row) => ({
-    priceDate: row.price_date,
-    adjustedClose: number(row.adjusted_close_price),
-  }));
+  const closeEvidence = resolvePreferredInvestmentLabCloseEvidence(closeRows);
+  const closes = closeEvidence.rows;
   const windowEndPriceDate = closes.at(-1)?.priceDate ?? "invalid";
   const schedule = scheduleInvestmentLabBoundaryFlows({
     events: eligible.map(({ row, classification }) => ({
@@ -68,6 +67,10 @@ export function auditInvestmentLabEventFlowEvidence({
       priceRows: closes.length,
       priceStartDate: closes[0]?.priceDate ?? null,
       priceEndDate: closes.at(-1)?.priceDate ?? null,
+      priceBasis: closeEvidence.priceBasis,
+      suppliedPriceRows: closeRows.length,
+      adjustedAdmittedRows: closeEvidence.adjustedAdmittedRows,
+      privateRawAdmittedRows: closeEvidence.privateRawAdmittedRows,
       status: schedule.status,
       scheduledRows: schedule.scheduledFlows.length,
       sameDayRows: schedule.sameDayFlowCount,

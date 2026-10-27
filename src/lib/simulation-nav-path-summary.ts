@@ -1,8 +1,9 @@
 import { summarizeSimulationTerminalDownsideTail } from "./simulation-terminal-downside-tail.ts";
+import { buildSimulationDisplayPaths } from "./simulation-display-paths.ts";
 
 export const SIMULATION_NAV_PATH_SUMMARY_POLICY = Object.freeze({
-  version: "simulation_nav_path_summary_v1",
-  requiredPathCount: 500,
+  version: "simulation_nav_path_summary_v2",
+  supportedPathCounts: Object.freeze([500, 1000] as const),
   quantileMethod: "type_7",
   normalizedStartNav: 1,
   sampleSelection: "terminal_rank_stratified",
@@ -16,9 +17,10 @@ export function summarizeSimulationNavPaths(input: {
   paths: readonly (readonly number[])[];
   horizon: number;
   samplePathCount: number;
+  includeDisplayPaths?: boolean;
 }) {
   if (
-    input.paths.length !== SIMULATION_NAV_PATH_SUMMARY_POLICY.requiredPathCount ||
+    !SIMULATION_NAV_PATH_SUMMARY_POLICY.supportedPathCounts.some((count) => count === input.paths.length) ||
     !Number.isInteger(input.horizon) ||
     input.horizon <= 0 ||
     !Number.isInteger(input.samplePathCount) ||
@@ -126,6 +128,10 @@ export function summarizeSimulationNavPaths(input: {
     }),
     bands: Object.freeze(bands),
     samplePaths: Object.freeze(samplePaths),
+    displayPaths: input.includeDisplayPaths ? buildSimulationDisplayPaths({
+      pathCount: input.paths.length, horizon: input.horizon,
+      navAt: (pathIndex, stepIndex) => input.paths[pathIndex][stepIndex],
+    }) : null,
   });
 }
 
@@ -165,5 +171,6 @@ function blocked(
     terminal: null,
     bands: Object.freeze([]),
     samplePaths: Object.freeze([]),
+    displayPaths: null,
   });
 }

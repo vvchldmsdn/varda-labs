@@ -1,5 +1,5 @@
 import {
-  admitPrivateSingleTenantRawTrendEvidenceRows,
+  admitSharedKisRawTrendEvidenceRows,
   type RawHistoricalPriceConsumerEvidenceRow,
 } from "./market-data/asset-price-consumer-admission.ts";
 import {
@@ -65,6 +65,7 @@ export type HoldingAnalysisDataPreparationActionState = Readonly<{
     | "success"
     | "already_ready"
     | "busy"
+    | "queued"
     | "invalid"
     | "unauthorized"
     | "conflict"
@@ -78,10 +79,9 @@ const UUID_PATTERN =
 const MANAGED_ASSET_TYPES = new Set(["managed_product", "managed_sleeve"]);
 
 export function buildHoldingAnalysisDataReadiness(input: {
+  requireAdjusted?: boolean;
   holding: HoldingAnalysisDataCandidate;
   serviceDate: string;
-  requestedOwnerUserId: string;
-  activeOwnerUserIds: readonly string[];
   priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
 }): HoldingAnalysisDataReadiness {
@@ -89,14 +89,6 @@ export function buildHoldingAnalysisDataReadiness(input: {
   const unsupported = unsupportedReason(input.holding, classification);
   if (unsupported) {
     return terminalReadiness(input.holding.holdingId, "unsupported", unsupported);
-  }
-
-  if (!hasPrivateOwnerScope(input.requestedOwnerUserId, input.activeOwnerUserIds)) {
-    return terminalReadiness(
-      input.holding.holdingId,
-      "blocked",
-      "private_owner_scope_not_established",
-    );
   }
 
   const matchingRows = input.priceRows.filter((row) =>
@@ -111,11 +103,7 @@ export function buildHoldingAnalysisDataReadiness(input: {
     );
   }
 
-  const admission = admitPrivateSingleTenantRawTrendEvidenceRows({
-    rows: matchingRows,
-    requestedOwnerUserId: input.requestedOwnerUserId,
-    activeOwnerUserIds: input.activeOwnerUserIds,
-  });
+  const admission = admitSharedKisRawTrendEvidenceRows(matchingRows);
   if (admission.status !== "ready") {
     return terminalReadiness(
       input.holding.holdingId,
@@ -138,8 +126,7 @@ export function buildHoldingAnalysisDataReadiness(input: {
   const trendReady =
     observationCount >= HOLDING_ANALYSIS_DATA_READINESS_POLICY.trendObservationCount;
   const history = buildPrivateOwnerRawHistory({
-    requestedOwnerUserId: input.requestedOwnerUserId,
-    activeOwnerUserIds: input.activeOwnerUserIds,
+    requireAdjusted: input.requireAdjusted,
     requestedEndServiceDate: latestServiceDate ?? input.serviceDate,
     returnStepCount:
       HOLDING_ANALYSIS_DATA_READINESS_POLICY.simulationReturnStepCount,
@@ -276,17 +263,6 @@ function unsupportedReason(
   return identity === "korea/KRW" || identity === "us/USD"
     ? null
     : "provider_market_unsupported";
-}
-
-function hasPrivateOwnerScope(
-  requestedOwnerUserId: string,
-  activeOwnerUserIds: readonly string[],
-) {
-  const requested = requestedOwnerUserId.trim().toLowerCase();
-  const active = [
-    ...new Set(activeOwnerUserIds.map((value) => value.trim().toLowerCase())),
-  ];
-  return requested.length > 0 && active.length === 1 && active[0] === requested;
 }
 
 function matchesHolding(

@@ -1,4 +1,5 @@
 import "server-only";
+import {findVerifiedHistoricalWindow} from "@/lib/shared-domain/simulation-verified-window";
 
 import {
   and,
@@ -16,7 +17,7 @@ import {
   assetPriceSnapshots,
   fxRates,
 } from "@/db/schema";
-import { planSimulationPeriodPreflightScan } from "@/lib/simulation-period-preflight-plan";
+import { planSimulationPeriodPreflightScan } from "@/lib/shared-domain/simulation-period-preflight-plan";
 import {
   buildSimulationOwnerHistoricalValidationEndpointDates,
   SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY,
@@ -26,15 +27,12 @@ import {
   resolveLatestCommonPrivateOwnerRawServiceDate,
   resolvePrivateOwnerRawAvailableServiceDates,
   type PrivateOwnerRawHistoryInstrumentInput,
-} from "@/lib/simulation-private-owner-raw-history";
+} from "@/lib/shared-domain/simulation-private-owner-raw-history";
 import type { SimulationResearchUniverseSelection } from "@/lib/simulation-research-universe-preflight";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
-export { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
-
 export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
 }) {
   if (options.selection.status !== "valid") return null;
@@ -54,7 +52,13 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
         market: normalizedMarket,
         currency: normalizedCurrency,
         ticker: normalizedTicker,
-        latestSourceDate: sql<string | null>`max(${assetPriceSnapshots.priceDate})`,
+        // A newer raw-only close must not displace the latest usable adjusted research window.
+        latestSourceDate: sql<string | null>`max(${assetPriceSnapshots.priceDate}) filter (where
+          ${assetPriceSnapshots.adjustedClosePrice} > 0
+          and ${assetPriceSnapshots.adjustedCloseBasis}='provider_adjusted_close_v1'
+          and ${assetPriceSnapshots.adjustedCloseProvider}='kis'
+          and right(${assetPriceSnapshots.adjustedCloseSource},12)=':adjusted_v1'
+          and ${assetPriceSnapshots.adjustedCloseFetchedAt} is not null)`,
         providerBindingCount: sql<number>`count(distinct (upper(trim(${assetPriceSnapshots.providerSymbol})) || '|' || upper(trim(${assetPriceSnapshots.providerExchange}))))`,
       })
       .from(assetPriceSnapshots)
@@ -90,8 +94,6 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
   ]);
 
   return resolveLatestCommonPrivateOwnerRawServiceDate({
-    requestedOwnerUserId: options.tenantContext.ownerUserId,
-    activeOwnerUserIds: options.activeOwnerUserIds,
     instruments,
     latestSourceRows,
     latestFxSourceDate: latestFxRows[0]?.latestSourceDate ?? null,
@@ -100,14 +102,12 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
 
 export async function getReadOnlyPrivateOwnerRawHistoryBundle(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   endServiceDate: string;
   returnStepCount?: number;
 }) {
   const [result] = await getReadOnlyPrivateOwnerRawHistoryBatch({
     tenantContext: options.tenantContext,
-    activeOwnerUserIds: options.activeOwnerUserIds,
     selection: options.selection,
     requests: [
       {
@@ -121,7 +121,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryBundle(options: {
 
 export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   requests: readonly Readonly<{
     endServiceDate: string;
@@ -136,9 +135,9 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
       const hasQueryablePlan =
         plan?.status === "queryable" && plan.queryRange !== null;
       return buildPrivateOwnerRawHistory({
-        requestedOwnerUserId: options.tenantContext.ownerUserId,
-        activeOwnerUserIds: options.activeOwnerUserIds,
+        requireAdjusted: true,
         requestedEndServiceDate: request.endServiceDate,
+        sourceDateFrom: plan?.queryRange?.sourceDateFrom,
         returnStepCount: request.returnStepCount,
         instruments: source.instruments,
         priceRows: hasQueryablePlan ? source.priceRows : [],
@@ -151,7 +150,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryBatch(options: {
 export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   options: {
     tenantContext: TenantContext;
-    activeOwnerUserIds: readonly string[];
     selection: SimulationResearchUniverseSelection;
     endServiceDate: string;
     currentReturnStepCount?: number;
@@ -163,7 +161,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
     policy.outcomeReturnStepCount * (policy.maximumEndpointCount - 1);
   const source = await loadPrivateOwnerRawHistorySource({
     tenantContext: options.tenantContext,
-    activeOwnerUserIds: options.activeOwnerUserIds,
     selection: options.selection,
     requests: [
       {
@@ -175,15 +172,14 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   const plan = source.plans[0];
   const hasQueryablePlan =
     plan?.status === "queryable" && plan.queryRange !== null;
-  const ownerScopeReady =
-    options.activeOwnerUserIds.length === 1 &&
-    options.activeOwnerUserIds[0] === options.tenantContext.ownerUserId;
   const priceRows = hasQueryablePlan ? source.priceRows : [];
   const fxRows = hasQueryablePlan ? source.fxRows : [];
   const availableServiceDates =
-    ownerScopeReady && hasQueryablePlan
+    hasQueryablePlan
       ? resolvePrivateOwnerRawAvailableServiceDates({
           endServiceDate: options.endServiceDate,
+          sourceDateFrom: plan?.queryRange?.sourceDateFrom,
+          instruments: source.instruments,
           priceRows,
           fxRows,
           requiresFx: source.requiresFx,
@@ -195,9 +191,9 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
   );
   const buildResult = (endServiceDate: string, returnStepCount: number) =>
     buildPrivateOwnerRawHistory({
-      requestedOwnerUserId: options.tenantContext.ownerUserId,
-      activeOwnerUserIds: options.activeOwnerUserIds,
+        requireAdjusted: true,
       requestedEndServiceDate: endServiceDate,
+      sourceDateFrom: plan?.queryRange?.sourceDateFrom,
       returnStepCount,
       instruments: source.instruments,
       priceRows,
@@ -227,7 +223,6 @@ export async function getReadOnlyPrivateOwnerRawHistoryValidationBatch(
 
 async function loadPrivateOwnerRawHistorySource(options: {
   tenantContext: TenantContext;
-  activeOwnerUserIds: readonly string[];
   selection: SimulationResearchUniverseSelection;
   requests: readonly Readonly<{
     endServiceDate: string;
@@ -298,6 +293,11 @@ async function loadRawPriceRows(input: {
       ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
       priceDate: assetPriceSnapshots.priceDate,
       closePrice: assetPriceSnapshots.closePrice,
+      adjustedClosePrice:assetPriceSnapshots.adjustedClosePrice,
+      adjustedCloseBasis:assetPriceSnapshots.adjustedCloseBasis,
+      adjustedCloseProvider:assetPriceSnapshots.adjustedCloseProvider,
+      adjustedCloseSource:assetPriceSnapshots.adjustedCloseSource,
+      adjustedCloseFetchedAt:assetPriceSnapshots.adjustedCloseFetchedAt,
       source: assetPriceSnapshots.source,
       providerSymbol: assetPriceSnapshots.providerSymbol,
       providerExchange: assetPriceSnapshots.providerExchange,

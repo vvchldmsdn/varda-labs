@@ -195,13 +195,162 @@ export const HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES =
   ...HOLDING_STATE_CORRECTION_TABLE_POLICIES,
   ]);
 
-export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+export const HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
   ...HOLDING_STATE_CORRECTION_EXPANDED_TENANT_TABLE_POLICIES,
   ...HOLDING_LIFECYCLE_TABLE_POLICIES,
 ]);
 
+export const MARKET_COLLECTION_TABLE_POLICIES = Object.freeze([
+  adminSystem("market_collection_jobs"), adminSystem("market_provider_budgets"),
+]);
+export const MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES, ...MARKET_COLLECTION_TABLE_POLICIES,
+]);
+export const INVESTMENT_PLAN_TABLE_POLICIES = Object.freeze([
+  userOwned("investment_plans", "owner_user_id", "not_applicable"),
+]);
+export const NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES = Object.freeze([
+  userOwned("native_contribution_plans", "owner_user_id", "not_applicable"),
+]);
+export const SIMULATION_EXECUTION_TABLE_POLICIES = Object.freeze([
+  userOwned("simulation_executions", "owner_user_id", "not_applicable"),
+  userOwned("simulation_execution_chunks", "owner_user_id", "not_applicable"),
+  adminSystem("simulation_execution_service"),
+  adminSystem("simulation_execution_frequency"),
+]);
+export const PORTFOLIO_DRAFT_TABLE_POLICIES = Object.freeze([
+  userOwned("portfolio_drafts", "owner_user_id", "not_applicable"),
+]);
+export const MEMBER_ACTIVITY_TABLE_POLICIES = Object.freeze([adminSystem("member_activity_daily"), adminSystem("member_activity_profiles")]);
+export const PROVIDER_RESERVATION_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_reservations")]);
+// License-scoped evidence is intentionally private to the server admission service.
+export const PROVIDER_EVIDENCE_TABLE_POLICIES = Object.freeze([adminSystem("market_provider_observations"), adminSystem("market_provider_action_coverage"), adminSystem("market_provider_corporate_actions")]);
+export const BROKER_RECOVERY_TABLE_POLICIES = Object.freeze([userOwned("broker_recovery_batches")]);
+// Operational access does not make account-specific retry/revision data shared.
+// Direct tenant DML stays forbidden by 0059; fixed functions and the trusted
+// worker derive canonical ownership from the verified session/account rows.
+export const TRADE_DAILY_RELIABILITY_TABLE_POLICIES = Object.freeze([
+  adminSystem("trade_reliability_runtime"),
+  userOwned("native_ledger_revisions", TRANSITIONAL_OWNER_COLUMN),
+  userOwned("native_operation_cancellations", TRANSITIONAL_OWNER_COLUMN),
+  userOwned("daily_snapshot_work", TRANSITIONAL_OWNER_COLUMN),
+]);
+
+// 0063 is a later, optional expansion of the 0059 reliability schema.
+// Private before-images retain tenant ownership even though only the worker
+// may read or write them; older schemas must not require this absent table.
+export const HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES = Object.freeze([
+  userOwned("holdings_snapshot_repair_archive", TRANSITIONAL_OWNER_COLUMN),
+]);
+
+export const SNAPSHOT_CUTOFF_TABLE_POLICIES = Object.freeze([
+  sharedReference("snapshot_cutoff_price_observations"),
+  sharedReference("snapshot_cutoff_fx_observations"),
+]);
+
+export const PORTFOLIO_TARGET_PLAN_TABLE_POLICIES = Object.freeze([userOwned("portfolio_target_plan_rows", TRANSITIONAL_OWNER_COLUMN)]);
+
+export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
+  ...SNAPSHOT_CUTOFF_TABLE_POLICIES,
+  ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES,
+  ...BROKER_RECOVERY_TABLE_POLICIES,
+  ...SIMULATION_EXECUTION_TABLE_POLICIES,
+  ...MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES, ...INVESTMENT_PLAN_TABLE_POLICIES, ...PORTFOLIO_DRAFT_TABLE_POLICIES, ...MEMBER_ACTIVITY_TABLE_POLICIES, ...PROVIDER_RESERVATION_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES, ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES,
+  ...PORTFOLIO_TARGET_PLAN_TABLE_POLICIES,
+  ...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES,
+]);
+
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
+  if (publicTableSet.has("holdings_snapshot_repair_archive")) {
+    const dependencies = [
+      ...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table),
+      ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES.map(({ table }) => table),
+      "accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots", "daily_position_snapshots",
+    ];
+    if (!dependencies.every(table => publicTableSet.has(table))) {
+      throw new Error("holdings snapshot repair archive requires complete ownership, reliability and snapshot tables");
+    }
+    return Object.freeze([
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "holdings_snapshot_repair_archive")),
+      ...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES,
+    ]);
+  }
+  const cutoffTables=SNAPSHOT_CUTOFF_TABLE_POLICIES.map(({table})=>table);
+  if(cutoffTables.some(table=>publicTableSet.has(table))) {
+    if(!cutoffTables.every(table=>publicTableSet.has(table)) || !["live_price_quotes","fx_rates"].every(table=>publicTableSet.has(table))) throw new Error("cutoff observations require both archives and shared caches");
+    return Object.freeze([...cutoffTables.map(sharedReference),...resolveTenantTablePolicies(publicTableNames.filter(table=>!cutoffTables.includes(table)))]);
+  }
+  if (publicTableSet.has("portfolio_target_plan_rows")) {
+    if (!["app_users", "auth_identities", "accounts", "assets", "portfolio_target_policy_revisions", "portfolio_target_policy_rows", "portfolio_target_policy_lifecycle_events"].every(table => publicTableSet.has(table))) throw new Error("target plan requires complete ownership and target policy tables");
+    return Object.freeze([...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "portfolio_target_plan_rows")), ...PORTFOLIO_TARGET_PLAN_TABLE_POLICIES]);
+  }
+  if (TRADE_DAILY_RELIABILITY_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
+    if (!TRADE_DAILY_RELIABILITY_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("trade daily reliability tables must be expanded atomically");
+    }
+    const dependencies = [...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table), "accounts", "assets", "event_ledger_entries", "daily_portfolio_snapshots"];
+    if (!dependencies.every(table => publicTableSet.has(table))) {
+      throw new Error("trade daily reliability requires complete identity, account, ledger and snapshot tables");
+    }
+    return Object.freeze([
+      ...TRADE_DAILY_RELIABILITY_TABLE_POLICIES,
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => !TRADE_DAILY_RELIABILITY_TABLE_POLICIES.some(policy => policy.table === table))),
+    ]);
+  }
+  if (publicTableSet.has("broker_recovery_batches")) {
+    const dependencies = [...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table), "accounts", "assets", "event_ledger_entries", "holding_lifecycle_events", "portfolio_group_asset_memberships"];
+    if (!dependencies.every(table => publicTableSet.has(table))) throw new Error("broker recovery requires complete identity and holding lifecycle tables");
+    return Object.freeze([...BROKER_RECOVERY_TABLE_POLICIES, ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "broker_recovery_batches"))]);
+  }
+  if (SIMULATION_EXECUTION_TABLE_POLICIES.some(({table})=>publicTableSet.has(table))) {
+    if (!SIMULATION_EXECUTION_TABLE_POLICIES.every(({table})=>publicTableSet.has(table)) || !IDENTITY_CORE_TABLE_POLICIES.every(({table})=>publicTableSet.has(table))) throw new Error("simulation executions require complete execution tables and identity core");
+    return Object.freeze([...SIMULATION_EXECUTION_TABLE_POLICIES, ...resolveTenantTablePolicies(publicTableNames.filter(table=>!SIMULATION_EXECUTION_TABLE_POLICIES.some(policy=>policy.table===table)))]);
+  }
+  if (publicTableSet.has("native_contribution_plans")) {
+    if (!IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) throw new Error("native contribution plans require the complete identity core");
+    return Object.freeze([...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "native_contribution_plans")), ...NATIVE_CONTRIBUTION_PLAN_TABLE_POLICIES]);
+  }
+  if (PROVIDER_EVIDENCE_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
+    if (!PROVIDER_EVIDENCE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table)) || !publicTableSet.has("market_provider_reservations")) throw new Error("provider evidence requires complete evidence and reservation tables");
+    const prior = resolveTenantTablePolicies(publicTableNames.filter(table => !PROVIDER_EVIDENCE_TABLE_POLICIES.some(policy => policy.table === table)));
+    return Object.freeze([...prior, ...PROVIDER_EVIDENCE_TABLE_POLICIES]);
+  }
+  // 0049 is optional relative to the original collection expansion; never invent an absent ledger.
+  if (publicTableSet.has("market_provider_reservations")) {
+    if (!MARKET_COLLECTION_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("provider reservations require complete market collection tables");
+    }
+    const prior = resolveTenantTablePolicies(publicTableNames.filter(table => table !== "market_provider_reservations"));
+    if (!MARKET_COLLECTION_TABLE_POLICIES.every(({ table }) => prior.some(policy => policy.table === table))) {
+      throw new Error("provider reservations require the reviewed market collection expansion");
+    }
+    return Object.freeze([...prior, ...PROVIDER_RESERVATION_TABLE_POLICIES]);
+  }
+  if (MEMBER_ACTIVITY_TABLE_POLICIES.some(({ table }) => publicTableSet.has(table))) {
+    if (!MEMBER_ACTIVITY_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table)) || !IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) throw new Error("member activity requires complete activity and identity tables");
+    return Object.freeze([...resolveTenantTablePolicies(publicTableNames.filter(table => !MEMBER_ACTIVITY_TABLE_POLICIES.some(policy => policy.table === table))), ...MEMBER_ACTIVITY_TABLE_POLICIES]);
+  }
+  if (publicTableSet.has("portfolio_drafts")) {
+    if (!IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("portfolio drafts require the complete identity core");
+    }
+    return Object.freeze([
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "portfolio_drafts")),
+      ...PORTFOLIO_DRAFT_TABLE_POLICIES,
+    ]);
+  }
+  // Plans depend only on the verified identity core, not legacy portfolio data.
+  // Preserve each older staged schema without declaring an absent plan table.
+  if (publicTableSet.has("investment_plans")) {
+    if (!IDENTITY_CORE_TABLE_POLICIES.every(({ table }) => publicTableSet.has(table))) {
+      throw new Error("investment plans require the complete identity core");
+    }
+    return Object.freeze([
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "investment_plans")),
+      ...INVESTMENT_PLAN_TABLE_POLICIES,
+    ]);
+  }
   const presentCoreTables = IDENTITY_CORE_TABLE_POLICIES.filter(
     ({ table }) => publicTableSet.has(table),
   );
@@ -417,7 +566,10 @@ export function resolveTenantTablePolicies(publicTableNames) {
     throw new Error("holding lifecycle tables must be expanded atomically");
   }
 
-  return EXPANDED_TENANT_TABLE_POLICIES;
+  const presentCollectionTables = MARKET_COLLECTION_TABLE_POLICIES.filter(({ table }) => publicTableSet.has(table));
+  if (presentCollectionTables.length === 0) return HOLDING_LIFECYCLE_EXPANDED_TENANT_TABLE_POLICIES;
+  if (presentCollectionTables.length !== MARKET_COLLECTION_TABLE_POLICIES.length) throw new Error("market collection tables must be expanded atomically");
+  return MARKET_COLLECTION_EXPANDED_TENANT_TABLE_POLICIES;
 }
 
 export function summarizeTenantClassifications(policies = TENANT_TABLE_POLICIES) {

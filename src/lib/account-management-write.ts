@@ -2,7 +2,8 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { sqlClient } from "@/db/client";
+import { runPortfolioMutation } from "@/lib/portfolio-mutation-transaction";
+import { isNativeLedgerGuardError, NATIVE_ACCOUNT_BALANCE_MESSAGE } from "@/lib/native-ledger-compatibility";
 import {
   ACCOUNT_MANAGEMENT_POLICY,
   generatedAccountCode,
@@ -30,6 +31,7 @@ type WriteResult = Readonly<{
   inconsistent_asset_count?: string | number;
   restored_count?: string | number;
   saved_count?: string | number;
+  native_balance_count?: string | number;
 }>;
 
 export async function createSessionAccount(
@@ -55,7 +57,7 @@ export async function createSessionAccount(
       ACCOUNT_MANAGEMENT_POLICY.maximumActiveAccounts,
     ]);
     if (number(result.saved_count) === 1) {
-      return state("success", "Account created.");
+      return Object.freeze({ ...state("success", "Account created."), createdAccountId: accountId });
     }
     if (number(result.duplicate_name_count) > 0) {
       return state("conflict", "An active account already uses this name.");
@@ -122,6 +124,7 @@ export async function archiveSessionAccount(
     if (number(result.archived_count) === 1) {
       return state("success", "Account archived. Historical rows were preserved.");
     }
+    if (number(result.native_balance_count) > 0) return state("conflict", NATIVE_ACCOUNT_BALANCE_MESSAGE);
     if (number(result.inconsistent_asset_count) > 0) {
       return state(
         "conflict",
@@ -211,12 +214,8 @@ async function authorize(operation: "insert" | "update") {
 }
 
 async function runAtomicQuery(query: string, parameters: unknown[]) {
-  const results = await sqlClient.transaction((transaction) => [
-    transaction.query("set local lock_timeout = '2s'"),
-    transaction.query("set local statement_timeout = '8s'"),
-    transaction.query(query, parameters),
-  ]);
-  return (results[2]?.[0] ?? {}) as WriteResult;
+  const rows = await runPortfolioMutation(String(parameters[1]), query, parameters);
+  return (rows[0] ?? {}) as WriteResult;
 }
 
 function lockName(ownerUserId: string) {
@@ -231,6 +230,7 @@ function staleAccountState(result: WriteResult) {
 }
 
 function databaseFailure(error: unknown, message: string) {
+  if (isNativeLedgerGuardError(error)) return state("conflict", NATIVE_ACCOUNT_BALANCE_MESSAGE);
   const code = databaseErrorCode(error);
   return ["23503", "23505", "55P03", "57014"].includes(code ?? "")
     ? state("conflict", "Another account change completed first. Refresh the page.")
@@ -334,7 +334,7 @@ const ATOMIC_ARCHIVE_QUERY = `
 with lock_acquired as materialized (
   select pg_advisory_xact_lock(hashtextextended($1, 0))
 ), existing_account as materialized (
-  select account_row.id, account_row.code, account_row.updated_at
+  select account_row.id, account_row.code, account_row.updated_at, account_row.native_state
   from accounts account_row
   cross join lock_acquired
   where account_row.id = $3::uuid
@@ -344,6 +344,11 @@ with lock_acquired as materialized (
 ), facts as materialized (
   select
     (select count(*) from existing_account) as existing_account_count,
+    (select count(*) from existing_account a where a.native_state is not null and (
+      exists(select 1 from jsonb_each_text(a.native_state->'cash') c where c.value::numeric<>0)
+      or exists(select 1 from jsonb_array_elements(a.native_state->'positions') p where (p->>'quantity')::numeric<>0)
+      or jsonb_array_length(coalesce(a.native_state->'unsettledTrades','[]'::jsonb))>0
+    )) as native_balance_count,
     (
       select count(*)
       from existing_account
@@ -389,6 +394,7 @@ with lock_acquired as materialized (
     and facts.existing_account_count = 1
     and facts.exact_account_count = 1
     and facts.active_holding_count = 0
+    and facts.native_balance_count = 0
     and facts.inconsistent_asset_count = 0
     and facts.open_group_reference_count = 0
   returning account_row.id

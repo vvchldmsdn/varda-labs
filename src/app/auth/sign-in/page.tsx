@@ -1,36 +1,19 @@
-import { notFound } from "next/navigation";
-
-import { GoogleSignInButton } from "@/components/auth/auth-transport-controls";
-import { getAuthTransportRuntimeState } from "@/lib/auth/auth-transport-runtime";
+import { localizedMetadata } from "@/lib/i18n/server";
+import { AuthEntry } from "@/components/auth/auth-entry";
 
 export const dynamic = "force-dynamic";
+export async function generateMetadata() {
+  return localizedMetadata({
+  title: "로그인 | CAIRN LABS",
+  robots: { index: false, follow: false },
+}, "Sign in | CAIRN LABS");
+}
 
-export default function SignInPage() {
-  const runtime = getAuthTransportRuntimeState();
-  if (runtime.state === "disabled") notFound();
-
-  return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-md rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-          Sign in
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-[#566056]">
-          Google sign-in verifies your session. Portfolio access remains
-          unavailable until your account is explicitly linked.
-        </p>
-
-        <div className="mt-6">
-          {runtime.state === "ready" ? (
-            <GoogleSignInButton />
-          ) : (
-            <p className="rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
-              Authentication is unavailable.
-            </p>
-          )}
-        </div>
-      </section>
-    </main>
-  );
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ preview?: string; verified?: string; error?: string }>;
+}) {
+  const params = await searchParams;
+  return <AuthEntry mode="sign-in" preview={params.preview === "design"} verified={params.verified === "1" && !params.error} callbackError={Boolean(params.error)} />;
 }

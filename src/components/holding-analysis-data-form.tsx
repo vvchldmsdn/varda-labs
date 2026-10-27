@@ -1,6 +1,8 @@
 "use client";
 
+import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState } from "react";
+import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
 
 import { prepareHoldingAnalysisData } from "@/app/portfolio/holdings/actions";
 import type {
@@ -25,27 +27,25 @@ export function HoldingAnalysisDataForm({
     INITIAL_STATE,
   );
   const messageId = `holding-analysis-data-${holdingId}`;
+  const collectionState = useMarketCollectionPolling(state.status === "queued" && readiness?.state !== "ready", state, true);
 
   if (!readiness) {
-    return <p className="text-xs text-[#8a5b16]">상태 확인 불가</p>;
+    return <p className="text-xs text-[var(--warning)]"><ManagementText>{"상태 확인 불가"}</ManagementText></p>;
   }
 
   return (
-    <div className="min-w-[190px] text-xs text-[#5e685e]">
-      <p className="font-semibold text-[#35423a]">
-        {readinessLabel(readiness)}
+    <div className="min-w-[190px] text-xs text-[var(--muted)]">
+      <p className="font-semibold text-[var(--ink)]">
+        <ManagementText>{readinessLabel(readiness)}</ManagementText>
       </p>
       {readiness.state !== "unsupported" && readiness.state !== "blocked" ? (
         <>
-          <p className="mt-1 tabular-nums">
-            가격 {readiness.observationCount}일
-            {readiness.latestSourceDate
+          <p className="mt-1 tabular-nums"><ManagementText>{"가격"}</ManagementText>{readiness.observationCount}<ManagementText>{"일"}</ManagementText><ManagementText>{readiness.latestSourceDate
               ? ` · 최신 ${readiness.latestSourceDate}`
-              : ""}
+              : ""}</ManagementText>
           </p>
-          <p className="mt-1">
-            시뮬레이션 {readiness.simulationReady ? "가능" : "준비 중"} · 추세{" "}
-            {readiness.trendReady ? "가능" : "준비 중"}
+          <p className="mt-1"><ManagementText>{"시뮬레이션"}</ManagementText><ManagementText>{readiness.simulationReady ? "가능" : "준비 중"}</ManagementText><ManagementText>{"· 추세"}</ManagementText>{" "}
+            <ManagementText>{readiness.trendReady ? "가능" : "준비 중"}</ManagementText>
           </p>
         </>
       ) : null}
@@ -54,11 +54,11 @@ export function HoldingAnalysisDataForm({
           <input name="holdingId" type="hidden" value={holdingId} />
           <button
             aria-describedby={messageId}
-            className="rounded-md border border-[#9caf9f] bg-white px-2.5 py-1.5 font-semibold text-[#1e3a34] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-md border border-[var(--faint)] bg-white px-2.5 py-1.5 font-semibold text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={pending}
             type="submit"
           >
-            {pending ? "가격 확인 중" : "과거 가격 준비"}
+            <ManagementText>{pending ? "가격 확인 중" : "과거 가격 준비"}</ManagementText>
           </button>
         </form>
       ) : null}
@@ -67,12 +67,12 @@ export function HoldingAnalysisDataForm({
         className={[
           "mt-1 min-h-4 leading-5",
           state.status === "success" || state.status === "already_ready"
-            ? "text-[#1e5d49]"
-            : "text-[#8a5b16]",
+            ? "text-[var(--brand)]"
+            : "text-[var(--warning)]",
         ].join(" ")}
         id={messageId}
       >
-        {state.message}
+        <ManagementText>{collectionState === "waiting" ? "준비 요청이 대기 중입니다. 과거 가격 준비를 눌러 다시 확인할 수 있습니다." : state.message}</ManagementText>
       </p>
     </div>
   );

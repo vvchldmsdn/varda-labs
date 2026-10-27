@@ -1,0 +1,28 @@
+.host { position:relative; }
+.panel { position:absolute; inset:0 0 0 auto; z-index:6; width:min(600px,100%); overflow:auto; overscroll-behavior:contain; padding:20px 24px; border:1px solid var(--line); border-radius:12px; background:var(--paper); color:var(--ink); font-size:12px; box-shadow:-12px 0 32px #20211f0a; }
+.panel header { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; padding-bottom:8px; background:var(--paper); }
+.panel header p,.caption { color:var(--muted); font-size:11px; line-height:1.65; }
+.panel h3 { font-size:20px; font-weight:500; }
+.panel button { min-width:44px; min-height:44px; }
+.panel button:focus-visible,.panel input:focus-visible,.panel summary:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+.timeline label { display:flex; justify-content:space-between; gap:12px; }
+.timeline input { width:100%; accent-color:var(--ink); height:36px; }
+.summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:12px 0; }
+.summary dt { color:var(--muted); font-size:11px; }
+.summary dd { font-size:21px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.metrics { display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; }
+.metrics span { margin-left:auto; }
+.section { border-top:1px solid var(--line); margin-top:18px; padding-top:16px; }
+.section h4 { font-size:13px; font-weight:600; margin-bottom:8px; }
+.table { margin-top:10px; }
+.row { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr)); gap:8px; align-items:start; padding:9px 0; font-variant-numeric:tabular-nums; }
+.row span { overflow-wrap:anywhere; min-width:0; }
+.row span:not(:first-child) { text-align:right; }
+.row small { display:block; font-size:9px; color:var(--muted); }
+.table > .row:first-child { color:var(--muted); font-size:10px; }
+.asset { border-top:1px solid var(--line); padding-bottom:8px; }
+.asset p { font-size:10px; color:var(--muted); text-align:right; }
+.provenance { border-top:1px solid var(--line); margin-top:16px; padding-top:12px; color:var(--muted); line-height:1.8; overflow-wrap:anywhere; }
+.provenance summary { cursor:pointer; }
+.message { padding:24px 0; line-height:1.8; }
+@media (max-width:600px) { .panel { padding:16px; } .summary dd { font-size:18px; } .row { gap:5px; font-size:11px; } }

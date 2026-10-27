@@ -81,14 +81,15 @@ async function loadPortfolioRiskReadModelWithSelection({
     -PORTFOLIO_RISK_READ_POLICY.maxFxCarryDays,
   );
   const assetRows = await repository.loadAssets(selection.account);
-  const tickers = uniqueStrings(
-    assetRows
+  const tickers = uniqueStrings([
+    ...assetRows
       .map((row) => normalizeTicker(row.ticker))
       .filter((ticker): ticker is string => Boolean(ticker)),
-  );
-  const requiresFx = assetRows.some(
-    (row) => normalizeCurrencyCode(row.currency) === "USD",
-  );
+  ]);
+  const requiresFx =
+    assetRows.some(
+      (row) => normalizeCurrencyCode(row.currency) === "USD",
+    );
 
   const priceRowsPromise =
     tickers.length > 0

@@ -160,7 +160,7 @@ function completeResult(
               reason: null,
             }
           : { value: null, reason: "zero_variance" },
-      sharpe: annualizedSharpe({
+      sharpe: base.dailyRiskFreeRate === null ? { value: null, reason: "risk_free_evidence_not_supplied" } : annualizedSharpe({
         returns: portfolioReturns,
         dailyRiskFreeRate: base.dailyRiskFreeRate,
         annualizationFactor: base.annualizationFactor,
@@ -267,10 +267,10 @@ function prepareRiskData(input: PortfolioRiskMathInput): PreparedRiskData | null
 }
 
 function resolveMathPolicy(input: PortfolioRiskMathInput) {
-  const annualRiskFreeRate = input.annualRiskFreeRate ?? 0;
+  const annualRiskFreeRate = input.annualRiskFreeRate === null ? null : input.annualRiskFreeRate ?? 0;
   const valid =
-    Number.isFinite(annualRiskFreeRate) &&
-    annualRiskFreeRate > -1;
+    annualRiskFreeRate === null || (Number.isFinite(annualRiskFreeRate) &&
+    annualRiskFreeRate > -1);
 
   return {
     valid,
@@ -292,7 +292,7 @@ function baseResult(
     inputStatus: input.inputStatus,
     annualizationFactor: policy.annualizationFactor,
     annualRiskFreeRate: policy.annualRiskFreeRate,
-    dailyRiskFreeRate:
+    dailyRiskFreeRate: policy.annualRiskFreeRate === null ? null :
       (1 + policy.annualRiskFreeRate) **
         (1 / policy.annualizationFactor) -
       1,

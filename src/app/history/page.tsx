@@ -1,10 +1,20 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
+import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
+import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { HistoryView } from "@/components/history/history-view";
+import { normalizeHistoryDetail } from "@/components/history/history-detail-state";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { getReadOnlyTenantEvents } from "@/db/queries/tenant-events";
 import { getReadOnlyTenantHistoryBalance } from "@/db/queries/history-balance";
+import { getReadOnlyTenantHistoryLiveValuation } from "@/db/queries/history-live-valuation";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { normalizeHistoryLane } from "@/lib/history-balance";
 import { normalizeHistoryPositionSelection } from "@/lib/history-position-detail";
@@ -19,19 +29,36 @@ import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata() {
+  return localizedMetadata({ title: "히스토리 | CAIRN LABS" }, "History | CAIRN LABS");
+}
+
 type HistoryPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     scope?: string | string[];
+    currency?: string | string[];
     lane?: string | string[];
     positionDate?: string | string[];
     positionSource?: string | string[];
     comparisonFrom?: string | string[];
     comparisonTo?: string | string[];
+    preview?: string | string[];
+    detail?: string | string[];
+    balancePage?: string | string[];
+    portfolioPage?: string | string[];
+    eventPage?: string | string[];
   }>;
 };
 
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
+  if (process.env.NODE_ENV === "development") {
+    const previewParams = await searchParams;
+    if (previewParams.preview === "design") {
+      const { HistoryDesignPreview } = await import("@/components/history/history-design-preview");
+      return <HistoryDesignPreview scope={previewParams.scope} detailParams={previewParams} />;
+    }
+  }
   const [params, resolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
@@ -55,12 +82,17 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       <PortfolioAnalysisScopeBoundary
         basePath="/history"
         context={scopeContext}
-        title="히스토리"
+        title="히스토리" titleEn={"History"}
       />
     );
   }
 
   const selectedScope = scopeContext.resolution.scope;
+  if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
+    const reporting = params.currency === "USD" ? "USD" : "KRW";
+    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
+    return <CurrencyPortfolioSurface surface="history" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
+  }
   const positionAccount =
     selectedScope.kind === "account" ? selectedScope.accountCode : "all";
   const eventScope = legacyEventScope(selectedScope);
@@ -78,7 +110,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       comparisonFrom: params.comparisonFrom,
       comparisonTo: params.comparisonTo,
     });
-  const [history, events] = await Promise.all([
+  const [history, events, liveValuation] = await Promise.all([
     getReadOnlyTenantHistoryBalance({
       analysisScopes: scopeContext.catalog.scopes,
       tenantContext: resolution.tenantContext,
@@ -86,6 +118,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       lane,
       positionSelection,
       positionComparisonSelection,
+      includeRawEvidence: normalizeHistoryDetail(params) === "raw",
     }),
     eventScope !== null && (lane === "all" || lane === "events")
       ? getReadOnlyTenantEvents({
@@ -93,13 +126,19 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           scope: eventScope,
         })
       : Promise.resolve(null),
+    lane === "all" || lane === "portfolio"
+      ? getReadOnlyTenantHistoryLiveValuation({ scope: selectedScope, tenantContext: resolution.tenantContext })
+      : Promise.resolve(null),
   ]);
 
   return (
     <HistoryView
       events={events}
       eventsSupported={eventScope !== null}
+      generatedAt={new Date().toISOString()}
       history={history}
+      liveValuation={liveValuation}
+      detailParams={params}
     />
   );
 }
@@ -123,15 +162,12 @@ function HistoryAccessBoundary({
   resolution: SessionResolverResult;
 }) {
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal">
-          히스토리
-        </h1>
-        <p className="mt-2 text-sm text-[#687064]">
-          로그인 세션과 사용자 소유권이 확인된 기록만 조회합니다.
-        </p>
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
+        <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko="히스토리" en="History"/></h1>
+        <p className="mt-2 text-sm text-[var(--muted)]"><T ko="로그인 세션과 사용자 소유권이 확인된 기록만 조회합니다." en="Only records with a verified session and ownership are retrieved."/></p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell
             label="사용자 연결"
@@ -139,16 +175,11 @@ function HistoryAccessBoundary({
           />
           <EvidenceCell label="상품 데이터 조회" value="시도하지 않음" />
         </dl>
-        <p className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
-          로그인과 사용자 연결이 확인되기 전에는 히스토리 데이터를 읽지
-          않습니다.
-        </p>
+        <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]"><T ko="로그인과 사용자 연결이 확인되기 전에는 히스토리 데이터를 읽지 않습니다." en="History is not retrieved until the session and user connection are verified."/></p>
         <Link
           href="/auth/sign-in"
-          className="mt-5 inline-flex rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
-        >
-          로그인
-        </Link>
+          className="mt-5 inline-flex rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
+        ><T ko="로그인" en="Sign in"/></Link>
       </section>
     </main>
   );
@@ -156,9 +187,9 @@ function HistoryAccessBoundary({
 
 function EvidenceCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <dt className="text-xs font-semibold text-[#687064]">{label}</dt>
-      <dd className="mt-2 font-semibold">{value}</dd>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <dt className="text-xs font-semibold text-[var(--muted)]">{<T ko={label} en={translateHomeHistory(label)}/>}</dt>
+      <dd className="mt-2 font-semibold"><T ko={value} en={translateHomeHistory(value)}/></dd>
     </div>
   );
 }

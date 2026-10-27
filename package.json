@@ -6,11 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "build:vercel": "node --no-warnings scripts/vercel-build.mjs",
+    "db:preview:release-verify": "node --no-warnings scripts/verify-isolated-release-preview.mjs",
     "db:preview:preflight": "node --no-warnings scripts/preview-database-evidence.mjs --phase preflight",
     "db:preview:postflight": "node --no-warnings scripts/preview-database-evidence.mjs --phase postflight",
     "start": "next start",
     "lint": "eslint",
     "test": "node --no-warnings tests/run.mjs",
+    "test:coverage": "node --experimental-test-coverage --no-warnings tests/run.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "smoke:portfolio-structure-route": "node --no-warnings scripts/smoke-portfolio-structure-route.mjs",
     "smoke:auth-transport-route": "node --no-warnings scripts/smoke-auth-transport-route.mjs",
     "smoke:portfolio-risk-route": "node --no-warnings scripts/smoke-portfolio-risk-route.mjs",
@@ -33,7 +37,9 @@
     "identity:assign-legacy-active-evidence-owners": "node --no-warnings scripts/assign-legacy-active-evidence-owners.mjs",
     "snapshots:backfill-owners": "node --no-warnings scripts/backfill-generated-snapshot-owners.mjs",
     "snapshots:backfill-gap": "node --conditions=react-server --import tsx scripts/backfill-daily-snapshot-gap.ts",
+    "snapshots:repair-fractional-movement": "node --no-warnings scripts/repair-snapshot-fractional-movement.mjs",
     "simulation:complete-kis-history": "node --conditions=react-server --import tsx scripts/complete-simulation-kis-history.ts",
+    "market-factors:sync-core": "node --conditions=react-server --import tsx scripts/sync-core-market-factors.ts",
     "investment-lab:complete-stress-history": "node --conditions=react-server --import tsx scripts/complete-investment-lab-stress-history.ts",
     "identity:issue-bootstrap-claim": "node --no-warnings scripts/issue-identity-bootstrap-claim.mjs",
     "audit:asset-price-duplicates": "node scripts/audit-asset-price-snapshot-duplicates.mjs",
@@ -96,20 +102,31 @@
     "import:base44:history": "node --no-warnings scripts/import-base44-history.mjs",
     "import:base44:market-data": "node scripts/import-base44-market-data.mjs",
     "import:base44:market-context": "node --no-warnings scripts/import-base44-market-context.mjs",
-    "import:base44:settings": "node --no-warnings scripts/import-base44-settings.mjs"
+    "import:base44:settings": "node --no-warnings scripts/import-base44-settings.mjs",
+    "prebuild": "node scripts/verify-shared-domains.mjs"
   },
   "dependencies": {
-    "@neondatabase/auth": "0.4.2-beta",
+    "@auth/core": "0.41.3",
+    "@neondatabase/auth": "0.5.0-beta",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "drizzle-orm": "^0.45.2",
-    "next": "16.2.10",
+    "lucide-react": "^1.37.0",
+    "next": "16.3.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
+  },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -117,7 +134,8 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.4",
+    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
     "typescript": "^5"

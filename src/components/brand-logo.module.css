@@ -1,0 +1,9 @@
+.lockup { display:inline-flex; align-items:center; gap:9px; color:var(--ink, #20231f); white-space:nowrap; vertical-align:middle; line-height:1; }
+.lockup .mark { flex:none; width:32px; height:32px; }
+.lockup .word { display:inline-flex; align-items:baseline; gap:5px; font-family:var(--font-geist),sans-serif; font-size:25px; font-weight:600; letter-spacing:-.065em; line-height:1; }
+.lockup .labs { font-size:12px; font-weight:450; letter-spacing:-.02em; }
+.lockup.stacked { flex-direction:column; gap:5px; }
+.lockup.stacked .mark { width:32px; height:32px; }
+.lockup.stacked .word { font-size:17px; gap:3px; }
+.lockup.stacked .labs { font-size:9px; }
+@media(max-width:640px) { .lockup { gap:6px; }.lockup .mark { width:26px; height:26px; }.lockup .word { font-size:22px; }.lockup .labs { font-size:11px; } }

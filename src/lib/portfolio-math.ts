@@ -23,17 +23,19 @@ export type KrwFxRateResolution =
     };
 
 export type FxAwarePositionMovementInput = {
-  quantity: number;
+  marketExposedQuantity: number;
   currentPrice: number;
   previousPrice: number;
   currentFxRate: number;
   previousFxRate: number;
-  fractionalKrwValue?: number;
+  fixedKrwValue?: number;
   previousMarketValueKrw?: number | null;
 };
 
 export type FxAwareSnapshotMovementInput = {
   quantity: number;
+  previousQuantity?: number | null;
+  trades?: readonly { quantityDelta: number; price: number; fxRate: number }[] | null;
   currentPrice: number;
   currentValueKrw: number;
   previousPrice: number;
@@ -58,7 +60,7 @@ export function resolveKrwFxRate(
   }
 
   if (code === "USD") {
-    return typeof usdKrwRate === "number" && usdKrwRate > 0
+    return typeof usdKrwRate === "number" && Number.isFinite(usdKrwRate) && usdKrwRate > 0
       ? { ok: true, currency: "USD", rate: usdKrwRate, requiresFx: true }
       : {
           ok: false,
@@ -84,21 +86,23 @@ export function convertToKrw(value: number, currency: string, usdKrwRate: number
 }
 
 export function calculateFxAwarePositionMovementKrw({
-  quantity,
+  marketExposedQuantity,
   currentPrice,
   previousPrice,
   currentFxRate,
   previousFxRate,
-  fractionalKrwValue = 0,
+  fixedKrwValue = 0,
   previousMarketValueKrw = null,
 }: FxAwarePositionMovementInput) {
-  const currentBaseValueKrw = quantity * currentPrice * currentFxRate;
-  const currentValueKrw = currentBaseValueKrw + fractionalKrwValue;
+  const currentBaseValueKrw = marketExposedQuantity * currentPrice * currentFxRate;
+  const currentValueKrw = currentBaseValueKrw + fixedKrwValue;
   const inferredPreviousValueKrw =
-    quantity * previousPrice * previousFxRate + fractionalKrwValue;
+    marketExposedQuantity * previousPrice * previousFxRate + fixedKrwValue;
   const previousValueKrw = previousMarketValueKrw ?? inferredPreviousValueKrw;
-  const priceChangeKrw = quantity * (currentPrice - previousPrice) * previousFxRate;
-  const fxChangeKrw = quantity * currentPrice * (currentFxRate - previousFxRate);
+  const priceChangeKrw =
+    marketExposedQuantity * (currentPrice - previousPrice) * previousFxRate;
+  const fxChangeKrw =
+    marketExposedQuantity * currentPrice * (currentFxRate - previousFxRate);
 
   return {
     currentValueKrw,
@@ -111,6 +115,8 @@ export function calculateFxAwarePositionMovementKrw({
 
 export function calculateFxAwareSnapshotMovementKrw({
   quantity,
+  previousQuantity,
+  trades,
   currentPrice,
   currentValueKrw,
   previousPrice,
@@ -119,15 +125,35 @@ export function calculateFxAwareSnapshotMovementKrw({
   previousFxRate,
   tradeFlowKrw = 0,
 }: FxAwareSnapshotMovementInput) {
-  const priceChangeKrw = quantity * (currentPrice - previousPrice) * previousFxRate;
-  const fxChangeKrw = quantity * currentPrice * (currentFxRate - previousFxRate);
+  const changeKrw = currentValueKrw - previousValueKrw - tradeFlowKrw;
+  const hasTradeEvidence = trades !== null && (tradeFlowKrw === 0 || trades !== undefined);
+  const legs = trades ?? [];
+  const baselineQuantity = previousQuantity ??
+    quantity - sumBy([...legs], (trade) => trade.quantityDelta);
+  let priceChangeKrw = baselineQuantity * (currentPrice - previousPrice) * previousFxRate;
+  let fxChangeKrw = baselineQuantity * currentPrice * (currentFxRate - previousFxRate);
+  for (const trade of legs) {
+    priceChangeKrw += trade.quantityDelta * (currentPrice - trade.price) * trade.fxRate;
+    fxChangeKrw += trade.quantityDelta * currentPrice * (currentFxRate - trade.fxRate);
+  }
+  // Stored valuations may include fixed KRW balances. Only publish a complete
+  // attribution when the observed values and transaction legs reconcile.
+  const toleranceKrw = Math.max(0.01, Math.abs(changeKrw) * 1e-10);
+  const quantityTolerance = Math.max(1e-8, Math.abs(quantity) * 1e-10);
+  const quantitiesReconcile = Math.abs(baselineQuantity +
+    sumBy([...legs], (trade) => trade.quantityDelta) - quantity) <= quantityTolerance;
+  const validPrices = previousPrice > 0 && currentPrice > 0 && previousFxRate > 0 && currentFxRate > 0 &&
+    legs.every((trade) => Number.isFinite(trade.quantityDelta) && trade.price > 0 && trade.fxRate > 0);
+  const reconciled = hasTradeEvidence && quantitiesReconcile && validPrices && baselineQuantity >= 0 &&
+    Number.isFinite(priceChangeKrw) && Number.isFinite(fxChangeKrw) &&
+    Math.abs(priceChangeKrw + fxChangeKrw - changeKrw) <= toleranceKrw;
 
   return {
     currentValueKrw,
     previousValueKrw,
-    changeKrw: currentValueKrw - previousValueKrw - tradeFlowKrw,
-    priceChangeKrw,
-    fxChangeKrw,
+    changeKrw,
+    priceChangeKrw: reconciled ? priceChangeKrw : null,
+    fxChangeKrw: reconciled ? fxChangeKrw : null,
     tradeFlowKrw,
   };
 }
@@ -153,6 +179,17 @@ export function sumBy<T>(
   selector: (row: T) => number | null | undefined,
 ) {
   return rows.reduce((sum, row) => sum + (selector(row) ?? 0), 0);
+}
+
+/** Financial totals are unknown when any required component is unknown. */
+export function sumComplete<T>(rows: readonly T[], selector: (row: T) => number | null) {
+  let total = 0;
+  for (const row of rows) {
+    const value = selector(row);
+    if (value === null || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  return Number.isFinite(total) ? total : null;
 }
 
 export function toNumber(value: unknown) {

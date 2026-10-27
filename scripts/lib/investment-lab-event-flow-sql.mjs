@@ -39,6 +39,7 @@ export const INVESTMENT_LAB_EVENT_FLOW_SQL = `
     from event_ledger_entries e
     left join assets a on a.id = e.asset_id
     where e.is_sample = false
+      and e.canonical_owner_user_id = $1::uuid
   )
   select
     event_type,
@@ -58,6 +59,7 @@ export const INVESTMENT_LAB_DERIVED_ALL_PATH_SQL = `
     sum(total_market_value) as total_market_value_krw
   from daily_portfolio_snapshots
   where is_sample = false
+    and canonical_owner_user_id = $1::uuid
     and account in ('brokerage', 'isa', 'irp')
   group by snapshot_date
   having count(distinct account) = 3
@@ -66,14 +68,47 @@ export const INVESTMENT_LAB_DERIVED_ALL_PATH_SQL = `
 
 export const INVESTMENT_LAB_KODEX_CLOSE_SQL = `
   select
+    ticker,
+    market,
+    currency,
     date::text as price_date,
-    adjusted_close_price
+    close_price,
+    adjusted_close_price,
+    adjusted_close_basis,
+    adjusted_close_provider,
+    adjusted_close_source,
+    adjusted_close_fetched_at,
+    provider_symbol,
+    provider_exchange,
+    fetched_at,
+    source
   from asset_price_snapshots
   where is_sample = false
     and upper(btrim(ticker)) = '069500'
     and lower(btrim(market)) = 'korea'
     and upper(btrim(currency)) = 'KRW'
   order by date
+`;
+
+export const INVESTMENT_LAB_ACTIVE_OWNER_SQL = `
+  select distinct
+    a.canonical_owner_user_id as owner_user_id
+  from accounts a
+  inner join app_users u on u.id = a.canonical_owner_user_id
+  inner join assets owned_asset
+    on owned_asset.account_id = a.id
+    and owned_asset.canonical_owner_user_id = a.canonical_owner_user_id
+  where a.is_active = true
+    and lower(btrim(a.account_type)) <> 'cash'
+    and u.status = 'active'
+    and u.role in ('user', 'admin')
+    and a.canonical_owner_user_id is not null
+    and owned_asset.archived_at is null
+    and owned_asset.quantity > 0
+    and lower(coalesce(owned_asset.asset_type, 'etf')) in (
+      'etf', 'stock', 'pension', 'commodity'
+    )
+  order by a.canonical_owner_user_id
 `;
 
 export const INVESTMENT_LAB_SNAPSHOT_BOUNDARY_SQL = `
@@ -83,4 +118,5 @@ export const INVESTMENT_LAB_SNAPSHOT_BOUNDARY_SQL = `
     count(*) filter (where coalesce(total_market_value, 0) > 0)::int as positive_market_value_rows
   from daily_portfolio_snapshots
   where is_sample = false
+    and canonical_owner_user_id = $1::uuid
 `;

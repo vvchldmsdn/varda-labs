@@ -1,3 +1,7 @@
+import { LocalizedElement } from "@/components/i18n/localized-element";
+import { LocalizedSvgText } from "@/components/i18n/localized-text";
+import { simulationEnglish } from "./simulation-copy";
+import { SimulationText } from "@/components/simulation/simulation-text";
 type ComparisonPoint = Readonly<{
   stepIndex: number;
   indexValue: number;
@@ -48,7 +52,7 @@ export function SimulationPathComparisonChart({
 
   return (
     <figure data-simulation-path-comparison-chart>
-      <div className="flex flex-wrap gap-4 text-xs text-[#596158]">
+      <div className="flex flex-wrap gap-4 text-xs text-[var(--muted)]">
         {series.map((item) => (
           <span className="inline-flex items-center gap-2" key={item.id}>
             <span
@@ -56,21 +60,21 @@ export function SimulationPathComparisonChart({
               className="h-0.5 w-5"
               style={{ backgroundColor: item.color }}
             />
-            {item.label}
+            <SimulationText ko={item.label} />
           </span>
         ))}
       </div>
-      <svg
+      <LocalizedElement as="svg" en={{"aria-label": simulationEnglish(ariaLabel)}}
         aria-label={ariaLabel}
         className="mt-3 block aspect-[18/7] w-full min-w-[560px]"
         role="img"
         viewBox={`0 0 ${width} ${height}`}
       >
-        <title>{ariaLabel}</title>
+        <LocalizedSvgText as="title" ko={ariaLabel} en={simulationEnglish(ariaLabel)} />
         {yTicks.map((tick) => (
           <g key={tick.y}>
             <line
-              stroke="#dde2d7"
+              stroke="var(--line)"
               strokeWidth="1"
               x1={padding.left}
               x2={width - padding.right}
@@ -78,7 +82,7 @@ export function SimulationPathComparisonChart({
               y2={tick.y}
             />
             <text
-              fill="#687064"
+              fill="var(--muted)"
               fontSize="10"
               textAnchor="end"
               x={padding.left - 8}
@@ -107,24 +111,22 @@ export function SimulationPathComparisonChart({
           />
         ))}
         <text
-          fill="#687064"
+          fill="var(--muted)"
           fontSize="10"
           textAnchor="start"
           x={padding.left}
           y={height - 8}
         >
-          검증 시작
-        </text>
+          <SimulationText ko={"검증 시작"} />{" "}</text>
         <text
-          fill="#687064"
+          fill="var(--muted)"
           fontSize="10"
           textAnchor="end"
           x={width - padding.right}
           y={height - 8}
         >
-          {maximumStep}개 관측 후
-        </text>
-      </svg>
+          {maximumStep}<SimulationText ko={"개 관측 후"} />{" "}</text>
+      </LocalizedElement>
     </figure>
   );
 }

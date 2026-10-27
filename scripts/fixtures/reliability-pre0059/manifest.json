@@ -1,0 +1,58 @@
+{
+  "base": "e9dee3648db5e36616105c3659b4819e5b867365",
+  "frozen": {
+    "src/db/queries/native-portfolio-ledger.ts": {
+      "file": "src__db__queries__native-portfolio-ledger.ts.txt",
+      "sha256": "8d30ca1c935cba9e48fbf21b91508d205936d11e3c520eacf1b45ddcc096b0a9"
+    },
+    "src/db/queries/native-portfolio-snapshots.ts": {
+      "file": "src__db__queries__native-portfolio-snapshots.ts.txt",
+      "sha256": "0cb642d63b013db1e7623683fd2b86429a137d915035c34b31cac30a78ecd27c"
+    },
+    "src/lib/portfolio-mutation-transaction.ts": {
+      "file": "src__lib__portfolio-mutation-transaction.ts.txt",
+      "sha256": "90401dd4e4cae7d6df46f464bbe82a72a27ffcb41aa6de0f6ec2bb4ff40d3771"
+    },
+    "src/lib/native-portfolio-projection.ts": {
+      "file": "src__lib__native-portfolio-projection.ts.txt",
+      "sha256": "60c2d2f0df3f9b8d164a37371604927c8b5139e1038b5b19733654f196bc1572"
+    },
+    "src/lib/snapshots/market-calendar.ts": {
+      "file": "src__lib__snapshots__market-calendar.ts.txt",
+      "sha256": "c9d72348a8eb5e9d11c61d415119dcc210e7044548617e45def122ad312043f4"
+    },
+    "src/lib/native-portfolio-ledger.ts": {
+      "file": "src__lib__native-portfolio-ledger.ts.txt",
+      "sha256": "6631c361fb7f3650e55729125fdce18989a56678e3bf0497e46389be5877123b"
+    },
+    "src/lib/money.ts": {
+      "file": "src__lib__money.ts.txt",
+      "sha256": "3bd8e3f207b9aee54836e396be12ce507d8385fa2ff06c8a11d1e096de0180c8"
+    },
+    "src/lib/currency-tracked-portfolio.ts": {
+      "file": "src__lib__currency-tracked-portfolio.ts.txt",
+      "sha256": "063b5c9595d11ccf7d32d7013fb8edd2f06496c85d9984fe8242efca66e1a141"
+    },
+    "src/lib/currency-valuation.ts": {
+      "file": "src__lib__currency-valuation.ts.txt",
+      "sha256": "acdd9db2e143b237bf05c8a5f37025c6daa54f29cde340e646b2d1e7a50d5958"
+    },
+    "src/lib/currency-performance.ts": {
+      "file": "src__lib__currency-performance.ts.txt",
+      "sha256": "4db1fe2e136056db620a11edae1a5dcd794a90a914f2d880d8cd7ca121307b52"
+    },
+    "src/lib/investment-lab-modified-dietz.ts": {
+      "file": "src__lib__investment-lab-modified-dietz.ts.txt",
+      "sha256": "555b209217d8c4a4e1685f3808cafedf19706ce94ae73bf6fcbdc9fa99cf09b1"
+    },
+    "src/lib/portfolio-risk-calendar.ts": {
+      "file": "src__lib__portfolio-risk-calendar.ts.txt",
+      "sha256": "6fd4a3f422fc973a6143f6968a5f42a5c95869834d4917afbe53f824839c59a6"
+    },
+    "src/lib/investment-lab-path-risk.ts": {
+      "file": "src__lib__investment-lab-path-risk.ts.txt",
+      "sha256": "b72acf2e681dac9a3a71e8c89513860ed65efc12a14a9a2ed6a510512a8b5cee"
+    }
+  },
+  "sharedRuntime": {}
+}

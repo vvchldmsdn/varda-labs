@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import type { InvestmentLabAnchorBasketScenario } from "@/lib/investment-lab-anchor-basket-scenario";
 import type { InvestmentLabAnchorValueWeightScenario } from "@/lib/investment-lab-anchor-value-weight-scenario";
 import type { InvestmentLabAnchorScheduledRebalanceScenario } from "@/lib/investment-lab-anchor-scheduled-rebalance";
@@ -11,6 +12,7 @@ import {
   type InvestmentLabScenarioMatrixRow,
   type InvestmentLabScenarioPriceBasis,
 } from "@/lib/investment-lab-scenario-matrix";
+import { diagnoseInvestmentLabScenario } from "@/lib/investment-lab-scenario-diagnostics";
 
 const MINIMUM_VOLATILITY_PERIODS =
   INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods;
@@ -43,7 +45,7 @@ export function InvestmentLabScenarioMatrix({
 
   return (
     <section
-      className="overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]"
+      className="overflow-hidden border-y border-[var(--line)]"
       data-scenario-matrix-ready-rows={matrix.coverage.readyRowCount}
       data-scenario-matrix-rows={matrix.coverage.rowCount}
       data-scenario-matrix-status={matrix.status}
@@ -52,19 +54,16 @@ export function InvestmentLabScenarioMatrix({
       }
       data-section="investment-lab-scenario-matrix"
     >
-      <div className="border-b border-[#e1e6dc] px-4 py-4">
+      <div className="border-b border-[var(--wash)] px-4 py-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">시나리오 한눈에 비교</h2>
-            <p className="mt-1 text-sm leading-6 text-[#687064]">
-              이미 계산된 경로만 같은 기간으로 맞춰 표시합니다. 순위나 추천이
-              아니라 계산 근거와 불가 사유를 확인하는 연구용 비교표입니다.
-            </p>
+            <h2 className="text-lg font-semibold"><LabText value="시나리오 한눈에 비교" /></h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 이미 계산된 경로만 같은 기간으로 맞춰 표시합니다. 순위나 추천이 아니라 계산 근거와 불가 사유를 확인하는 연구용 비교표입니다. " /></p>
           </div>
-          <p className="text-xs leading-5 text-[#73786c]">
-            {matrix.period
+          <p className="text-xs leading-5 text-[var(--muted)]">
+            <LabText value={matrix.period
               ? `${formatDate(matrix.period.startServiceDate)} ~ ${formatDate(matrix.period.endServiceDate)} · ${matrix.period.comparisonDateCount}개 평가일`
-              : "공통 비교 구간 없음"}
+              : "공통 비교 구간 없음"} />
           </p>
         </div>
       </div>
@@ -72,16 +71,16 @@ export function InvestmentLabScenarioMatrix({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1380px] border-collapse text-sm">
           <thead>
-            <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
-              <th className="px-4 py-3">시나리오</th>
-              <th className="px-3 py-3">상태</th>
-              <th className="px-3 py-3 text-right">종료 평가액</th>
-              <th className="px-3 py-3 text-right">실제 대비</th>
-              <th className="px-3 py-3 text-right">추정수익률</th>
-              <th className="px-3 py-3 text-right">관측 기준 MDD</th>
-              <th className="px-3 py-3 text-right">연환산 변동성</th>
-              <th className="px-3 py-3 text-right">흐름 / 대기 평가일</th>
-              <th className="px-4 py-3">가격·환율 근거</th>
+            <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--muted)]">
+              <th className="px-4 py-3"><LabText value="시나리오" /></th>
+              <th className="px-3 py-3"><LabText value="상태" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="종료 평가액" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="실제 대비" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="추정수익률" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="관측 기준 MDD" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="연환산 변동성" /></th>
+              <th className="px-3 py-3 text-right"><LabText value="흐름 / 대기 평가일" /></th>
+              <th className="px-4 py-3"><LabText value="가격·환율 근거" /></th>
             </tr>
           </thead>
           <tbody>
@@ -92,16 +91,7 @@ export function InvestmentLabScenarioMatrix({
         </table>
       </div>
 
-      <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
-        MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을
-        연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만
-        표시합니다. 변동성은 최소 {MINIMUM_VOLATILITY_PERIODS}개의 연속 1일
-        기간수익률이 있을 때만 {VOLATILITY_ANNUALIZATION_FACTOR}일 기준으로
-        연환산합니다. KODEX 200과 VOO는 각 행에 표시된 단일 가격 근거를
-        사용하며, KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. USD
-        경로는 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가
-        아닙니다.
-      </p>
+      <p className="border-t border-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]"><LabText value=" MDD와 변동성은 외부 입출금을 조정한 Modified Dietz 기간수익률을 연결해 계산합니다. MDD는 저장된 서비스 관측 시점 사이의 하락만 표시합니다. 변동성은 최소 " />{MINIMUM_VOLATILITY_PERIODS}<LabText value="개의 연속 1일 기간수익률이 있을 때만 " />{VOLATILITY_ANNUALIZATION_FACTOR}<LabText value="일 기준으로 연환산합니다. KODEX 200과 VOO는 각 행에 표시된 단일 가격 근거를 사용하며, KIS 원종가 구간은 배당·기업행사를 조정하지 않습니다. USD 경로는 저장 USD/KRW를 사용합니다. 제로수익 경로는 실제 현금계좌가 아닙니다. " /></p>
     </section>
   );
 }
@@ -113,19 +103,21 @@ function ScenarioRow({
   row: InvestmentLabScenarioMatrixRow;
   model: InvestmentLabCounterfactualReadModel;
 }) {
+  const diagnosis = diagnoseInvestmentLabScenario(row.reasonCodes);
+
   return (
     <tr
-      className="border-t border-[#e1e6dc] align-top"
+      className="border-t border-[var(--wash)] align-top"
       data-scenario-row={row.id}
       data-scenario-weight-constraint={scenarioWeightConstraint(row.id, model)}
       data-scenario-status={row.status}
       data-scenario-risk-status={row.riskMetrics.status}
     >
       <td className="px-4 py-3">
-        <p className="font-semibold text-[#171916]">
-          {scenarioLabel(row.id, model)}
+        <p className="font-semibold text-[var(--ink)]">
+          <LabText value={scenarioLabel(row.id, model)} />
         </p>
-        <p className="mt-1 text-xs text-[#73786c]">
+        <p className="mt-1 text-xs text-[var(--muted)]">
           {scenarioDetail(row.id, model)}
         </p>
       </td>
@@ -133,18 +125,23 @@ function ScenarioRow({
         <span
           className={
             row.status === "ready"
-              ? "font-semibold text-[#08784d]"
-              : "font-semibold text-[#9a6b18]"
+              ? "font-semibold text-[var(--brand)]"
+              : "font-semibold text-[var(--warning)]"
           }
         >
-          {row.status === "ready" ? "경로 계산" : "계산 불가"}
+          <LabText value={row.status === "ready" ? "경로 계산" : "계산 불가"} />
         </span>
-        {row.status === "unavailable" ? (
-          <p className="mt-1 max-w-52 text-xs leading-5 text-[#7b6232]">
-            {reasonLabel(row.reasonCodes)}
-          </p>
-        ) : row.returnEstimate.status === "unavailable" ? (
-          <p className="mt-1 text-xs text-[#7b6232]">수익률 근거 부족</p>
+        {row.status === "unavailable" ||
+        row.returnEstimate.status === "unavailable" ? (
+          <div className="mt-1 max-w-72 space-y-1 text-xs leading-5">
+            <p className="text-[var(--warning)]">
+              <span className="font-semibold"><LabText value="원인" /></span> <LabText value={diagnosis.reason} />
+            </p>
+            <p className="text-[var(--muted)]">
+              <span className="font-semibold"><LabText value="해결" /></span>{" "}
+              <LabText value={diagnosis.resolution} />
+            </p>
+          </div>
         ) : null}
       </td>
       <td className="px-3 py-3 text-right font-semibold tabular-nums">
@@ -164,28 +161,28 @@ function ScenarioRow({
       >
         {formatPercentOrDash(row.returnEstimate.value)}
       </td>
-      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#4f584f]">
+      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[var(--muted)]">
         {formatRiskPercentOrDash(row.riskMetrics.maximumDrawdown)}
       </td>
-      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[#4f584f]">
+      <td className="px-3 py-3 text-right font-semibold tabular-nums text-[var(--muted)]">
         <p>
           {formatRiskPercentOrDash(row.riskMetrics.annualizedVolatility)}
         </p>
-        <p className="mt-1 text-xs font-normal text-[#73786c]">
-          {riskEvidenceLabel(row.riskMetrics)}
+        <p className="mt-1 text-xs font-normal text-[var(--muted)]">
+          <LabText value={riskEvidenceLabel(row.riskMetrics)} />
         </p>
       </td>
-      <td className="px-3 py-3 text-right tabular-nums text-[#4f584f]">
-        <p>{row.flowCount === null ? "-" : `${row.flowCount}건`}</p>
-        <p className="mt-1 text-xs text-[#73786c]">
-          {row.pendingComparisonCount === null
+      <td className="px-3 py-3 text-right tabular-nums text-[var(--muted)]">
+        <p><LabText value={row.flowCount === null ? "-" : `${row.flowCount}건`} /></p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          <LabText value={row.pendingComparisonCount === null
             ? "대기 해당 없음"
-            : `대기 ${row.pendingComparisonCount}일`}
+            : `대기 ${row.pendingComparisonCount}일`} />
         </p>
       </td>
-      <td className="px-4 py-3 text-xs leading-5 text-[#5f685d]">
-        <p>{priceBasisLabel(row.priceBasis)}</p>
-        <p className="text-[#73786c]">{fxBasisLabel(row.fxBasis)}</p>
+      <td className="px-4 py-3 text-xs leading-5 text-[var(--muted)]">
+        <p><LabText value={priceBasisLabel(row.priceBasis)} /></p>
+        <p className="text-[var(--muted)]"><LabText value={fxBasisLabel(row.fxBasis)} /></p>
       </td>
     </tr>
   );
@@ -318,48 +315,6 @@ function fxBasisLabel(value: InvestmentLabScenarioFxBasis) {
   return labels[value];
 }
 
-function reasonLabel(reasonCodes: readonly string[]) {
-  if (reasonCodes.includes("approved_target_policy_missing")) {
-    return "승인된 목표 비중 없음";
-  }
-  if (reasonCodes.includes("approved_target_policy_conflict")) {
-    return "승인 목표 비중이 둘 이상이라 확정 불가";
-  }
-  if (reasonCodes.includes("target_policy_not_effective")) {
-    return "선택 구간이 목표 정책 효력일보다 이름";
-  }
-  if (
-    reasonCodes.includes("target_policy_universe_mismatch") ||
-    reasonCodes.includes("target_policy_vector_mismatch") ||
-    reasonCodes.includes("target_weight_vector_mismatch")
-  ) {
-    return "현재 종목 집합과 승인 목표 비중 불일치";
-  }
-  if (reasonCodes.includes("named_account_target_policy_unavailable")) {
-    return "일부 계정의 승인 목표 비중 없음";
-  }
-  if (reasonCodes.includes("period_mismatch")) return "공통 비교 기간 불일치";
-  if (
-    reasonCodes.includes("tickerless_anchor_holding") ||
-    reasonCodes.includes("physical_anchor_holding")
-  ) {
-    return "기준일 미식별·특수 포지션 존재";
-  }
-  if (reasonCodes.some((reason) => reason.includes("price"))) {
-    return "가격 근거 부족 또는 중복";
-  }
-  if (reasonCodes.some((reason) => reason.includes("fx"))) {
-    return "환율 근거 부족 또는 중복";
-  }
-  if (reasonCodes.includes("base_period_unavailable")) {
-    return "기본 비교 구간 계산 불가";
-  }
-  if (reasonCodes.includes("insufficient_common_preperiod_rows")) {
-    return "기간 시작 전 공동 관측 60개 미만";
-  }
-  return "필요한 계산 근거가 완전하지 않음";
-}
-
 function formatDate(value: string) {
   return value.replaceAll("-", ".");
 }
@@ -389,8 +344,8 @@ function formatRiskPercentOrDash(value: number | null) {
 }
 
 function moneyTone(value: number | null) {
-  if (value === null || value === 0) return "text-[#4f584f]";
-  return value > 0 ? "text-[#08784d]" : "text-[#bd2929]";
+  if (value === null || value === 0) return "text-[var(--muted)]";
+  return value > 0 ? "text-[var(--brand)]" : "text-[var(--negative)]";
 }
 
 function percentTone(value: number | null) {

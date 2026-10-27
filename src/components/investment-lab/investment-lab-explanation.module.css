@@ -1,0 +1,27 @@
+.intro { color: var(--muted); font-size: 14px; line-height: 1.9; max-width: 68ch; margin-bottom: 24px; }
+.evidenceGroup { border-top: 1px solid var(--line); }
+.evidenceGroup:last-child { border-bottom: 1px solid var(--line); }
+.evidenceGroup > summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; cursor: pointer; min-height: 76px; padding: 19px 0; list-style: none; }
+.evidenceGroup > summary::-webkit-details-marker { display: none; }
+.evidenceGroup > summary > span { display: grid; gap: 7px; min-width: 0; }
+.evidenceGroup > summary strong { color: var(--ink); font-size: 15px; font-weight: 550; }
+.evidenceGroup > summary span span { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.evidenceGroup > summary i { display: grid; place-items: center; width: 28px; height: 28px; flex: none; color: var(--brand); font-size: 24px; font-style: normal; }
+.evidenceGroup[open] > summary i { rotate: 45deg; }
+.evidenceGroup > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.evidenceBody { padding: 0 0 24px; min-width: 0; }
+.method { display: grid; gap: 24px; }
+.methodLead { border-left: 3px solid var(--accent); padding-left: 18px; }
+.methodLead h3 { color: var(--ink); font-size: 20px; font-weight: 550; line-height: 1.5; }
+.methodLead p { margin-top: 10px; color: var(--muted); font-size: 14px; line-height: 1.9; }
+.methodFacts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 30px; border-top: 1px solid var(--line); padding-top: 22px; }
+.methodFacts dt { color: var(--muted); font-size: 12px; }
+.methodFacts dd { margin-top: 7px; color: var(--ink); font-size: 14px; line-height: 1.8; }
+.methodNote { font-size: 12px; line-height: 1.9; color: var(--muted); }
+@media (max-width: 600px) {
+  .intro { font-size: 13px; }
+  .methodFacts { grid-template-columns: 1fr; gap: 20px; }
+  .methodLead h3 { font-size: 18px; }
+  .methodLead p { font-size: 13px; }
+  .evidenceGroup > summary { gap: 12px; }
+}

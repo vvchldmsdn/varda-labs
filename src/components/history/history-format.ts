@@ -15,9 +15,9 @@ const NUMBER_FORMATTER = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 8,
 });
 
-export function historyAccountLabel(account: string) {
-  if (account === "all") return "전체";
-  if (account === "brokerage") return "증권";
+export function historyAccountLabel(account: string, locale: "ko" | "en" = "ko") {
+  if (account === "all") return locale === "en" ? "All" : "전체";
+  if (account === "brokerage") return locale === "en" ? "Brokerage" : "증권";
   return account.toUpperCase();
 }
 
@@ -29,18 +29,22 @@ export function historyLaneLabel(lane: HistoryLane) {
 }
 
 export function historySourceLabel(source: string) {
+  if (source.startsWith("broker_reconstructed_close_v1:")) return "종가 재구성 · 현금·손익 제외";
+  if (source === "varda_current_valuation") return "현재 보유자산 평가";
   if (source === "stored_balance_record") return "저장 잔액 기록";
   if (source === "base44_import") return "Base44 이관";
-  if (source === "varda_manual_daily_snapshot") return "Varda 일일 저장";
+  if (source === "varda_manual_daily_snapshot") return "Cairn Labs 일일 저장";
   return source;
 }
 
-export function historyRowKindLabel(row: PortfolioHistoryDisplayRow) {
-  if (row.rowKind === "stored") return "저장값";
+export function historyRowKindLabel(row: PortfolioHistoryDisplayRow, locale: "ko" | "en" = "ko") {
+  if (row.rowKind === "stored") return locale === "en" ? "Recorded value" : "저장값";
   const accounts = row.derivedFromAccounts
-    .map(historyAccountLabel)
+    .map((account) => historyAccountLabel(account, locale))
     .join(", ");
-  const label = row.rowKind === "partial" ? "부분 합산" : "표시용 합산";
+  const label = row.rowKind === "partial"
+    ? locale === "en" ? "Partial total" : "부분 합산"
+    : locale === "en" ? "Display total" : "표시용 합산";
   return `${label}${accounts ? ` (${accounts})` : ""}`;
 }
 

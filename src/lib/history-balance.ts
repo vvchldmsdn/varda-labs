@@ -1,3 +1,5 @@
+import { commonHistoryValuationDate, historySnapshotDisplayDate } from "./history-snapshot-date.ts";
+
 export const HISTORY_ACCOUNTS = ["all", "brokerage", "isa", "irp"] as const;
 export const HISTORY_LANES = ["all", "portfolio", "balance", "events"] as const;
 
@@ -20,6 +22,7 @@ export type BalanceHistoryValueRow = {
 
 export type PortfolioHistoryRawRow = {
   snapshotDate: string;
+  valuationDate?: string | null;
   account: string;
   source: string;
   rowKind?: "stored" | "derived" | "partial";
@@ -30,10 +33,16 @@ export type PortfolioHistoryRawRow = {
   totalMarketValue: string | null;
   totalPnl: string | null;
   totalReturnPct: string | null;
+  avgCorrelation?: string | null;
+  enb?: string | null;
+  portfolioVolatility?: string | null;
+  regimeLabel?: string | null;
+  regimeScore?: string | null;
 };
 
 export type PortfolioHistoryDisplayRow = {
   snapshotDate: string;
+  valuationDate?: string | null;
   account: string;
   source: string;
   rowKind: "stored" | "derived" | "partial";
@@ -44,6 +53,11 @@ export type PortfolioHistoryDisplayRow = {
   totalMarketValue: number | null;
   totalPnl: number | null;
   totalReturnPct: number | null;
+  avgCorrelation?: number | null;
+  enb?: number | null;
+  portfolioVolatility?: number | null;
+  regimeLabel?: string | null;
+  regimeScore?: number | null;
 };
 
 export function normalizeHistoryAccount(
@@ -122,6 +136,7 @@ function storedPortfolioRow(
 ): PortfolioHistoryDisplayRow {
   return {
     snapshotDate: row.snapshotDate,
+    valuationDate: historySnapshotDisplayDate(row),
     account,
     source: row.source,
     rowKind: row.rowKind ?? "stored",
@@ -132,6 +147,42 @@ function storedPortfolioRow(
     totalMarketValue: numberOrNull(row.totalMarketValue),
     totalPnl: numberOrNull(row.totalPnl),
     totalReturnPct: numberOrNull(row.totalReturnPct),
+    ...storedRiskEvidence(row),
+  };
+}
+
+function storedRiskEvidence(
+  row: PortfolioHistoryRawRow,
+): Pick<
+  PortfolioHistoryDisplayRow,
+  | "avgCorrelation"
+  | "enb"
+  | "portfolioVolatility"
+  | "regimeLabel"
+  | "regimeScore"
+> | Record<string, never> {
+  const avgCorrelation = numberOrNull(row.avgCorrelation ?? null);
+  const enb = numberOrNull(row.enb ?? null);
+  const portfolioVolatility = numberOrNull(row.portfolioVolatility ?? null);
+  const regimeLabel = row.regimeLabel?.trim() || null;
+  const regimeScore = numberOrNull(row.regimeScore ?? null);
+
+  if (
+    avgCorrelation === null &&
+    enb === null &&
+    portfolioVolatility === null &&
+    regimeLabel === null &&
+    regimeScore === null
+  ) {
+    return {};
+  }
+
+  return {
+    avgCorrelation,
+    enb,
+    portfolioVolatility,
+    regimeLabel,
+    regimeScore,
   };
 }
 
@@ -160,15 +211,16 @@ function derivedAllPortfolioRow(
     availableRows,
     (row) => row.totalMarketValue,
   );
-  const totalCost = sumNullable(availableRows, (row) => row.totalCost);
-  const totalPnl = sumNullable(availableRows, (row) => row.totalPnl);
+  const totalCost = sumComplete(availableRows, (row) => numberOrNull(row.totalCost));
+  const totalPnl = sumComplete(availableRows, (row) => numberOrNull(row.totalPnl));
 
   return {
     snapshotDate: representative.snapshotDate,
+    valuationDate: commonHistoryValuationDate(availableRows),
     account: "all",
     source: representative.source,
     rowKind:
-      availableRows.length === expectedAccounts.length
+      availableRows.length === expectedAccounts.length && totalCost !== null && totalPnl !== null
         ? "derived"
         : "partial",
     derivedFromAccounts: [...availableAccounts],
@@ -222,3 +274,4 @@ function isHistoryAccount(value: string | null): value is HistoryAccount {
 function isHistoryLane(value: string | null): value is HistoryLane {
   return HISTORY_LANES.includes(value as HistoryLane);
 }
+import { sumComplete } from "./portfolio-math.ts";

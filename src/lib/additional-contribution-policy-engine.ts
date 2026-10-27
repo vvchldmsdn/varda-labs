@@ -1,0 +1,560 @@
+import { parseSaleExclusionKeys } from './additional-contribution-sale-exclusions.ts';
+import { contributionFxPriority, contributionMinimumRatio, resolveContributionMultipliers, type ContributionEvidence, type ContributionFxExposure, type ContributionModifiers } from './additional-contribution-modifiers.ts';
+
+export const ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY = Object.freeze({
+  version: "gyeol_fin_explainable_rebalance_v1",
+  targetWeightTotalBps: 10_000,
+  trimLandingTargetMultiplier: 1.05,
+  trimRequiresNonnegativeUnrealizedReturn: true,
+  trimRounding: "floor_krw_with_sub_krw_holding_remainder",
+  allocation: "post_trim_effective_target_deficit_proportional",
+  rounding: "integer_krw_largest_remainder_then_allocation_key_with_deficit_cap",
+  minimumExecution: "reference_only_without_forced_topup",
+  unavailableMaEvidence: "do_not_reduce_target",
+  ma120BufferPct: 3,
+  ma120ClassMultipliers: Object.freeze({
+    broad_index: 0.8,
+    dividend_quality: 0.8,
+    large_growth: 0.7,
+    thematic: 0.5,
+    defensive_gold: 1,
+    bond: 1,
+    other: 0.8,
+  }),
+  unsupportedDynamicModifiers: Object.freeze([
+    "fx_entry_timing",
+    "risk_contribution",
+    "market_regime",
+    "news_event",
+    "performance_watch",
+  ]),
+  orders: "calculation_only",
+} as const);
+export const ADDITIONAL_CONTRIBUTION_MODIFIER_POLICY = Object.freeze({
+  ...ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY,
+  version: 'gyeol_fin_explainable_rebalance_v2',
+  minimumExecution: 'eligible_capped_topup_after_five_modifiers',
+  unsupportedDynamicModifiers: Object.freeze([]),
+  missingModifierEvidence: 'unapplied_with_explicit_status',
+  groupExecution: 'unavailable_without_verified_member_execution_policy',
+  fxFunding: 'krw_funded_usd_exposure_only',
+} as const);
+
+export type AdditionalContributionMa120Status =
+  | "above_ma"
+  | "at_ma"
+  | "below_ma"
+  | "insufficient_history"
+  | "invalid_history"
+  | "unavailable";
+
+export type AdditionalContributionPolicyBlocker =
+  | "invalid_sale_exclusions"
+  | "invalid_cash_amount"
+  | "empty_valuation_universe"
+  | "invalid_current_value"
+  | "invalid_cost_basis"
+  | "invalid_target_weight"
+  | "duplicate_allocation_key"
+  | "target_policy_incomplete"
+  | "unallocatable_target_deficit"
+  | "invalid_policy_parameter"
+  | "allocation_invariant_failed";
+
+export type AdditionalContributionPolicyRow<T> = Readonly<{
+  allocationKey: string;
+  assetType: string | null;
+  buyable: boolean;
+  costBasisKrw: number | null;
+  /** An exact decimal comparison can only veto a sale; legacy callers remain unchanged. */
+  hasExactLoss?: boolean;
+  currentValueKrw: number;
+  ma120Evidence: Readonly<{
+    distanceFromMaPct: number | null;
+    status: AdditionalContributionMa120Status;
+  }>;
+  maAssetClass: string | null;
+  maRuleEnabled: boolean;
+  metadata: T;
+  targetWeightBps: number;
+  trimDriftThresholdPct?: number;
+  riskContribution?: ContributionEvidence<number>;
+  fxExposureType?: ContributionFxExposure;
+}>;
+
+type MaAdjustmentReason =
+  | "above_or_at_ma120"
+  | "below_ma120_buffer"
+  | "below_ma120_full_adjustment"
+  | "asset_class_exempt"
+  | "asset_rule_disabled"
+  | "evidence_unavailable";
+
+type TrimReason =
+  | "user_sale_excluded"
+  | "eligible_overweight"
+  | "eligible_zero_target_exit"
+  | "not_overweight"
+  | "loss_position"
+  | "cost_basis_unavailable"
+  | "target_zero_but_loss"
+  | "target_zero_cost_basis_unavailable";
+
+type WorkingRow<T> = AdditionalContributionPolicyRow<T> & {
+  action: "buy" | "hold" | "trim";
+  allocationKrw: number;
+  baseNeedKrw: number;
+  currentWeightPct: number;
+  driftRatioPct: number | null;
+  effectiveTargetValueKrw: number;
+  effectiveTargetWeightBps: number;
+  maAdjustmentReason: MaAdjustmentReason;
+  maBaseMultiplier: number;
+  maEffectiveMultiplier: number;
+  postTradeValueKrw: number;
+  postTradeWeightPct: number;
+  postTrimValueKrw: number;
+  strategicAllocationKrw: number;
+  strategicNeedKrw: number;
+  strategicTargetValueKrw: number;
+  trimAmountKrw: number;
+  trimReason: TrimReason;
+  trimTriggered: boolean;
+  unrealizedReturnPct: number | null;
+};
+
+export function calculateExplainableAdditionalContribution<T>({
+  cashAmountKrw,
+  excludedSellKeys,
+  minimumExecutionRatioPct,
+  rows: sourceRows,
+  trimDriftThresholdPct,
+  modifiers,
+}: {
+  cashAmountKrw: number;
+  excludedSellKeys?: readonly string[];
+  minimumExecutionRatioPct: number;
+  rows: readonly AdditionalContributionPolicyRow<T>[];
+  trimDriftThresholdPct: number;
+  modifiers?: ContributionModifiers;
+}) {
+  const saleSelection = parseSaleExclusionKeys(excludedSellKeys);
+  if (!saleSelection.ok || saleSelection.keys.some(key => !sourceRows.some(row => row.allocationKey === key))) return blocked(new Set(["invalid_sale_exclusions"]));
+  const excludedSales = new Set(saleSelection.keys);
+
+  const blockers = validateInputs({
+    cashAmountKrw,
+    minimumExecutionRatioPct,
+    rows: sourceRows,
+    trimDriftThresholdPct,
+  });
+  if (blockers.size > 0) return blocked(blockers);
+
+  const currentPortfolioTotalKrw = sum(sourceRows, (row) => row.currentValueKrw);
+  if (currentPortfolioTotalKrw <= 0 || !Number.isFinite(currentPortfolioTotalKrw)) {
+    return blocked(new Set(["empty_valuation_universe"]));
+  }
+  if (currentPortfolioTotalKrw > Number.MAX_SAFE_INTEGER - cashAmountKrw) {
+    return blocked(new Set(["allocation_invariant_failed"]));
+  }
+  const postContributionTotalKrw = currentPortfolioTotalKrw + cashAmountKrw;
+  const rows: WorkingRow<T>[] = sourceRows.map((row) => {
+    const currentWeightPct = (row.currentValueKrw / currentPortfolioTotalKrw) * 100;
+    const targetWeightPct = row.targetWeightBps / 100;
+    const driftRatioPct = targetWeightPct > 0
+      ? ((currentWeightPct - targetWeightPct) / targetWeightPct) * 100
+      : null;
+    const unrealizedReturnPct = row.costBasisKrw !== null && row.costBasisKrw > 0
+      ? ((row.currentValueKrw - row.costBasisKrw) / row.costBasisKrw) * 100
+      : null;
+    const trim = excludedSales.has(row.allocationKey) ? { amountKrw: 0, reason: "user_sale_excluded" as const, triggered: false } : resolveTrim({
+      currentValueKrw: row.currentValueKrw,
+      driftRatioPct,
+      postContributionTotalKrw,
+      targetWeightBps: row.targetWeightBps,
+      trimDriftThresholdPct: row.trimDriftThresholdPct ?? trimDriftThresholdPct,
+      unrealizedReturnPct,
+      hasExactLoss: row.hasExactLoss === true,
+    });
+    const ma = resolveMaAdjustment(row);
+    const strategicTargetValueKrw =
+      (row.targetWeightBps / ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.targetWeightTotalBps) *
+      postContributionTotalKrw;
+    const postTrimValueKrw = row.currentValueKrw - trim.amountKrw;
+
+    return {
+      ...row,
+      action: "hold",
+      allocationKrw: 0,
+      baseNeedKrw: 0,
+      currentWeightPct,
+      driftRatioPct,
+      effectiveTargetValueKrw: 0,
+      effectiveTargetWeightBps: row.targetWeightBps * ma.multiplier,
+      maAdjustmentReason: ma.reason,
+      maBaseMultiplier: ma.baseMultiplier,
+      maEffectiveMultiplier: ma.multiplier,
+      postTradeValueKrw: 0,
+      postTradeWeightPct: 0,
+      postTrimValueKrw,
+      strategicAllocationKrw: 0,
+      strategicNeedKrw: Math.max(0, strategicTargetValueKrw - postTrimValueKrw),
+      strategicTargetValueKrw,
+      trimAmountKrw: trim.amountKrw,
+      trimReason: trim.reason,
+      trimTriggered: trim.triggered,
+      unrealizedReturnPct,
+    };
+  });
+
+  const totalTrimProceedsKrw = sum(rows, (row) => row.trimAmountKrw);
+  const totalAvailableFundsKrw = cashAmountKrw + totalTrimProceedsKrw;
+  if (!Number.isSafeInteger(totalAvailableFundsKrw)) {
+    return blocked(new Set(["allocation_invariant_failed"]));
+  }
+  for (const row of rows) {
+    row.effectiveTargetValueKrw =
+      (row.effectiveTargetWeightBps /
+        ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.targetWeightTotalBps) *
+      postContributionTotalKrw;
+    row.baseNeedKrw = Math.max(0, row.effectiveTargetValueKrw - row.postTrimValueKrw);
+    if (!row.trimTriggered && row.baseNeedKrw > EPSILON_KRW && !row.buyable) {
+      blockers.add("unallocatable_target_deficit");
+    }
+  }
+  if (blockers.size > 0) return blocked(blockers);
+
+  const strategic = allocateWithCaps(
+    totalAvailableFundsKrw,
+    rows.filter(isBuyCandidate).map((row) => ({
+      needKrw: row.strategicNeedKrw,
+      key: row.allocationKey,
+    })),
+  );
+  const final = allocateWithCaps(
+    totalAvailableFundsKrw,
+    rows.filter(isBuyCandidate).map((row) => ({
+      needKrw: row.baseNeedKrw,
+      key: row.allocationKey,
+    })),
+  );
+  const strategicByKey = new Map(strategic.map((row) => [row.key, row.amountKrw]));
+  const finalByKey = new Map(final.map((row) => [row.key, row.amountKrw]));
+  const modifierRows = modifiers ? applyModifiers(rows, finalByKey, totalAvailableFundsKrw, minimumExecutionRatioPct, modifiers) : null;
+
+  for (const row of rows) {
+    row.strategicAllocationKrw = strategicByKey.get(row.allocationKey) ?? 0;
+    row.allocationKrw = modifierRows?.allocations.get(row.allocationKey) ?? finalByKey.get(row.allocationKey) ?? 0;
+    row.action = row.trimAmountKrw > 0 ? "trim" : row.allocationKrw > 0 ? "buy" : "hold";
+    row.postTradeValueKrw = row.postTrimValueKrw + row.allocationKrw;
+    row.postTradeWeightPct = (row.postTradeValueKrw / postContributionTotalKrw) * 100;
+  }
+
+  const totalAllocatedKrw = sum(rows, (row) => row.allocationKrw);
+  const residualCashKrw = totalAvailableFundsKrw - totalAllocatedKrw;
+  const totalBaseNeedKrw = sum(rows.filter(isBuyCandidate), (row) => row.baseNeedKrw);
+  const minimumExecutionTargetKrw = modifierRows ? modifierRows.minimumTarget ?? 0 : minimumExecutionReferenceKrw(
+    totalAvailableFundsKrw,
+    minimumExecutionRatioPct,
+  );
+  if (!invariantsHold({
+    currentPortfolioTotalKrw,
+    postContributionTotalKrw,
+    residualCashKrw,
+    rows,
+    totalAllocatedKrw,
+    totalAvailableFundsKrw,
+    totalTrimProceedsKrw,
+  })) {
+    return blocked(new Set(["allocation_invariant_failed"]));
+  }
+
+  return Object.freeze({
+    status: "ready" as const,
+    policy: modifiers ? ADDITIONAL_CONTRIBUTION_MODIFIER_POLICY : ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY,
+    modifierEvidence: modifiers ?? null,
+    minimumExecutionEvidenceAvailable: modifierRows ? modifierRows.minimumTarget !== null : true,
+    parameters: Object.freeze({ minimumExecutionRatioPct, trimDriftThresholdPct }),
+    cashAmountKrw,
+    currentPortfolioTotalKrw,
+    postContributionTotalKrw,
+    totalTrimProceedsKrw,
+    totalAvailableFundsKrw,
+    totalBaseNeedKrw,
+    minimumExecutionTargetKrw,
+    minimumExecutionSatisfied: totalAllocatedKrw + EPSILON_KRW >= minimumExecutionTargetKrw,
+    totalAllocatedKrw,
+    residualCashKrw,
+    rows: Object.freeze(rows.toSorted((a, b) => a.allocationKey.localeCompare(b.allocationKey)).map((row) => Object.freeze({
+      action: row.action,
+      allocationKey: row.allocationKey,
+      allocationKrw: row.allocationKrw,
+      rawAllocationKrw: finalByKey.get(row.allocationKey) ?? 0,
+      modifierBreakdown: modifierRows?.details.get(row.allocationKey) ?? null,
+      baseNeedKrw: row.baseNeedKrw,
+      costBasisKrw: row.costBasisKrw,
+      currentValueKrw: row.currentValueKrw,
+      currentWeightPct: row.currentWeightPct,
+      driftRatioPct: row.driftRatioPct,
+      effectiveTargetValueKrw: row.effectiveTargetValueKrw,
+      effectiveTargetWeightBps: row.effectiveTargetWeightBps,
+      maAdjustmentReason: row.maAdjustmentReason,
+      maBaseMultiplier: row.maBaseMultiplier,
+      maEffectiveMultiplier: row.maEffectiveMultiplier,
+      metadata: row.metadata,
+      postTradeValueKrw: row.postTradeValueKrw,
+      postTradeWeightPct: row.postTradeWeightPct,
+      postTrimValueKrw: row.postTrimValueKrw,
+      strategicAllocationKrw: row.strategicAllocationKrw,
+      strategicNeedKrw: row.strategicNeedKrw,
+      strategicTargetValueKrw: row.strategicTargetValueKrw,
+      targetWeightBps: row.targetWeightBps,
+      trimAmountKrw: row.trimAmountKrw,
+      trimReason: row.trimReason,
+      trimTriggered: row.trimTriggered,
+      unrealizedReturnPct: row.unrealizedReturnPct,
+    }))),
+    blockers: Object.freeze([] as AdditionalContributionPolicyBlocker[]),
+  });
+}
+
+function validateInputs<T>({ cashAmountKrw, minimumExecutionRatioPct, rows, trimDriftThresholdPct }: {
+  cashAmountKrw: number;
+  minimumExecutionRatioPct: number;
+  rows: readonly AdditionalContributionPolicyRow<T>[];
+  trimDriftThresholdPct: number;
+}) {
+  const blockers = new Set<AdditionalContributionPolicyBlocker>();
+  // A zero contribution may still be funded by eligible trim proceeds.
+  if (!Number.isSafeInteger(cashAmountKrw) || cashAmountKrw < 0) blockers.add("invalid_cash_amount");
+  if (rows.length === 0) blockers.add("empty_valuation_universe");
+  if (!validPercent(minimumExecutionRatioPct) || !validPercent(trimDriftThresholdPct)) blockers.add("invalid_policy_parameter");
+  const keys = new Set<string>();
+  for (const row of rows) {
+    if (!row.allocationKey || keys.has(row.allocationKey)) blockers.add("duplicate_allocation_key");
+    keys.add(row.allocationKey);
+    if (!validMoney(row.currentValueKrw)) blockers.add("invalid_current_value");
+    if (row.costBasisKrw !== null && !validMoney(row.costBasisKrw)) blockers.add("invalid_cost_basis");
+    if (row.hasExactLoss !== undefined && typeof row.hasExactLoss !== "boolean") blockers.add("invalid_cost_basis");
+    if (row.trimDriftThresholdPct !== undefined && !validPercent(row.trimDriftThresholdPct)) blockers.add('invalid_policy_parameter');
+    if (!Number.isSafeInteger(row.targetWeightBps) || row.targetWeightBps < 0 || row.targetWeightBps > 10_000) blockers.add("invalid_target_weight");
+  }
+  if (rows.length > 0 && sum(rows, (row) => row.targetWeightBps) !== 10_000) blockers.add("target_policy_incomplete");
+  return blockers;
+}
+
+function resolveTrim({ currentValueKrw, driftRatioPct, postContributionTotalKrw, targetWeightBps, trimDriftThresholdPct, unrealizedReturnPct, hasExactLoss }: {
+  currentValueKrw: number;
+  driftRatioPct: number | null;
+  postContributionTotalKrw: number;
+  targetWeightBps: number;
+  trimDriftThresholdPct: number;
+  unrealizedReturnPct: number | null;
+  hasExactLoss: boolean;
+}) {
+  if (targetWeightBps === 0 && currentValueKrw > 0) {
+    if (unrealizedReturnPct === null) return trimResult(0, "target_zero_cost_basis_unavailable");
+    if (hasExactLoss || unrealizedReturnPct < 0) return trimResult(0, "target_zero_but_loss");
+    return trimResult(Math.floor(currentValueKrw), "eligible_zero_target_exit");
+  }
+  if (driftRatioPct === null || belowThreshold(driftRatioPct, trimDriftThresholdPct)) return trimResult(0, "not_overweight");
+  if (unrealizedReturnPct === null) return trimResult(0, "cost_basis_unavailable");
+  if (hasExactLoss || unrealizedReturnPct < 0) return trimResult(0, "loss_position");
+  const landingValueKrw =
+    (targetWeightBps / 10_000) *
+    ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.trimLandingTargetMultiplier *
+    postContributionTotalKrw;
+  return trimResult(Math.max(0, Math.floor(currentValueKrw - landingValueKrw)), "eligible_overweight");
+}
+
+function trimResult(amountKrw: number, reason: TrimReason) {
+  return { amountKrw, reason, triggered: amountKrw > 0 };
+}
+
+function resolveMaAdjustment<T>(row: AdditionalContributionPolicyRow<T>) {
+  const assetType = normalize(row.assetType);
+  const assetClass = normalize(row.maAssetClass) ?? "other";
+  const baseMultiplier = maClassMultiplier(assetClass);
+  if (!row.maRuleEnabled) return { baseMultiplier, multiplier: 1, reason: "asset_rule_disabled" as const };
+  if (["savings", "pension", "housing_subscription", "fixed_deposit"].includes(assetType ?? "") || assetClass === "defensive_gold" || assetClass === "bond") {
+    return { baseMultiplier: 1, multiplier: 1, reason: "asset_class_exempt" as const };
+  }
+  if (row.ma120Evidence.status !== "below_ma" || row.ma120Evidence.distanceFromMaPct === null || !Number.isFinite(row.ma120Evidence.distanceFromMaPct) || row.ma120Evidence.distanceFromMaPct >= 0) {
+    const known = row.ma120Evidence.status === "above_ma" || row.ma120Evidence.status === "at_ma";
+    return { baseMultiplier, multiplier: 1, reason: known ? "above_or_at_ma120" as const : "evidence_unavailable" as const };
+  }
+  const gapPct = Math.max(0, -row.ma120Evidence.distanceFromMaPct);
+  if (gapPct >= ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.ma120BufferPct) {
+    return { baseMultiplier, multiplier: baseMultiplier, reason: "below_ma120_full_adjustment" as const };
+  }
+  const progress = gapPct / ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.ma120BufferPct;
+  return { baseMultiplier, multiplier: 1 - progress * (1 - baseMultiplier), reason: "below_ma120_buffer" as const };
+}
+
+function maClassMultiplier(assetClass: string) {
+  const values = ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.ma120ClassMultipliers;
+  return Object.hasOwn(values, assetClass) ? values[assetClass as keyof typeof values] : values.other;
+}
+
+function allocateWithCaps(availableKrw: number, rows: readonly { needKrw: number; key: string }[]) {
+  const totalNeedKrw = sum(rows, (row) => row.needKrw);
+  const deployKrw = Math.min(availableKrw, totalNeedKrw);
+  if (deployKrw <= 0 || totalNeedKrw <= 0) return rows.map((row) => ({ ...row, amountKrw: 0 }));
+  const working = rows.map((row) => {
+    // Keep the exact deficit as the weight; only executable KRW has an integer cap.
+    const capKrw = Math.floor(row.needKrw);
+    const idealKrw = deployKrw * (row.needKrw / totalNeedKrw);
+    return { ...row, capKrw, amountKrw: Math.min(capKrw, Math.floor(idealKrw)), idealKrw };
+  });
+  let remainder = Math.floor(deployKrw) - sum(working, (row) => row.amountKrw);
+  for (const row of working.toSorted((a, b) => fractionalPart(b.idealKrw) - fractionalPart(a.idealKrw) || a.key.localeCompare(b.key))) {
+    if (remainder <= 0) break;
+    if (row.amountKrw < row.capKrw) { row.amountKrw += 1; remainder -= 1; }
+  }
+  return working;
+}
+
+function isBuyCandidate<T>(row: WorkingRow<T>) {
+  return !row.trimTriggered && row.buyable;
+}
+
+function applyModifiers<T>(rows: WorkingRow<T>[], raw: Map<string, number>, available: number, configuredPct: number, modifiers: ContributionModifiers) {
+  const totalRaw = [...raw.values()].reduce((a,b)=>a+b,0);
+  const postTrimTotal = sum(rows,row=>row.postTrimValueKrw);
+  const working = rows.map(row=>{
+    const rawAmount = raw.get(row.allocationKey) ?? 0;
+    const multipliers = resolveContributionMultipliers({ modifiers, exposure:row.fxExposureType, riskContribution:row.riskContribution, targetFraction:row.effectiveTargetWeightBps/10000 });
+    const penalized = Math.min(rawAmount,Math.floor(row.baseNeedKrw),Math.max(0,Math.round(rawAmount*multipliers.penaltyMult)));
+    const maKnown = ['above_or_at_ma120','asset_class_exempt','asset_rule_disabled'].includes(row.maAdjustmentReason);
+    const room = Math.max(0,Math.floor(row.baseNeedKrw)-penalized);
+    const evidenceKnown = [multipliers.fx,multipliers.rc,multipliers.regime,multipliers.event,multipliers.performance].every(value=>value.status!=='unavailable');
+    const eligible = isBuyCandidate(row) && rawAmount>0 && room>0 && multipliers.penaltyMult>=.85 && maKnown && evidenceKnown;
+    const target=row.effectiveTargetWeightBps/10000;
+    const postTrimWeight=postTrimTotal>0?row.postTrimValueKrw/postTrimTotal:0;
+    const rawAllocationRatio=totalRaw>0?Math.max(0,Math.min(1,rawAmount/totalRaw)):0;
+    const deficitPct=target>0?Math.max(0,Math.min(1,(target-postTrimWeight)/target)):0;
+    const penaltyPriority=multipliers.penaltyMult, maPriority=maKnown?1:row.maAdjustmentReason==='below_ma120_buffer'?.5:0;
+    const fxPriority=contributionFxPriority(row.fxExposureType);
+    const score=eligible?Math.round((40*rawAllocationRatio+25*penaltyPriority+20*deficitPct+10*maPriority+5*fxPriority)*100)/100:0;
+    return { key:row.allocationKey, rawAmount, multipliers, penalizedAllocationKrw:penalized, topupEligible:eligible, topupScore:score, topupFactors:{rawAllocationRatio,penaltyPriority,deficitPct,maPriority,fxPriority}, topupAllocationKrw:0, room };
+  });
+  const totalNeed=sum(rows.filter(isBuyCandidate),row=>row.baseNeedKrw);
+  const ratio=contributionMinimumRatio(modifiers,configuredPct);
+  const minimumTarget=ratio===null?null:Math.min(Math.floor(available*ratio),Math.floor(totalNeed));
+  let remaining=Math.max(0,(minimumTarget??0)-sum(working,row=>row.penalizedAllocationKrw));
+  // Each capped round either spends the budget or fills a candidate. Deterministic finite loop.
+  for(let pass=0;remaining>0&&pass<=working.length;pass++) {
+    const eligible=working.filter(row=>row.topupEligible&&row.topupScore>0&&row.room>0);
+    const totalScore=sum(eligible,row=>row.topupScore);
+    if(!eligible.length||totalScore<=0)break;
+    const shares=eligible.map(row=>({row,ideal:remaining*row.topupScore/totalScore,allocated:Math.min(row.room,Math.floor(remaining*row.topupScore/totalScore))}));
+    let spent=sum(shares,s=>s.allocated);
+    let residual=remaining-spent;
+    for(const s of shares.toSorted((a,b)=>fractionalPart(b.ideal)-fractionalPart(a.ideal)||a.row.key.localeCompare(b.row.key))) {
+      if(residual<=0)break;
+      if(s.allocated<s.row.room){s.allocated++;spent++;residual--;}
+    }
+    for(const s of shares){s.row.topupAllocationKrw+=s.allocated;s.row.room-=s.allocated;}
+    if(spent===0)break;
+    remaining-=spent;
+  }
+  return { minimumTarget, allocations:new Map(working.map(row=>[row.key,row.penalizedAllocationKrw+row.topupAllocationKrw])), details:new Map(working.map(({key,room,...row})=>{ void room; return [key,row] as const; })) };
+}
+
+function invariantsHold<T>({ currentPortfolioTotalKrw, postContributionTotalKrw, residualCashKrw, rows, totalAllocatedKrw, totalAvailableFundsKrw, totalTrimProceedsKrw }: {
+  currentPortfolioTotalKrw: number;
+  postContributionTotalKrw: number;
+  residualCashKrw: number;
+  rows: readonly WorkingRow<T>[];
+  totalAllocatedKrw: number;
+  totalAvailableFundsKrw: number;
+  totalTrimProceedsKrw: number;
+}) {
+  if (![totalAllocatedKrw, totalTrimProceedsKrw, residualCashKrw, totalAvailableFundsKrw].every(Number.isSafeInteger)) return false;
+  if (!validMoney(currentPortfolioTotalKrw) || !validMoney(postContributionTotalKrw)) return false;
+  if (residualCashKrw < 0 || totalAllocatedKrw + residualCashKrw !== totalAvailableFundsKrw) return false;
+  if (rows.some((row) =>
+    !Number.isSafeInteger(row.allocationKrw) || !Number.isSafeInteger(row.trimAmountKrw) ||
+    !Number.isSafeInteger(row.strategicAllocationKrw) ||
+    row.allocationKrw < 0 || row.trimAmountKrw < 0 || row.strategicAllocationKrw < 0 ||
+    row.allocationKrw > Math.floor(row.baseNeedKrw) ||
+    row.strategicAllocationKrw > Math.floor(row.strategicNeedKrw) ||
+    row.trimAmountKrw > row.currentValueKrw ||
+    !validMoney(row.postTrimValueKrw) || !validMoney(row.postTradeValueKrw) ||
+    !validMoney(row.baseNeedKrw) || !validMoney(row.strategicNeedKrw) ||
+    !Number.isFinite(row.postTradeWeightPct) ||
+    (row.unrealizedReturnPct !== null && !Number.isFinite(row.unrealizedReturnPct)) ||
+    (row.trimAmountKrw > 0 && (row.allocationKrw > 0 || row.strategicAllocationKrw > 0 || row.unrealizedReturnPct === null || row.unrealizedReturnPct < 0)) ||
+    (!row.buyable && (row.allocationKrw > 0 || row.strategicAllocationKrw > 0))
+  )) return false;
+  if (sum(rows, (row) => row.strategicAllocationKrw) > totalAvailableFundsKrw) return false;
+  const holdingsAfterTradeKrw = sum(rows, (row) => row.postTradeValueKrw);
+  const holdingsAfterTrimKrw = sum(rows, (row) => row.postTrimValueKrw);
+  // Valuations may contain fractional KRW. Allow their accumulated floating-point
+  // error while keeping every integer cash identity and row cap exact above.
+  const valuationToleranceKrw = Math.min(0.25, Math.max(
+    EPSILON_KRW,
+    Number.EPSILON * Math.max(1, rows.length) * postContributionTotalKrw * 4,
+  ));
+  return Math.abs(holdingsAfterTrimKrw - (currentPortfolioTotalKrw - totalTrimProceedsKrw)) <= valuationToleranceKrw &&
+    Math.abs(holdingsAfterTradeKrw + residualCashKrw - postContributionTotalKrw) <= valuationToleranceKrw;
+}
+
+function blocked(blockers: Set<AdditionalContributionPolicyBlocker>) {
+  return Object.freeze({
+    status: "blocked" as const,
+    policy: ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY,
+    parameters: null,
+    cashAmountKrw: null,
+    currentPortfolioTotalKrw: null,
+    postContributionTotalKrw: null,
+    totalTrimProceedsKrw: null,
+    totalAvailableFundsKrw: null,
+    totalBaseNeedKrw: null,
+    minimumExecutionTargetKrw: null,
+    minimumExecutionSatisfied: null,
+    totalAllocatedKrw: null,
+    residualCashKrw: null,
+    rows: Object.freeze([]),
+    blockers: Object.freeze([...blockers].toSorted()),
+  });
+}
+
+function validPercent(value: number) {
+  return Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function validMoney(value: number) {
+  return Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+}
+
+function minimumExecutionReferenceKrw(availableKrw: number, ratioPct: number) {
+  // Decimal percentage arithmetic avoids ceil(100 * 0.07) becoming 8 KRW.
+  const [mantissa, exponent = "0"] = ratioPct.toString().split("e");
+  const [whole, fractional = ""] = mantissa.split(".");
+  const scale = Number(exponent) - fractional.length;
+  const power = BigInt(`1${"0".repeat(Math.abs(scale))}`);
+  const numerator = BigInt(`${whole}${fractional}`) * (scale > 0 ? power : BigInt(1));
+  const denominator = BigInt(100) * (scale < 0 ? power : BigInt(1));
+  const amount = BigInt(availableKrw) * numerator;
+  return Number((amount + denominator - BigInt(1)) / denominator);
+}
+
+function belowThreshold(value: number, threshold: number) {
+  const comparisonTolerance = Number.EPSILON * 16 * Math.max(1, Math.abs(value), threshold);
+  return value < threshold - comparisonTolerance;
+}
+
+function normalize(value: string | null) {
+  return value?.trim().toLowerCase() || null;
+}
+
+function fractionalPart(value: number) {
+  return value - Math.floor(value);
+}
+
+function sum<T>(rows: readonly T[], select: (row: T) => number) {
+  return rows.reduce((total, row) => total + select(row), 0);
+}
+
+const EPSILON_KRW = 1e-6;

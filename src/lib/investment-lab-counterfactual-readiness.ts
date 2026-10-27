@@ -17,9 +17,20 @@ export const HISTORICAL_COUNTERFACTUAL_CONTRACT = Object.freeze({
   persistence: "none",
 } as const);
 
-export const HISTORICAL_COUNTERFACTUAL_POLICY_GATES = Object.freeze([
-  "cashflow_adjusted_return_fixture",
-] as const);
+export const HISTORICAL_COUNTERFACTUAL_ENGINE_EVIDENCE = Object.freeze({
+  pathEngine: "position_flow_counterfactual_v1",
+  executionSchedule: "eod_admitted_close_on_or_after_v2",
+  returnMethod: "modified_dietz_daily_weighted_eod_v1",
+  returnEvidence: "position_return_evidence_v1",
+  fixtureCoverage: Object.freeze([
+    "same_day_and_delayed_execution",
+    "inflow_and_outflow_weighting",
+    "cash_and_unsupported_event_fail_closed",
+    "actual_and_scenario_axis_identity",
+  ]),
+} as const);
+
+export const HISTORICAL_COUNTERFACTUAL_POLICY_GATES = Object.freeze([] as const);
 
 export const LEGACY_COUNTERFACTUAL_PARITY_REJECTIONS = Object.freeze([
   "current_holdings_backcast_as_historical_actual",
@@ -146,19 +157,22 @@ export function assessInvestmentLabCounterfactualReadiness(
     }
   }
 
+  const productionEngineReady = blockers.length === 0;
   return Object.freeze({
     contract: "investment_lab_historical_counterfactual_v1",
     account: input.account,
     instrumentKey: scenario.instrumentKey,
-    status:
-      blockers.length === 0 ? "ready_for_engine_fixture" : "blocked",
+    status: productionEngineReady
+      ? "ready_for_production_engine"
+      : "blocked",
     blockers: Object.freeze(blockers),
     coverageBasis: "service_date_range_with_bounded_prior_carry",
-    productionEngineReady: false,
+    productionEngineReady,
+    engineEvidence: HISTORICAL_COUNTERFACTUAL_ENGINE_EVIDENCE,
     unresolvedPolicyGates: HISTORICAL_COUNTERFACTUAL_POLICY_GATES,
     providerCalls: 0,
     databaseWrites: 0,
-    userFacingRouteEnabled: false,
+    userFacingRouteEnabled: true,
   } as const);
 }
 

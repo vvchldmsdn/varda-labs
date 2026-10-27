@@ -1,12 +1,10 @@
 import { KIS_RAW_HISTORY_POLICY } from "./providers/kis-history.ts";
 import type { PriceLookupTarget } from "./providers/types.ts";
 
-const TRACKED_ACCOUNT_CODES = new Set(["brokerage", "isa", "irp"]);
-
 export const SIMULATION_HISTORY_COMPLETION_POLICY = Object.freeze({
-  version: "simulation_history_completion_v1",
+  version: "simulation_history_completion_v2",
   sharedReferenceData: true,
-  targetAccounts: Object.freeze(["brokerage", "isa", "irp"]),
+  accountAuthority: "caller_selected_active_owned_accounts",
   supportedMarketCurrencies: Object.freeze(["korea|KRW", "us|USD"]),
   maximumRangeCalendarDays: 180,
   maximumBatchSize: KIS_RAW_HISTORY_POLICY.maximumInstrumentCount,
@@ -73,8 +71,8 @@ export function planSimulationHistoryCompletion(input: {
   for (const holding of input.holdings) {
     const accountCode = normalizeText(holding.accountCode)?.toLowerCase();
     const quantity = Number(holding.quantity);
-    if (!accountCode || !TRACKED_ACCOUNT_CODES.has(accountCode)) {
-      increment(excludedByReason, "account_not_supported");
+    if (!accountCode) {
+      increment(excludedByReason, "account_identity_missing");
       continue;
     }
     if (!Number.isFinite(quantity) || quantity <= 0) {

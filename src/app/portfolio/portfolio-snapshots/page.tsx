@@ -1,3 +1,6 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementElement, ManagementText } from "@/components/i18n/management-text";
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { PortfolioSnapshotControls } from "@/components/portfolio-snapshots/portfolio-snapshot-controls";
@@ -15,6 +18,10 @@ import { parseTenantSnapshotDateQuery } from "@/lib/tenant-snapshot-date-query";
 import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata() {
+  return localizedMetadata({ title: "포트폴리오 스냅샷 | CAIRN LABS" }, "Portfolio snapshots | CAIRN LABS");
+}
 
 type TenantPortfolioSnapshotsPageProps = {
   searchParams: Promise<{
@@ -60,26 +67,27 @@ export default async function TenantPortfolioSnapshotsPage({
   const evidence = isEvidenceResult(result) ? result : null;
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-6xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <section className="mx-auto w-full max-w-6xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-normal">
               Owner-scoped portfolio snapshots
             </h1>
-            <p className="mt-2 text-sm text-[#687064]">
+            <p className="mt-2 text-sm text-[var(--muted)]">
               Account-level daily totals authorized through owned accounts
             </p>
           </div>
-          <nav className="flex flex-wrap gap-2" aria-label="Related evidence">
+          <ManagementElement as="nav" className="flex flex-wrap gap-2" aria-label="Related evidence">
             <PageLink href="/portfolio/accounts?account=all">Accounts</PageLink>
             <PageLink href="/portfolio/holdings?account=all">Holdings</PageLink>
             <PageLink href="/portfolio/position-snapshots?account=all">
               Positions
             </PageLink>
             <PageLink href="/auth/session">Session evidence</PageLink>
-          </nav>
+          </ManagementElement>
         </div>
 
         {selectedScope ? (
@@ -107,7 +115,7 @@ export default async function TenantPortfolioSnapshotsPage({
             <PortfolioSnapshotTable snapshots={evidence.snapshots} />
           </>
         ) : (
-          <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+          <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
             Portfolio snapshot evidence remains closed until the request,
             session, ownership relationship, and row integrity checks all pass.
           </p>
@@ -121,9 +129,9 @@ function PageLink({ href, children }: { href: string; children: React.ReactNode 
   return (
     <Link
       href={href}
-      className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+      className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </Link>
   );
 }

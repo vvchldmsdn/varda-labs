@@ -1,4 +1,6 @@
 import "server-only";
+import { buildCurrentHoldingMovement, type CurrentHoldingMovement } from "./current-holding-movement";
+import { resolveCurrentUsdKrwRate } from "@/lib/market-data/fx-rate-admission";
 
 import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
 import {
@@ -8,6 +10,7 @@ import {
   livePriceQuotes,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import { isDashboardInvestmentAsset, type PortfolioDashboardDemand } from "@/lib/portfolio-dashboard-demand";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -15,9 +18,19 @@ import {
   getSelectedRealizedRows,
   portfolioEventAccount,
   type AssetReturnMetrics,
+  type RealizedReturnRow,
   type ReturnMetricsSummary,
 } from "@/lib/portfolio-return-metrics";
 import { buildPortfolioDashboardSnapshotTrend } from "@/lib/portfolio-dashboard-snapshots";
+import {
+  buildPortfolioDashboardHoldingHistory,
+  buildPortfolioDashboardPositionTrend,
+  type PortfolioDashboardHoldingHistory,
+} from "@/lib/portfolio-dashboard-history";
+import {
+  buildDashboardFxTrend,
+  type DashboardFxTrendPoint,
+} from "@/lib/fx-trend";
 import {
   convertToKrw,
   diffDays,
@@ -25,12 +38,14 @@ import {
   resolveKrwFxRate,
   percentOrNull,
   sumBy,
+  sumComplete,
   toNumber,
   uniqueStrings,
 } from "@/lib/portfolio-math";
 import {
   buildDailyPositionMovement,
   buildPreviousCloseMovement,
+  isPortfolioMovementEligibleHolding,
   type PortfolioMovementContribution,
   type PortfolioMovementCycle,
   type PortfolioMovementCoverage,
@@ -38,9 +53,10 @@ import {
   type PortfolioMovementSource,
 } from "@/lib/portfolio-movement";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import { buildHoldingPriceReturn, type HoldingPriceReturn } from "@/lib/holding-price-return";
+import { currentKstDate } from "@/lib/current-kst-date";
 import { buildCycleForSnapshotDate, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 
-const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
 const NON_INVESTMENT_ASSET_TYPES = new Set([
   "savings",
   "fixed_deposit",
@@ -61,6 +77,8 @@ export type DashboardHolding = {
   legacyBase44Id: string | null;
   name: string;
   ticker: string | null;
+  assetType: string | null;
+  movementEligible: boolean;
   account: string;
   market: string;
   currency: string;
@@ -72,11 +90,11 @@ export type DashboardHolding = {
   priceQuoteType: string | null;
   priceStatus: string | null;
   valueKrw: number;
-  costBasisKrw: number;
-  realizedCostBasisKrw: number;
-  unrealizedPnlKrw: number;
-  realizedPnlKrw: number;
-  totalPnlKrw: number;
+  costBasisKrw: number | null;
+  realizedCostBasisKrw: number | null;
+  unrealizedPnlKrw: number | null;
+  realizedPnlKrw: number | null;
+  totalPnlKrw: number | null;
   holdingReturnPct: number | null;
   totalReturnPct: number | null;
   currentWeight: number;
@@ -86,8 +104,10 @@ export type DashboardHolding = {
   needsTrim: boolean;
   dailyChangeKrw: number | null;
   dailyReturnPct: number | null;
+  dailyPriceReturn?: HoldingPriceReturn;
   dailySource: MovementSource;
   previousCloseValueKrw: number | null;
+  priceDailyChangeKrw: number | null;
   fxDailyChangeKrw: number | null;
   groupName: string | null;
 };
@@ -96,10 +116,10 @@ export type AccountSummary = {
   code: string;
   label: string;
   totalValueKrw: number;
-  costBasisKrw: number;
-  unrealizedPnlKrw: number;
-  realizedPnlKrw: number;
-  totalPnlKrw: number;
+  costBasisKrw: number | null;
+  unrealizedPnlKrw: number | null;
+  realizedPnlKrw: number | null;
+  totalPnlKrw: number | null;
   holdingReturnPct: number | null;
   totalReturnPct: number | null;
   holdingCount: number;
@@ -142,18 +162,22 @@ export type DashboardEventActivity = {
 };
 
 export type DashboardData = {
+  currentHoldingMovement?: CurrentHoldingMovement;
   selectedScope: PortfolioAnalysisScope;
   analysisScopes: readonly PortfolioAnalysisScope[];
   generatedAt: string;
   usdKrwRate: number;
-  latestSnapshotDate: string | null;
-  latestSnapshotReferenceDate: string | null;
+  fxTrend: readonly DashboardFxTrendPoint[];
+  movementBaselineDate: string | null;
+  baselineExecutionFxFetchedAt?: string | null;
+  baselineExecutionCapturedAt?: string | null;
+  marketPriceReferenceDate: string | null;
   totalValueKrw: number;
-  costBasisKrw: number;
-  realizedCostBasisKrw: number;
-  unrealizedPnlKrw: number;
-  realizedPnlKrw: number;
-  totalPnlKrw: number;
+  costBasisKrw: number | null;
+  realizedCostBasisKrw: number | null;
+  unrealizedPnlKrw: number | null;
+  realizedPnlKrw: number | null;
+  totalPnlKrw: number | null;
   holdingReturnPct: number | null;
   totalReturnPct: number | null;
   todayChangeKrw: number | null;
@@ -167,6 +191,7 @@ export type DashboardData = {
   nonInvestmentAssets: NonInvestmentAsset[];
   nonInvestmentTotalKrw: number;
   recentSnapshots: RecentPortfolioPoint[];
+  holdingHistory: PortfolioDashboardHoldingHistory;
   eventActivity: DashboardEventActivity[];
   topMovers: DashboardHolding[];
   todayMovement: DashboardTodayMovement;
@@ -189,6 +214,8 @@ export type DashboardData = {
     movementSnapshotCoveragePct: number | null;
     movementCountCoveragePct: number | null;
     previousCloseCoveragePct: number | null;
+    movementEligibleAssetCount: number;
+    movementExcludedAssetCount: number;
     headlineBasis: "current_assets_plus_event_ledger";
     trendBasis: "daily_portfolio_snapshots";
     latestPortfolioSnapshotDate: string | null;
@@ -215,7 +242,11 @@ export type DashboardTodayMovement = {
   changeKrw: number | null;
   returnPct: number | null;
   tradeFlowKrw: number;
+  priceChangeKrw: number | null;
   fxChangeKrw: number | null;
+  scopePreviousTotalKrw: number | null;
+  scopeCurrentTotalKrw: number | null;
+  movementExcludedCurrentValueKrw: number;
   contributionRows: PortfolioMovementContribution[];
   exclusions: PortfolioMovementExclusion[];
   coverage: PortfolioMovementCoverage;
@@ -224,10 +255,12 @@ export type DashboardTodayMovement = {
 export async function getPortfolioDashboard(
   {
     analysisScopes,
+    demand = { surface: "home" },
     scope,
     tenantContext,
   }: {
     analysisScopes: readonly PortfolioAnalysisScope[];
+    demand?: PortfolioDashboardDemand;
     scope: PortfolioAnalysisScope;
     tenantContext: TenantContext;
   },
@@ -240,33 +273,42 @@ export async function getPortfolioDashboard(
     assetRows,
     settingsRows,
     latestFxRows,
+    recentFxRows,
     latestPositionRows,
+    baselineReferenceDate,
+    baselineIsCurrent,
+    recentPositionRows,
+    historyAssetIds,
     recentPortfolioRows,
     eventRows,
+    nativeHoldingCosts,
     unmatchedSnapshotCountRows,
     liveQuoteRows,
     recentPriceRows,
   } = await getReadOnlyTenantPortfolioDashboardSources({
+    demand,
     scope,
     tenantContext,
-    snapshotDate: movementCycle.snapshotDate,
+    serviceDate: movementCycle.snapshotDate,
   });
 
-  const latestSnapshotDate =
-    latestPositionRows.length > 0 ? movementCycle.snapshotDate : null;
+  const movementBaselineDate = baselineReferenceDate;
+  const activeMovementBaselineDate = baselineIsCurrent ? movementBaselineDate : null;
+  const baselineIsDelayed = movementBaselineDate !== null && !baselineIsCurrent;
 
-  const investmentAssetRows = assetRows.filter((asset) =>
-    INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
-  );
+  const investmentAssetRows = assetRows.filter(isDashboardInvestmentAsset);
   const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
   const valuationAssetRows = investmentAssetRows.map((asset) =>
-    applyLiveQuote(asset, liveQuotesByAssetKey.get(assetLiveQuoteKey(asset))),
+    applyLiveQuote(
+      asset,
+      liveQuotesByAssetKey.get(assetLiveQuoteKey(asset)),
+    ),
   );
   const selectedInvestmentAssetRows = valuationAssetRows;
   const setting = settingsRows[0] ?? null;
   const latestFxRow = latestFxRows[0] ?? null;
   const usdKrwRate =
-    toNumber(latestFxRow?.usdKrw) ?? toNumber(setting?.usdKrwRate) ?? 0;
+    resolveCurrentUsdKrwRate(latestFxRows, setting?.usdKrwRate) ?? 0;
   const latestFxAgeDays = latestFxRow?.rateDate
     ? diffDays(movementCycle.snapshotDate, latestFxRow.rateDate)
     : null;
@@ -283,6 +325,7 @@ export async function getPortfolioDashboard(
     eventRows,
     investmentAssetRows,
     usdKrwRate,
+    { nativeHoldingCosts },
   );
 
   const allHoldingsWithoutWeights = valuationAssetRows.map((asset) =>
@@ -292,7 +335,6 @@ export async function getPortfolioDashboard(
       groupName: asset.groupId ? assetGroupNames.get(asset.groupId) : null,
       usdKrwRate,
       trimDriftThreshold,
-      useTrendFilter,
       returnMetrics: getAssetReturnMetrics(returnSummary, asset, usdKrwRate),
     }),
   );
@@ -308,7 +350,6 @@ export async function getPortfolioDashboard(
       groupName: asset.groupId ? assetGroupNames.get(asset.groupId) : null,
       usdKrwRate,
       trimDriftThreshold,
-      useTrendFilter,
       returnMetrics: getAssetReturnMetrics(returnSummary, asset, usdKrwRate),
     }),
   );
@@ -325,57 +366,102 @@ export async function getPortfolioDashboard(
     positionRows: latestPositionRows,
     eventRows,
     selectedAccount: "all",
-    baselineDate: latestSnapshotDate,
+    baselineDate: activeMovementBaselineDate,
     usdKrwRate,
     movementCycle,
   });
   const previousCloseFallback = buildPreviousCloseMovement({
     holdings: holdingsBase,
     priceRows: recentPriceRows,
-    referenceDate: latestSnapshotDate,
+    referenceDate: activeMovementBaselineDate,
     usdKrwRate,
     movementCycle,
   });
-  const movement = dailyPositionMovement.ready
+  const currentHoldingMovement = buildCurrentHoldingMovement({
+    holdings: holdingsBase, positionRows: baselineIsDelayed ? [] : latestPositionRows,
+    priceRows: baselineIsDelayed ? [] : recentPriceRows,
+    baselineDate: activeMovementBaselineDate, usdKrwRate, movementCycle,
+  });
+  // A current-quantity close comparison cannot replace a snapshot valuation
+  // across trades, nor resolve an ambiguous trade-to-position identity.
+  const canUsePreviousCloseFallback = !eventRows.some((event) =>
+    movementBaselineDate !== null && event.eventDate > movementBaselineDate &&
+    (event.eventType === "buy" || event.eventType === "sell"),
+  );
+  // Never relabel a delayed snapshot's multi-day move as today's change. The
+  // historical baseline date remains visible, and live valuation stays intact.
+  const movement = baselineIsDelayed
+    ? {
+        ...dailyPositionMovement,
+        reason: "stale_baseline_snapshot",
+        exclusions: dailyPositionMovement.exclusions.map((exclusion) => ({
+          ...exclusion,
+          reason: "stale_baseline_snapshot" as const,
+        })),
+      }
+    : dailyPositionMovement.ready
     ? dailyPositionMovement
-    : previousCloseFallback.ready
+    : canUsePreviousCloseFallback && previousCloseFallback.ready
       ? previousCloseFallback
       : dailyPositionMovement;
-  const fallbackContributions = previousCloseFallback.ready
+  const fallbackContributions = canUsePreviousCloseFallback && previousCloseFallback.ready
     ? previousCloseFallback.contributions
     : new Map<string, PortfolioMovementContribution>();
   const holdings = holdingsBase
     .map((holding) =>
       attachDailyContribution(
-        holding,
+        { ...holding, dailyPriceReturn: buildHoldingPriceReturn({ holding, priceRows: recentPriceRows, movementCycle, now }) },
         movement.contributions.get(holding.id) ??
           fallbackContributions.get(holding.id),
       ),
     )
     .sort((a, b) => b.valueKrw - a.valueKrw);
+  const movementEligibleAssetCount = holdings.filter(
+    (holding) => holding.movementEligible,
+  ).length;
 
   const totalValueKrw = sumBy(holdings, (holding) => holding.valueKrw);
-  const costBasisKrw = sumBy(holdings, (holding) => holding.costBasisKrw);
-  const realizedCostBasisKrw =
-    sumBy(holdings, (holding) => holding.realizedCostBasisKrw) +
-    sumBy(
-      realizedRows.filter((row) => !row.assetKey),
-      (row) => row.realizedCostBasisKrw,
-    );
-  const unrealizedPnlKrw = sumBy(holdings, (holding) => holding.unrealizedPnlKrw);
-  const realizedPnlKrw =
-    sumBy(holdings, (holding) => holding.realizedPnlKrw) +
-    sumBy(
-      realizedRows.filter((row) => !row.assetKey),
-      (row) => row.realizedPnlKrw,
-    );
-  const totalPnlKrw = unrealizedPnlKrw + realizedPnlKrw;
+  const movementExcludedCurrentValueKrw = sumBy(
+    holdings.filter((holding) => !holding.movementEligible),
+    (holding) => holding.valueKrw,
+  );
+  // Compare the exact movement-eligible set, never add today's manual value
+  // to fabricate yesterday's whole-portfolio value.
+  const scopePreviousTotalKrw = movement.ready ? movement.previousTotalKrw : null;
+  const scopeTodayReturnPct = percentOrNull(
+    movement.changeKrw,
+    scopePreviousTotalKrw,
+  );
+  const costBasisKrw = sumComplete(holdings, (holding) => holding.costBasisKrw);
+  const realizedCostBasisKrw = sumComplete([
+    ...holdings.map((holding) => holding.realizedCostBasisKrw),
+    ...realizedRows.filter((row) => !row.assetKey).map((row) => row.realizedCostBasisKrw),
+  ], value => value);
+  const unrealizedPnlKrw = sumComplete(holdings, (holding) => holding.unrealizedPnlKrw);
+  const realizedPnlKrw = sumComplete([
+    ...holdings.map((holding) => holding.realizedPnlKrw),
+    ...realizedRows.filter((row) => !row.assetKey).map((row) => row.realizedPnlKrw),
+  ], value => value);
+  const totalPnlKrw = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
   const holdingReturnPct = percentOrNull(unrealizedPnlKrw, costBasisKrw);
   const totalReturnPct = percentOrNull(
     totalPnlKrw,
-    costBasisKrw + realizedCostBasisKrw,
+    sumComplete([costBasisKrw, realizedCostBasisKrw], value => value),
   );
-  const recentSnapshots = buildPortfolioDashboardSnapshotTrend(recentPortfolioRows);
+  const holdingHistory = buildPortfolioDashboardHoldingHistory({
+    currentDate: currentKstDate(now),
+    holdings: demand.surface === "home"
+      ? holdings
+      : holdings.filter((holding) => historyAssetIds.includes(holding.id)),
+    rows: recentPositionRows,
+  });
+  const recentSnapshots =
+    demand.surface !== "home" ? [] : scope.kind === "portfolio_group"
+      ? buildPortfolioDashboardPositionTrend({
+          holdings,
+          rows: recentPositionRows,
+        })
+      : buildPortfolioDashboardSnapshotTrend(recentPortfolioRows);
   const latestPortfolioSnapshot = recentSnapshots.at(-1) ?? null;
   const latestPortfolioSnapshotValue =
     latestPortfolioSnapshot?.totalMarketValue ?? null;
@@ -383,12 +469,12 @@ export async function getPortfolioDashboard(
   const latestPortfolioSnapshotReturnPct =
     latestPortfolioSnapshot?.totalReturnPct ?? null;
   const latestAccountPositions = latestPositionRows;
-  const latestSnapshotReferenceDate =
+  const marketPriceReferenceDate =
     latestDate(
       latestAccountPositions
         .map((position) => position.referenceDate ?? position.priceDate)
         .filter((date): date is string => Boolean(date)),
-    ) ?? latestSnapshotDate;
+    ) ?? movementBaselineDate;
   const unmatchedSnapshotRows = latestAccountPositions.filter(
     (position) => position.assetId === null,
   ).length;
@@ -399,11 +485,21 @@ export async function getPortfolioDashboard(
 
   return {
     selectedScope: scope,
+    currentHoldingMovement,
     analysisScopes,
     generatedAt: new Date().toISOString(),
     usdKrwRate,
-    latestSnapshotDate,
-    latestSnapshotReferenceDate,
+    fxTrend: demand.surface === "home" ? buildDashboardFxTrend(recentFxRows) : [],
+    movementBaselineDate,
+    baselineExecutionCapturedAt: latestPositionRows
+      .filter(row => row.description?.split(/;\s*/).includes("valuation_policy=execution_collection_v1"))
+      .map(row => row.capturedAt?.toISOString()).filter((at): at is string => !!at).sort().at(-1) ?? null,
+    baselineExecutionFxFetchedAt: latestPositionRows
+      .filter(row => row.description?.includes("fx_valuation_policy=execution_collection_v1") && row.currency === "USD")
+      .map(row => row.description?.match(/(?:^|;\s*)fx_fetched_at=([^;]+)/)?.[1])
+      .filter((at): at is string => !!at && Number.isFinite(Date.parse(at))).sort().at(-1) ?? null,
+
+    marketPriceReferenceDate,
     totalValueKrw,
     costBasisKrw,
     realizedCostBasisKrw,
@@ -413,7 +509,7 @@ export async function getPortfolioDashboard(
     holdingReturnPct,
     totalReturnPct,
     todayChangeKrw: movement.changeKrw,
-    todayReturnPct: movement.returnPct,
+    todayReturnPct: scopeTodayReturnPct,
     todayFxChangeKrw: movement.fxChangeKrw,
     tradeFlowKrw: movement.tradeFlowKrw,
     trimDriftThreshold,
@@ -422,6 +518,7 @@ export async function getPortfolioDashboard(
       accountRows.map((account) => account.code),
       holdings,
       accountLabels,
+      realizedRows,
     ),
     holdings,
     nonInvestmentAssets,
@@ -430,12 +527,13 @@ export async function getPortfolioDashboard(
       (asset) => asset.valueKrw,
     ),
     recentSnapshots,
-    eventActivity: buildEventActivity({
+    holdingHistory,
+    eventActivity: demand.surface === "home" ? buildEventActivity({
       eventRows,
       assetRows: investmentAssetRows,
       accountLabels,
       returnSummary,
-    }),
+    }) : [],
     topMovers: [...holdings]
       .filter((holding) => holding.dailyChangeKrw !== null)
       .sort(
@@ -448,9 +546,13 @@ export async function getPortfolioDashboard(
       reason: movement.reason,
       previousTotalKrw: movement.previousTotalKrw,
       changeKrw: movement.changeKrw,
-      returnPct: movement.returnPct,
+      returnPct: scopeTodayReturnPct,
       tradeFlowKrw: movement.tradeFlowKrw,
+      priceChangeKrw: movement.priceChangeKrw,
       fxChangeKrw: movement.fxChangeKrw,
+      scopePreviousTotalKrw,
+      scopeCurrentTotalKrw: movement.ready && movement.changeKrw !== null ? movement.previousTotalKrw + movement.changeKrw + movement.tradeFlowKrw : null,
+      movementExcludedCurrentValueKrw,
       contributionRows: movement.contributionRows,
       exclusions: movement.exclusions,
       coverage: movement.coverage,
@@ -475,6 +577,8 @@ export async function getPortfolioDashboard(
       movementSnapshotCoveragePct: movement.coverage.snapshotCoveragePct,
       movementCountCoveragePct: movement.coverage.countCoveragePct,
       previousCloseCoveragePct: previousCloseFallback.coverage.previousCloseCoveragePct,
+      movementEligibleAssetCount,
+      movementExcludedAssetCount: holdings.length - movementEligibleAssetCount,
       headlineBasis: "current_assets_plus_event_ledger",
       trendBasis: "daily_portfolio_snapshots",
       latestPortfolioSnapshotDate: latestPortfolioSnapshot?.date ?? null,
@@ -563,7 +667,6 @@ function buildHolding({
   groupName,
   usdKrwRate,
   trimDriftThreshold,
-  useTrendFilter,
   returnMetrics,
 }: {
   asset: AssetRow;
@@ -571,28 +674,25 @@ function buildHolding({
   groupName: string | null | undefined;
   usdKrwRate: number;
   trimDriftThreshold: number;
-  useTrendFilter: boolean;
   returnMetrics: AssetReturnMetrics;
 }): DashboardHolding {
   const quantity = toNumber(asset.quantity) ?? 0;
   const currentPrice = toNumber(asset.currentPrice) ?? 0;
   const targetWeight = toNumber(asset.targetWeight) ?? 0;
-  const ma120 = toNumber(asset.ma120);
   const fractionalKrwValue = toNumber(asset.fractionalKrwValue) ?? 0;
   const localValue = quantity * currentPrice;
   const valueKrw =
     (convertToKrw(localValue, asset.currency, usdKrwRate) ?? 0) +
     fractionalKrwValue;
   const costBasisKrw = returnMetrics.costBasisKrw;
-  const unrealizedPnlKrw = valueKrw - costBasisKrw;
+  const unrealizedPnlKrw = costBasisKrw === null ? null : valueKrw - costBasisKrw;
   const realizedPnlKrw = returnMetrics.realizedPnlKrw;
   const realizedCostBasisKrw = returnMetrics.realizedCostBasisKrw;
-  const totalPnlKrw = unrealizedPnlKrw + realizedPnlKrw;
+  const totalPnlKrw = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
   const currentWeight =
     accountTotalValueKrw > 0 ? (valueKrw / accountTotalValueKrw) * 100 : 0;
-  const belowMa =
-    useTrendFilter && ma120 !== null && ma120 > 0 && currentPrice <= ma120;
-  const effectiveTargetWeight = belowMa ? targetWeight / 2 : targetWeight;
+  // Strategic targets remain authoritative outside the additional-contribution preview.
+  const effectiveTargetWeight = targetWeight;
   const driftPct =
     effectiveTargetWeight > 0
       ? (currentWeight / effectiveTargetWeight - 1) * 100
@@ -603,6 +703,8 @@ function buildHolding({
     legacyBase44Id: asset.legacyBase44Id,
     name: asset.name,
     ticker: asset.ticker,
+    assetType: asset.assetType,
+    movementEligible: isPortfolioMovementEligibleHolding(asset),
     account: asset.account,
     market: asset.market,
     currency: asset.currency,
@@ -622,7 +724,7 @@ function buildHolding({
     holdingReturnPct: percentOrNull(unrealizedPnlKrw, costBasisKrw),
     totalReturnPct: percentOrNull(
       totalPnlKrw,
-      costBasisKrw + realizedCostBasisKrw,
+      sumComplete([costBasisKrw, realizedCostBasisKrw], value => value),
     ),
     currentWeight,
     targetWeight,
@@ -633,6 +735,7 @@ function buildHolding({
     dailyReturnPct: null,
     dailySource: null,
     previousCloseValueKrw: null,
+    priceDailyChangeKrw: null,
     fxDailyChangeKrw: null,
     groupName: groupName ?? null,
   };
@@ -650,6 +753,7 @@ function attachDailyContribution(
     dailyReturnPct: contribution.returnPct,
     dailySource: contribution.source,
     previousCloseValueKrw: contribution.previousValueKrw,
+    priceDailyChangeKrw: contribution.priceChangeKrw,
     fxDailyChangeKrw: contribution.fxChangeKrw,
   };
 }
@@ -682,24 +786,30 @@ function buildAccountSummaries(
   accountCodes: readonly string[],
   holdings: DashboardHolding[],
   accountLabels: Map<string, string>,
+  realizedRows: RealizedReturnRow[],
 ): AccountSummary[] {
   return accountCodes.map((code) => {
     const accountHoldings = holdings.filter((holding) => holding.account === code);
     const totalValueKrw = sumBy(accountHoldings, (holding) => holding.valueKrw);
-    const costBasisKrw = sumBy(accountHoldings, (holding) => holding.costBasisKrw);
-    const realizedCostBasisKrw = sumBy(
-      accountHoldings,
-      (holding) => holding.realizedCostBasisKrw,
+    const costBasisKrw = sumComplete(accountHoldings, (holding) => holding.costBasisKrw);
+    const accountRealizedRows = getSelectedRealizedRows(
+      { realizedRows },
+      code,
+      new Set(accountHoldings.map(holding => holding.legacyBase44Id ?? holding.id)),
     );
-    const unrealizedPnlKrw = sumBy(
+    const realizedCostBasisKrw = sumComplete(
+      accountRealizedRows,
+      (row) => row.realizedCostBasisKrw,
+    );
+    const unrealizedPnlKrw = sumComplete(
       accountHoldings,
       (holding) => holding.unrealizedPnlKrw,
     );
-    const realizedPnlKrw = sumBy(
-      accountHoldings,
-      (holding) => holding.realizedPnlKrw,
+    const realizedPnlKrw = sumComplete(
+      accountRealizedRows,
+      (row) => row.realizedPnlKrw,
     );
-    const totalPnlKrw = unrealizedPnlKrw + realizedPnlKrw;
+    const totalPnlKrw = sumComplete([unrealizedPnlKrw, realizedPnlKrw], value => value);
     return {
       code,
       label: accountLabels.get(code) ?? code,
@@ -711,7 +821,7 @@ function buildAccountSummaries(
       holdingReturnPct: percentOrNull(unrealizedPnlKrw, costBasisKrw),
       totalReturnPct: percentOrNull(
         totalPnlKrw,
-        costBasisKrw + realizedCostBasisKrw,
+        sumComplete([costBasisKrw, realizedCostBasisKrw], value => value),
       ),
       holdingCount: accountHoldings.length,
     };

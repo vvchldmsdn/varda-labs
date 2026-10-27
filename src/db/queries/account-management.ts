@@ -1,15 +1,18 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
 import { assets } from "@/db/schema";
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { TenantContext } from "@/lib/session-resolver-contract";
+import { isHoldingMutationVersion as isAccountMutationVersion } from "@/lib/holding-mutation-version";
 
 export type AccountManagementModel = Readonly<{
   state: "ready";
+  // Archived assets and assets in closed accounts still establish prior use.
+  hasAssetHistory: boolean;
   accounts: readonly Readonly<{
     id: string;
     code: string;
@@ -49,10 +52,7 @@ export async function getReadOnlyTenantAccountManagementModel({
         })
         .from(assets)
         .where(
-          and(
-            eq(assets.canonicalOwnerUserId, ownerUserId),
-            sql`${assets.accountId} is not null`,
-          ),
+          eq(assets.canonicalOwnerUserId, ownerUserId),
         ),
       loadTenantPortfolioGroupMemberships({
         mode: "open",
@@ -87,6 +87,7 @@ export async function getReadOnlyTenantAccountManagementModel({
 
     return Object.freeze({
       state: "ready",
+      hasAssetHistory: assetRows.length > 0,
       accounts: Object.freeze(
         accountRows.map((row) =>
           Object.freeze({
@@ -116,7 +117,7 @@ const ACCOUNT_MANAGEMENT_ACCOUNT_ROWS_SQL = `
     account_type,
     currency,
     is_active,
-    updated_at::text as updated_at
+    to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as updated_at
   from public.accounts
   order by is_active desc, sort_order asc, name asc
 `;
@@ -149,11 +150,10 @@ function requiredBoolean(value: unknown) {
 
 function requiredTimestamp(value: unknown) {
   const timestamp = requiredString(value);
-  const parsed = new Date(timestamp);
-  if (Number.isNaN(parsed.getTime())) {
+  if (!isAccountMutationVersion(timestamp)) {
     throw new Error("Tenant account row is invalid");
   }
-  return parsed.toISOString();
+  return timestamp;
 }
 
 function countByAccount(rows: readonly { accountId: string | null }[]) {

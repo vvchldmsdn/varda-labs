@@ -1,0 +1,9 @@
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.saved { margin-top: 24px; }
+.saved h3 { font-size: 18px; font-weight: 550; }
+.savedRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.7; }
+.savedRow > a { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; padding: 10px 0; text-decoration: underline; text-underline-offset: 4px; }
+.savedActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.savedActions button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; cursor: pointer; }
+.savedActions button:disabled { opacity: .5; cursor: wait; }
+.savedRow a:focus-visible, .savedActions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

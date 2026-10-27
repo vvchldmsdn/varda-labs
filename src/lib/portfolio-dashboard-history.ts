@@ -1,0 +1,311 @@
+import { percentOrNull, sumBy, sumComplete, toNumber } from "./portfolio-math.ts";
+import type { HoldingPriceReturn } from "./holding-price-return.ts";
+
+export type PortfolioDashboardPositionHistoryRow = Readonly<{
+  snapshotDate: string;
+  assetId: string | null;
+  ticker: string | null;
+  assetName: string | null;
+  account: string | null;
+  unitValueChangePct: unknown;
+  marketValueChangePct: unknown;
+  marketValueChangeKrw: unknown;
+  priceChangeKrw: unknown;
+  fxChangeKrw: unknown;
+  marketValueKrw: unknown;
+  costKrw: unknown;
+  pnlKrw: unknown;
+  source: string | null;
+  cycleEndAt?: Date | string | null;
+  capturedAt: Date | string | null;
+  createdAt: Date | string | null;
+}>;
+
+export type PortfolioDashboardHistoryHolding = Readonly<{
+  id: string;
+  name: string;
+  ticker: string | null;
+  account: string;
+  currentWeight: number;
+  valueKrw?: number;
+  dailyChangeKrw?: number | null;
+  dailyReturnPct?: number | null;
+  dailyPriceReturn?: HoldingPriceReturn;
+  priceDailyChangeKrw?: number | null;
+  fxDailyChangeKrw?: number | null;
+}>;
+
+export type PortfolioDashboardHeatmapCell = Readonly<{
+  date: string;
+  changePct: number | null;
+  marketValueKrw: number | null;
+  changeKrw: number | null;
+  priceChangeKrw: number | null;
+  fxChangeKrw: number | null;
+  basis: "live_price" | "live_movement" | "unit_value" | "market_value" | "missing";
+  priceReturnEvidence?: HoldingPriceReturn;
+}>;
+
+export type PortfolioDashboardHeatmapRow = Readonly<{
+  holdingId: string;
+  name: string;
+  ticker: string | null;
+  account: string;
+  currentWeight: number;
+  cells: readonly PortfolioDashboardHeatmapCell[];
+}>;
+
+export type PortfolioDashboardHoldingHistory = Readonly<{
+  dates: readonly string[];
+  rows: readonly PortfolioDashboardHeatmapRow[];
+  observedCellCount: number;
+  expectedCellCount: number;
+  coveragePct: number | null;
+}>;
+
+export type PortfolioDashboardPositionTrendPoint = Readonly<{
+  date: string;
+  totalMarketValue: number;
+  totalPnl: number | null;
+  totalReturnPct: number | null;
+}>;
+
+export function buildPortfolioDashboardHoldingHistory({
+  currentDate,
+  holdings,
+  maxDates = 31,
+  maxRows,
+  rows,
+}: {
+  currentDate?: string;
+  holdings: readonly PortfolioDashboardHistoryHolding[];
+  maxDates?: number;
+  maxRows?: number;
+  rows: readonly PortfolioDashboardPositionHistoryRow[];
+}): PortfolioDashboardHoldingHistory {
+  const selectedHoldings = maxRows === undefined
+    ? [...holdings]
+    : holdings.slice(0, Math.max(0, maxRows));
+  const selectedHoldingIds = new Set(selectedHoldings.map((holding) => holding.id));
+  const preferred = preferredPositionRows(rows, selectedHoldingIds, portfolioDashboardHistoryDisplayDate);
+  const observedDates = [...new Set([
+    ...[...preferred.values()].map(portfolioDashboardHistoryDisplayDate),
+    ...(isIsoDate(currentDate) ? [currentDate] : []),
+  ])]
+    .sort((left, right) => left.localeCompare(right));
+  const dates = continuousDateWindow(observedDates, maxDates);
+
+  let observedCellCount = 0;
+  const heatmapRows = selectedHoldings.map((holding) => ({
+    holdingId: holding.id,
+    name: holding.name,
+    ticker: holding.ticker,
+    account: holding.account,
+    currentWeight: holding.currentWeight,
+    cells: dates.map((date) => {
+      if (date === currentDate) {
+        const liveCell = currentMovementCell(date, holding);
+        if (liveCell.basis !== "missing") observedCellCount += 1;
+        return liveCell;
+      }
+
+      const row = preferred.get(positionRowKey(date, holding.id));
+      const unitValueChangePct = toNumber(row?.unitValueChangePct);
+      const marketValueChangePct = toNumber(row?.marketValueChangePct);
+      const changePct = unitValueChangePct ?? marketValueChangePct;
+      if (changePct !== null) observedCellCount += 1;
+
+      return Object.freeze({
+        date,
+        changePct,
+        marketValueKrw: toNumber(row?.marketValueKrw),
+        changeKrw: toNumber(row?.marketValueChangeKrw),
+        priceChangeKrw: toNumber(row?.priceChangeKrw),
+        fxChangeKrw: toNumber(row?.fxChangeKrw),
+        basis:
+          unitValueChangePct !== null
+            ? ("unit_value" as const)
+            : marketValueChangePct !== null
+              ? ("market_value" as const)
+              : ("missing" as const),
+      });
+    }),
+  }));
+  const expectedCellCount = heatmapRows.length * dates.length;
+
+  return Object.freeze({
+    dates: Object.freeze(dates),
+    rows: Object.freeze(
+      heatmapRows.map((row) => Object.freeze({
+        ...row,
+        cells: Object.freeze(row.cells),
+      })),
+    ),
+    observedCellCount,
+    expectedCellCount,
+    coveragePct: percentOrNull(observedCellCount, expectedCellCount),
+  });
+}
+
+function currentMovementCell(
+  date: string,
+  holding: PortfolioDashboardHistoryHolding,
+): PortfolioDashboardHeatmapCell {
+  // Reuse Today's valuation return. The trading-currency price return is
+  // independent evidence for the detail view, never a fallback for this metric.
+  const changePct = toNumber(holding.dailyReturnPct);
+  const changeKrw = toNumber(holding.dailyChangeKrw);
+  const marketValueKrw = toNumber(holding.valueKrw);
+
+  if (changePct === null) {
+    return Object.freeze({
+      date,
+      changePct: null,
+      marketValueKrw,
+      changeKrw,
+      priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
+      fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
+      basis: "missing" as const,
+      ...(holding.dailyPriceReturn ? { priceReturnEvidence: holding.dailyPriceReturn } : {}),
+    });
+  }
+
+  return Object.freeze({
+    date,
+    changePct,
+    marketValueKrw,
+    changeKrw,
+    priceChangeKrw: toNumber(holding.priceDailyChangeKrw),
+    fxChangeKrw: toNumber(holding.fxDailyChangeKrw),
+    basis: "live_movement" as const,
+    priceReturnEvidence: holding.dailyPriceReturn,
+  });
+}
+
+function continuousDateWindow(observedDates: readonly string[], maxDates: number) {
+  const latest = observedDates.at(-1);
+  const earliest = observedDates[0];
+  const boundedCount = Math.max(0, Math.floor(maxDates));
+  if (!latest || !earliest || boundedCount === 0) return [];
+
+  const candidateStart = shiftIsoDate(latest, -(boundedCount - 1));
+  const start = candidateStart.localeCompare(earliest) > 0 ? candidateStart : earliest;
+  const dates: string[] = [];
+  for (let date = start; date.localeCompare(latest) <= 0; date = shiftIsoDate(date, 1)) {
+    dates.push(date);
+  }
+  return dates;
+}
+
+function shiftIsoDate(value: string, dayDelta: number) {
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  return new Date(timestamp + dayDelta * 86_400_000).toISOString().slice(0, 10);
+}
+
+function isIsoDate(value: string | undefined): value is string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value ?? "");
+}
+
+export function buildPortfolioDashboardPositionTrend({
+  holdings,
+  maxDates = 130,
+  rows,
+}: {
+  holdings: readonly PortfolioDashboardHistoryHolding[];
+  maxDates?: number;
+  rows: readonly PortfolioDashboardPositionHistoryRow[];
+}): PortfolioDashboardPositionTrendPoint[] {
+  const holdingIds = new Set(holdings.map((holding) => holding.id));
+  const preferred = preferredPositionRows(rows, holdingIds);
+  const byDate = new Map<string, PortfolioDashboardPositionHistoryRow[]>();
+
+  for (const row of preferred.values()) {
+    const dateRows = byDate.get(row.snapshotDate) ?? [];
+    dateRows.push(row);
+    byDate.set(row.snapshotDate, dateRows);
+  }
+
+  return [...byDate.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, dateRows]) => {
+      const totalMarketValue = sumBy(
+        dateRows,
+        (row) => toNumber(row.marketValueKrw) ?? 0,
+      );
+      const totalPnl = sumComplete(dateRows, (row) => toNumber(row.pnlKrw));
+      const totalCost = sumComplete(dateRows, (row) => toNumber(row.costKrw));
+
+      return Object.freeze({
+        date,
+        totalMarketValue,
+        totalPnl,
+        totalReturnPct:
+          totalPnl !== null && totalCost !== null
+            ? percentOrNull(totalPnl, totalCost)
+            : null,
+      });
+    })
+    .slice(-Math.max(0, maxDates));
+}
+
+function preferredPositionRows(
+  rows: readonly PortfolioDashboardPositionHistoryRow[],
+  selectedHoldingIds: ReadonlySet<string>,
+  displayDate: (row: PortfolioDashboardPositionHistoryRow) => string = (row) => row.snapshotDate,
+) {
+  const preferred = new Map<string, PortfolioDashboardPositionHistoryRow>();
+
+  for (const row of rows) {
+    if (!row.assetId || !selectedHoldingIds.has(row.assetId)) continue;
+    const key = positionRowKey(displayDate(row), row.assetId);
+    const existing = preferred.get(key);
+    if (!existing || compareEvidenceRecency(row, existing) > 0) {
+      preferred.set(key, row);
+    }
+  }
+
+  return preferred;
+}
+
+/**
+ * This writer stores a completed service day under its following 07:00 KST cutoff.
+ * Quote reference dates can be older (holidays), so they are not display dates.
+ * Imported/unknown writers retain their own date semantics until verified.
+ */
+export function portfolioDashboardHistoryDisplayDate(
+  row: Pick<PortfolioDashboardPositionHistoryRow, "snapshotDate" | "source" | "cycleEndAt">,
+) {
+  if (row.source !== "varda_manual_daily_snapshot" && !row.source?.startsWith("broker_reconstructed_close_v1:")) return row.snapshotDate;
+  const cycleEnd = timestamp(row.cycleEndAt ?? null);
+  const cutoffDate = cycleEnd > 0
+    ? new Date(cycleEnd + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : row.snapshotDate;
+  return shiftIsoDate(cutoffDate, -1);
+}
+
+function positionRowKey(date: string, assetId: string) {
+  return `${date}:${assetId}`;
+}
+
+function compareEvidenceRecency(
+  left: PortfolioDashboardPositionHistoryRow,
+  right: PortfolioDashboardPositionHistoryRow,
+) {
+  const capturedDelta = timestamp(left.capturedAt) - timestamp(right.capturedAt);
+  if (capturedDelta !== 0) return capturedDelta;
+  const createdDelta = timestamp(left.createdAt) - timestamp(right.createdAt);
+  if (createdDelta !== 0) return createdDelta;
+  return sourcePriority(left.source) - sourcePriority(right.source);
+}
+
+function timestamp(value: Date | string | null) {
+  if (!value) return 0;
+  const result = value instanceof Date ? value.getTime() : Date.parse(value);
+  return Number.isFinite(result) ? result : 0;
+}
+
+function sourcePriority(value: string | null) {
+  if (value === "varda_manual_daily_snapshot") return 2;
+  if (value === "base44_import") return 1;
+  return 0;
+}

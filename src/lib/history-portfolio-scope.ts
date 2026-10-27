@@ -1,3 +1,4 @@
+import { commonHistoryValuationDate } from "./history-snapshot-date.ts";
 import type { PortfolioAnalysisScopeKey } from "./portfolio-analysis-scope.ts";
 
 export const HISTORY_PORTFOLIO_SCOPE_POLICY = Object.freeze({
@@ -17,6 +18,7 @@ export type HistoryMembershipPeriod = Readonly<{
 
 export type HistoryPositionScopeCandidate = Readonly<{
   snapshotDate: string;
+  valuationDate?: string | null;
   source: string;
   account: string;
   accountId: string | null;
@@ -28,6 +30,7 @@ export type HistoryPositionScopeCandidate = Readonly<{
 
 export type PortfolioGroupHistoryRawRow = Readonly<{
   snapshotDate: string;
+  valuationDate?: string | null;
   account: PortfolioAnalysisScopeKey;
   source: string;
   rowKind: "derived" | "partial";
@@ -129,6 +132,7 @@ function aggregateGroup(
 
   return Object.freeze({
     snapshotDate: rows[0]!.snapshotDate,
+    valuationDate: commonHistoryValuationDate(rows),
     account: scopeKey,
     source: rows[0]!.source,
     rowKind: complete ? "derived" : "partial",

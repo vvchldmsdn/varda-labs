@@ -1,6 +1,8 @@
 import {
   boolean,
+  bigint,
   check,
+  customType,
   date,
   decimal,
   foreignKey,
@@ -49,6 +51,59 @@ export const appUsers = pgTable(
     ),
   }),
 );
+
+// Deliberately separate from actual holdings, quantities and transaction records.
+export const investmentPlans = pgTable("investment_plans", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  id: uuid("id").notNull(),
+  inputJson: jsonb("input_json").notNull(),
+  engineVersion: varchar("engine_version", { length: 80 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.id] }),
+  ownerCreatedIdx: index("investment_plans_owner_created_idx").on(table.ownerUserId, table.createdAt),
+  inputCheck: check("investment_plans_input_check", sql`jsonb_typeof(${table.inputJson}) = 'object' and octet_length(${table.inputJson}::text) <= 4096`),
+  engineCheck: check("investment_plans_engine_check", sql`${table.engineVersion} in ('deficit_proportional_capped_v1', 'deficit_proportional_currency_v2')`),
+  selectPolicy: pgPolicy("investment_plans_tenant_select_v1", { for: "select", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  insertPolicy: pgPolicy("investment_plans_tenant_insert_v1", { for: "insert", to: tenantDatabaseRole, withCheck: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  deletePolicy: pgPolicy("investment_plans_tenant_delete_v1", { for: "delete", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+})).enableRLS();
+
+// Deliberately separate from actual holdings, quantities and transaction records.
+export const nativeContributionPlans = pgTable("native_contribution_plans", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  id: uuid("id").notNull(),
+  scopeKey: text("scope_key").notNull(),
+  reportingCurrency: varchar("reporting_currency", { length: 3 }).notNull(),
+  requestJson: jsonb("request_json").notNull(),
+  documentJson: jsonb("document_json").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ name: "native_contribution_plans_pk", columns: [table.ownerUserId, table.id] }),
+  ownerCreatedIdx: index("native_contribution_plans_owner_created_idx").on(table.ownerUserId, table.createdAt),
+  currencyCheck: check("native_contribution_plans_currency_check", sql`${table.reportingCurrency} in ('KRW','USD')`),
+  requestCheck: check("native_contribution_plans_request_check", sql`jsonb_typeof(${table.requestJson})='object' and octet_length(${table.requestJson}::text)<=4096`),
+  documentCheck: check("native_contribution_plans_document_check", sql`jsonb_typeof(${table.documentJson})='object' and octet_length(${table.documentJson}::text)<=524288 and ${table.documentJson}->>'version'='native_contribution_plan_v1' and ${table.documentJson}->'result'->'context'->>'profitCurrency'=${table.reportingCurrency} and ${table.documentJson}->'result'->'context'->>'reportingCurrency'=${table.reportingCurrency}`),
+  selectPolicy: pgPolicy("native_contribution_plans_tenant_select_v1", { for: "select", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  insertPolicy: pgPolicy("native_contribution_plans_tenant_insert_v1", { for: "insert", to: tenantDatabaseRole, withCheck: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  deletePolicy: pgPolicy("native_contribution_plans_tenant_delete_v1", { for: "delete", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+})).enableRLS();
+
+export const portfolioDrafts = pgTable("portfolio_drafts", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  id: uuid("id").notNull(),
+  inputJson: jsonb("input_json").notNull(),
+  engineVersion: varchar("engine_version", { length: 80 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.id] }),
+  ownerCreatedIdx: index("portfolio_drafts_owner_created_idx").on(table.ownerUserId, table.createdAt),
+  inputCheck: check("portfolio_drafts_input_check", sql`jsonb_typeof(${table.inputJson}) = 'object' and octet_length(${table.inputJson}::text) <= 4096`),
+  engineCheck: check("portfolio_drafts_engine_check", sql`${table.engineVersion} in ('amount_composition_v1', 'amount_composition_currency_v2')`),
+  selectPolicy: pgPolicy("portfolio_drafts_tenant_select_v1", { for: "select", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  insertPolicy: pgPolicy("portfolio_drafts_tenant_insert_v1", { for: "insert", to: tenantDatabaseRole, withCheck: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+  deletePolicy: pgPolicy("portfolio_drafts_tenant_delete_v1", { for: "delete", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
+})).enableRLS();
 
 export const authIdentities = pgTable(
   "auth_identities",
@@ -446,7 +501,7 @@ export const assets = pgTable(
     market: varchar("market", { length: 20 }).notNull(),
     currency: varchar("currency", { length: 10 }).notNull(),
     account: varchar("account", { length: 50 }).notNull(),
-    accountId: uuid("account_id"),
+    accountId: uuid("account_id").notNull(),
 
     quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
     currentPrice: decimal("current_price", { precision: 20, scale: 4 }).notNull(),
@@ -500,6 +555,11 @@ export const assets = pgTable(
       table.id,
       table.accountId,
     ),
+    accountFk: foreignKey({
+      name: "assets_account_fk",
+      columns: [table.accountId],
+      foreignColumns: [accounts.id],
+    }).onDelete("restrict"),
     ownerAccountInstrumentUnique: uniqueIndex(
       "assets_owner_account_instrument_unique",
     )
@@ -513,6 +573,11 @@ export const assets = pgTable(
       .where(
         sql`${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.ticker} is not null`,
       ),
+    activeAccountInstrumentIdx: index(
+      "assets_active_account_instrument_idx",
+    )
+      .on(table.accountId, table.market, table.currency, table.ticker)
+      .where(sql`${table.archivedAt} is null`),
     tenantSelectPolicy: pgPolicy("assets_tenant_select_v1", {
       as: "permissive",
       for: "select",
@@ -536,6 +601,7 @@ export const accounts = pgTable(
     name: varchar("name", { length: 100 }).notNull(),
     accountType: varchar("account_type", { length: 50 }).notNull(),
     currency: varchar("currency", { length: 10 }).default("KRW").notNull(),
+    nativeState: jsonb("native_state"),
 
     isActive: boolean("is_active").default(true).notNull(),
     sortOrder: integer("sort_order").default(0).notNull(),
@@ -544,6 +610,7 @@ export const accounts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
+    nativeStateCheck: check("accounts_native_state_check", sql`${table.nativeState} is null or (${table.nativeState}->>'version' = '1' and ${table.nativeState}->>'accountId' = ${table.id}::text and octet_length(${table.nativeState}::text) <= 1000000)`),
     ownerCodeUnique: uniqueIndex("accounts_owner_code_unique").on(
       table.ownerUserId,
       table.code,
@@ -576,7 +643,7 @@ export const holdingOnboardingEvidence = pgTable(
     assetId: uuid("asset_id").notNull(),
     accountId: uuid("account_id").notNull(),
     quantity: decimal("quantity", { precision: 20, scale: 6 }).notNull(),
-    averageCost: decimal("average_cost", { precision: 20, scale: 4 }).notNull(),
+    averageCost: decimal("average_cost", { precision: 20, scale: 4 }),
     currentPrice: decimal("current_price", {
       precision: 20,
       scale: 4,
@@ -693,7 +760,7 @@ export const holdingStateCorrections = pgTable(
     correctedAverageCost: decimal("corrected_average_cost", {
       precision: 20,
       scale: 4,
-    }).notNull(),
+    }),
     previousAssetUpdatedAt: timestamp("previous_asset_updated_at", {
       withTimezone: true,
     }).notNull(),
@@ -1309,7 +1376,7 @@ export const portfolioTargetPolicyRevisions = pgTable(
     ),
     policyVersionCheck: check(
       "portfolio_target_revisions_policy_version_check",
-      sql`${table.policyVersion} = 'portfolio_target_policy_v1'`,
+      sql`${table.policyVersion} in ('portfolio_target_policy_v1', 'portfolio_target_policy_v2')`,
     ),
     approvalRevisionCheck: check(
       "portfolio_target_revisions_revision_check",
@@ -1474,6 +1541,97 @@ export const portfolioTargetPolicyRows = pgTable(
   }),
 ).enableRLS();
 
+export const portfolioTargetPlanRows = pgTable(
+  "portfolio_target_plan_rows",
+  {
+    approvalRevisionId: uuid("approval_revision_id").notNull(),
+    canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+    accountId: uuid("account_id").notNull(),
+    planRowId: uuid("plan_row_id").notNull(),
+    originAssetId: uuid("origin_asset_id"),
+    assetType: varchar("asset_type", { length: 30 }),
+    assetName: varchar("asset_name", { length: 255 }).notNull(),
+    market: varchar("market", { length: 20 }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(),
+    ticker: varchar("ticker", { length: 50 }),
+    buyability: varchar("buyability", { length: 32 }).notNull(),
+    targetWeightBps: integer("target_weight_bps").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      name: "portfolio_target_plan_rows_pk",
+      columns: [table.approvalRevisionId, table.planRowId],
+    }),
+    revisionOwnerFk: foreignKey({
+      name: "portfolio_target_plan_revision_owner_fk",
+      columns: [table.approvalRevisionId, table.canonicalOwnerUserId],
+      foreignColumns: [
+        portfolioTargetPolicyRevisions.id,
+        portfolioTargetPolicyRevisions.canonicalOwnerUserId,
+      ],
+    }).onDelete("restrict"),
+    accountOwnerFk: foreignKey({
+      name: "portfolio_target_plan_account_owner_fk",
+      columns: [table.accountId, table.canonicalOwnerUserId],
+      foreignColumns: [accounts.id, accounts.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetOwnerFk: foreignKey({
+      name: "portfolio_target_plan_asset_owner_fk",
+      columns: [table.originAssetId, table.canonicalOwnerUserId],
+      foreignColumns: [assets.id, assets.canonicalOwnerUserId],
+    }).onDelete("restrict"),
+    assetAccountFk: foreignKey({
+      name: "portfolio_target_plan_asset_account_fk",
+      columns: [table.originAssetId, table.accountId],
+      foreignColumns: [assets.id, assets.accountId],
+    }).onDelete("restrict"),
+    instrumentUnique: uniqueIndex("portfolio_target_plan_instrument_unique").on(table.approvalRevisionId,table.accountId,table.market,table.currency,table.ticker).where(sql`${table.ticker} is not null`),
+    candidateIdentityCheck: check("portfolio_target_plan_candidate_check",sql`${table.originAssetId} is not null or (${table.ticker} is not null and (${table.market},${table.currency}) in (('korea','KRW'),('us','USD')))`),
+    ownerIdx: index("portfolio_target_plan_owner_idx").on(
+      table.canonicalOwnerUserId,
+    ),
+    accountIdx: index("portfolio_target_plan_account_idx").on(table.accountId),
+    assetIdx: index("portfolio_target_plan_asset_idx").on(table.originAssetId),
+    assetNameCheck: check(
+      "portfolio_target_plan_asset_name_check",
+      sql`${table.assetName} = btrim(${table.assetName}) and char_length(${table.assetName}) > 0`,
+    ),
+    marketCheck: check(
+      "portfolio_target_plan_market_check",
+      sql`${table.market} = lower(btrim(${table.market})) and char_length(${table.market}) > 0`,
+    ),
+    currencyCheck: check(
+      "portfolio_target_plan_currency_check",
+      sql`${table.currency} = upper(btrim(${table.currency})) and char_length(${table.currency}) > 0`,
+    ),
+    tickerCheck: check(
+      "portfolio_target_plan_ticker_check",
+      sql`${table.ticker} is null or (${table.ticker} = upper(btrim(${table.ticker})) and char_length(${table.ticker}) > 0)`,
+    ),
+    buyabilityCheck: check(
+      "portfolio_target_plan_buyability_check",
+      sql`${table.buyability} in ('buyable', 'not_buyable', 'tickerless', 'unsupported_market', 'unsupported_currency')`,
+    ),
+    targetWeightCheck: check(
+      "portfolio_target_plan_weight_check",
+      sql`${table.targetWeightBps} between 0 and 10000`,
+    ),
+    positiveTargetBuyabilityCheck: check(
+      "portfolio_target_plan_positive_buyability_check",
+      sql`${table.targetWeightBps} = 0 or ${table.buyability} = 'buyable'`,
+    ),
+    tenantSelectPolicy: pgPolicy(
+      "portfolio_target_plan_rows_tenant_select_v1",
+      {
+        as: "permissive",
+        for: "select",
+        to: tenantDatabaseRole,
+        using: currentTenantOwns(table.canonicalOwnerUserId),
+      },
+    ),
+  }),
+).enableRLS();
+
 export const portfolioTargetPolicyLifecycleEvents = pgTable(
   "portfolio_target_policy_lifecycle_events",
   {
@@ -1627,6 +1785,9 @@ export const fxRates = pgTable(
 
     rateDate: date("date").notNull(),
     usdKrw: decimal("usdkrw", { precision: 20, scale: 6 }).notNull(),
+    // Nullable for legacy records: collection time is not observation time.
+    observedAt: timestamp("observed_at", { withTimezone: true }),
+    rateKind: varchar("rate_kind", { length: 30 }),
     source: varchar("source", { length: 100 }),
     status: varchar("status", { length: 50 }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }),
@@ -1642,6 +1803,7 @@ export const fxRates = pgTable(
       table.legacyBase44Id,
     ),
     rateDateIdx: index("fx_rates_date_idx").on(table.rateDate),
+    evidenceCheck: check("fx_rates_observation_check", sql`${table.observedAt} is null or (${table.fetchedAt} is not null and ${table.observedAt} <= ${table.fetchedAt} and ${table.rateKind} is not null and ${table.rateKind} in ('spot', 'daily_reference'))`),
   }),
 );
 
@@ -1692,6 +1854,14 @@ export const assetPriceSnapshots = pgTable(
       table.assetId,
       table.priceDate,
     ),
+    normalizedInstrumentDateIdx: index(
+      "asset_price_snapshots_normalized_instrument_date_idx",
+    ).on(
+      sql`lower(trim(${table.market}))`,
+      sql`upper(trim(${table.currency}))`,
+      sql`upper(trim(${table.ticker}))`,
+      table.priceDate,
+    ),
   }),
 );
 
@@ -1728,6 +1898,62 @@ export const marketDataSyncRuns = pgTable(
     ),
   }),
 );
+
+// Server-only operational state. No tenant SELECT policy or browser grants.
+export const marketCollectionJobs = pgTable("market_collection_jobs", {
+  key: varchar("key", { length: 200 }).primaryKey(),
+  kind: varchar("kind", { length: 10 }).notNull(),
+  ticker: varchar("ticker", { length: 50 }).notNull(),
+  market: varchar("market", { length: 20 }).notNull(),
+  currency: varchar("currency", { length: 10 }).notNull(),
+  startDate: date("start_date"), endDate: date("end_date"),
+  status: varchar("status", { length: 10 }).default("pending").notNull(),
+  enqueuedAt: timestamp("enqueued_at", { withTimezone: true }).defaultNow().notNull(),
+  availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+  leasedUntil: timestamp("leased_until", { withTimezone: true }),
+  claimToken: uuid("claim_token"), attempts: integer("attempts").default(0).notNull(),
+  requestCount: integer("request_count").default(1).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  lastCode: varchar("last_code", { length: 50 }),
+}, (table) => ({
+  pendingIdx: index("market_collection_jobs_pending_idx").on(table.status, table.availableAt, table.enqueuedAt),
+  stateCheck: check("market_collection_jobs_state_check", sql`${table.status} in ('pending','running','done','failed') and ${table.attempts} >= 0 and ${table.requestCount} >= 1`),
+  identityCheck: check("market_collection_jobs_identity_check", sql`${table.kind} in ('live','history','fx') and ((${table.market}='korea' and ${table.currency}='KRW') or (${table.market}='us' and ${table.currency}='USD'))`),
+  datesCheck: check("market_collection_jobs_dates_check", sql`(${table.kind}='history' and ${table.startDate} is not null and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate}) or (${table.kind}<>'history' and ${table.startDate} is null and ${table.endDate} is null)`),
+})).enableRLS();
+
+export const marketProviderBudgets = pgTable("market_provider_budgets", {
+  scopeHash: varchar("scope_hash", { length: 64 }).primaryKey(),
+  provider: varchar("provider", { length: 20 }).default("kis").notNull(),
+  windowCredits: integer("window_credits").default(0).notNull(),
+  creditCount: bigint("credit_count", { mode: "number" }).default(0).notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  windowRequests: integer("window_requests").default(0).notNull(),
+  nextAllowedAt: timestamp("next_allowed_at", { withTimezone: true }).defaultNow().notNull(),
+  tokenNextAllowedAt: timestamp("token_next_allowed_at", { withTimezone: true }).defaultNow().notNull(),
+  blockedUntil: timestamp("blocked_until", { withTimezone: true }).defaultNow().notNull(),
+  failureCount: integer("failure_count").default(0).notNull(),
+  requestCount: integer("request_count").default(0).notNull(),
+  limitedCount: integer("limited_count").default(0).notNull(),
+  lastCode: varchar("last_code", { length: 40 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  countsCheck: check("market_provider_budgets_counts_check", sql`${table.windowRequests} >= 0 and ${table.failureCount} >= 0 and ${table.requestCount} >= 0 and ${table.limitedCount} >= 0`),
+  creditsCheck: check("market_provider_budgets_credits_check", sql`${table.windowCredits} >= 0 and ${table.creditCount} >= 0 and ${table.provider} in ('kis','twelve_data')`),
+})).enableRLS();
+
+export const marketProviderReservations = pgTable("market_provider_reservations", {
+  scopeHash: varchar("scope_hash", { length: 64 }).notNull().references(() => marketProviderBudgets.scopeHash),
+  reservationId: varchar("reservation_id", { length: 64 }).notNull(),
+  httpRequests: integer("http_requests").notNull(),
+  apiCredits: integer("api_credits").notNull(),
+  reservedAt: timestamp("reserved_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.scopeHash, table.reservationId] }),
+  countsCheck: check("market_provider_reservations_counts_check", sql`${table.httpRequests} > 0 and ${table.apiCredits} > 0`),
+  ageIdx: index("market_provider_reservations_age_idx").on(table.scopeHash, table.reservedAt),
+})).enableRLS();
 
 export const livePriceQuotes = pgTable(
   "live_price_quotes",
@@ -1934,6 +2160,25 @@ export const etfHoldings = pgTable(
   }),
 );
 
+export const brokerRecoveryBatches = pgTable("broker_recovery_batches", {
+  id: uuid("id").primaryKey(),
+  canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull().references(() => appUsers.id, { onDelete: "restrict" }),
+  accountId: uuid("account_id").notNull(),
+  manifestHash: varchar("manifest_hash", { length: 64 }).notNull(),
+  expectedStateHash: varchar("expected_state_hash", { length: 64 }).notNull(),
+  beforeState: jsonb("before_state").notNull(),
+  afterState: jsonb("after_state").notNull(),
+  manifest: jsonb("manifest").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  accountOwner: foreignKey({ name: "broker_recovery_account_owner_fk", columns: [t.accountId,t.canonicalOwnerUserId], foreignColumns: [accounts.id,accounts.canonicalOwnerUserId] }).onDelete("restrict"),
+  ownerAccount: uniqueIndex("broker_recovery_batch_owner_account_unique").on(t.id,t.canonicalOwnerUserId,t.accountId),
+  manifestUnique: uniqueIndex("broker_recovery_manifest_unique").on(t.canonicalOwnerUserId,t.accountId,t.manifestHash),
+  manifestHashCheck: check("broker_recovery_batches_manifest_hash_check", sql`${t.manifestHash} ~ '^[a-f0-9]{64}$'`),
+  stateHashCheck: check("broker_recovery_batches_expected_state_hash_check", sql`${t.expectedStateHash} ~ '^[a-f0-9]{64}$'`),
+  selectPolicy: pgPolicy("broker_recovery_tenant_select", { for: "select", to: tenantDatabaseRole, using: currentTenantOwns(t.canonicalOwnerUserId) }),
+})).enableRLS();
+
 export const eventLedgerEntries = pgTable(
   "event_ledger_entries",
   {
@@ -1951,7 +2196,13 @@ export const eventLedgerEntries = pgTable(
     accountId: uuid("account_id"),
 
     assetId: uuid("asset_id"),
-    legacyAssetId: varchar("legacy_asset_id", { length: 24 }).notNull(),
+    legacyAssetId: varchar("legacy_asset_id", { length: 24 }),
+    brokerRecoveryBatchId: uuid("broker_recovery_batch_id"),
+    brokerRecoveryData: jsonb("broker_recovery_data"),
+    brokerRecoveryAssetId: uuid("broker_recovery_asset_id").generatedAlwaysAs(sql`case when broker_recovery_batch_id is not null then asset_id else null end`),
+    nativeData: jsonb("native_data"),
+    nativeSequence: integer("native_sequence"),
+    nativeOperationId: uuid("native_operation_id"),
     ticker: varchar("ticker", { length: 50 }),
     assetName: text("asset_name").notNull(),
 
@@ -1982,6 +2233,13 @@ export const eventLedgerEntries = pgTable(
     legacyBase44IdUnique: uniqueIndex(
       "event_ledger_entries_legacy_base44_id_unique",
     ).on(table.legacyBase44Id),
+    nativeSequenceUnique: uniqueIndex("event_native_sequence_unique").on(table.canonicalOwnerUserId, table.accountId, table.nativeSequence).where(sql`${table.nativeData} is not null`),
+    nativeOperationUnique: uniqueIndex("event_native_operation_unique").on(table.canonicalOwnerUserId, table.accountId, table.nativeOperationId).where(sql`${table.nativeData} is not null`),
+    brokerRecoveryFk: foreignKey({ name: "event_broker_recovery_batch_fk", columns: [table.brokerRecoveryBatchId,table.canonicalOwnerUserId,table.accountId], foreignColumns: [brokerRecoveryBatches.id,brokerRecoveryBatches.canonicalOwnerUserId,brokerRecoveryBatches.accountId] }).onDelete("restrict"),
+    brokerRecoveryAssetOwnerFk: foreignKey({ name: "event_broker_recovery_asset_owner_fk", columns: [table.brokerRecoveryAssetId,table.canonicalOwnerUserId], foreignColumns: [assets.id,assets.canonicalOwnerUserId] }).onDelete("restrict"),
+    brokerRecoveryAssetAccountFk: foreignKey({ name: "event_broker_recovery_asset_account_fk", columns: [table.brokerRecoveryAssetId,table.accountId], foreignColumns: [assets.id,assets.accountId] }).onDelete("restrict"),
+    brokerRecoveryUnique: uniqueIndex("event_broker_recovery_row_unique").on(table.brokerRecoveryBatchId,sql`(${table.brokerRecoveryData}->>'rowId')`).where(sql`${table.brokerRecoveryBatchId} is not null`),
+    nativeCheck: check("event_ledger_native_check", sql`(${table.brokerRecoveryBatchId} is null and ${table.brokerRecoveryData} is null and ((${table.nativeData} is null and ${table.nativeSequence} is null and ${table.nativeOperationId} is null and ${table.legacyAssetId} is not null and ${table.source} is distinct from 'broker_recovery_v1') or (${table.nativeData} is not null and ${table.nativeSequence} >= 0 and ${table.nativeOperationId} is not null and ${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.source} = 'native_ledger_v1' and not ${table.isSample}))) or coalesce((${table.brokerRecoveryBatchId} is not null and ${table.brokerRecoveryData} is not null and ${table.nativeData} is null and ${table.nativeSequence} is null and ${table.nativeOperationId} is null and ${table.canonicalOwnerUserId} is not null and ${table.accountId} is not null and ${table.assetId} is not null and ${table.source} = 'broker_recovery_v1' and ${table.ruleVersion} = 'broker_recovery_v1' and ${table.eventType} in ('buy','sell') and not ${table.isSample} and ${table.brokerRecoveryData}->>'version' = '1' and coalesce(length(${table.brokerRecoveryData}->>'rowId'),0) between 1 and 120 and ${table.brokerRecoveryData}->>'tradeDate' = ${table.eventDate}::text and octet_length(${table.brokerRecoveryData}::text) <= 32768),false)`),
     eventDateTypeIdx: index("event_ledger_entries_date_type_idx").on(
       table.eventDate,
       table.eventType,
@@ -2003,6 +2261,9 @@ export const eventLedgerEntries = pgTable(
     canonicalOwnerUserIdIdx: index(
       "event_ledger_entries_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerAccountDateIdx: index(
+      "event_ledger_entries_owner_account_date_idx",
+    ).on(table.canonicalOwnerUserId, table.accountId, table.eventDate),
     tenantSelectPolicy: pgPolicy("event_ledger_entries_tenant_select_v1", {
       as: "permissive",
       for: "select",
@@ -2141,6 +2402,9 @@ export const globalMarketFactors = pgTable(
       table.factorKey,
       table.factorDate,
     ),
+    factorDateUnique: uniqueIndex(
+      "global_market_factors_factor_key_date_unique",
+    ).on(table.factorKey, table.factorDate),
     dateIdx: index("global_market_factors_date_idx").on(table.factorDate),
     familyDateIdx: index("global_market_factors_family_date_idx").on(
       table.factorFamily,
@@ -2371,6 +2635,7 @@ export const dailyPortfolioSnapshots = pgTable(
     accountId: uuid("account_id"),
     source: varchar("source", { length: 100 }).default("base44_import").notNull(),
     ruleVersion: varchar("rule_version", { length: 100 }),
+    nativeEvidence: jsonb("native_evidence"),
     description: text("description"),
     isSample: boolean("is_sample").default(false).notNull(),
 
@@ -2426,6 +2691,7 @@ export const dailyPortfolioSnapshots = pgTable(
     legacyBase44IdUnique: uniqueIndex(
       "daily_portfolio_snapshots_legacy_base44_id_unique",
     ).on(table.legacyBase44Id),
+    nativeEvidenceCheck: check("snapshot_native_evidence_check", sql`${table.nativeEvidence} is null or ((${table.source} in ('native_ledger_v1','native_ledger_cutoff_v2') or ${table.source} ~ '^native_ledger_cutoff_v3:r[0-9]+$') and not ${table.isSample} and octet_length(${table.nativeEvidence}::text) <= 2000000)`),
     snapshotAccountIdx: index("daily_portfolio_snapshots_date_account_idx").on(
       table.snapshotDate,
       table.account,
@@ -2443,6 +2709,9 @@ export const dailyPortfolioSnapshots = pgTable(
     canonicalOwnerUserIdIdx: index(
       "daily_portfolio_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerAccountDateIdx: index(
+      "daily_portfolio_snapshots_owner_account_date_idx",
+    ).on(table.canonicalOwnerUserId, table.accountId, table.snapshotDate),
     ownerUserFk: foreignKey({
       name: "daily_portfolio_snapshots_owner_user_fk",
       columns: [table.canonicalOwnerUserId],
@@ -2611,6 +2880,12 @@ export const dailyPositionSnapshots = pgTable(
     canonicalOwnerUserIdIdx: index(
       "daily_position_snapshots_canonical_owner_user_id_idx",
     ).on(table.canonicalOwnerUserId),
+    ownerAccountDateIdx: index(
+      "daily_position_snapshots_owner_account_date_idx",
+    ).on(table.canonicalOwnerUserId, table.accountId, table.snapshotDate),
+    ownerAssetDateIdx: index(
+      "daily_position_snapshots_owner_asset_date_idx",
+    ).on(table.canonicalOwnerUserId, table.assetId, table.snapshotDate),
     ownerUserFk: foreignKey({
       name: "daily_position_snapshots_owner_user_fk",
       columns: [table.canonicalOwnerUserId],
@@ -2847,3 +3122,231 @@ export type NewDailyPositionSnapshot = typeof dailyPositionSnapshots.$inferInser
 
 export type Settings = typeof settings.$inferSelect;
 export type NewSettings = typeof settings.$inferInsert;
+
+// Operational usage aggregates: intentionally inaccessible to tenant SQL roles.
+export const memberActivityProfiles = pgTable("member_activity_profiles", {
+  ownerUserId: uuid("owner_user_id").primaryKey().references(() => appUsers.id, { onDelete: "cascade" }),
+  displayName: varchar("display_name", { length: 80 }),
+  email: varchar("email", { length: 254 }),
+  firstSeen: timestamp("first_seen", { withTimezone: true }).defaultNow().notNull(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow().notNull(),
+}).enableRLS();
+export const memberActivityDaily = pgTable("member_activity_daily", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  activityDate: date("activity_date").notNull(),
+  feature: varchar("feature", { length: 20 }).notNull(),
+  views: integer("views").notNull(),
+  visits: integer("visits").notNull(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.activityDate, table.feature] }),
+  dateIdx: index("member_activity_daily_date_idx").on(table.activityDate),
+  countsCheck: check("member_activity_daily_counts", sql`${table.views} > 0 and ${table.visits} >= 0 and ${table.visits} <= ${table.views}`),
+  featureCheck: check("member_activity_daily_feature", sql`${table.feature} in ('home','today','structure','contribution','lab','simulation','history','manage','plans','input')`),
+})).enableRLS();
+
+// Licensed provider evidence is readable through the server admission service only.
+// Migration 0051 additionally forces RLS and revokes tenant/public grants.
+export const marketProviderObservations = pgTable("market_provider_observations", {
+  observationKey: varchar("observation_key", { length: 64 }).primaryKey(), scopeKey: varchar("scope_key", { length: 64 }).notNull(),
+  identityKey: varchar("identity_key", { length: 64 }).notNull(), provider: varchar("provider", { length: 20 }).notNull(),
+  licenseScope: varchar("license_scope", { length: 160 }).notNull(), audience: varchar("audience", { length: 24 }).notNull(),
+  contractVersion: varchar("contract_version", { length: 80 }).notNull(), dataset: varchar("dataset", { length: 24 }).notNull(),
+  instrumentKey: varchar("instrument_key", { length: 160 }), ticker: varchar("ticker", { length: 32 }).notNull(), micCode: varchar("mic_code", { length: 4 }),
+  exchange: varchar("exchange", { length: 80 }), instrumentType: varchar("instrument_type", { length: 20 }), currency: varchar("currency", { length: 3 }).notNull(),
+  quoteCurrency: varchar("quote_currency", { length: 3 }), value: decimal("value", { precision: 38, scale: 18 }).notNull(),
+  priceBasis: varchar("price_basis", { length: 32 }).notNull(), adjustment: varchar("adjustment", { length: 20 }).notNull(), session: varchar("session", { length: 20 }).notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }), requestedAt: timestamp("requested_at", { withTimezone: true }), exchangeDate: date("exchange_date"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(), lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), source: varchar("source", { length: 32 }).notNull(),
+  synthetic: boolean("synthetic").default(false).notNull(), status: varchar("status", { length: 12 }).default("ok").notNull(),
+}, table => ({
+  lookupIdx: index("market_provider_observations_lookup_idx").on(table.scopeKey, table.identityKey, table.dataset, table.observedAt, table.exchangeDate),
+  expiryIdx: index("market_provider_observations_expiry_idx").on(table.expiresAt),
+  historicalFxIdx: index("market_provider_observations_historical_fx_idx").on(table.scopeKey, table.identityKey, table.dataset, table.requestedAt),
+  sourceCheck: check("market_provider_observations_source_check", sql`provider='twelve_data' and source='twelve_data' and not synthetic and value>0 and audience in ('internal_validation','member_display','public_demo') and status in ('ok','conflict') and fetched_at<=last_fetched_at and expires_at>fetched_at and (observed_at is null or observed_at<=fetched_at)`),
+  basisCheck: check("market_provider_observations_basis_check", sql`(dataset='us_quote' and requested_at is null and currency='USD' and quote_currency is null and instrument_key is not null and mic_code is not null and exchange is not null and instrument_type in ('Common Stock','ETF') and price_basis='provider_quote_close' and adjustment='not_applicable' and session='regular' and observed_at is not null and exchange_date is null) or (dataset='us_daily_raw' and requested_at is null and currency='USD' and quote_currency is null and instrument_key is not null and mic_code is not null and exchange is not null and instrument_type in ('Common Stock','ETF') and price_basis='raw_close' and adjustment='none' and session='regular' and observed_at is null and exchange_date is not null) or (dataset='usd_krw' and requested_at is null and currency='USD' and quote_currency='KRW' and instrument_key is null and mic_code is null and exchange is null and instrument_type is null and price_basis='fx_rate' and adjustment='not_applicable' and session='not_applicable' and observed_at is not null and exchange_date is null) or (dataset='usd_krw_history' and currency='USD' and quote_currency='KRW' and instrument_key is null and mic_code is null and exchange is null and instrument_type is null and price_basis='fx_rate' and adjustment='not_applicable' and session='not_applicable' and observed_at is not null and exchange_date is null and requested_at is not null and observed_at<=requested_at and requested_at<=fetched_at)`),
+})).enableRLS();
+
+export const marketProviderActionCoverage = pgTable("market_provider_action_coverage", {
+  coverageKey: varchar("coverage_key", { length: 64 }).primaryKey(), scopeKey: varchar("scope_key", { length: 64 }).notNull(), identityKey: varchar("identity_key", { length: 64 }).notNull(),
+  instrumentKey: varchar("instrument_key", { length: 160 }).notNull(), ticker: varchar("ticker", { length: 32 }).notNull(), micCode: varchar("mic_code", { length: 4 }).notNull(),
+  actionType: varchar("action_type", { length: 12 }).notNull(), startDate: date("start_date").notNull(), endDate: date("end_date").notNull(),
+  status: varchar("status", { length: 12 }).notNull(), source: varchar("source", { length: 32 }).notNull(), sourceEndpoint: varchar("source_endpoint", { length: 20 }),
+  sourceMeaning: varchar("source_meaning", { length: 40 }).notNull(), responseHash: varchar("response_hash", { length: 64 }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(), lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), synthetic: boolean("synthetic").default(false).notNull(),
+}, table => ({
+  lookupIdx: index("market_provider_action_coverage_lookup_idx").on(table.scopeKey, table.identityKey, table.actionType, table.startDate, table.endDate),
+  expiryIdx: index("market_provider_action_coverage_expiry_idx").on(table.expiresAt),
+  coverageCheck: check("market_provider_action_coverage_check", sql`action_type in ('split','dividend') and status in ('unknown','complete','conflict') and source='twelve_data' and not synthetic and start_date<=end_date and end_date-start_date<90 and fetched_at<=last_fetched_at and expires_at>fetched_at and ((status='unknown' and source_endpoint is null and source_meaning='not_collected' and response_hash is null) or (status in ('complete','conflict') and response_hash is not null and ((action_type='split' and source_endpoint='/splits' and source_meaning='provider_split_factors') or (action_type='dividend' and source_endpoint='/dividends' and source_meaning='unadjusted_cash_per_share'))))`),
+})).enableRLS();
+
+export const marketProviderCorporateActions = pgTable("market_provider_corporate_actions", {
+  actionKey: varchar("action_key", { length: 64 }).primaryKey(), coverageKey: varchar("coverage_key", { length: 64 }).notNull().references(() => marketProviderActionCoverage.coverageKey, { onDelete: "cascade" }),
+  eventKey: varchar("event_key", { length: 64 }).notNull(), actionType: varchar("action_type", { length: 12 }).notNull(), effectiveDate: date("effective_date").notNull(),
+  fromFactor: decimal("from_factor", { precision: 38, scale: 18 }), toFactor: decimal("to_factor", { precision: 38, scale: 18 }),
+  cashAmount: decimal("cash_amount", { precision: 38, scale: 18 }), currency: varchar("currency", { length: 3 }), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+}, table => ({
+  coverageIdx: index("market_provider_corporate_actions_coverage_idx").on(table.coverageKey, table.effectiveDate),
+  valuesCheck: check("market_provider_corporate_actions_values_check", sql`(action_type='split' and from_factor is not null and to_factor is not null and from_factor>0 and to_factor>0 and cash_amount is null and currency is null) or (action_type='dividend' and from_factor is null and to_factor is null and cash_amount is not null and cash_amount>0 and currency is not null and currency='USD')`),
+})).enableRLS();
+
+// C-stage ephemeral execution artifacts. Trigger guards and FORCE RLS live in 0054.
+const executionBytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
+// Private service controls; no tenant grants. 0055 owns trigger/counter authority.
+export const simulationExecutionService = pgTable("simulation_execution_service", {
+  id: boolean("id").primaryKey().default(true), enabled: boolean("enabled").notNull().default(false),
+  qaOnly: boolean("qa_only").notNull().default(true), qaOwners: uuid("qa_owners").array().notNull().default(sql`'{}'::uuid[]`),
+  maxBytes: bigint("max_bytes", { mode: "number" }).notNull().default(134217728), maxCount: integer("max_count").notNull().default(8),
+  maxCreating: integer("max_creating").notNull().default(1), maxHourly: integer("max_hourly").notNull().default(4),
+  ownerIntervalSeconds: integer("owner_interval_seconds").notNull().default(60), cleanupMaxAgeSeconds: integer("cleanup_max_age_seconds").notNull().default(93600),
+  backlogMaxAgeSeconds: integer("backlog_max_age_seconds").notNull().default(93600), usedBytes: bigint("used_bytes", { mode: "number" }).notNull().default(0),
+  retained: integer("retained").notNull().default(0), creating: integer("creating").notNull().default(0),
+  hourStartedAt: timestamp("hour_started_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`), hourly: integer("hourly").notNull().default(0),
+  cleanupLease: uuid("cleanup_lease"), cleanupLeaseUntil: timestamp("cleanup_lease_until", { withTimezone: true }),
+  cleanupStartedAt: timestamp("cleanup_started_at", { withTimezone: true }), cleanupSucceededAt: timestamp("cleanup_succeeded_at", { withTimezone: true }),
+  cleanupFailedAt: timestamp("cleanup_failed_at", { withTimezone: true }), cleanupRemoved: integer("cleanup_removed").notNull().default(0),
+  cleanupBacklog: integer("cleanup_backlog").notNull().default(0), cleanupOldestExpiredAt: timestamp("cleanup_oldest_expired_at", { withTimezone: true }),
+}, t => ({
+  singleton: check("simulation_execution_service_id_check",sql`${t.id}`),
+  bytes: check("simulation_execution_service_max_bytes_check",sql`${t.maxBytes} between 1048576 and 536870912`),
+  count: check("simulation_execution_service_max_count_check",sql`${t.maxCount} between 1 and 128`),
+  concurrent: check("simulation_execution_service_max_creating_check",sql`${t.maxCreating} between 1 and 4`),
+  hourlyLimit: check("simulation_execution_service_max_hourly_check",sql`${t.maxHourly} between 1 and 100`),
+  interval: check("simulation_execution_service_owner_interval_seconds_check",sql`${t.ownerIntervalSeconds} between 0 and 86400`),
+  cleanupAge: check("simulation_execution_service_cleanup_max_age_seconds_check",sql`${t.cleanupMaxAgeSeconds} between 60 and 93600`),
+  backlogAge: check("simulation_execution_service_backlog_max_age_seconds_check",sql`${t.backlogMaxAgeSeconds} between 60 and 93600`),
+  used: check("simulation_execution_service_used_bytes_check",sql`${t.usedBytes}>=0`), retained: check("simulation_execution_service_retained_check",sql`${t.retained}>=0`),
+  creating: check("simulation_execution_service_creating_check",sql`${t.creating}>=0`), hourly: check("simulation_execution_service_hourly_check",sql`${t.hourly}>=0`),
+}));
+export const simulationExecutionFrequency = pgTable("simulation_execution_frequency", {
+  ownerUserId: uuid("owner_user_id").primaryKey().references(() => appUsers.id, { onDelete: "cascade" }),
+  lastAdmittedAt: timestamp("last_admitted_at", { withTimezone: true }).notNull(),
+}).enableRLS();
+export const simulationExecutions = pgTable("simulation_executions", {
+  ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }), id: uuid("id").notNull(),
+  binding: text("binding").notNull(), codec: text("codec").notNull(), projection: integer("projection").notNull(), model: text("model").notNull(), currency: text("currency").notNull(),
+  manifest: jsonb("manifest").notNull(), commonData: executionBytea("common_data").notNull(), reservedBytes: bigint("reserved_bytes", { mode: "number" }).notNull(),
+  state: text("state").default("creating").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }), expiresAt: timestamp("expires_at", { withTimezone: true }).default(sql`clock_timestamp()+interval '6 hours'`).notNull(),
+}, t => ({ pk: primaryKey({ columns: [t.ownerUserId,t.id] }), expiry: index("simulation_executions_expiry").on(t.expiresAt), ownerBinding: uniqueIndex("simulation_executions_owner_binding").on(t.ownerUserId,t.binding), incomplete: index("simulation_executions_incomplete").on(t.createdAt).where(sql`${t.state}<>'ready'`),
+  owner: pgPolicy("simulation_executions_owner", { to: tenantDatabaseRole, using: sql`${currentTenantOwns(t.ownerUserId)} and investment_plan_tenant_active()`, withCheck: sql`${currentTenantOwns(t.ownerUserId)} and investment_plan_tenant_active()` }),
+  bindingCheck: check("simulation_executions_binding_check",sql`${t.binding} ~ '^[a-f0-9]{64}$'`), codecCheck:check("simulation_executions_codec_check",sql`length(${t.codec})<=80`),
+  modelCheck:check("simulation_executions_model_check",sql`${t.model} in ('economic','bootstrap')`), currencyCheck:check("simulation_executions_currency_check",sql`${t.currency} in ('KRW','USD')`),
+  manifestCheck:check("simulation_executions_manifest_check",sql`jsonb_typeof(${t.manifest})='object' and octet_length(${t.manifest}::text)<=131072`),
+  dataCheck:check("simulation_executions_common_data_check",sql`octet_length(${t.commonData})<=2098176`), bytesCheck:check("simulation_executions_reserved_bytes_check",sql`${t.reservedBytes} between 1 and 100663296`), stateCheck:check("simulation_executions_state_check",sql`${t.state} in ('creating','ready','failed')`),
+})).enableRLS();
+export const simulationExecutionChunks=pgTable("simulation_execution_chunks", {
+  ownerUserId:uuid("owner_user_id").notNull(),executionId:uuid("execution_id").notNull(),chunkIndex:integer("chunk_index").notNull(),manifest:jsonb("manifest").notNull(),data:executionBytea("data").notNull(),
+}, t=>({pk:primaryKey({columns:[t.ownerUserId,t.executionId,t.chunkIndex]}),execution:foreignKey({columns:[t.ownerUserId,t.executionId],foreignColumns:[simulationExecutions.ownerUserId,simulationExecutions.id]}).onDelete("cascade"),
+  owner:pgPolicy("simulation_chunks_owner",{to:tenantDatabaseRole,using:sql`${currentTenantOwns(t.ownerUserId)} and investment_plan_tenant_active()`,withCheck:sql`${currentTenantOwns(t.ownerUserId)} and investment_plan_tenant_active()`}),
+  indexCheck:check("simulation_execution_chunks_chunk_index_check",sql`${t.chunkIndex} between 0 and 124`),manifestCheck:check("simulation_execution_chunks_manifest_check",sql`octet_length(${t.manifest}::text)<=1024`),dataCheck:check("simulation_execution_chunks_data_check",sql`octet_length(${t.data})<=615424`),
+})).enableRLS();
+
+// 0059 owns function/view privileges and FORCE RLS; the table shape stays in sync here.
+export const tradeReliabilityRuntime = pgTable("trade_reliability_runtime", {
+  singleton:boolean("singleton").primaryKey().notNull().default(true),
+  mode:text("mode").notNull().default("legacy"),
+  reason:text("reason").notNull().default("0059 installed; compatible release not activated"),
+  changedAt:timestamp("changed_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>[
+  check("trade_reliability_runtime_singleton_check",sql`${t.singleton}`),
+  check("trade_reliability_runtime_mode_check",sql`${t.mode} IN ('legacy','compatible','paused')`),
+]).enableRLS();
+export const nativeLedgerRevisions = pgTable("native_ledger_revisions", {
+  id:uuid("id").defaultRandom().primaryKey(),
+  canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),
+  accountId:uuid("account_id").notNull().references(()=>accounts.id),
+  operationId:uuid("operation_id").notNull(), markerSequence:integer("marker_sequence").notNull(),
+  affectedAt:timestamp("affected_at",{withTimezone:true}).notNull(),recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().defaultNow(),
+  reason:text("reason").notNull(),effectiveEntries:jsonb("effective_entries").notNull(),
+},t=>[
+  uniqueIndex("native_revision_owner_account_marker_unique").on(t.canonicalOwnerUserId,t.accountId,t.markerSequence),
+  check("native_ledger_revisions_reason_check",sql`length(${t.reason}) BETWEEN 1 AND 300`),
+  check("native_ledger_revisions_effective_entries_check",sql`jsonb_typeof(${t.effectiveEntries})='array' AND jsonb_array_length(${t.effectiveEntries}) BETWEEN 2 AND 501 AND octet_length(${t.effectiveEntries}::text)<=8000000`),
+  pgPolicy("native_revision_owner",{for:"select",to:tenantDatabaseRole,using:currentTenantOwns(t.canonicalOwnerUserId)}),
+]).enableRLS();
+export const nativeOperationCancellations=pgTable("native_operation_cancellations",{
+  canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),operationId:uuid("operation_id").notNull(),
+  cancelledAt:timestamp("cancelled_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[primaryKey({columns:[t.canonicalOwnerUserId,t.operationId]}),pgPolicy("native_cancellation_owner",{for:"select",to:tenantDatabaseRole,using:currentTenantOwns(t.canonicalOwnerUserId)})]).enableRLS();
+export const dailySnapshotWork=pgTable("daily_snapshot_work",{
+  id:uuid("id").defaultRandom().primaryKey(),canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),
+  accountId:uuid("account_id").notNull().references(()=>accounts.id),snapshotDate:date("snapshot_date").notNull(),stage:text("stage").notNull(),
+  revision:integer("revision").notNull().default(0),status:text("status").notNull().default("pending"),attempts:integer("attempts").notNull().default(0),generation:integer("generation").notNull().default(0),
+  leaseUntil:timestamp("lease_until",{withTimezone:true}),nextAttemptAt:timestamp("next_attempt_at",{withTimezone:true}),startedAt:timestamp("started_at",{withTimezone:true}),finishedAt:timestamp("finished_at",{withTimezone:true}),
+  reason:text("reason"),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("daily_snapshot_work_cutoff_unique").on(t.accountId,t.snapshotDate,t.stage,t.revision),
+  index("daily_snapshot_work_due").on(t.status,t.nextAttemptAt,t.snapshotDate),
+  check("daily_snapshot_work_stage_check",sql`${t.stage} IN ('legacy','native')`),
+  check("daily_snapshot_work_status_check",sql`${t.status} IN ('pending','running','completed','blocked','failed')`),
+]).enableRLS();
+
+// Only the 15-minute pre-cutoff window is retained, capped at 32 receipts per
+// instrument/provider/day for 35 days. Completed snapshots own their evidence.
+export const snapshotCutoffPriceObservations = pgTable("snapshot_cutoff_price_observations", {
+  id: uuid("id").defaultRandom().primaryKey(), snapshotDate: date("snapshot_date").notNull(),
+  ticker: varchar("ticker", { length: 50 }).notNull(), market: varchar("market", { length: 20 }).notNull(),
+  currency: varchar("currency", { length: 10 }).notNull(), provider: varchar("provider", { length: 100 }).notNull(),
+  source: varchar("source", { length: 100 }).notNull(), quoteType: varchar("quote_type", { length: 50 }).notNull(),
+  price: decimal("price", { precision: 28, scale: 12 }).notNull(), observedAt: timestamp("observed_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  storedAt: timestamp("stored_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+  timestampBasis: varchar("timestamp_basis", { length: 20 }).notNull(),
+}, t => [
+  uniqueIndex("cutoff_price_receipt_unique").on(t.snapshotDate, t.market, t.ticker, t.currency, t.provider, t.fetchedAt),
+  index("cutoff_price_retention_idx").on(t.snapshotDate),
+  check("cutoff_price_positive", sql`${t.price}>0`),
+  check("cutoff_price_time_order", sql`${t.observedAt} is null or ${t.observedAt}<=${t.fetchedAt}`),
+  check("cutoff_price_basis", sql`(${t.timestampBasis}='collection' and ${t.observedAt} is null) or (${t.timestampBasis}='provider' and ${t.observedAt} is not null)`),
+  check("cutoff_price_date", sql`${t.snapshotDate}=(${t.fetchedAt} at time zone 'Asia/Seoul')::date`),
+  check("cutoff_price_window", sql`(${t.fetchedAt} at time zone 'Asia/Seoul')::time between time '06:45' and time '07:00'`),
+]).enableRLS();
+
+export const snapshotCutoffFxObservations = pgTable("snapshot_cutoff_fx_observations", {
+  id: uuid("id").defaultRandom().primaryKey(), snapshotDate: date("snapshot_date").notNull(),
+  pair: varchar("pair", { length: 10 }).notNull(), provider: varchar("provider", { length: 100 }).notNull(),
+  source: varchar("source", { length: 100 }).notNull(), rateDate: date("rate_date").notNull(),
+  usdKrw: decimal("usd_krw", { precision: 20, scale: 6 }).notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }), rateKind: varchar("rate_kind", { length: 30 }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  storedAt: timestamp("stored_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+  timestampBasis: varchar("timestamp_basis", { length: 20 }).notNull(),
+}, t => [
+  uniqueIndex("cutoff_fx_receipt_unique").on(t.snapshotDate, t.pair, t.provider, t.fetchedAt),
+  index("cutoff_fx_retention_idx").on(t.snapshotDate),
+  check("cutoff_fx_pair", sql`${t.pair}='USD/KRW'`),
+  check("cutoff_fx_positive", sql`${t.usdKrw}>0`),
+  check("cutoff_fx_time_order", sql`${t.observedAt} is null or ${t.observedAt}<=${t.fetchedAt}`),
+  check("cutoff_fx_basis", sql`(${t.timestampBasis}='collection' and ${t.observedAt} is null and ${t.rateKind} is null) or (${t.timestampBasis}='provider' and ${t.observedAt} is not null and ${t.rateKind} in ('spot','daily_reference'))`),
+  check("cutoff_fx_date", sql`${t.snapshotDate}=(${t.fetchedAt} at time zone 'Asia/Seoul')::date`),
+  check("cutoff_fx_window", sql`(${t.fetchedAt} at time zone 'Asia/Seoul')::time between time '06:45' and time '07:00'`),
+]).enableRLS();
+
+// Server-only immutable before-images; no tenant grants or public read surface.
+export const holdingsSnapshotRepairArchive = pgTable("holdings_snapshot_repair_archive", {
+ id:uuid("id").defaultRandom().primaryKey(),
+ canonicalOwnerUserId:uuid("canonical_owner_user_id").notNull().references(()=>appUsers.id),
+ accountId:uuid("account_id").references(()=>accounts.id), snapshotDate:date("snapshot_date").notNull(),
+ revision:integer("revision").notNull(),portfolioId:uuid("portfolio_id").notNull(),
+ portfolio:jsonb("portfolio").notNull(),positions:jsonb("positions").notNull(),
+ createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>[uniqueIndex("holdings_snapshot_repair_archive_portfolio_id_revision_key").on(t.portfolioId,t.revision),
+ check("holdings_snapshot_repair_archive_revision_check",sql`${t.revision}>0`),
+ check("holdings_snapshot_repair_archive_check",sql`jsonb_typeof(${t.portfolio})='object' AND jsonb_typeof(${t.positions})='array'`)]).enableRLS();
+
+export { instrumentCatalog } from "@/db/instrument-catalog-schema";
+
+export const recoveredCloseValuations=pgTable('recovered_close_valuations',{
+ canonicalOwnerUserId:uuid('canonical_owner_user_id').notNull().references(()=>appUsers.id),
+ accountId:uuid('account_id').notNull(),revision:integer('revision').notNull(),
+ valuationDate:date('valuation_date').notNull(),valueKrw:decimal('value_krw',{precision:36,scale:12}).notNull(),
+ evidence:jsonb('evidence').notNull(),createdAt:timestamp('created_at',{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>[primaryKey({columns:[t.accountId,t.revision,t.valuationDate]}),
+ foreignKey({columns:[t.accountId,t.canonicalOwnerUserId],foreignColumns:[accounts.id,accounts.canonicalOwnerUserId]}).onDelete('restrict'),
+ check('recovered_close_valuations_revision_check',sql`${t.revision}>0`),
+ check('recovered_close_valuations_value_krw_check',sql`${t.valueKrw}>0`),
+ check('recovered_close_valuations_evidence_check',sql`jsonb_typeof(${t.evidence})='object'`),
+ pgPolicy('recovered_close_valuations_owner',{for:'select',to:tenantDatabaseRole,using:currentTenantOwns(t.canonicalOwnerUserId)})]).enableRLS();

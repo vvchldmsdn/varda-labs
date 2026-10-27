@@ -1,0 +1,113 @@
+import { AuthElement, AuthText } from "./auth-localized";
+import Link from "next/link";
+import { ArrowRight, Check, Plus, Wallet } from "lucide-react";
+import { AuthHeading, AuthShell } from "./auth-shell";
+import { SelfServiceTenantOnboardingForm } from "./self-service-tenant-onboarding-form";
+import { OnboardingAccountForm } from "./onboarding-account-form";
+import styles from "./auth-experience.module.css";
+import { T } from "@/components/i18n/localized-text";
+
+export type OnboardingStep = "portfolio" | "account" | "holding";
+const steps = [
+  { id: "portfolio", label: "포트폴리오" },
+  { id: "account", label: "첫 계좌" },
+  { id: "holding", label: "첫 종목" },
+] as const;
+
+export function OnboardingView({
+  step,
+  accountName,
+  preview = false,
+}: {
+  step: OnboardingStep;
+  accountName?: string;
+  preview?: boolean;
+}) {
+  const activeIndex = steps.findIndex((item) => item.id === step);
+  const connectionHref = `/auth/session?view=account${preview ? "&preview=design" : ""}`;
+  return (
+    <AuthShell
+      preview={preview}
+      alternate={{ href: connectionHref, label: "내 계정" }}
+    >
+      <AuthElement as="section" className={styles.onboardingPanel} aria-label="포트폴리오 시작">
+        <AuthElement as="ol" className={styles.steps} aria-label="시작 단계">
+          {steps.map((item, index) => (
+            <li
+              key={item.id}
+              className={styles.step}
+              data-current={index === activeIndex}
+              data-complete={index < activeIndex}
+              aria-current={index === activeIndex ? "step" : undefined}
+            >
+              <span className={styles.stepNumber}>
+                {index < activeIndex ? (
+                  <Check size={14} aria-label="완료" />
+                ) : (
+                  `0${index + 1}`
+                )}
+              </span>
+              <span className={styles.stepLabel}><AuthText>{item.label}</AuthText></span>
+            </li>
+          ))}
+        </AuthElement>
+        {step === "portfolio" ? (
+          <>
+            <AuthHeading
+              eyebrow="01 / A FRESH START"
+              title="나만의 포트폴리오"
+              description={
+                <><AuthText>{"새 포트폴리오는 빈 기록에서 시작합니다."}</AuthText><br /><AuthText>{"이전 서비스의 기록이 있다면 기존 데이터를 연결해 주세요."}</AuthText></>
+              }
+            />
+            <SelfServiceTenantOnboardingForm preview={preview} />
+            <details className={styles.disclosure}>
+              <summary><AuthText>{"이전 서비스에 기록이 있나요?"}</AuthText></summary>
+              <p><AuthText>{"기존 자산을 자동으로 가져오지 않습니다. 안내받은 연결 코드가 있다면 새 포트폴리오를 만들기 전에 기존 데이터 연결을 진행해 주세요."}</AuthText></p>
+              <Link href={connectionHref} className={styles.textLink}><AuthText>{"기존 데이터 연결"}</AuthText><ArrowRight size={14} aria-hidden="true" />
+              </Link>
+            </details>
+          </>
+        ) : step === "account" ? (
+          <>
+            <AuthHeading
+              eyebrow="02 / YOUR FIRST ACCOUNT"
+              title="첫 계좌 등록"
+              description={
+                <><T ko="보유한 종목을 담을 공간을 준비할게요." en="Let’s prepare a home for your holdings." /><br /><AuthText>{"계좌번호나 금융기관 비밀번호는 필요하지 않습니다."}</AuthText></>
+              }
+            />
+            <OnboardingAccountForm preview={preview} />
+          </>
+        ) : (
+          <>
+            <AuthHeading
+              eyebrow="03 / READY TO BEGIN"
+              title="첫 종목을 기록해볼까요"
+              description={
+                <><T ko="종목 이름과 보유 수량만 있으면 시작할 수 있어요." en="A holding’s name and quantity are enough to get started." /><br /><T ko="매입가는 나중에 추가해도 괜찮습니다." en="You can add purchase prices later." /></>
+              }
+            />
+            <div className={styles.accountSummary}>
+              <Wallet size={28} strokeWidth={1.5} aria-hidden="true" />
+              <div>
+                <p>{accountName}</p>
+                <small><AuthText>{"등록된 계좌 · 원화 기준 평가"}</AuthText></small>
+              </div>
+            </div>
+            <div className={styles.stack}>
+              <Link
+                className={styles.primaryButton}
+                href={preview ? "/portfolio/holdings/new?preview=design" : "/portfolio/holdings/new"}
+              >
+                <Plus size={17} aria-hidden="true" /><AuthText>{"보유 종목 추가"}</AuthText></Link>
+              <Link className={styles.secondaryButton} href="/"><AuthText>{"지금은 홈 둘러보기"}</AuthText><ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </div>
+            <p className={styles.note}><AuthText>{"종목을 등록하기 전에는 평가액과 수익률이 비어 있을 수 있습니다."}</AuthText></p>
+          </>
+        )}
+      </AuthElement>
+    </AuthShell>
+  );
+}

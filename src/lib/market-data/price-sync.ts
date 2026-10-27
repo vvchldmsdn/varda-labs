@@ -1,9 +1,12 @@
 import "server-only";
+import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { KisRefreshLeaseBusyError, withKisRefreshLease } from "@/lib/market-data/kis-refresh-lease";
 import {
+  accounts,
   assets,
   livePriceQuotes,
   marketDataSyncRuns,
@@ -103,13 +106,19 @@ export type PriceSyncCooldownStatus = {
 };
 
 export type PriceSyncTargetMarket = "korea" | "us";
-export type PriceSyncTargetAccount = "brokerage" | "isa" | "irp";
+export type PriceSyncTargetAccount = string;
 
 export type PriceSyncTargetFilter = {
   tickers?: string[];
   market?: PriceSyncTargetMarket;
   account?: PriceSyncTargetAccount;
 };
+
+export type ExplicitPriceSyncTarget = Readonly<{
+  ticker: string;
+  market: string;
+  currency: string;
+}>;
 
 export type PriceSyncTargetFilterResult = {
   ticker: string;
@@ -238,7 +247,7 @@ export async function getKisPriceSyncCooldownStatus(
   };
 }
 
-export async function runMarketPriceSync(options: {
+type MarketPriceSyncOptions = {
   mode: PriceSyncMode;
   dryRun?: boolean;
   fixture?: boolean;
@@ -246,7 +255,26 @@ export async function runMarketPriceSync(options: {
   provider?: MarketDataProvider;
   targetLimit?: number;
   targetFilter?: PriceSyncTargetFilter;
-}): Promise<PriceSyncRunResult> {
+  explicitTargets?: readonly ExplicitPriceSyncTarget[];
+};
+
+export async function runMarketPriceSync(options: MarketPriceSyncOptions): Promise<PriceSyncRunResult> {
+  if (options.provider?.name !== "kis" || (options.dryRun ?? true)) {
+    return runMarketPriceSyncWithLease(options);
+  }
+  try {
+    return await withKisRefreshLease(() => runMarketPriceSyncWithLease(options));
+  } catch (error) {
+    if (error instanceof KisRefreshLeaseBusyError) {
+      throw new PriceSyncRequestError("provider_cooldown", error.message, {
+        retryAfterSeconds: error.retryAfterSeconds,
+      }, 429);
+    }
+    throw error;
+  }
+}
+
+async function runMarketPriceSyncWithLease(options: MarketPriceSyncOptions): Promise<PriceSyncRunResult> {
   const provider = options.provider ?? createStubMarketDataProvider();
   const dryRun = options.dryRun ?? true;
   const fixture = options.fixture ?? false;
@@ -259,31 +287,54 @@ export async function runMarketPriceSync(options: {
   const liveWritePolicy = getLivePriceWritePolicy(provider.name);
   const closeWriteEnabled = !dryRun && closeWritePolicy !== "none";
   const liveWriteEnabled = !dryRun && liveWritePolicy !== "none";
+  if (options.explicitTargets && options.targetFilter) {
+    throw new PriceSyncRequestError(
+      "ambiguous_target_authority",
+      "Explicit targets cannot be combined with asset target filters",
+      {},
+    );
+  }
+
   const targetFilter = normalizeTargetFilter(options.targetFilter);
-  const assetRows = await getAssetRowsForPriceSync();
+  const explicitPriceTargets = options.explicitTargets
+    ? buildExplicitPriceLookupTargets(options.explicitTargets)
+    : null;
+  const assetRows = explicitPriceTargets ? [] : await getAssetRowsForPriceSync();
   const syncableAssetRows = assetRows.filter(isSyncableAssetRow);
-  const totalPriceTargets = buildPriceLookupTargets(syncableAssetRows);
-  const filteredAssetRows = applyTargetFilter(syncableAssetRows, targetFilter);
-  const filteredPriceTargets = orderPriceTargetsByFilter(
-    buildPriceLookupTargets(filteredAssetRows),
-    targetFilter,
-  );
+  const totalPriceTargets =
+    explicitPriceTargets ?? buildPriceLookupTargets(syncableAssetRows);
+  const filteredAssetRows = explicitPriceTargets
+    ? []
+    : applyTargetFilter(syncableAssetRows, targetFilter);
+  const filteredPriceTargets = explicitPriceTargets
+    ? explicitPriceTargets
+    : orderPriceTargetsByFilter(
+        buildPriceLookupTargets(filteredAssetRows),
+        targetFilter,
+      );
   const priceTargets =
     options.targetLimit === undefined
       ? filteredPriceTargets
       : filteredPriceTargets.slice(0, options.targetLimit);
-  const targetFilterResults = buildTargetFilterResults({
-    targetFilter,
-    allAssetRows: assetRows,
-    syncableAssetRows,
-    filteredPriceTargets,
-    priceTargets,
-  });
+  const targetFilterResults = explicitPriceTargets
+    ? []
+    : buildTargetFilterResults({
+        targetFilter,
+        allAssetRows: assetRows,
+        syncableAssetRows,
+        filteredPriceTargets,
+        priceTargets,
+      });
+  const selectedAssetCount = explicitPriceTargets
+    ? explicitPriceTargets.length
+    : syncableAssetRows.length;
   const targetFilterSummary = summarizeTargetFilter({
     targetFilter,
-    totalSyncableAssetCount: syncableAssetRows.length,
+    totalSyncableAssetCount: selectedAssetCount,
     totalPriceTargetCount: totalPriceTargets.length,
-    filteredAssetCount: filteredAssetRows.length,
+    filteredAssetCount: explicitPriceTargets
+      ? explicitPriceTargets.length
+      : filteredAssetRows.length,
     filteredPriceTargetCount: filteredPriceTargets.length,
     limitedPriceTargetCount: priceTargets.length,
   });
@@ -417,7 +468,7 @@ export async function runMarketPriceSync(options: {
       fixture,
       priceDate,
       requestedCount: priceTargets.length,
-      assetCount: syncableAssetRows.length,
+      assetCount: selectedAssetCount,
       successCount: counts.successCount,
       failedCount:
         counts.failedCount +
@@ -454,7 +505,7 @@ export async function runMarketPriceSync(options: {
           priceDate,
           provider: provider.name,
           mode: options.mode,
-          assetCount: syncableAssetRows.length,
+          assetCount: selectedAssetCount,
           priceTargetCount: priceTargets.length,
           totalPriceTargetCount: totalPriceTargets.length,
           filteredPriceTargetCount: filteredPriceTargets.length,
@@ -506,6 +557,7 @@ export async function runMarketPriceSync(options: {
       })
       .where(eq(marketDataSyncRuns.id, run.id));
 
+    if (isProviderCollectionDeferred(error)) throw error;
     throw new PriceSyncError(safeError, run.id);
   }
 }
@@ -522,6 +574,16 @@ async function getAssetRowsForPriceSync(): Promise<PriceSyncAssetRow[]> {
       account: assets.account,
     })
     .from(assets)
+    .innerJoin(accounts, eq(assets.accountId, accounts.id))
+    .where(
+      and(
+        eq(accounts.isActive, true),
+        ne(accounts.accountType, "cash"),
+        eq(assets.account, accounts.code),
+        eq(assets.canonicalOwnerUserId, accounts.canonicalOwnerUserId),
+        isNull(assets.archivedAt),
+      ),
+    )
     .orderBy(assets.market, assets.ticker, assets.name);
 
   return rows;
@@ -557,9 +619,48 @@ function buildPriceLookupTargets(rows: PriceSyncAssetRow[]): PriceLookupTarget[]
       ticker,
       market,
       currency,
+      authority: "asset_rows",
       accounts: [normalizeText(row.account) ?? "unknown"],
       assetIds: [row.id],
       assetNames: [row.name],
+    });
+  }
+
+  return Array.from(targetsByKey.values()).sort((left, right) =>
+    left.key.localeCompare(right.key),
+  );
+}
+
+function buildExplicitPriceLookupTargets(
+  rows: readonly ExplicitPriceSyncTarget[],
+): PriceLookupTarget[] {
+  const targetsByKey = new Map<string, PriceLookupTarget>();
+
+  for (const row of rows) {
+    const ticker = normalizeTicker(row.ticker);
+    const market = normalizeText(row.market);
+    const currency = normalizeText(row.currency);
+
+    if (!ticker || !market || !currency) {
+      throw new PriceSyncRequestError(
+        "invalid_explicit_target",
+        "Explicit price targets require market, ticker, and currency",
+        {},
+      );
+    }
+
+    const key = `${market}:${ticker}:${currency}`;
+    if (targetsByKey.has(key)) continue;
+
+    targetsByKey.set(key, {
+      key,
+      ticker,
+      market,
+      currency,
+      authority: "explicit_instrument",
+      accounts: [],
+      assetIds: [],
+      assetNames: [],
     });
   }
 
@@ -578,7 +679,7 @@ function normalizeTargetFilter(
   return {
     tickers: tickers && tickers.length > 0 ? [...new Set(tickers)] : undefined,
     market: filter?.market,
-    account: filter?.account,
+    account: normalizeText(filter?.account) ?? undefined,
   };
 }
 

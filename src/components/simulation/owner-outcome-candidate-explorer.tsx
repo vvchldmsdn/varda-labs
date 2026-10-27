@@ -1,5 +1,8 @@
 "use client";
 
+import { SimulationText, useSimulationText } from "@/components/simulation/simulation-text";
+
+
 import { useState } from "react";
 
 import type { SimulationOwnerCandidateComparisonResult } from "@/lib/simulation-owner-candidate-comparison";
@@ -29,6 +32,8 @@ export function OwnerOutcomeCandidateExplorer({
   reason: ReadyComparison["outcomeCandidateReason"];
   status: ReadyComparison["outcomeCandidateStatus"];
 }) {
+  const pt = useSimulationText();
+  const pathCount = currentExecution.assumptions.pathCount;
   const [selectedObjective, setSelectedObjective] =
     useState<OutcomeCandidate["objective"] | null>(
       candidates[0]?.objective ?? null,
@@ -40,26 +45,22 @@ export function OwnerOutcomeCandidateExplorer({
 
   return (
     <div
-      className="mt-6 border-t border-[#d7ddcf] pt-5"
+      className="mt-6 border-t border-[var(--line)] pt-5"
       data-owner-outcome-candidates
       data-owner-outcome-candidates-status={status}
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
-            확률 경로를 비중으로 역산
-          </p>
-          <h3 className="mt-1 text-base font-semibold">목적별 비중 후보</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            500개 경로를 탐색용 250개와 확인용 250개로 분리합니다. 현재
-            비중보다 확인용 경로에서도 나아진 경우만 보여주며, 같은 종목·환율
-            자료와 같은 무작위 경로를 사용합니다.
-          </p>
+          <p className="text-xs font-semibold text-[var(--muted)]">
+            <SimulationText ko={"확률 경로를 비중으로 역산"} />{" "}</p>
+          <h3 className="mt-1 text-base font-semibold"><SimulationText ko={"목적별 비중 후보"} /></h3>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+            <SimulationText ko={`${pathCount.toLocaleString("ko-KR")}개 경로를 탐색용 ${Math.ceil(pathCount / 2)}개와 확인용 ${Math.floor(pathCount / 2)}개로 분리합니다. 현재 비중보다 확인용 경로에서도 나아진 경우만 보여주며, 같은 종목·환율 자료와 같은 무작위 경로를 사용합니다.`} en={`Split ${pathCount.toLocaleString("en-US")} paths into ${Math.ceil(pathCount / 2)} selection paths and ${Math.floor(pathCount / 2)} confirmation paths. Only candidates that also improve on current weights in the confirmation paths are shown, using the same instruments, FX data and random paths.`} />{" "}</p>
         </div>
         {selected ? (
           <div
-            aria-label="비중 후보 목적"
-            className="flex w-fit flex-wrap rounded-md border border-[#d7ddcf] bg-[#fbfcf7] p-1"
+            aria-label={pt("비중 후보 목적")}
+            className="flex w-fit flex-wrap rounded-md border border-[var(--line)] bg-[var(--surface)] p-1"
             role="tablist"
           >
             {candidates.map((candidate) => (
@@ -67,15 +68,15 @@ export function OwnerOutcomeCandidateExplorer({
                 aria-selected={candidate.objective === selected.objective}
                 className={`min-h-9 px-3 text-sm font-semibold ${
                   candidate.objective === selected.objective
-                    ? "rounded bg-[#173f3a] text-white"
-                    : "text-[#596258]"
+                    ? "rounded bg-[var(--ink)] text-white"
+                    : "text-[var(--muted)]"
                 }`}
                 key={candidate.objective}
                 onClick={() => setSelectedObjective(candidate.objective)}
                 role="tab"
                 type="button"
               >
-                {objectiveLabel(candidate.objective)}
+                <SimulationText ko={objectiveLabel(candidate.objective)} />
               </button>
             ))}
           </div>
@@ -89,12 +90,10 @@ export function OwnerOutcomeCandidateExplorer({
           currentExecution={currentExecution}
         />
       ) : (
-        <div className="mt-4 rounded-md border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4">
-          <p className="font-semibold">확인 경로를 통과한 비중 후보가 없습니다.</p>
-          <p className="mt-1 text-sm leading-6 text-[#6b6044]">
-            {outcomeUnavailableLabel(reason)} 현재 비중의 확률 경로와 기존
-            변동성 완화 후보는 그대로 확인할 수 있습니다.
-          </p>
+        <div className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4">
+          <p className="font-semibold"><SimulationText ko={"확인 경로를 통과한 비중 후보가 없습니다."} /></p>
+          <p className="mt-1 text-sm leading-6 text-[var(--warning)]">
+            <SimulationText ko={outcomeUnavailableLabel(reason)} /> {" "}<SimulationText ko={"현재 비중의 확률 경로와 기존 변동성 완화 후보는 그대로 확인할 수 있습니다."} />{" "}</p>
         </div>
       )}
     </div>
@@ -132,14 +131,16 @@ function ReadyOutcomeCandidate({
     >
       <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
-          detail="확인용 250개 경로"
+          detail={`확인용 ${candidate.confirmation.pathCount}개 경로`}
+          detailEn={`${candidate.confirmation.pathCount} confirmation paths`}
           label={objectiveMetricLabel(candidate.objective)}
           value={formatSignedPct(
             candidate.confirmation.objectiveImprovementPctPoints,
           )}
         />
         <Metric
-          detail="전체 500개 경로 · 후보 - 현재"
+          detail={`전체 ${currentExecution.assumptions.pathCount.toLocaleString("ko-KR")}개 경로 · 후보 - 현재`}
+          detailEn={`All ${currentExecution.assumptions.pathCount.toLocaleString("en-US")} paths · Candidate − current`}
           label="중앙값 수익률 차이"
           value={formatSignedPct(candidate.deltas.p50ReturnPctPoints)}
         />
@@ -168,14 +169,14 @@ function ReadyOutcomeCandidate({
         />
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-md border border-[#d7ddcf] bg-[#fbfcf7]">
+      <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full min-w-[620px] border-collapse text-left text-sm">
-          <thead className="text-xs text-[#687064]">
+          <thead className="text-xs text-[var(--muted)]">
             <tr>
-              <th className="px-4 py-3 font-semibold">종목</th>
-              <th className="px-4 py-3 text-right font-semibold">현재</th>
-              <th className="px-4 py-3 text-right font-semibold">후보</th>
-              <th className="px-4 py-3 text-right font-semibold">변화</th>
+              <th className="px-4 py-3 font-semibold"><SimulationText ko={"종목"} /></th>
+              <th className="px-4 py-3 text-right font-semibold"><SimulationText ko={"현재"} /></th>
+              <th className="px-4 py-3 text-right font-semibold"><SimulationText ko={"후보"} /></th>
+              <th className="px-4 py-3 text-right font-semibold"><SimulationText ko={"변화"} /></th>
             </tr>
           </thead>
           <tbody>
@@ -187,12 +188,12 @@ function ReadyOutcomeCandidate({
               )
               .map((row) => (
                 <tr
-                  className="border-t border-[#e1e5da]"
+                  className="border-t border-[var(--line)]"
                   key={row.instrumentKey}
                 >
                   <td className="px-4 py-3">
                     <p className="font-semibold">{row.ticker}</p>
-                    <p className="mt-1 text-xs text-[#687064]">
+                    <p className="mt-1 text-xs text-[var(--muted)]">
                       {row.market} · {row.currency}
                     </p>
                   </td>
@@ -211,13 +212,8 @@ function ReadyOutcomeCandidate({
         </table>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[#687064]">
-        이 후보는 종목당 최대 {formatWeight(candidate.constraints.maximumInstrumentWeightBps)},
-        한 방향 비중 이동 최대 {formatWeight(candidate.constraints.maximumOneWayTurnoverBps)},
-        외화 비중 변화 최대 {formatWeight(candidate.constraints.maximumFxExposureChangeBps)}를
-        지킵니다. 조회 시 계산되는 연구 결과이며 수수료·세금·주문 가능 여부를
-        반영한 투자 추천이 아닙니다.
-      </p>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+        <SimulationText ko={"이 후보는 종목당 최대"} />{" "}{formatWeight(candidate.constraints.maximumInstrumentWeightBps)}<SimulationText ko={", 한 방향 비중 이동 최대"} />{" "}{formatWeight(candidate.constraints.maximumOneWayTurnoverBps)}<SimulationText ko={", 외화 비중 변화 최대"} />{" "}{formatWeight(candidate.constraints.maximumFxExposureChangeBps)}<SimulationText ko={"를 지킵니다. 조회 시 계산되는 연구 결과이며 수수료·세금·주문 가능 여부를 반영한 투자 추천이 아닙니다."} />{" "}</p>
     </div>
   );
 }
@@ -235,9 +231,9 @@ function OutcomeChartCard({
   valueDomain: ReturnType<typeof resolveResearchFanChartValueDomain>;
 }) {
   return (
-    <article className="overflow-hidden rounded-md border border-[#d7ddcf] bg-[#fbfcf7]">
-      <h4 className="border-b border-[#e1e5da] px-4 py-3 font-semibold">
-        {label}
+    <article className="overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]">
+      <h4 className="border-b border-[var(--line)] px-4 py-3 font-semibold">
+        <SimulationText ko={label} />
       </h4>
       <SimulationTerminalRiskMetrics compact terminal={execution.terminal} />
       <ResearchFanChart execution={execution} valueDomain={valueDomain} />
@@ -247,18 +243,20 @@ function OutcomeChartCard({
 
 function Metric({
   detail,
+  detailEn,
   label,
   value,
 }: {
   detail: string;
+  detailEn?: string;
   label: string;
   value: string;
 }) {
   return (
-    <div className="rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[#7a8175]">{detail}</dd>
+    <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} en={detailEn} /></dd>
     </div>
   );
 }

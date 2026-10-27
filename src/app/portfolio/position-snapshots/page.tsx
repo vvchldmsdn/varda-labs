@@ -1,3 +1,6 @@
+import { localizedMetadata } from "@/lib/i18n/server";
+import { ManagementText } from "@/components/i18n/management-text";
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import Link from "next/link";
 
 import { PortfolioSnapshotControls } from "@/components/portfolio-snapshots/portfolio-snapshot-controls";
@@ -13,6 +16,10 @@ import { parseTenantPositionSnapshotDateQuery } from "@/lib/tenant-position-snap
 import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata() {
+  return localizedMetadata({ title: "종목 스냅샷 | CAIRN LABS" }, "Position snapshots | CAIRN LABS");
+}
 
 type TenantPositionSnapshotsPageProps = {
   searchParams: Promise<{
@@ -59,15 +66,16 @@ export default async function TenantPositionSnapshotsPage({
       : null;
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-6xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <section className="mx-auto w-full max-w-6xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-normal">
               Owner-scoped position snapshots
             </h1>
-            <p className="mt-2 text-sm text-[#687064]">
+            <p className="mt-2 text-sm text-[var(--muted)]">
               Stored daily evidence authorized only through owned accounts
             </p>
           </div>
@@ -122,16 +130,16 @@ export default async function TenantPositionSnapshotsPage({
             </div>
 
             {result.state === "partial" ? (
-              <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+              <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
                 Partial evidence only. Missing accounts: {formatAccounts(result.missingAccounts)}.
                 Excluded rows: {result.excludedPositionCount}. Do not use this
                 view for portfolio totals or decision support.
               </p>
             ) : null}
 
-            <div className="mt-4 overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
+            <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
               <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
-                <thead className="bg-[#eef2e8] text-xs text-[#5e685e]">
+                <thead className="bg-[var(--wash)] text-xs text-[var(--muted)]">
                   <tr>
                     <TableHeading>Position</TableHeading>
                     <TableHeading>Account</TableHeading>
@@ -144,21 +152,21 @@ export default async function TenantPositionSnapshotsPage({
                     <TableHeading>Evidence</TableHeading>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#e5e8df]">
+                <tbody className="divide-y divide-[var(--wash)]">
                   {result.positions.map((position, index) => (
                     <tr
                       key={`${position.accountCode}:${position.assetLinkStatus}:${position.ticker ?? position.assetName}:${index}`}
                     >
                       <td className="px-4 py-3">
                         <p className="font-semibold">{position.assetName}</p>
-                        <p className="text-xs text-[#687064]">
+                        <p className="text-xs text-[var(--muted)]">
                           {position.ticker ?? "No ticker"}
                           {position.assetType ? ` / ${position.assetType}` : ""}
                         </p>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold">{position.accountName}</p>
-                        <p className="text-xs text-[#687064]">
+                        <p className="text-xs text-[var(--muted)]">
                           {position.accountCode}
                         </p>
                       </td>
@@ -170,7 +178,7 @@ export default async function TenantPositionSnapshotsPage({
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         <p>{formatDecimal(position.storedPrice)}</p>
-                        <p className="text-xs text-[#687064]">
+                        <p className="text-xs text-[var(--muted)]">
                           {position.storedPriceKind ?? "no price"}
                         </p>
                       </td>
@@ -183,7 +191,7 @@ export default async function TenantPositionSnapshotsPage({
                       <td className="px-4 py-3 text-right tabular-nums">
                         {formatPercent(position.targetWeight)}
                       </td>
-                      <td className="px-4 py-3 text-xs text-[#687064]">
+                      <td className="px-4 py-3 text-xs text-[var(--muted)]">
                         <p>{position.assetLinkStatus}</p>
                         <p>{position.priceSource ?? "No price source"}</p>
                         <p>{position.priceBasis ?? "No price basis"}</p>
@@ -196,7 +204,7 @@ export default async function TenantPositionSnapshotsPage({
             </div>
           </>
         ) : (
-          <p className="mt-4 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
+          <p className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
             Position evidence remains closed until the request, session,
             ownership relationship, and row integrity checks all pass.
           </p>
@@ -210,17 +218,17 @@ function PageLink({ href, children }: { href: string; children: React.ReactNode 
   return (
     <Link
       href={href}
-      className="rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+      className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </Link>
   );
 }
 
 function EvidenceCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <p className="text-xs font-semibold text-[var(--muted)]"><ManagementText>{label}</ManagementText></p>
       <p className="mt-2 break-words text-lg font-semibold">{value}</p>
     </div>
   );
@@ -237,7 +245,7 @@ function TableHeading({
     <th
       className={`px-4 py-3 font-semibold ${align === "right" ? "text-right" : ""}`}
     >
-      {children}
+      <ManagementText>{children}</ManagementText>
     </th>
   );
 }

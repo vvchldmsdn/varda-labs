@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import { REVIEWED_AUTH_SDK_VERSIONS } from "./auth-sdk-version-policy.mjs";
+
 const CONTRACT_PATHS = [
   "src/lib/initial-identity-link-planner.ts",
   "src/lib/initial-identity-link-policy.ts",
@@ -19,7 +21,6 @@ const IDENTITY_DML_PATTERN =
   /(?:\.insert|\.update|\.delete)\s*\(|(?:insert\s+into|update\s+|delete\s+from)\s+["']?(?:app_users|auth_identities)\b/i;
 const AUTH_SDK_DEPENDENCY_PATTERN =
   /^(?:@neondatabase\/auth|@auth\/|next-auth|better-auth)/i;
-const ALLOWED_PREVIEW_AUTH_SDK = "@neondatabase/auth";
 const SUBJECT_CLI_PATTERN =
   /process\.argv|process\.env|--provider|--subject|readArgument\s*\(/;
 
@@ -92,15 +93,18 @@ export function auditInitialIdentityLinkPlanner({ root, writerRegistry }) {
   if (subjectCliEntrypoints !== 0) findings.push("subject_cli_entrypoint");
 
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const dependencyNames = Object.keys({
+  const dependencies = {
     ...(packageJson.dependencies ?? {}),
     ...(packageJson.devDependencies ?? {}),
-  });
+  };
+  const dependencyNames = Object.keys(dependencies);
   const authSdkDependencies = dependencyNames.filter((name) =>
     AUTH_SDK_DEPENDENCY_PATTERN.test(name),
   );
   const unexpectedAuthSdkDependencies = authSdkDependencies.filter(
-    (name) => name !== ALLOWED_PREVIEW_AUTH_SDK,
+    (name) =>
+      !Object.hasOwn(REVIEWED_AUTH_SDK_VERSIONS, name) ||
+      dependencies[name] !== REVIEWED_AUTH_SDK_VERSIONS[name],
   );
   if (unexpectedAuthSdkDependencies.length !== 0) {
     findings.push("unexpected_auth_sdk_installed");

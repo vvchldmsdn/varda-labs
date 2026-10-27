@@ -1,3 +1,6 @@
+import { LabText } from "./lab-text";
+import { T } from "@/components/i18n/localized-text";
+import type { Ref } from "react";
 import type {
   InvestmentLabSmallAdjustmentCalculation,
   InvestmentLabSmallAdjustmentCalculationBlocker,
@@ -5,16 +8,19 @@ import type {
 
 export function InvestmentLabSmallAdjustmentResult({
   accountLabel,
+  headingRef,
   result,
 }: {
   accountLabel: string;
+  headingRef?: Ref<HTMLHeadingElement>;
   result: InvestmentLabSmallAdjustmentCalculation;
 }) {
   if (result.status === "blocked") {
     return (
-      <div className="rounded-lg border border-[#d8c7a1] bg-[#fff8e6] p-4 text-sm text-[#725f2d]">
+      <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
+        <h3 className="mb-3 font-semibold" ref={headingRef} tabIndex={-1}><T ko="입력 내용을 확인해 주세요" en="Check your inputs" /></h3>
         {result.blockers.map((blocker) => (
-          <p key={blocker}>{calculationBlockerLabel(blocker)}</p>
+          <p key={blocker}><LabText value={calculationBlockerLabel(blocker)} /></p>
         ))}
       </div>
     );
@@ -29,19 +35,17 @@ export function InvestmentLabSmallAdjustmentResult({
 
   return (
     <div
-      className="space-y-4 rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4"
+      className="space-y-5 border-y border-[var(--line)] py-5"
       data-adjustment-result="ready"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold">조정 전후 비교</h3>
-          <p className="mt-1 text-sm text-[#687064]">
-            {accountLabel} · {formatKrw(result.transferAmountKrw)}
+          <h3 className="text-lg font-semibold" ref={headingRef} tabIndex={-1}><span className="sr-only"><T ko="계산 완료. " en="Calculation complete. " /></span><LabText value="조정 전후 비교" /></h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            {accountLabel} · <LabText value={formatKrw(result.transferAmountKrw)} />
           </p>
         </div>
-        <p className="text-xs text-[#777e73]">
-          현재 평가액 고정 · 거래비용 0원 · 저장 안 함
-        </p>
+        <p className="text-xs text-[var(--muted)]"><LabText value=" 현재 평가액 고정 · 거래비용 0원 · 저장 안 함 " /></p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -67,32 +71,30 @@ export function InvestmentLabSmallAdjustmentResult({
         />
       </div>
 
-      <section className="overflow-hidden rounded-md border border-[#e1e6dc]">
-        <div className="border-b border-[#e1e6dc] bg-white px-4 py-3">
-          <h4 className="font-semibold">통화 노출 변화</h4>
-          <p className="mt-1 text-xs text-[#687064]">
-            직접 보유 평가액 기준이며 ETF 구성종목 통화는 펼치지 않습니다.
-          </p>
+      <section className="overflow-hidden border-y border-[var(--wash)]">
+        <div className="border-b border-[var(--wash)] py-3">
+          <h4 className="font-semibold"><LabText value="통화 노출 변화" /></h4>
+          <p className="mt-1 text-xs text-[var(--muted)]"><LabText value=" 직접 보유 평가액 기준이며 ETF 구성종목 통화는 펼치지 않습니다. " /></p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] border-collapse text-sm">
             <thead>
-              <tr className="bg-[#eef2e8] text-left text-xs font-semibold text-[#616a5e]">
-                <th className="px-4 py-3">통화</th>
-                <th className="px-3 py-3 text-right">조정 전</th>
-                <th className="px-3 py-3 text-right">조정 후</th>
-                <th className="px-4 py-3 text-right">비중 변화</th>
+              <tr className="text-left text-xs font-semibold text-[var(--muted)]">
+                <th className="px-4 py-3"><LabText value="통화" /></th>
+                <th className="px-3 py-3 text-right"><LabText value="조정 전" /></th>
+                <th className="px-3 py-3 text-right"><LabText value="조정 후" /></th>
+                <th className="px-4 py-3 text-right"><LabText value="비중 변화" /></th>
               </tr>
             </thead>
             <tbody>
               {result.currencyExposures.map((row) => (
-                <tr className="border-t border-[#e1e6dc]" key={row.currency}>
+                <tr className="border-t border-[var(--wash)]" key={row.currency}>
                   <td className="px-4 py-3 font-semibold">{row.currency}</td>
                   <td className="px-3 py-3 text-right tabular-nums">
-                    {formatKrw(row.beforeValueKrw)} · {formatPercent(row.beforeWeightPct)}
+                    <LabText value={formatKrw(row.beforeValueKrw)} /> · {formatPercent(row.beforeWeightPct)}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">
-                    {formatKrw(row.afterValueKrw)} · {formatPercent(row.afterWeightPct)}
+                    <LabText value={formatKrw(row.afterValueKrw)} /> · {formatPercent(row.afterWeightPct)}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">
                     {formatSignedPercentagePoints(row.changePercentagePoints)}
@@ -117,12 +119,12 @@ function ResultCell({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-[#e1e6dc] bg-white p-3">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
+    <div className="border-l-2 border-[var(--line)] pl-3">
+      <p className="text-xs font-semibold text-[var(--muted)]"><LabText value={label} /></p>
       <p className="mt-2 break-words text-base font-semibold tabular-nums">
-        {value}
+        <LabText value={value} />
       </p>
-      <p className="mt-1 text-xs tabular-nums text-[#687064]">{detail}</p>
+      <p className="mt-1 text-xs tabular-nums text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }

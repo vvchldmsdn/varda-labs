@@ -1,0 +1,112 @@
+import { LabText } from "./lab-text";
+import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
+import { buildInvestmentLabDesignPreview } from "@/lib/investment-lab-design-preview";
+import { InvestmentLabWorkspace } from "./investment-lab-workspace";
+import { InvestmentLabScopeTabs } from "./investment-lab-scope-tabs";
+import { InvestmentLabPeriodSelector } from "./investment-lab-period-selector";
+import { InvestmentLabTimeMachine } from "./investment-lab-time-machine";
+import { InvestmentLabDialog } from "./investment-lab-dialog";
+import styles from "./investment-lab-modern.module.css";
+import {
+  labKrw,
+  labPercent,
+  labScenarioLabel,
+} from "./investment-lab-chart-presentation";
+
+export function InvestmentLabDesignPreview({
+  query,
+}: {
+  query: Parameters<typeof buildInvestmentLabDesignPreview>[0] & {
+    view?: string | readonly string[];
+  };
+}) {
+  const { dashboard, chart, summaries, period, selection, model } =
+    buildInvestmentLabDesignPreview(query);
+  return (
+    <main
+      className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
+      data-lab-design-preview
+    >
+      <PortfolioPrimaryNavigation
+        activePath="/investment-lab"
+        generatedAt={dashboard.generatedAt}
+        selectedScopeKey={dashboard.selectedScope.key}
+      />
+      <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
+        <header className={styles.stageHeader}>
+          <h1 className="varda-page-title"><LabText value="투자 랩" /></h1>
+          <InvestmentLabScopeTabs scopes={dashboard.analysisScopes} selectedScopeKey={dashboard.selectedScope.key} />
+        </header>
+        <div className={styles.workspaceSlot}>
+          <InvestmentLabWorkspace
+            scopeKey={dashboard.selectedScope.key}
+            weights={{ period, selection, fixedMixScenario: model.fixedMixScenario, fixedMixComparison: model.fixedMixComparison, preperiodMinVolatility: model.preperiodMinVolatility }}
+            tools={
+              <InvestmentLabPeriodSelector
+                period={period}
+                query={query}
+                scopeKey={dashboard.selectedScope.key}
+              />
+            }
+            comparison={
+              <InvestmentLabTimeMachine
+                chart={chart}
+                scenarioSummaries={summaries}
+                unavailableScenarios={[
+                  {
+                    id: "approved_target_weight_monthly",
+                    reason: "일부 계좌에 목표 비중이 설정되어 있지 않습니다.",
+                    resolution:
+                      "목표 비중을 설정하면 해당 효력일 이후의 비교를 계산할 수 있습니다.",
+                  },
+                  {
+                    id: "preperiod_min_volatility",
+                    reason: "시작일 이전의 공통 가격 이력이 부족합니다.",
+                    resolution:
+                      "데이터 준비에서 누락된 종목과 날짜를 확인하거나 비교 시작일을 조정할 수 있습니다.",
+                  },
+                ]}
+                details={
+                  <InvestmentLabDialog
+                    label="시나리오"
+                    title="모든 시나리오 비교"
+                    size="wide"
+                  >
+                  <div className="overflow-x-auto pb-5">
+                    <table className="w-full min-w-[570px] text-left text-sm">
+                      <thead className="text-xs text-[var(--muted)]">
+                        <tr>
+                          <th className="py-4 font-normal"><LabText value="시나리오" /></th>
+                          <th className="font-normal"><LabText value="종료 평가액" /></th>
+                          <th className="font-normal"><LabText value="실제 대비" /></th>
+                          <th className="font-normal"><LabText value="추정수익률" /></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {summaries.map((row) => (
+                          <tr
+                            className="border-t border-[var(--wash)] tabular-nums"
+                            key={row.id}
+                          >
+                            <th className="py-4 font-medium">
+                              <LabText value={labScenarioLabel(row.id)} />
+                            </th>
+                            <td>{labKrw(row.endValueKrw)}</td>
+                            <td>{labKrw(row.endDifferenceKrw, true)}</td>
+                            <td>{labPercent(row.returnEstimate, true)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  </InvestmentLabDialog>
+                }
+              />
+            }
+
+          />
+        </div>
+      </div>
+    </main>
+  );
+}

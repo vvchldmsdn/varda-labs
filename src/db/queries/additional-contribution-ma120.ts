@@ -1,18 +1,18 @@
 import "server-only";
 
-import { getActivePortfolioOwnerUserIds } from "@/db/queries/active-portfolio-owners";
 import { loadPortfolioRiskPriceCandidates } from "@/db/queries/portfolio-risk";
 import {
+  ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY,
   evaluateAdditionalContributionMa120OperationalEvidence,
   type AdditionalContributionMa120OperationalEvidence,
+  type AdditionalContributionMa120OperationalEvidenceBlocker,
   type AdditionalContributionMa120OperationalPriceBasis,
 } from "@/lib/additional-contribution-ma120-operational-evidence";
 import {
   admitAdjustedHistoricalPriceRows,
-  admitPrivateSingleTenantRawTrendEvidenceRows,
+  admitSharedKisRawTrendEvidenceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import type { PortfolioStructureHoldingRow } from "@/lib/portfolio-structure";
-import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const HISTORY_LOOKBACK_CALENDAR_DAYS = 420;
 
@@ -21,15 +21,16 @@ type Ma120HoldingInput = Pick<
   | "market"
   | "currency"
   | "ticker"
-  | "currentPrice"
   | "priceSource"
->;
+  | "priceAsOf"
+> & { currentPrice: number | null };
 
 export type AdditionalContributionMa120UnavailableReason =
   | "invalid_instrument_identity"
   | "price_history_missing"
   | "price_history_not_admitted"
-  | "comparison_price_source_incompatible";
+  | "comparison_price_source_incompatible"
+  | AdditionalContributionMa120OperationalEvidenceBlocker;
 
 export type AdditionalContributionMa120ReadRow = Readonly<{
   instrumentKey: string;
@@ -44,11 +45,11 @@ export type AdditionalContributionMa120ReadRow = Readonly<{
 export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
   holdings,
   serviceDate,
-  tenantContext,
+  now = new Date(),
 }: {
   holdings: readonly Ma120HoldingInput[];
   serviceDate: string;
-  tenantContext: TenantContext;
+  now?: Date;
 }) {
   const normalizedHoldings = holdings
     .map(normalizeHolding)
@@ -59,21 +60,13 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
     -HISTORY_LOOKBACK_CALENDAR_DAYS,
   );
 
-  const [candidateRows, activeOwnerUserIds] = await Promise.all([
-    loadPortfolioRiskPriceCandidates({
-      tickers,
-      sourceDateFrom,
-      sourceDateTo: serviceDate,
-    }),
-    getActivePortfolioOwnerUserIds(),
-  ]);
+  const candidateRows = await loadPortfolioRiskPriceCandidates({
+    tickers,
+    sourceDateFrom,
+    sourceDateTo: serviceDate,
+  });
   const adjustedAdmission = admitAdjustedHistoricalPriceRows(candidateRows);
-  const privateRawAdmission =
-    admitPrivateSingleTenantRawTrendEvidenceRows({
-      rows: candidateRows,
-      requestedOwnerUserId: tenantContext.ownerUserId,
-      activeOwnerUserIds,
-    });
+  const privateRawAdmission = admitSharedKisRawTrendEvidenceRows(candidateRows);
   const adjustedRowsByInstrument = groupRowsByInstrument(
     adjustedAdmission.rows,
   );
@@ -112,6 +105,8 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
         instrumentKey: holding.instrumentKey,
         asOfPriceDate: serviceDate,
         comparisonPrice: holding.currentPrice,
+        comparisonPriceAsOf: holding.priceAsOf,
+        evaluatedAt: now,
         priceBasis: selection.priceBasis,
         observations: selection.rows.map((row) => ({
           priceDate: row.priceDate,
@@ -123,7 +118,7 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
         status: evidence.status,
         priceBasis: selection.priceBasis,
         evidence,
-        unavailableReason: null,
+        unavailableReason: evidence.blockers[0] ?? null,
       });
     },
   );
@@ -134,9 +129,8 @@ export async function getReadOnlyTenantAdditionalContributionMa120Evidence({
   ).length;
 
   return Object.freeze({
-    policyVersion:
-      "additional_contribution_ma120_operational_evidence_v1" as const,
-    allocationEffect: "none" as const,
+    policyVersion: ADDITIONAL_CONTRIBUTION_MA120_OPERATIONAL_EVIDENCE_POLICY.version,
+    allocationEffect: "bounded_overlay" as const,
     status:
       usableCount === rows.length && rows.length > 0
         ? ("ready" as const)
@@ -163,6 +157,7 @@ function normalizeHolding(row: Ma120HoldingInput) {
     ticker,
     currentPrice,
     priceSource: normalizeText(row.priceSource),
+    priceAsOf: row.priceAsOf ?? null,
   });
 }
 

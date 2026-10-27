@@ -44,6 +44,10 @@ export type InvestmentLabScheduledFlow = InvestmentLabBoundaryFlow &
     pendingCalendarDays: number;
   }>;
 
+export type InvestmentLabMoneyFlow = Omit<InvestmentLabBoundaryFlow, "amountKrw" | "amountProvenance"> & Readonly<{ amount: number; amountProvenance: InvestmentLabAmountProvenance | "dated_reporting_money"; eventAt?: string }>;
+export type InvestmentLabScheduledMoneyFlow = InvestmentLabMoneyFlow & Readonly<{ sourceIndex: number; executionPriceDate: string; executionServiceDate: string; adjustedClose: number; pendingCalendarDays: number }>;
+export type InvestmentLabPendingMoneyFlow = InvestmentLabMoneyFlow & Readonly<{ sourceIndex: number }>;
+
 export type InvestmentLabScheduleBlocker = Readonly<{
   reason:
     | "invalid_window_end"
@@ -68,6 +72,20 @@ export function scheduleInvestmentLabBoundaryFlows(input: {
   windowEndPriceDate: string;
   maxPendingCalendarDays?: number;
 }) {
+  const invalidProvenance = input.events.flatMap((row, sourceIndex) => !["explicit_amount_krw", "derived_quantity_price_krw", "derived_quantity_price_fx"].includes(row.amountProvenance) ? [{ reason: "invalid_amount_provenance" as const, sourceIndex }] : []);
+  const result = invalidProvenance.length ? blockedSchedule(invalidProvenance) : scheduleInvestmentLabMoneyFlows({ ...input, events: input.events.map(({ amountKrw, ...row }) => ({ ...row, amount: amountKrw })) });
+  return { status: result.status, policy: result.policy, blockers: result.blockers, pendingFlowCount: result.pendingFlowCount, sameDayFlowCount: result.sameDayFlowCount,
+    scheduledFlows: result.scheduledFlows.map(({ amount, ...row }) => ({ ...row, amountKrw: amount, amountProvenance: row.amountProvenance as InvestmentLabAmountProvenance })) };
+}
+
+/** Same execution policy in the caller's explicit reporting unit. */
+export function scheduleInvestmentLabMoneyFlows(input: {
+  events: readonly InvestmentLabMoneyFlow[];
+  closes: readonly InvestmentLabAdjustedClose[];
+  windowEndPriceDate: string;
+  maxPendingCalendarDays?: number;
+  allowPendingAtWindowEnd?: boolean;
+}) {
   const blockers: InvestmentLabScheduleBlocker[] = [];
   if (!isRiskDate(input.windowEndPriceDate)) {
     blockers.push({ reason: "invalid_window_end", sourceIndex: null });
@@ -88,11 +106,13 @@ export function scheduleInvestmentLabBoundaryFlows(input: {
 
   if (blockers.length > 0) return blockedSchedule(blockers);
 
-  const scheduled: InvestmentLabScheduledFlow[] = [];
+  const scheduled: InvestmentLabScheduledMoneyFlow[] = [];
+  const pending: InvestmentLabPendingMoneyFlow[] = [];
   let closeIndex = 0;
 
   for (const event of events) {
     if (event.eventDate > input.windowEndPriceDate) {
+      if (input.allowPendingAtWindowEnd && event.eventDate === mapRiskEvidenceDateToServiceDate(input.windowEndPriceDate)) { pending.push(event); continue; }
       blockers.push({
         reason: "event_after_window_end",
         sourceIndex: event.sourceIndex,
@@ -109,6 +129,7 @@ export function scheduleInvestmentLabBoundaryFlows(input: {
 
     const close = closes[closeIndex];
     if (!close || close.priceDate > input.windowEndPriceDate) {
+      if (input.allowPendingAtWindowEnd && riskCalendarDayDistance(event.eventDate, input.windowEndPriceDate) <= maxPendingCalendarDays) { pending.push(event); continue; }
       blockers.push({
         reason: "unexecutable_trade_before_window_end",
         sourceIndex: event.sourceIndex,
@@ -143,6 +164,7 @@ export function scheduleInvestmentLabBoundaryFlows(input: {
     status: "ready",
     policy: INVESTMENT_LAB_EXECUTION_POLICY.version,
     scheduledFlows: scheduled,
+    pendingFlows: pending,
     blockers: [],
     pendingFlowCount: scheduled.filter((row) => row.pendingCalendarDays > 0)
       .length,
@@ -158,11 +180,15 @@ export function applyInvestmentLabScheduledFlow(
     "direction" | "amountKrw" | "adjustedClose"
   >,
 ) {
+  return applyInvestmentLabUnitFlow(units, { direction: flow.direction, amount: flow.amountKrw, adjustedClose: flow.adjustedClose });
+}
+
+export function applyInvestmentLabUnitFlow(units: number, flow: Pick<InvestmentLabScheduledMoneyFlow, "direction" | "amount" | "adjustedClose">) {
   if (
     !Number.isFinite(units) ||
     units < 0 ||
-    !Number.isFinite(flow.amountKrw) ||
-    flow.amountKrw <= 0 ||
+    !Number.isFinite(flow.amount) ||
+    flow.amount <= 0 ||
     !Number.isFinite(flow.adjustedClose) ||
     flow.adjustedClose <= 0 ||
     (flow.direction !== "inflow" && flow.direction !== "outflow")
@@ -174,10 +200,10 @@ export function applyInvestmentLabScheduledFlow(
     } as const;
   }
 
-  const unitDelta = flow.amountKrw / flow.adjustedClose;
+  const unitDelta = flow.amount / flow.adjustedClose;
   if (
     flow.direction === "outflow" &&
-    units * flow.adjustedClose + 1e-6 < flow.amountKrw
+    units * flow.adjustedClose + 1e-6 < flow.amount
   ) {
     return {
       status: "blocked",
@@ -229,14 +255,14 @@ function normalizeCloses(
 }
 
 function normalizeEvents(
-  rows: readonly InvestmentLabBoundaryFlow[],
+  rows: readonly InvestmentLabMoneyFlow[],
   blockers: InvestmentLabScheduleBlocker[],
 ) {
-  const normalized: Array<InvestmentLabBoundaryFlow & { sourceIndex: number }> =
+  const normalized: Array<InvestmentLabMoneyFlow & { sourceIndex: number }> =
     [];
 
   rows.forEach((row, sourceIndex) => {
-    if (!isRiskDate(row.eventDate)) {
+    if (!isRiskDate(row.eventDate) || (row.eventAt !== undefined && !Number.isFinite(Date.parse(row.eventAt)))) {
       blockers.push({ reason: "invalid_event_date", sourceIndex });
       return;
     }
@@ -248,7 +274,7 @@ function normalizeEvents(
       blockers.push({ reason: "invalid_event_direction", sourceIndex });
       return;
     }
-    if (!Number.isFinite(row.amountKrw) || row.amountKrw <= 0) {
+    if (!Number.isFinite(row.amount) || row.amount <= 0) {
       blockers.push({ reason: "invalid_event_amount", sourceIndex });
       return;
     }
@@ -269,11 +295,12 @@ function normalizeEvents(
 
 function isAmountProvenance(
   value: string,
-): value is InvestmentLabAmountProvenance {
+): value is InvestmentLabAmountProvenance | "dated_reporting_money" {
   return (
     value === "explicit_amount_krw" ||
     value === "derived_quantity_price_krw" ||
-    value === "derived_quantity_price_fx"
+    value === "derived_quantity_price_fx" ||
+    value === "dated_reporting_money"
   );
 }
 
@@ -282,6 +309,7 @@ function blockedSchedule(blockers: InvestmentLabScheduleBlocker[]) {
     status: "blocked",
     policy: INVESTMENT_LAB_EXECUTION_POLICY.version,
     scheduledFlows: [],
+    pendingFlows: [],
     blockers,
     pendingFlowCount: 0,
     sameDayFlowCount: 0,

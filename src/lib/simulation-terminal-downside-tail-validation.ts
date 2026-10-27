@@ -20,9 +20,11 @@ export function validateSimulationTerminalDownsideTailInput(
     return blocked(reasons);
   }
 
+  const pathCount = value.terminalReturns.length;
   if (
-    value.terminalReturns.length !==
-    SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.requiredPathCount
+    !SIMULATION_TERMINAL_DOWNSIDE_TAIL_POLICY.supportedPathCounts.some(
+      (count) => count === pathCount,
+    )
   ) {
     reasons.add("invalid_path_count");
   }

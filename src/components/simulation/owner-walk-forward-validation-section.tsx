@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerWalkForwardValidationResult } from "@/lib/simulation-owner-walk-forward-validation";
 
 export function OwnerWalkForwardValidationSection({
@@ -5,17 +6,10 @@ export function OwnerWalkForwardValidationSection({
 }: {
   result: SimulationOwnerWalkForwardValidationResult;
 }) {
-  if (
-    result.status === "unavailable" &&
-    result.reason === "current_execution_unavailable"
-  ) {
-    return null;
-  }
-
   return (
     <section
       aria-labelledby="owner-walk-forward-validation-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-owner-walk-forward-validation
       data-owner-walk-forward-validation-account={result.account}
       data-owner-walk-forward-validation-ready-folds={
@@ -25,36 +19,28 @@ export function OwnerWalkForwardValidationSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold text-[#687064]">
-            학습 구간과 확인 구간 분리
-          </p>
+          <p className="text-xs font-semibold text-[var(--muted)]">
+            <SimulationText ko={"학습 구간과 확인 구간 분리"} />{" "}</p>
           <h2
             className="mt-1 text-lg font-semibold"
             id="owner-walk-forward-validation-title"
           >
-            과거 구간 밖 검증
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#687064]">
-            앞선 60개 수익률로 후보 비중을 만든 뒤, 계산에 쓰지 않은 다음
-            10개 수익률에서 현재 비중과 비교합니다. 시작점을 10개씩 옮겨
-            총 세 번 반복해 같은 90개 구간에만 맞춘 결과인지 점검합니다.
-          </p>
+            <SimulationText ko={"과거 구간 밖 검증"} />{" "}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+            <SimulationText ko={"앞선 60개 수익률로 후보 비중을 만든 뒤, 계산에 쓰지 않은 다음 10개 수익률에서 현재 비중과 비교합니다. 시작점을 10개씩 옮겨 총 세 번 반복해 같은 90개 구간에만 맞춘 결과인지 점검합니다."} />{" "}</p>
         </div>
-        <span className="w-fit rounded-md border border-[#d8d9e5] bg-[#f2f2f8] px-3 py-1.5 text-xs font-semibold text-[#52566f]">
-          과거 진단 · 추천 아님
-        </span>
+        <span className="w-fit rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand)]">
+          <SimulationText ko={"과거 진단 · 추천 아님"} />{" "}</span>
       </div>
 
       {result.folds.length === 0 ? (
         <div
-          className="mt-4 rounded-md border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4"
+          className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4"
           data-owner-walk-forward-validation-unavailable-reason={result.reason}
         >
-          <p className="font-semibold">구간 밖 검증을 만들지 않았습니다.</p>
-          <p className="mt-1 text-sm leading-6 text-[#6b6044]">
-            {reasonLabel(result.reason)} 현재 포트폴리오 확률 경로는 그대로
-            유지됩니다.
-          </p>
+          <p className="font-semibold"><SimulationText ko={"구간 밖 검증을 만들지 않았습니다."} /></p>
+          <p className="mt-1 text-sm leading-6 text-[var(--warning)]">
+            <SimulationText ko={reasonLabel(result.reason)} /> {" "}<SimulationText ko={"현재 포트폴리오 확률 경로는 그대로 유지됩니다."} />{" "}</p>
         </div>
       ) : (
         <>
@@ -83,41 +69,35 @@ export function OwnerWalkForwardValidationSection({
             />
           </dl>
 
-          <div className="mt-4 overflow-x-auto rounded-md border border-[#d7ddcf] bg-[#fbfcf7]">
+          <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-[var(--surface)]">
             <table className="w-full min-w-[940px] border-collapse text-left text-sm">
-              <thead className="text-xs text-[#687064]">
+              <thead className="text-xs text-[var(--muted)]">
                 <tr>
-                  <th className="px-3 py-3 font-semibold">회차</th>
-                  <th className="px-3 py-3 font-semibold">학습 구간</th>
-                  <th className="px-3 py-3 font-semibold">검증 구간</th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"회차"} /></th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"학습 구간"} /></th>
+                  <th className="px-3 py-3 font-semibold"><SimulationText ko={"검증 구간"} /></th>
                   <th className="px-3 py-3 text-right font-semibold">
-                    학습 변동성
-                  </th>
+                    <SimulationText ko={"학습 변동성"} />{" "}</th>
                   <th className="px-3 py-3 text-right font-semibold">
-                    검증 변동성
-                  </th>
+                    <SimulationText ko={"검증 변동성"} />{" "}</th>
                   <th className="px-3 py-3 text-right font-semibold">
-                    검증 수익률
-                  </th>
+                    <SimulationText ko={"검증 수익률"} />{" "}</th>
                   <th className="px-3 py-3 text-right font-semibold">
-                    최대 낙폭
-                  </th>
+                    <SimulationText ko={"최대 낙폭"} />{" "}</th>
                   <th className="px-3 py-3 text-right font-semibold">
-                    비중 이동
-                  </th>
+                    <SimulationText ko={"비중 이동"} />{" "}</th>
                 </tr>
               </thead>
               <tbody>
                 {result.folds.map((fold) => (
                   <tr
-                    className="border-t border-[#e1e5da]"
+                    className="border-t border-[var(--line)]"
                     data-owner-walk-forward-fold={fold.foldIndex + 1}
                     data-owner-walk-forward-fold-status={fold.status}
                     key={fold.foldIndex}
                   >
                     <td className="px-3 py-3 font-semibold">
-                      {fold.foldIndex + 1}차
-                    </td>
+                      {fold.foldIndex + 1}<SimulationText ko={"차"} />{" "}</td>
                     <td className="px-3 py-3 tabular-nums">
                       {formatRange(
                         fold.trainStartServiceDate,
@@ -158,8 +138,8 @@ export function OwnerWalkForwardValidationSection({
                         </td>
                       </>
                     ) : (
-                      <td className="px-3 py-3 text-[#7a5117]" colSpan={5}>
-                        계산 불가 · {reasonLabel(fold.reason)}
+                      <td className="px-3 py-3 text-[var(--warning)]" colSpan={5}>
+                        <SimulationText ko={"계산 불가 ·"} />{" "}<SimulationText ko={reasonLabel(fold.reason)} />
                       </td>
                     )}
                   </tr>
@@ -170,16 +150,11 @@ export function OwnerWalkForwardValidationSection({
         </>
       )}
 
-      <div className="mt-3 space-y-1 text-xs leading-5 text-[#687064]">
+      <div className="mt-3 space-y-1 text-xs leading-5 text-[var(--muted)]">
         <p>
-          각 셀은 현재 → 후보 순서입니다. 후보는 매 회차의 학습 구간만 보고
-          다시 계산하며, 뒤의 검증 수익률은 비중 계산에 사용하지 않습니다.
-        </p>
+          <SimulationText ko={"각 셀은 현재 → 후보 순서입니다. 후보는 매 회차의 학습 구간만 보고 다시 계산하며, 뒤의 검증 수익률은 비중 계산에 사용하지 않습니다."} />{" "}</p>
         <p>
-          세 검증 구간은 서로 겹치지 않지만 학습 구간은 일부 겹칩니다. 현재
-          보유 비중을 과거에도 동일했다고 가정하고, 수수료·세금은 0으로
-          두므로 독립 실험이나 미래 성과 보장이 아닙니다.
-        </p>
+          <SimulationText ko={"세 검증 구간은 서로 겹치지 않지만 학습 구간은 일부 겹칩니다. 현재 보유 비중을 과거에도 동일했다고 가정하고, 수수료·세금은 0으로 두므로 독립 실험이나 미래 성과 보장이 아닙니다."} />{" "}</p>
       </div>
     </section>
   );
@@ -212,10 +187,10 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="rounded-md border border-[#d7ddcf] bg-[#fbfcf7] px-3 py-3">
-      <dt className="text-xs text-[#687064]">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
-      <dd className="mt-1 text-xs text-[#7a8175]">{detail}</dd>
+    <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
+      <dt className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></dd>
+      <dd className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></dd>
     </div>
   );
 }

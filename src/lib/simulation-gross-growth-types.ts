@@ -47,7 +47,7 @@ export type SimulationGrossGrowthResult = Readonly<{
     outputKind: "per_instrument_gross_growth_factor_only";
     portfolioAggregation: "forbidden";
     distributionSummary: "forbidden";
-    maxGrowthFactorCells: 1_000_000;
+    maxGrowthFactorCells: 2_000_000;
   }>;
   inputMatrixHash: string | null;
   drawPlanHash: string | null;

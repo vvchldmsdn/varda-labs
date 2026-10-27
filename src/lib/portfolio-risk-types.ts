@@ -4,6 +4,7 @@ import type {
 } from "./portfolio-risk-input-types.ts";
 
 export type PortfolioRiskMetricReason =
+  | "risk_free_evidence_not_supplied"
   | "insufficient_observations"
   | "zero_variance"
   | "zero_portfolio_volatility"
@@ -31,7 +32,8 @@ export type PortfolioRiskMathInput = {
   inputStatus: PortfolioRiskInputStatus;
   instruments: readonly PortfolioRiskMathInstrument[];
   returnRows: readonly PortfolioRiskReturnRow[];
-  annualRiskFreeRate?: number;
+  /** Explicit null means no admitted rate; legacy omitted-rate math is unchanged. */
+  annualRiskFreeRate?: number | null;
 };
 
 export type PortfolioRiskInstrumentMetrics = PortfolioRiskMathInstrument & {
@@ -93,8 +95,8 @@ export type PortfolioRiskResult = {
   reason: PortfolioRiskCalculationReason | null;
   inputStatus: PortfolioRiskInputStatus;
   annualizationFactor: number;
-  annualRiskFreeRate: number;
-  dailyRiskFreeRate: number;
+  annualRiskFreeRate: number | null;
+  dailyRiskFreeRate: number | null;
   observationCount: number;
   instruments: PortfolioRiskInstrumentMetrics[];
   portfolio: PortfolioRiskPortfolioMetrics | null;

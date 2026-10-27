@@ -23,6 +23,7 @@ const HOLDING_STATE_AFFECTED_PATHS = [
   "/today",
   "/additional-contribution",
   "/portfolio/holdings",
+  "/portfolio/first-look",
   "/portfolio/groups",
   "/portfolio/risk",
   "/portfolio/structure",
@@ -94,10 +95,11 @@ export async function prepareHoldingAnalysisData(
   formData: FormData,
 ): Promise<HoldingAnalysisDataPreparationActionState> {
   const state = await prepareSessionHoldingAnalysisData(formData);
-  if (state.status === "success") {
+  if (state.status === "success" || state.status === "already_ready") {
     for (const path of [
       "/additional-contribution",
       "/portfolio/holdings",
+      "/portfolio/first-look",
       "/portfolio/risk",
       "/investment-lab",
       "/simulation",

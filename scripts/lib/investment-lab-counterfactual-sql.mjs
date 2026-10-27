@@ -3,6 +3,7 @@ export const SNAPSHOT_EVIDENCE_SQL = `
     select account, snapshot_date, total_market_value
     from daily_portfolio_snapshots
     where is_sample = false
+      and canonical_owner_user_id = $1::uuid
       and account in ('brokerage', 'isa', 'irp')
   ),
   derived_all_rows as (
@@ -17,7 +18,9 @@ export const SNAPSHOT_EVIDENCE_SQL = `
   stored_all_rows as (
     select snapshot_date, total_market_value
     from daily_portfolio_snapshots
-    where is_sample = false and account = 'all'
+    where is_sample = false
+      and canonical_owner_user_id = $1::uuid
+      and account = 'all'
   ),
   reconciliation as (
     select
@@ -91,6 +94,7 @@ export const TRADE_EVIDENCE_SQL = `
       end
       from daily_position_snapshots p
       where p.is_sample = false
+        and p.canonical_owner_user_id = $1::uuid
         and p.legacy_asset_id = e.legacy_asset_id
     ) as historical_position_account,
     e.event_date::text as event_date,
@@ -112,6 +116,7 @@ export const TRADE_EVIDENCE_SQL = `
   from event_ledger_entries e
   left join assets a on a.id = e.asset_id
   where e.is_sample = false
+    and e.canonical_owner_user_id = $1::uuid
     and e.event_type in ('buy', 'sell')
   order by e.event_date, e.recorded_at nulls last
 `;
@@ -124,6 +129,7 @@ export const PRICE_EVIDENCE_SQL = `
       upper(btrim(currency)) as currency
     from assets
     where ticker is not null
+      and canonical_owner_user_id = $1::uuid
       and btrim(ticker) <> ''
       and quantity > 0
     union

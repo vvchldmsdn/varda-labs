@@ -1,5 +1,9 @@
 "use client";
 
+import { LabText } from "./lab-text";
+import { labEnglish } from "./lab-copy";
+import { LocalizedElement } from "@/components/i18n/localized-element";
+
 import { useState } from "react";
 
 import { InvestmentLabComparisonChart } from "@/components/investment-lab/investment-lab-comparison-chart";
@@ -27,7 +31,9 @@ export function InvestmentLabPreperiodOptimizerView({
   const initialObjective =
     model.candidates.find(
       (candidate) => candidate.objective === "minimum_volatility",
-    )?.objective ?? model.candidates[0]?.objective ?? "minimum_volatility";
+    )?.objective ??
+    model.candidates[0]?.objective ??
+    "minimum_volatility";
   const [selectedObjective, setSelectedObjective] =
     useState<InvestmentLabOptimizerObjective>(initialObjective);
   const candidate =
@@ -36,55 +42,54 @@ export function InvestmentLabPreperiodOptimizerView({
 
   return (
     <section
-      className="border-t border-[#dfe3d5] bg-[#f3f4ef] px-4 py-6"
+      className="min-w-0 py-6"
       data-optimizer-candidate-count={model.candidates.length}
       data-optimizer-status={model.status}
       data-section="investment-lab-preperiod-optimizer"
     >
-      <div className="mx-auto w-full max-w-[1500px] overflow-hidden rounded-lg border border-[#dfe3d5] bg-[#fbfcf7]">
-        <header className="border-b border-[#e1e6dc] px-4 py-4">
+      <div className="mx-auto w-full max-w-[1540px] overflow-hidden">
+        <header className="border-b border-[var(--line)] pb-6">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">과거 학습 비중 실험</h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
-                비교 시작일 이전의 공통 가격 60개 수익률만으로 비중 후보를
-                만들고, 이후 실제 기간에는 같은 입출금과 리밸런싱하지 않는
-                조건으로 비교합니다. 수동 평가 종목은 시작 비중을 유지합니다.
+              <p className="text-[11px] font-medium text-[var(--muted)]">
+                OBJECTIVE LAB
               </p>
+              <h2 className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" 과거 학습 비중 실험 " /></h2>
+              <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 비교 시작일 이전의 공통 가격 60개 수익률만으로 비중 후보를 만들고, 이후 실제 기간에는 같은 입출금과 리밸런싱하지 않는 조건으로 비교합니다. 수동 평가 종목은 시작 비중을 유지합니다. " /></p>
             </div>
-            <p className="text-sm font-semibold text-[#4f584f]">
-              {statusLabel(model.status)}
+            <p className="text-sm font-semibold text-[var(--muted)]">
+              <LabText value={statusLabel(model.status)} />
             </p>
           </div>
         </header>
 
         {candidate && model.training ? (
           <>
-            <div className="border-b border-[#e1e6dc] px-4 py-3">
-              <div
+            <div className="border-b border-[var(--line)] py-3">
+              <LocalizedElement as="div"
                 aria-label="비중 후보 선택"
-                className="grid grid-cols-2 gap-1 rounded-md border border-[#d6ddd1] bg-white p-1 lg:inline-grid lg:grid-cols-4"
-                role="group"
+                className="grid grid-cols-2 gap-x-6 lg:inline-grid lg:grid-cols-4"
+                role="group" en={{"aria-label": labEnglish("비중 후보 선택")}}
               >
-                {OBJECTIVES.map((objective) => (
+                {OBJECTIVES.filter(objective => model.candidates.some(row => row.objective === objective.id)).map((objective) => (
                   <button
                     aria-pressed={candidate.objective === objective.id}
-                    className={`min-h-10 px-3 py-2 text-sm font-semibold ${
+                    className={`min-h-10 border-b-2 px-1 py-2 text-sm font-semibold ${
                       candidate.objective === objective.id
-                        ? "rounded bg-[#173f38] text-white"
-                        : "text-[#4f584f] hover:bg-[#edf1e9]"
+                        ? "border-[var(--ink)] text-[var(--ink)]"
+                        : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
                     }`}
                     key={objective.id}
                     onClick={() => setSelectedObjective(objective.id)}
                     type="button"
                   >
-                    {objective.label}
+                    <LabText value={objective.label} />
                   </button>
                 ))}
-              </div>
+              </LocalizedElement>
             </div>
 
-            <div className="grid gap-px border-b border-[#e1e6dc] bg-[#e1e6dc] sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid border-b border-[var(--line)] sm:grid-cols-2 xl:grid-cols-5">
               <Metric
                 detail={`${model.training.returnObservationCount}개 수익률 · 상장 ${model.training.instrumentCount}개`}
                 label="학습 구간"
@@ -110,11 +115,9 @@ export function InvestmentLabPreperiodOptimizerView({
                 )}
               />
               <Metric
-                detail="무위험 수익률 0% 가정"
+                detail="같은 통화·기간의 무위험 수익률 근거 필요"
                 label="샤프"
-                value={formatNumber(
-                  candidate.trainingMetrics.annualizedSharpe,
-                )}
+                value={formatNumber(candidate.trainingMetrics.annualizedSharpe)}
               />
             </div>
 
@@ -122,13 +125,8 @@ export function InvestmentLabPreperiodOptimizerView({
               <ReadyCandidate candidate={candidate} />
             ) : (
               <div className="px-4 py-5">
-                <p className="font-semibold text-[#8a641f]">
-                  비중 후보는 계산됐지만 이후 비교 경로 근거가 부족합니다.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[#6d6657]">
-                  이 실험만 숨기며 실제 포트폴리오와 다른 계산 가능한 시나리오는
-                  계속 표시합니다.
-                </p>
+                <p className="font-semibold text-[var(--warning)]"><LabText value=" 비중 후보는 계산됐지만 이후 비교 경로 근거가 부족합니다. " /></p>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]"><LabText value=" 이 실험만 숨기며 실제 포트폴리오와 다른 계산 가능한 시나리오는 계속 표시합니다. " /></p>
                 <WeightTable candidate={candidate} />
               </div>
             )}
@@ -137,12 +135,7 @@ export function InvestmentLabPreperiodOptimizerView({
           <Unavailable model={model} />
         )}
 
-        <p className="border-t border-[#e1e6dc] px-4 py-3 text-xs leading-5 text-[#73786c]">
-          학습 지표는 수동 평가 종목을 제외한 상장 종목 부분 기준입니다. 이
-          결과는 과거 학습 구간을 뒤늦게 보고 만든 연구 후보이며 미래 성과,
-          주문 가능성, 세금·거래비용을 보장하지 않습니다. 현재 보유비중이나
-          목표비중도 자동으로 바꾸지 않습니다.
-        </p>
+        <p className="border-t border-[var(--line)] py-4 text-xs leading-5 text-[var(--muted)]"><LabText value=" 학습 지표는 수동 평가 종목을 제외한 상장 종목 부분 기준입니다. 이 결과는 과거 학습 구간을 뒤늦게 보고 만든 연구 후보이며 미래 성과, 주문 가능성, 세금·거래비용을 보장하지 않습니다. 현재 보유비중이나 목표비중도 자동으로 바꾸지 않습니다. " /></p>
       </div>
     </section>
   );
@@ -163,7 +156,7 @@ function ReadyCandidate({
   const estimate = candidate.scenario.returnEstimate;
   const summary = candidate.scenario.summary;
   return (
-    <div className="grid gap-5 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-8 py-7 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0">
         <InvestmentLabComparisonChart
           chartId={`investment-lab-optimizer-${candidate.objective}`}
@@ -174,7 +167,7 @@ function ReadyCandidate({
         />
       </div>
       <div>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-[#e1e6dc] pb-4 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-[var(--wash)] pb-4 text-sm">
           <EvidenceRow
             label="후보 기간 수익률"
             value={formatPercent(estimate.scenarioReturn)}
@@ -211,24 +204,22 @@ function WeightTable({
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full min-w-[320px] text-left text-sm">
-        <thead className="text-xs text-[#687064]">
+        <thead className="text-xs text-[var(--muted)]">
           <tr>
-            <th className="pb-2 font-semibold">종목</th>
-            <th className="pb-2 text-right font-semibold">학습 비중</th>
+            <th className="pb-2 font-semibold"><LabText value="종목" /></th>
+            <th className="pb-2 text-right font-semibold"><LabText value="학습 비중" /></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#e1e6dc]">
+        <tbody className="divide-y divide-[var(--wash)]">
           {rows.map((row) => (
             <tr key={row.instrumentKey}>
               <td className="py-2">
-                <span className="font-semibold">{row.label}</span>
-                <span className="ml-2 text-xs text-[#73786c]">
+                <span className="font-semibold"><LabText value={row.label} /></span>
+                <span className="ml-2 text-xs text-[var(--muted)]">
                   {row.instrumentKey}
                 </span>
                 {row.allocationRole === "fixed_manual" ? (
-                  <span className="ml-2 text-xs font-semibold text-[#8a641f]">
-                    시작 비중 고정
-                  </span>
+                  <span className="ml-2 text-xs font-semibold text-[var(--warning)]"><LabText value=" 시작 비중 고정 " /></span>
                 ) : null}
               </td>
               <td className="py-2 text-right font-semibold tabular-nums">
@@ -247,15 +238,9 @@ function WeightTable({
 
 function Unavailable({ model }: { model: InvestmentLabPreperiodOptimizer }) {
   return (
-    <div className="px-4 py-5">
-      <p className="font-semibold text-[#8a641f]">
-        현재 계정 범위에서는 학습 비중 후보를 만들 수 없습니다.
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[#6d6657]">
-        필요한 모든 종목의 비교 시작일 이전 공통 종가가 61개 이상 있어야
-        합니다. 수동 평가 종목은 과거 가격을 임의로 채우지 않고 시작일 저장
-        비중으로 고정합니다.
-      </p>
+    <div className="py-6">
+      <p className="font-semibold text-[var(--warning)]"><LabText value=" 현재 계정 범위에서는 학습 비중 후보를 만들 수 없습니다. " /></p>
+      <p className="mt-2 text-sm leading-6 text-[var(--muted)]"><LabText value=" 필요한 모든 종목의 비교 시작일 이전 공통 종가가 61개 이상 있어야 합니다. 수동 평가 종목은 과거 가격을 임의로 채우지 않고 시작일 저장 비중으로 고정합니다. " /></p>
       <dl className="mt-4 grid max-w-xl grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <EvidenceRow
           label="공통 가격일"
@@ -288,10 +273,10 @@ function Metric({
   value: string;
 }) {
   return (
-    <div className="bg-[#fbfcf7] px-4 py-4">
-      <p className="text-xs font-semibold text-[#687064]">{label}</p>
-      <p className="mt-2 text-base font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#73786c]">{detail}</p>
+    <div className="border-b border-[var(--line)] px-4 py-5 xl:border-b-0 xl:border-r xl:last:border-r-0">
+      <p className="text-xs font-semibold text-[var(--muted)]"><LabText value={label} /></p>
+      <p className="mt-2 text-base font-semibold tabular-nums"><LabText value={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><LabText value={detail} /></p>
     </div>
   );
 }
@@ -299,8 +284,8 @@ function Metric({
 function EvidenceRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="contents">
-      <dt className="text-[#687064]">{label}</dt>
-      <dd className="text-right font-semibold tabular-nums">{value}</dd>
+      <dt className="text-[var(--muted)]"><LabText value={label} /></dt>
+      <dd className="text-right font-semibold tabular-nums"><LabText value={value} /></dd>
     </div>
   );
 }

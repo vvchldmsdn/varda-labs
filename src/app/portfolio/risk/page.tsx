@@ -1,3 +1,4 @@
+import { localizedMetadata } from "@/lib/i18n/server";
 import { PortfolioAnalysisScopeBoundary } from "@/components/portfolio-analysis-scope-boundary";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
 import { PortfolioRiskView } from "@/components/portfolio-risk/portfolio-risk-view";
@@ -7,9 +8,14 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata() {
+  return localizedMetadata({ title: "위험 분석 | CAIRN LABS" }, "Risk analysis | CAIRN LABS");
+}
+
 type PortfolioRiskPageProps = {
   searchParams: Promise<{
     account?: string | string[];
+    preview?: string | string[];
     scope?: string | string[];
     window?: string | string[];
   }>;
@@ -18,6 +24,14 @@ type PortfolioRiskPageProps = {
 export default async function PortfolioRiskPage({
   searchParams,
 }: PortfolioRiskPageProps) {
+  if (process.env.NODE_ENV === "development") {
+    const previewParams = await searchParams;
+    if ((Array.isArray(previewParams.preview) ? previewParams.preview[0] : previewParams.preview) === "design") {
+      const { buildPortfolioStructureDesignPreview } = await import("@/lib/portfolio-structure-design-preview");
+      const sample = buildPortfolioStructureDesignPreview(previewParams.scope);
+      return <PortfolioRiskView model={sample.riskModel} scopes={sample.analysisScopes} selectedScope={sample.selectedScope} isDesignPreview />;
+    }
+  }
   const [params, resolution] = await Promise.all([
     searchParams,
     resolveCurrentTenantContext(),
@@ -27,7 +41,7 @@ export default async function PortfolioRiskPage({
     return (
       <PortfolioReadAccessBoundary
         resolution={resolution}
-        title="Portfolio risk"
+        title="위험 분석" titleEn="Portfolio risk"
       />
     );
   }
@@ -45,7 +59,7 @@ export default async function PortfolioRiskPage({
       <PortfolioAnalysisScopeBoundary
         basePath="/portfolio/risk"
         context={scopeContext}
-        title="Portfolio risk"
+        title="위험 분석" titleEn="Portfolio risk"
       />
     );
   }

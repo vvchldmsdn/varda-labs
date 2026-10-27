@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isIsolatedReleasePreview } from "../deployment/isolated-release-preview.ts";
 
 export const AUTH_TRANSPORT_SESSION_CACHE_SECONDS = 60;
 export {
@@ -13,15 +14,22 @@ export const AUTH_TRANSPORT_ALLOWED_API_ENDPOINTS = Object.freeze([
   Object.freeze({
     method: "POST",
     path: Object.freeze(["sign-in", "social"]),
-    socialProvider: "google",
+    socialProviders: Object.freeze(["google", "github"]),
   }),
   Object.freeze({
     method: "POST",
     path: Object.freeze(["sign-out"]),
   }),
+  Object.freeze({ method: "POST", path: Object.freeze(["sign-in", "email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["sign-up", "email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["send-verification-email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["email-otp", "verify-email"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["request-password-reset"]) }),
+  Object.freeze({ method: "POST", path: Object.freeze(["reset-password"]) }),
 ] as const);
 
 export type AuthTransportEnvironment = Readonly<{
+  [key: string]: string | undefined;
   VERCEL_ENV?: string;
   NEON_AUTH_BASE_URL?: string;
   NEON_AUTH_BASE_URL_SHA256?: string;
@@ -46,7 +54,7 @@ export function assessAuthTransportEnvironment(
   if (
     !AUTH_TRANSPORT_ALLOWED_ENVIRONMENTS.some(
       (candidate) => candidate === vercelEnvironment,
-    )
+    ) && !isIsolatedReleasePreview(environment)
   ) {
     return Object.freeze({ state: "disabled" });
   }
@@ -84,8 +92,8 @@ export function isAuthTransportApiRequestAllowed(
   if (!endpoint) return false;
 
   return (
-    !("socialProvider" in endpoint) ||
-    endpoint.socialProvider === request.socialProvider
+    !("socialProviders" in endpoint) ||
+    endpoint.socialProviders.some((provider) => provider === request.socialProvider)
   );
 }
 

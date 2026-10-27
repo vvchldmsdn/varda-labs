@@ -58,6 +58,11 @@ export type SimulationRegimeFactorObservation = Readonly<{
   releaseDate: string;
   value: number | string;
   volatility20dPct: number | string;
+  source?: string;
+  sourceSeriesId?: string;
+  /** Import timestamp only; this is not the publication/availability timestamp. */
+  observedAt?: Date | string;
+  sourceVersion?: string | null;
 }>;
 
 export type SimulationRegimeFactorSourceSummary = Readonly<{

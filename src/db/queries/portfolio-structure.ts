@@ -14,10 +14,12 @@ import { cache } from "react";
 
 import { db } from "@/db/client";
 import { getPortfolioAnalysisScopeTargets } from "@/db/queries/portfolio-analysis-scope-targets";
+import { loadUsablePortfolioFxRows } from "@/db/queries/portfolio-fx-rates";
+import { resolveCurrentUsdKrwRate } from "@/lib/market-data/fx-rate-admission";
 import {
-  loadActiveTenantLegacyAssetGroupBundle,
-  type TenantLegacyAssetGroupMemberRow,
-  type TenantLegacyAssetGroupRow,
+  loadActiveTenantAllocationGroupBundle,
+  type TenantAllocationGroupMemberRow,
+  type TenantAllocationGroupRow,
 } from "@/db/queries/tenant-group-reads";
 import {
   loadLatestTenantPortfolioSettingsRows,
@@ -38,7 +40,7 @@ import {
 } from "@/lib/portfolio-structure";
 import { NAMED_PORTFOLIO_ACCOUNTS } from "@/lib/portfolio-account-scope";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
-import { normalizeTicker, toNumber, uniqueStrings } from "@/lib/portfolio-math";
+import { normalizeTicker, uniqueStrings } from "@/lib/portfolio-math";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const INVESTMENT_ASSET_TYPES = new Set(["etf", "stock", "pension", "commodity"]);
@@ -138,20 +140,22 @@ async function loadTenantPortfolioStructureRows({
       assetScopePredicate === null
         ? Promise.resolve([])
         : db
-            .select(getTableColumns(assets))
+            .select({
+              ...getTableColumns(assets),
+              account: accounts.code,
+            })
             .from(assets)
             .innerJoin(accounts, eq(assets.accountId, accounts.id))
             .where(
               and(
                 ...ownedAccountPredicates,
                 eq(assets.canonicalOwnerUserId, tenantContext.ownerUserId),
-                eq(assets.account, accounts.code),
                 isNull(assets.archivedAt),
                 assetScopePredicate,
               ),
             ),
-      loadActiveTenantLegacyAssetGroupBundle(tenantContext),
-      db.select().from(fxRates).orderBy(desc(fxRates.rateDate)).limit(1),
+      loadActiveTenantAllocationGroupBundle(tenantContext),
+      loadUsablePortfolioFxRows(1),
       loadLatestTenantPortfolioSettingsRows(tenantContext),
     ]);
 
@@ -194,8 +198,8 @@ async function buildStructureFromRows({
   identityScope,
 }: {
   assetRows: (typeof assets.$inferSelect)[];
-  groupRows: readonly TenantLegacyAssetGroupRow[];
-  memberRows: readonly TenantLegacyAssetGroupMemberRow[];
+  groupRows: readonly TenantAllocationGroupRow[];
+  memberRows: readonly TenantAllocationGroupMemberRow[];
   latestFxRows: (typeof fxRates.$inferSelect)[];
   settingsRows: readonly TenantPortfolioSettingsRow[];
   selectedAccount: PortfolioStructureAccount;
@@ -206,10 +210,7 @@ async function buildStructureFromRows({
     INVESTMENT_ASSET_TYPES.has(asset.assetType ?? "etf"),
   );
   const quoteRows = await loadLiveQuoteRows(structureAssetRows);
-  const usdKrwRate =
-    toNumber(latestFxRows[0]?.usdKrw) ??
-    toNumber(settingsRows[0]?.usdKrwRate) ??
-    null;
+  const usdKrwRate = resolveCurrentUsdKrwRate(latestFxRows, settingsRows[0]?.usdKrwRate);
 
   return buildPortfolioStructure({
     assets: structureAssetRows,

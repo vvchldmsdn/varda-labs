@@ -1,4 +1,7 @@
-import Link from "next/link";
+
+import { T } from "@/components/i18n/localized-text";
+import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { HistoryEvidenceLink as Link } from "./history-records-dialog";
 import type { ReactNode } from "react";
 
 import type { ReadOnlyBalanceHistoryRow } from "@/db/queries/history-balance";
@@ -31,18 +34,18 @@ export function BalanceHistoryTable({
   account: HistoryAccount;
 }) {
   if (rows.length === 0) {
-    return <EmptyTableMessage>잔액 기록이 없습니다.</EmptyTableMessage>;
+    return <EmptyTableMessage><T ko="잔액 기록이 없습니다." en="No balance records are available."/></EmptyTableMessage>;
   }
 
   return (
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs text-[#687064]">
+        <thead className="text-xs text-[var(--muted)]">
           <tr>
-            <TableHeader>잔액 기준일</TableHeader>
-            <TableHeader align="right">선택 계정</TableHeader>
-            <TableHeader align="right">현금</TableHeader>
-            <TableHeader align="right">증권</TableHeader>
+            <TableHeader><T ko="잔액 기준일" en="Balance date"/></TableHeader>
+            <TableHeader align="right"><T ko="선택 계정" en="Selected account"/></TableHeader>
+            <TableHeader align="right"><T ko="현금" en="Cash"/></TableHeader>
+            <TableHeader align="right"><T ko="증권" en="Brokerage"/></TableHeader>
             <TableHeader align="right">ISA</TableHeader>
             <TableHeader align="right">IRP</TableHeader>
           </tr>
@@ -51,7 +54,7 @@ export function BalanceHistoryTable({
           {rows.map((row, index) => (
             <tr
               key={`balance:${row.balanceDate}:${index}`}
-              className="border-t border-[#e1e6dc]"
+              className="border-t border-[var(--wash)]"
             >
               <TableCell strong>{row.balanceDate}</TableCell>
               <TableCell align="right">
@@ -85,25 +88,25 @@ export function PortfolioHistoryTable({
   selectedScope: PortfolioAnalysisScope;
 }) {
   if (rows.length === 0) {
-    return <EmptyTableMessage>포트폴리오 기록이 없습니다.</EmptyTableMessage>;
+    return <EmptyTableMessage><T ko="포트폴리오 기록이 없습니다." en="No portfolio records are available."/></EmptyTableMessage>;
   }
 
   return (
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-sm">
-        <thead className="text-xs text-[#687064]">
+        <thead className="text-xs text-[var(--muted)]">
           <tr>
-            <TableHeader>스냅샷 저장일</TableHeader>
-            <TableHeader>계정</TableHeader>
-            <TableHeader>출처</TableHeader>
-            <TableHeader>행 구분</TableHeader>
-            <TableHeader align="right">현금</TableHeader>
-            <TableHeader align="right">투입 원금</TableHeader>
-            <TableHeader align="right">비용 기준</TableHeader>
-            <TableHeader align="right">평가액</TableHeader>
-            <TableHeader align="right">손익</TableHeader>
-            <TableHeader align="right">수익률</TableHeader>
-            <TableHeader>보유 상세</TableHeader>
+            <TableHeader><T ko="스냅샷 저장일" en="Snapshot date"/></TableHeader>
+            <TableHeader><T ko="계정" en="Account"/></TableHeader>
+            <TableHeader><T ko="출처" en="Source"/></TableHeader>
+            <TableHeader><T ko="행 구분" en="Row type"/></TableHeader>
+            <TableHeader align="right"><T ko="현금" en="Cash"/></TableHeader>
+            <TableHeader align="right"><T ko="투입 원금" en="Contributed capital"/></TableHeader>
+            <TableHeader align="right"><T ko="비용 기준" en="Cost basis"/></TableHeader>
+            <TableHeader align="right"><T ko="평가액" en="Value"/></TableHeader>
+            <TableHeader align="right"><T ko="손익" en="Gain/loss"/></TableHeader>
+            <TableHeader align="right"><T ko="수익률" en="Return"/></TableHeader>
+            <TableHeader><T ko="보유 상세" en="Holding details"/></TableHeader>
           </tr>
         </thead>
         <tbody>
@@ -122,14 +125,14 @@ export function PortfolioHistoryTable({
                 data-history-row-kind={row.rowKind}
                 data-history-position-selected={selected ? "true" : undefined}
                 className={cn(
-                  "border-t border-[#e1e6dc]",
-                  selected && "bg-[#eef2e8]",
+                  "border-t border-[var(--wash)]",
+                  selected && "bg-[var(--wash)]",
                 )}
               >
                 <TableCell strong>{row.snapshotDate}</TableCell>
-                <TableCell>{portfolioRowScopeLabel(selectedScope)}</TableCell>
-                <TableCell>{historySourceLabel(row.source)}</TableCell>
-                <TableCell>{historyRowKindLabel(row)}</TableCell>
+                <TableCell>{<T ko={portfolioRowScopeLabel(selectedScope)} en={translateHomeHistory(portfolioRowScopeLabel(selectedScope))}/>}</TableCell>
+                <TableCell>{<T ko={historySourceLabel(row.source)} en={translateHomeHistory(historySourceLabel(row.source))}/>}</TableCell>
+                <TableCell><T ko={historyRowKindLabel(row)} en={historyRowKindLabel(row, "en")}/></TableCell>
                 <TableCell align="right">
                   {formatHistoryKrw(row.cashValue)}
                 </TableCell>
@@ -151,9 +154,7 @@ export function PortfolioHistoryTable({
                 <TableCell>
                   {selectedScope.kind !== "account" ||
                   row.rowKind !== "stored" ? (
-                    <span className="text-xs text-[#687064]">
-                      범위 상세 준비 중
-                    </span>
+                    <span className="text-xs text-[var(--muted)]"><T ko="범위 상세 준비 중" en="Scope details unavailable"/></span>
                   ) : (
                     <Link
                       aria-current={selected ? "page" : undefined}
@@ -162,9 +163,9 @@ export function PortfolioHistoryTable({
                         lane,
                         selectedScope.key,
                       )}
-                      className="inline-flex rounded-md border border-[#d7ddcf] bg-white px-2 py-1 text-xs font-semibold text-[#1e3a34] hover:bg-[#eef2e8]"
+                      className="inline-flex rounded-md border border-[var(--line)] bg-white px-2 py-1 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
                     >
-                      {selected ? "선택됨" : "보유 상세"}
+                      {<T ko={selected ? "선택됨" : "보유 상세"} en={translateHomeHistory(selected ? "선택됨" : "보유 상세")}/>}
                     </Link>
                   )}
                 </TableCell>
@@ -210,7 +211,7 @@ function portfolioRowScopeLabel(scope: PortfolioAnalysisScope) {
 
 function EmptyTableMessage({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[#687064]">
+    <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm text-[var(--muted)]">
       {children}
     </p>
   );

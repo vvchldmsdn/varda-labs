@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "authority": "packages/cairn-financial-domain/src",
+  "files": {
+    "portfolio-math.ts": "80c1fd6f60a9ee00d2e771087b2926173167bdc8df3118de978f7ce6d9519161",
+    "portfolio-movement.ts": "cdf0e77223e84dca0a8995f3f893e47d15d54ab99b793c7c88bab7081ff4e7d4",
+    "current-holding-movement.ts": "cff436879dc82a9c00d0a41495cc1cc12df62a2a58ef1ca263b9c8b5d49101d2"
+  }
+}

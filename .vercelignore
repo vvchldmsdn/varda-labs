@@ -1,0 +1,14 @@
+.git
+.next/
+node_modules/
+.vercel/
+.env*
+.codex-remote-attachments/
+output/
+.worktrees/
+.codex/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+tests/

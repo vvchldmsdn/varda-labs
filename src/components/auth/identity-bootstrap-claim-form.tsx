@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthText } from "./auth-localized";
 import { useState, type FormEvent } from "react";
 
 const PRESENTATION_ENDPOINT =
@@ -49,39 +50,33 @@ export function IdentityBootstrapClaimForm() {
   }
 
   return (
-    <section className="mt-6 rounded-md border border-[#dfe3d5] bg-white p-4">
-      <h2 className="font-semibold">One-time account link</h2>
+    <section className="mt-6 rounded-md border border-[var(--line)] bg-white p-4">
+      <h2 className="font-medium"><AuthText>{"기존 포트폴리오 연결"}</AuthText></h2>
       <form className="mt-3 space-y-3" onSubmit={submitClaim}>
-        <label className="block text-sm font-semibold text-[#4f594e]">
-          Bootstrap claim
-          <input
+        <label className="block text-sm font-semibold text-[var(--muted)]"><AuthText>{"안내받은 일회용 연결 코드"}</AuthText><input
             name="claim"
             type="password"
             required
             autoComplete="off"
             spellCheck={false}
             disabled={locked}
-            className="mt-2 block w-full rounded-md border border-[#cfd6c8] bg-white px-3 py-2 font-mono text-sm text-[#171916] disabled:bg-[#f3f4ef] disabled:text-[#7b8278]"
+            className="mt-2 block w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 font-mono text-sm text-[var(--ink)] disabled:bg-[var(--paper)] disabled:text-[var(--faint)]"
           />
         </label>
         <button
           type="submit"
           disabled={locked}
-          className="rounded-md bg-[#173f38] px-4 py-2 font-semibold text-white hover:bg-[#0f312b] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-[var(--ink)] px-4 py-2 font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {status === "submitting" ? "Submitting" : "Link once"}
+          <AuthText>{status === "submitting" ? "확인 중" : "연결 코드 확인"}</AuthText>
         </button>
       </form>
 
       {status === "submitted" ? (
-        <p role="status" className="mt-3 text-sm text-[#386744]">
-          Submitted once. Server verification is pending.
-        </p>
+        <p role="status" className="mt-3 text-sm text-[var(--brand)]"><AuthText>{"코드가 전달되었습니다. 서버 확인 후 계정 연결 상태가 반영됩니다."}</AuthText></p>
       ) : null}
       {status === "failed" ? (
-        <p role="alert" className="mt-3 text-sm text-[#a43e3e]">
-          Submission was not confirmed. Stop here; do not submit again.
-        </p>
+        <p role="alert" className="mt-3 text-sm text-[var(--negative)]"><AuthText>{"코드 전달 여부를 확인하지 못했습니다. 중복 제출하지 말고 운영자에게 확인해 주세요."}</AuthText></p>
       ) : null}
     </section>
   );

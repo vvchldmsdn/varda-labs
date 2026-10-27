@@ -1,4 +1,8 @@
+import { SecondaryPageHeader } from "@/components/secondary-page-header";
+import { T } from "@/components/i18n/localized-text";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { RetryPageButton } from "@/components/retry-page-button";
 
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import { sessionResolutionNextAction } from "@/lib/session-resolution-next-action";
@@ -11,20 +15,43 @@ export function PortfolioReadAccessBoundary({
     "This view reads portfolio data only after the signed-in user and canonical account ownership are resolved on the server.",
   resolution,
   title,
+  titleEn,
+  descriptionEn,
+  closedMessageEn,
 }: {
   closedMessage?: string;
   description?: string;
   resolution: SessionResolverResult;
   title: string;
+  titleEn?: string;
+  descriptionEn?: string;
+  closedMessageEn?: string;
 }) {
+  if (!resolution.ok && resolution.failure.code === "unauthenticated") redirect("/auth/sign-in");
+  if (!resolution.ok && resolution.failure.code === "identity_unlinked") redirect("/portfolio/onboarding");
+  if (!resolution.ok && (resolution.failure.code === "auth_provider_unavailable" || resolution.failure.code === "identity_store_unavailable")) {
+    return (
+      <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+        <SecondaryPageHeader />
+        <section className="mx-auto w-full max-w-3xl border-y border-[var(--line)] py-8">
+          <h1 className="text-2xl font-semibold"><T ko="잠시 연결을 확인하고 있어요" en="We could not verify your connection" /></h1>
+          <p role="status" className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
+            <T ko="로그인 상태를 확인하지 못해 자산 정보를 불러오지 않았습니다. 잠시 후 다시 시도해 주세요." en="We could not confirm your sign-in, so your portfolio has not been loaded. Please try again shortly." />
+          </p>
+          <RetryPageButton />
+        </section>
+      </main>
+    );
+  }
   const nextAction = sessionResolutionNextAction(resolution);
 
   return (
-    <main className="min-h-screen bg-[#f3f4ef] px-4 py-10 text-[#171916]">
-      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-6">
-        <p className="text-xs font-semibold text-[#687064]">Varda Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal">{title}</h1>
-        <p className="mt-2 text-sm text-[#687064]">{description}</p>
+    <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-10 text-[var(--ink)]">
+      <SecondaryPageHeader />
+      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
+        <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko={title} en={titleEn ?? title} /></h1>
+        <p className="mt-2 text-sm text-[var(--muted)]"><T ko={description} en={descriptionEn ?? description} /></p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell
             label="Portfolio user link"
@@ -32,12 +59,12 @@ export function PortfolioReadAccessBoundary({
           />
           <EvidenceCell label="Product database read" value="Not attempted" />
         </dl>
-        <p className="mt-6 rounded-md border border-[#ead9b5] bg-[#fff9eb] p-3 text-sm text-[#76591f]">
-          {closedMessage}
+        <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
+          <T ko={closedMessage} en={closedMessageEn ?? closedMessage} />
         </p>
         <Link
           href={nextAction.href}
-          className="mt-5 inline-flex rounded-md border border-[#cfd6c8] bg-white px-4 py-2 text-sm font-semibold text-[#35423a] hover:bg-[#eef2e8]"
+          className="mt-5 inline-flex rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)]"
         >
           {nextAction.label}
         </Link>
@@ -48,8 +75,8 @@ export function PortfolioReadAccessBoundary({
 
 function EvidenceCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#dfe3d5] bg-white p-4">
-      <dt className="text-xs font-semibold text-[#687064]">{label}</dt>
+    <div className="rounded-md border border-[var(--line)] bg-white p-4">
+      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
       <dd className="mt-2 font-semibold">{value}</dd>
     </div>
   );

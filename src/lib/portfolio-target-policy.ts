@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { PortfolioAnalysisScope } from "./portfolio-analysis-scope.ts";
+import { isKrxGoldManualInstrumentCandidate } from "./market-data/manual-asset-price.ts";
 
 export const PORTFOLIO_TARGET_POLICY = Object.freeze({
   version: "portfolio_target_policy_v1",
@@ -24,8 +25,12 @@ export type PortfolioTargetUniverseInput = Readonly<{
   accountCode: string;
   accountId: string;
   accountName: string;
+  /** Stable target row key; v1 uses the holding UUID. Never a holding writer input. */
   assetId: string;
+  originAssetId?: string | null;
+  heldAssetId?: string | null;
   assetName: string;
+  assetType: string | null;
   market: string;
   currency: string;
   ticker: string | null;
@@ -36,8 +41,12 @@ export type PortfolioTargetUniverseRow = Readonly<{
   accountCode: string;
   accountId: string;
   accountName: string;
+  /** Stable target row key; v1 uses the holding UUID. Never a holding writer input. */
   assetId: string;
+  originAssetId?: string | null;
+  heldAssetId?: string | null;
   assetName: string;
+  assetType: string | null;
   market: string;
   currency: string;
   ticker: string | null;
@@ -63,7 +72,10 @@ export type PortfolioTargetPolicyDecision = Readonly<{
 
 type PortfolioTargetPolicyPersistenceRow = Readonly<{
   accountId: string;
+  /** Stable target row key; v1 uses the holding UUID. Never a holding writer input. */
   assetId: string;
+  originAssetId?: string | null;
+  heldAssetId?: string | null;
   assetName: string;
   market: string;
   currency: string;
@@ -72,6 +84,19 @@ type PortfolioTargetPolicyPersistenceRow = Readonly<{
   targetWeightBps: number;
 }>;
 
+/** Editor continuity only: a changed universe still requires explicit approval. */
+export function preservePortfolioTargetDraft(
+  universe: readonly PortfolioTargetUniverseRow[],
+  approved: readonly Pick<PortfolioTargetPolicyPersistenceRow, "accountId" | "assetId" | "market" | "currency" | "ticker" | "targetWeightBps">[],
+) {
+  return new Map(universe.map(row => {
+    const matches = approved.filter(previous => previous.assetId === row.assetId &&
+      previous.accountId === row.accountId && previous.market === row.market &&
+      previous.currency === row.currency && previous.ticker === row.ticker);
+    const value = matches.length === 1 ? matches[0].targetWeightBps : null;
+    return [row.assetId, value !== null && Number.isSafeInteger(value) && value >= 0 && value <= 10_000 ? value : null] as const;
+  }));
+}
 export function normalizePortfolioTargetUniverse(
   input: readonly PortfolioTargetUniverseInput[],
 ) {
@@ -109,7 +134,9 @@ export function buildPortfolioTargetPolicyRecord({
   effectiveServiceDate,
   scope,
   universe,
+  policyVersion = PORTFOLIO_TARGET_POLICY.version as string,
 }: {
+  policyVersion?: string;
   decisions: readonly PortfolioTargetPolicyDecision[];
   effectiveServiceDate: string;
   scope: PortfolioAnalysisScope;
@@ -178,10 +205,10 @@ export function buildPortfolioTargetPolicyRecord({
     });
   }
 
-  const universeHash = createPortfolioTargetUniverseHash({ scope, universe });
+  const universeHash = createPortfolioTargetUniverseHash({ scope, universe, policyVersion });
   const vectorSerialization = JSON.stringify({
     hashVersion: PORTFOLIO_TARGET_POLICY.vectorHashVersion,
-    policyVersion: PORTFOLIO_TARGET_POLICY.version,
+    policyVersion,
     scopeKey: scope.key,
     effectiveServiceDate,
     rows: rows.map((row) => ({
@@ -194,6 +221,7 @@ export function buildPortfolioTargetPolicyRecord({
     status: "ready" as const,
     policy: PORTFOLIO_TARGET_POLICY,
     scopeKey: scope.key,
+    policyVersion,
     effectiveServiceDate,
     rows: Object.freeze(rows),
     totalWeightBps,
@@ -206,14 +234,16 @@ export function buildPortfolioTargetPolicyRecord({
 export function createPortfolioTargetUniverseHash({
   scope,
   universe,
+  policyVersion = PORTFOLIO_TARGET_POLICY.version as string,
 }: {
+  policyVersion?: string;
   scope: PortfolioAnalysisScope;
   universe: readonly PortfolioTargetUniverseRow[];
 }) {
   return sha256(
     JSON.stringify({
       hashVersion: PORTFOLIO_TARGET_POLICY.universeHashVersion,
-      policyVersion: PORTFOLIO_TARGET_POLICY.version,
+      policyVersion,
       scopeKey: scope.key,
       rows: universe.map(projectUniverseHashRow),
     }),
@@ -291,11 +321,13 @@ export function portfolioTargetScopeColumns(scope: PortfolioAnalysisScope) {
 
 export function serializePortfolioTargetPolicyRows(
   rows: readonly PortfolioTargetPolicyPersistenceRow[],
+  policyVersion: string = PORTFOLIO_TARGET_POLICY.version,
 ) {
   return JSON.stringify(
     rows.map((row) => ({
       account_id: row.accountId,
       asset_id: row.assetId,
+      ...(policyVersion === "portfolio_target_policy_v2" ? {origin_asset_id: row.originAssetId ?? null,asset_type: ("assetType" in row ? row.assetType : null)} : {}),
       asset_name: row.assetName,
       market: row.market,
       currency: row.currency,
@@ -307,14 +339,29 @@ export function serializePortfolioTargetPolicyRows(
 }
 
 export function classifyPortfolioTargetBuyability({
+  assetName,
+  assetType,
   currency,
   market,
   ticker,
 }: {
+  assetName: string | null;
+  assetType: string | null;
   currency: string | null;
   market: string | null;
   ticker: string | null;
 }): PortfolioTargetBuyability {
+  if (
+    isKrxGoldManualInstrumentCandidate({
+      name: assetName,
+      ticker,
+      assetType,
+      market,
+      currency,
+    })
+  ) {
+    return "buyable";
+  }
   if (!ticker) return "tickerless";
   if (!market || !SUPPORTED_MARKETS.has(market)) return "unsupported_market";
   if (!currency || !SUPPORTED_CURRENCIES.has(currency)) {
@@ -331,6 +378,7 @@ function normalizeUniverseRow(
   const accountCode = canonicalText(source.accountCode);
   const accountName = canonicalText(source.accountName);
   const assetName = canonicalText(source.assetName);
+  const assetType = canonicalText(source.assetType)?.toLowerCase() ?? null;
   const market = canonicalText(source.market)?.toLowerCase() ?? null;
   const currency = canonicalText(source.currency)?.toUpperCase() ?? null;
   const ticker = canonicalText(source.ticker)?.toUpperCase() ?? null;
@@ -354,11 +402,16 @@ function normalizeUniverseRow(
     accountId: source.accountId.toLowerCase(),
     accountName,
     assetId: source.assetId.toLowerCase(),
+    originAssetId: source.originAssetId === undefined ? source.assetId.toLowerCase() : source.originAssetId,
+    heldAssetId: source.heldAssetId === undefined ? source.assetId.toLowerCase() : source.heldAssetId,
     assetName,
+    assetType,
     market,
     currency,
     ticker,
     buyability: classifyPortfolioTargetBuyability({
+      assetName,
+      assetType,
       currency,
       market,
       ticker,

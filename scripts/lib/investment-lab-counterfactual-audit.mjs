@@ -195,8 +195,8 @@ function summarizeScenarios(scenarios) {
 
   return {
     total: scenarios.length,
-    readyForFixture: scenarios.filter(
-      (scenario) => scenario.status === "ready_for_engine_fixture",
+    readyForProductionEngine: scenarios.filter(
+      (scenario) => scenario.status === "ready_for_production_engine",
     ).length,
     blocked: scenarios.filter((scenario) => scenario.status === "blocked").length,
     blockerCounts,

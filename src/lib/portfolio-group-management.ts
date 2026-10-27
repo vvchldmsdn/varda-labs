@@ -49,7 +49,7 @@ export function parsePortfolioGroupSaveInput(
   const rawGroupId = optionalText(formData.get("groupId"));
   const mode = rawGroupId === null ? "create" : "update";
   if (rawGroupId !== null && !UUID_PATTERN.test(rawGroupId)) {
-    return invalid("자산 그룹 식별자가 올바르지 않습니다.");
+    return invalid("분석 범위 식별자가 올바르지 않습니다.");
   }
 
   const expectedUpdatedAt = optionalText(formData.get("expectedUpdatedAt"));
@@ -57,15 +57,15 @@ export function parsePortfolioGroupSaveInput(
     mode === "update" &&
     (expectedUpdatedAt === null || !isStrictUtcTimestamp(expectedUpdatedAt))
   ) {
-    return invalid("자산 그룹의 최신 상태를 확인할 수 없습니다.");
+    return invalid("분석 범위의 최신 상태를 확인할 수 없습니다.");
   }
   if (mode === "create" && expectedUpdatedAt !== null) {
-    return invalid("새 자산 그룹에 기존 버전 값이 포함되어 있습니다.");
+    return invalid("새 분석 범위에 기존 버전 값이 포함되어 있습니다.");
   }
 
   const name = normalizeName(formData.get("name"));
   if (name === null) {
-    return invalid("자산 그룹 이름을 100자 이내로 입력해 주세요.");
+    return invalid("분석 범위 이름을 100자 이내로 입력해 주세요.");
   }
 
   const description = normalizeDescription(formData.get("description"));
@@ -109,16 +109,16 @@ export function parsePortfolioGroupArchiveInput(
   const groupId = optionalText(formData.get("groupId"));
   const expectedUpdatedAt = optionalText(formData.get("expectedUpdatedAt"));
   if (groupId === null || !UUID_PATTERN.test(groupId)) {
-    return invalid("자산 그룹 식별자가 올바르지 않습니다.");
+    return invalid("분석 범위 식별자가 올바르지 않습니다.");
   }
   if (
     expectedUpdatedAt === null ||
     !isStrictUtcTimestamp(expectedUpdatedAt)
   ) {
-    return invalid("자산 그룹의 최신 상태를 확인할 수 없습니다.");
+    return invalid("분석 범위의 최신 상태를 확인할 수 없습니다.");
   }
   if (formData.get("archiveConfirmed") !== "yes") {
-    return invalid("자산 그룹 삭제 확인란을 선택해 주세요.");
+    return invalid("분석 범위 삭제 확인란을 선택해 주세요.");
   }
 
   return Object.freeze({

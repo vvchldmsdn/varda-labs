@@ -1,4 +1,5 @@
 import "server-only";
+import { brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
 import {
   and,
@@ -36,7 +37,7 @@ import {
 } from "@/lib/portfolio-account-scope";
 import {
   admitAdjustedHistoricalPriceRows,
-  admitPrivateSingleTenantRawHistoricalPriceRows,
+  admitSharedKisRawHistoricalPriceRows,
   selectPreferredPrivateHistoricalPriceRows,
 } from "@/lib/market-data/asset-price-consumer-admission";
 import {
@@ -46,7 +47,6 @@ import {
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
-import { getActivePortfolioOwnerUserIds } from "./active-portfolio-owners";
 
 export async function getReadOnlyTenantInvestmentLabDataAvailability({
   account,
@@ -56,7 +56,6 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
   tenantContext: TenantContext;
 }) {
   const selectedAccounts = [...accountsForPortfolioScope(account)];
-  const activeOwnerUserIdsPromise = getActivePortfolioOwnerUserIds();
   const goldDecision =
     DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS.decisions.krxGold;
   const [
@@ -80,6 +79,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
           inArray(accounts.code, selectedAccounts),
           eq(dailyPortfolioSnapshots.account, accounts.code),
           eq(dailyPortfolioSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_portfolio_snapshots"),
         ),
       )
       .orderBy(
@@ -142,6 +142,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
           inArray(accounts.code, selectedAccounts),
           eq(dailyPositionSnapshots.account, accounts.code),
           eq(dailyPositionSnapshots.isSample, false),
+          brokerRecoverySnapshotPredicate("daily_position_snapshots"),
           eq(dailyPositionSnapshots.assetName, goldDecision.assetName),
           eq(accounts.code, goldDecision.account),
           eq(
@@ -164,10 +165,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailability({
         asc(dailyPositionSnapshots.assetName),
       ),
     loadPortfolioRiskReadModel(
-      createTenantInvestmentLabMarketHistoryRepository(
-        tenantContext,
-        activeOwnerUserIdsPromise,
-      ),
+      createTenantInvestmentLabMarketHistoryRepository(tenantContext),
       { account, window: 90 },
     ),
   ]);
@@ -206,7 +204,6 @@ export async function getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
 }) {
   const readNow = new Date();
   const serviceDate = resolveSnapshotCycle(readNow).snapshotDate;
-  const activeOwnerUserIdsPromise = getActivePortfolioOwnerUserIds();
   const targetsPromise = getPortfolioAnalysisScopeTargets({
     scope,
     serviceDate,
@@ -214,10 +211,7 @@ export async function getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
   });
   const riskModelPromise = loadPreselectedPortfolioRiskReadModel(
     createTenantPortfolioRiskScopeRepository({
-      loadPrices: createInvestmentLabHistoricalPriceLoader(
-        tenantContext,
-        activeOwnerUserIdsPromise,
-      ),
+      loadPrices: createInvestmentLabHistoricalPriceLoader(),
       scope,
       serviceDate,
       tenantContext,
@@ -327,31 +321,20 @@ export async function getReadOnlyTenantInvestmentLabDataAvailabilityForScope({
 
 function createTenantInvestmentLabMarketHistoryRepository(
   tenantContext: TenantContext,
-  activeOwnerUserIdsPromise: Promise<readonly string[]>,
 ) {
   return createTenantPortfolioRiskRepository(
     tenantContext,
-    createInvestmentLabHistoricalPriceLoader(
-      tenantContext,
-      activeOwnerUserIdsPromise,
-    ),
+    createInvestmentLabHistoricalPriceLoader(),
   );
 }
 
-function createInvestmentLabHistoricalPriceLoader(
-  tenantContext: TenantContext,
-  activeOwnerUserIdsPromise: Promise<readonly string[]>,
-) {
+function createInvestmentLabHistoricalPriceLoader() {
   return async (
     input: Parameters<typeof loadPortfolioRiskPriceCandidates>[0],
   ) => {
     const rows = await loadPortfolioRiskPriceCandidates(input);
     const adjustedRows = admitAdjustedHistoricalPriceRows(rows).rows;
-    const privateRawRows = admitPrivateSingleTenantRawHistoricalPriceRows({
-      rows,
-      requestedOwnerUserId: tenantContext.ownerUserId,
-      activeOwnerUserIds: await activeOwnerUserIdsPromise,
-    }).rows;
+    const privateRawRows = admitSharedKisRawHistoricalPriceRows(rows).rows;
     const preferred = selectPreferredPrivateHistoricalPriceRows({
       adjustedRows,
       privateRawRows,

@@ -1,14 +1,16 @@
+import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type {
   PortfolioRiskMathInstrument,
   PortfolioRiskPortfolioMetrics,
 } from "@/lib/portfolio-risk";
 
-import { formatRiskDecimal, metricReasonLabel } from "./portfolio-risk-format";
+import { ChevronDown } from "lucide-react";
+import { metricReasonLabel } from "./portfolio-risk-format";
+import { RiskCorrelationMatrix } from "./risk-correlation-matrix";
+import styles from "./risk-workspace.module.css";
 import {
   RiskEmptyMessage,
   RiskSection,
-  RiskTableCell,
-  RiskTableHeader,
 } from "./portfolio-risk-primitives";
 
 export function RiskCorrelationSections({
@@ -23,31 +25,33 @@ export function RiskCorrelationSections({
       <RiskMatrixSection
         title="상관관계 행렬"
         marker="correlation-matrix"
-        detail="calculation instrument order"
+        detail="같은 기간에 관측한 종목별 수익률"
         instruments={instruments}
         matrix={portfolio.correlationMatrix}
       />
+      <details className={styles.stressDisclosure}>
+      <summary><span><PortfolioText ko={"하락일에도 함께 움직였을까?"} /></span><small>{portfolio.stress.downDayObservations}<PortfolioText ko={"개 하락일"} /></small><ChevronDown size={16} aria-hidden="true" /></summary>
       <RiskSection
         title="하락 구간 상관"
         marker="stress-correlation"
-        detail={`${portfolio.stress.downDayObservations} down days`}
+        detail={`${portfolio.stress.downDayObservations}개 하락일`}
       >
         {portfolio.stress.correlationMatrix ? (
-          <RiskMatrix
+          <RiskCorrelationMatrix
             instruments={instruments}
             matrix={portfolio.stress.correlationMatrix}
           />
         ) : (
           <RiskEmptyMessage>
-            하락일 {portfolio.stress.downDayObservations}개로 최소{" "}
-            {portfolio.stress.minimumObservations}개 기준을 충족하지 못했습니다.
-            {" "}
-            {metricReasonLabel(
+            <PortfolioText ko={"하락일"} />{" "}{portfolio.stress.downDayObservations}<PortfolioText ko={"개로 최소"} />{" "}
+            {portfolio.stress.minimumObservations}<PortfolioText ko={"개 기준을 충족하지 못했습니다."} />{" "}{" "}
+            <PortfolioText ko={metricReasonLabel(
               portfolio.stress.weightedAverageCorrelation.reason,
-            ) ?? "행렬을 계산할 수 없습니다."}
+            ) ?? "행렬을 계산할 수 없습니다."} />
           </RiskEmptyMessage>
         )}
       </RiskSection>
+      </details>
     </>
   );
 }
@@ -67,54 +71,7 @@ function RiskMatrixSection({
 }) {
   return (
     <RiskSection title={title} marker={marker} detail={detail}>
-      <RiskMatrix instruments={instruments} matrix={matrix} />
+      <RiskCorrelationMatrix instruments={instruments} matrix={matrix} />
     </RiskSection>
-  );
-}
-
-function RiskMatrix({
-  instruments,
-  matrix,
-}: {
-  instruments: readonly PortfolioRiskMathInstrument[];
-  matrix: Array<Array<number | null>>;
-}) {
-  const minimumWidth = Math.max(720, (instruments.length + 1) * 84);
-
-  return (
-    <div className="mt-3 max-w-full overflow-x-auto">
-      <table
-        className="border-separate border-spacing-0"
-        style={{ minWidth: minimumWidth }}
-      >
-        <thead>
-          <tr>
-            <RiskTableHeader>종목</RiskTableHeader>
-            {instruments.map((instrument) => (
-              <RiskTableHeader key={instrument.instrumentKey} align="center">
-                {instrument.ticker}
-              </RiskTableHeader>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {instruments.map((instrument, rowIndex) => (
-            <tr key={instrument.instrumentKey}>
-              <RiskTableCell strong>{instrument.ticker}</RiskTableCell>
-              {instruments.map((column, columnIndex) => (
-                <RiskTableCell
-                  key={column.instrumentKey}
-                  align="center"
-                >
-                  {formatRiskDecimal(
-                    matrix[rowIndex]?.[columnIndex] ?? null,
-                  )}
-                </RiskTableCell>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }

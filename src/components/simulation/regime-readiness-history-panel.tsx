@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationRegimeReadinessHistory } from "@/lib/simulation-regime-readiness-history";
 
 export function RegimeReadinessHistoryPanel({
@@ -8,7 +9,7 @@ export function RegimeReadinessHistoryPanel({
   return (
     <section
       aria-labelledby="regime-readiness-history-title"
-      className="border-b border-[#d7ddcf] py-5"
+      className="border-b border-[var(--line)] py-5"
       data-regime-readiness-history
       data-regime-readiness-history-policy={model.policy.version}
       data-regime-point-in-time-status={model.pointInTime.status}
@@ -20,20 +21,15 @@ export function RegimeReadinessHistoryPanel({
             id="regime-readiness-history-title"
             className="text-lg font-semibold"
           >
-            체제 데이터 시점 검증
-          </h2>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-[#687064]">
-            선택 기준일과 직전 6개 서비스 날짜를 독립적으로 점검합니다.
-            날짜를 자동으로 되돌리지 않으며, 사후 연구 가능 여부와 당시
-            실제 이용 가능성이 입증됐는지를 분리합니다.
-          </p>
+            <SimulationText ko={"체제 데이터 시점 검증"} />{" "}</h2>
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
+            <SimulationText ko={"선택 기준일과 직전 6개 서비스 날짜를 독립적으로 점검합니다. 날짜를 자동으로 되돌리지 않으며, 사후 연구 가능 여부와 당시 실제 이용 가능성이 입증됐는지를 분리합니다."} />{" "}</p>
         </div>
-        <span className="w-fit rounded-md border border-[#e6d8ae] bg-[#fffdf6] px-3 py-1.5 text-xs font-semibold text-[#6b6044]">
-          엄격한 시점 검증 미확립
-        </span>
+        <span className="w-fit rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--warning)]">
+          <SimulationText ko={"엄격한 시점 검증 미확립"} />{" "}</span>
       </div>
 
-      <div className="mt-4 grid border-y border-[#e1e5da] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid border-y border-[var(--line)] sm:grid-cols-2 xl:grid-cols-4">
         <SummaryItem
           label="검사 날짜"
           value={`${model.summary.inspectedDateCount}일`}
@@ -56,33 +52,29 @@ export function RegimeReadinessHistoryPanel({
         />
       </div>
 
-      <div className="mt-4 rounded-lg border border-[#e6d8ae] bg-[#fffdf6] px-4 py-4">
-        <p className="font-semibold">현재 import만으로 당시 공개 상태를 증명할 수 없습니다.</p>
-        <p className="mt-2 text-sm leading-6 text-[#6b6044]">
-          factor별 공개 날짜는 보존됐지만 공개 시각과 revision vintage는
-          보존되지 않았습니다. 같은 날짜 공개값은 다음 서비스 날짜부터만
-          사후 연구에 사용하며, 아래 결과를 당시 알 수 있었던 예측이나
-          추천으로 해석하지 않습니다.
-        </p>
+      <div className="mt-4 rounded-lg border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4">
+        <p className="font-semibold"><SimulationText ko={"현재 import만으로 당시 공개 상태를 증명할 수 없습니다."} /></p>
+        <p className="mt-2 text-sm leading-6 text-[var(--warning)]">
+          <SimulationText ko={"factor별 공개 날짜는 보존됐지만 공개 시각과 revision vintage는 보존되지 않았습니다. 같은 날짜 공개값은 다음 서비스 날짜부터만 사후 연구에 사용하며, 아래 결과를 당시 알 수 있었던 예측이나 추천으로 해석하지 않습니다."} />{" "}</p>
       </div>
 
       {model.entries.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[940px] border-collapse text-left text-sm">
-            <thead className="border-y border-[#d7ddcf] text-xs text-[#687064]">
+            <thead className="border-y border-[var(--line)] text-xs text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-3 font-semibold">기준일</th>
-                <th className="px-3 py-3 font-semibold">사후 연구</th>
-                <th className="px-3 py-3 font-semibold">적용 공개일</th>
-                <th className="px-3 py-3 text-right font-semibold">정렬 상태</th>
-                <th className="px-3 py-3 text-right font-semibold">후보 상태</th>
-                <th className="px-3 py-3 font-semibold">엄격한 시점 검증</th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"기준일"} /></th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"사후 연구"} /></th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"적용 공개일"} /></th>
+                <th className="px-3 py-3 text-right font-semibold"><SimulationText ko={"정렬 상태"} /></th>
+                <th className="px-3 py-3 text-right font-semibold"><SimulationText ko={"후보 상태"} /></th>
+                <th className="px-3 py-3 font-semibold"><SimulationText ko={"엄격한 시점 검증"} /></th>
               </tr>
             </thead>
             <tbody>
               {model.entries.map((entry) => (
                 <tr
-                  className="border-b border-[#e1e5da] align-top"
+                  className="border-b border-[var(--line)] align-top"
                   data-regime-history-date={entry.serviceDate}
                   data-regime-history-research-status={entry.retrospectiveStatus}
                   data-regime-history-point-in-time-status={entry.pointInTimeStatus}
@@ -91,9 +83,8 @@ export function RegimeReadinessHistoryPanel({
                   <td className="px-3 py-3 font-semibold tabular-nums">
                     {formatDate(entry.serviceDate)}
                     {entry.serviceDate === model.selectedEndServiceDate ? (
-                      <span className="ml-2 text-xs font-normal text-[#687064]">
-                        선택일
-                      </span>
+                      <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                        <SimulationText ko={"선택일"} />{" "}</span>
                     ) : null}
                   </td>
                   <td className="px-3 py-3">
@@ -115,26 +106,24 @@ export function RegimeReadinessHistoryPanel({
                       ? `${entry.readiness.selectedNeighborCount}/${entry.readiness.eligibleCandidateRowCount}`
                       : "-"}
                   </td>
-                  <td className="px-3 py-3 text-[#8a5d1f]">
-                    공개시각·vintage 없음
-                  </td>
+                  <td className="px-3 py-3 text-[var(--warning)]">
+                    <SimulationText ko={"공개시각·vintage 없음"} />{" "}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="mt-4 text-sm text-[#687064]">
-          기준일을 직접 선택하면 최근 날짜별 준비도를 검사합니다.
-        </p>
+        <p className="mt-4 text-sm text-[var(--muted)]">
+          <SimulationText ko={"기준일을 직접 선택하면 최근 날짜별 준비도를 검사합니다."} />{" "}</p>
       )}
 
-      <div className="mt-4 border-t border-[#e1e5da] pt-4">
-        <p className="text-xs font-semibold text-[#687064]">시점 안전 날짜</p>
+      <div className="mt-4 border-t border-[var(--line)] pt-4">
+        <p className="text-xs font-semibold text-[var(--muted)]"><SimulationText ko={"시점 안전 날짜"} /></p>
         <p className="mt-1 text-sm">
-          {model.safeEndServiceDates.length > 0
+          <SimulationText ko={model.safeEndServiceDates.length > 0
             ? model.safeEndServiceDates.map(formatDate).join(", ")
-            : "현재 보존된 provenance로 입증된 날짜가 없습니다."}
+            : "현재 보존된 provenance로 입증된 날짜가 없습니다."} />
         </p>
       </div>
     </section>
@@ -154,10 +143,10 @@ function FactorReleaseList({
       {factors.map((factor) => (
         <li key={factor.factorKey}>
           <span className="font-semibold">{factor.label}</span>{" "}
-          <span className="tabular-nums text-[#687064]">
-            {factor.currentReleaseDate
+          <span className="tabular-nums text-[var(--muted)]">
+            <SimulationText ko={factor.currentReleaseDate
               ? `${formatDate(factor.currentReleaseDate)} · ${factor.currentCarryDays}일 경과`
-              : "적용값 없음"}
+              : "적용값 없음"} />
           </span>
         </li>
       ))}
@@ -172,10 +161,10 @@ function StatusText({
   ready: boolean;
   reason: SimulationRegimeReadinessHistory["entries"][number]["reason"];
 }) {
-  if (ready) return <span className="font-semibold text-[#176b43]">계산 가능</span>;
+  if (ready) return <span className="font-semibold text-[var(--brand)]"><SimulationText ko={"계산 가능"} /></span>;
   return (
-    <span className="text-[#8a5d1f]">
-      사용 불가 · {reasonLabel(reason)}
+    <span className="text-[var(--warning)]">
+      <SimulationText ko={"사용 불가 ·"} />{" "}<SimulationText ko={reasonLabel(reason)} />
     </span>
   );
 }
@@ -190,10 +179,10 @@ function SummaryItem({
   detail: string;
 }) {
   return (
-    <div className="border-b border-r border-[#e1e5da] px-4 py-3 last:border-r-0 xl:border-b-0">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#7a8175]">{detail}</p>
+    <div className="border-b border-r border-[var(--line)] px-4 py-3 last:border-r-0 xl:border-b-0">
+      <p className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></p>
+      <p className="mt-1 text-lg font-semibold tabular-nums"><SimulationText ko={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></p>
     </div>
   );
 }

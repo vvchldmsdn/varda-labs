@@ -11,9 +11,9 @@ export function PortfolioSnapshotTable({
   snapshots: readonly TenantPortfolioSnapshotDto[];
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-md border border-[#dfe3d5] bg-white">
+    <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)] bg-white">
       <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
-        <thead className="bg-[#eef2e8] text-xs text-[#5e685e]">
+        <thead className="bg-[var(--wash)] text-xs text-[var(--muted)]">
           <tr>
             <TableHeading>Account</TableHeading>
             <TableHeading align="right">Market value</TableHeading>
@@ -27,12 +27,12 @@ export function PortfolioSnapshotTable({
             <TableHeading>Captured</TableHeading>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#e5e8df]">
+        <tbody className="divide-y divide-[var(--wash)]">
           {snapshots.map((snapshot) => (
             <tr key={snapshot.accountCode}>
               <td className="px-4 py-3">
                 <p className="font-semibold">{snapshot.accountName}</p>
-                <p className="text-xs text-[#687064]">
+                <p className="text-xs text-[var(--muted)]">
                   {snapshot.accountCode}
                 </p>
               </td>
@@ -45,11 +45,11 @@ export function PortfolioSnapshotTable({
               <NumberCell value={String(snapshot.numAssets ?? "-")} />
               <td className="px-4 py-3">
                 <p>{snapshot.topHoldingName ?? "-"}</p>
-                <p className="text-xs text-[#687064]">
+                <p className="text-xs text-[var(--muted)]">
                   {formatPortfolioPercent(snapshot.topHoldingWeight)}
                 </p>
               </td>
-              <td className="px-4 py-3 text-xs text-[#687064]">
+              <td className="px-4 py-3 text-xs text-[var(--muted)]">
                 <p>{formatPortfolioCapturedAt(snapshot.capturedAt)}</p>
                 <p>{snapshot.ruleVersion ?? "Unversioned"}</p>
               </td>

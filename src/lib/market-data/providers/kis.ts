@@ -1,4 +1,9 @@
 import "server-only";
+import { pairKisHistory, mergeKisPairedHistory } from "./kis-paired-history";
+import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
+import { fetchKisWithBudget } from "@/lib/market-data/provider-budget";
+
+import { createHash } from "node:crypto";
 
 import type {
   ClosePrice,
@@ -18,6 +23,15 @@ import {
   planKisRawHistoryRequests,
   type KisHistoryWindow,
 } from "./kis-history";
+import {
+  getReusableKisAccessToken,
+  type KisTokenSession,
+} from "./kis-token-lifecycle";
+import {
+  KIS_US_EXCHANGES,
+  parseKisUsdKrwPriceDetailResponse,
+  type KisUsdKrwQuoteTarget,
+} from "./kis-fx";
 import { redactSensitiveText } from "@/lib/redaction";
 
 export const KIS_REQUIRED_ENV_KEYS = ["KIS_APP_KEY", "KIS_APP_SECRET"] as const;
@@ -36,11 +50,6 @@ type KisConfig = {
   appSecret: string;
   baseUrl: string;
   tokenPolicy: KisTokenPolicy;
-};
-
-type KisTokenCache = {
-  accessToken: string;
-  expiresAt: number;
 };
 
 type KisHistoryRow = {
@@ -70,8 +79,7 @@ export type KisProviderPolicy = {
 type EnvReader = Record<string, string | undefined>;
 const DEFAULT_KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 const MOCK_KIS_BASE_URL = "https://openapivts.koreainvestment.com:29443";
-const US_EXCHANGES = ["NAS", "NYS", "AMS"] as const;
-let memoryTokenCache: KisTokenCache | null = null;
+const US_EXCHANGES = KIS_US_EXCHANGES;
 
 export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderPolicy {
   const missingEnvKeys = KIS_REQUIRED_ENV_KEYS.filter(
@@ -89,15 +97,27 @@ export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderP
     storesSecretsInDatabase: false,
     notes: [
       "KIS app key, app secret, and access tokens must not be stored in Postgres settings or market_data_sync_runs metadata.",
-      "per_request token policy is the safest first implementation because it persists no token.",
-      "memory_cache token policy may reuse tokens only inside a warm server instance and must tolerate cold-start refetches.",
+      "memory_cache reuses an unexpired token inside a warm server instance and coalesces concurrent token requests.",
+      "per_request remains available as an explicit troubleshooting policy.",
+      "serverless cold starts and separate instances may still obtain separate tokens.",
       "Vercel KV or another external secret store can be considered later, but is not required for the first KIS adapter.",
     ],
   };
 }
 
-export function createKisMarketDataProvider(): MarketDataProvider {
-  const session: KisProviderSession = { tokenCache: null };
+export type KisProviderRequestSession = KisTokenSession;
+
+type KisProviderSession = KisProviderRequestSession;
+
+export function createKisProviderRequestSession(): KisProviderRequestSession {
+  return { tokenCache: null, tokenRequest: null };
+}
+
+export function createKisMarketDataProvider(
+  requestSession?: KisProviderRequestSession,
+): MarketDataProvider {
+  const session: KisProviderSession =
+    requestSession ?? createKisProviderRequestSession();
 
   return {
     name: "kis",
@@ -114,9 +134,66 @@ export function createKisMarketDataProvider(): MarketDataProvider {
   };
 }
 
-type KisProviderSession = {
-  tokenCache: KisTokenCache | null;
-};
+export async function fetchKisUsdKrwFxCandidate({
+  rateDate,
+  session = createKisProviderRequestSession(),
+  target,
+}: {
+  fetchedAt?: Date;
+  rateDate: string;
+  session?: KisProviderRequestSession;
+  target: KisUsdKrwQuoteTarget;
+}) {
+  const config = getKisConfig();
+  if (!config) throw new Error("KIS provider is not configured");
+
+  const ticker = target.ticker.trim().toUpperCase();
+  if (!ticker) throw new Error("KIS USD/KRW quote target is missing");
+
+  const token = await getKisAccessToken(config, session);
+  const exchanges = target.exchange ? [target.exchange] : [...US_EXCHANGES];
+  const errors: string[] = [];
+
+  for (const [index, exchange] of exchanges.entries()) {
+    try {
+      const params = new URLSearchParams({
+        AUTH: "",
+        EXCD: exchange,
+        SYMB: ticker,
+      });
+      const response = await fetchKisWithBudget(config,
+        `${config.baseUrl}/uapi/overseas-price/v1/quotations/price-detail?${params}`,
+        {
+          headers: kisHeaders(config, token, "HHDFS76200200"),
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      const data = await readKisJson(
+        response,
+        `overseas-price-detail:${ticker}:${exchange}`,
+      );
+      const parsed = response.ok
+        ? parseKisUsdKrwPriceDetailResponse(data, {
+            exchange,
+            fetchedAt: new Date(),
+            rateDate,
+          })
+        : { ok: false as const, error: `provider_http_${response.status}` };
+
+      if (parsed.ok) return parsed.candidate;
+      errors.push(`${exchange}:${parsed.error}`);
+    } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
+      errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
+    }
+
+    if (index < exchanges.length - 1) await sleep(180);
+  }
+
+  throw new Error(
+    `KIS USD/KRW quote returned no usable rate (${ticker}): ${errors.join(" / ")}`,
+  );
+}
 
 async function fetchKisLiveQuotes(
   targets: PriceLookupTarget[],
@@ -148,6 +225,7 @@ async function fetchKisLiveQuotes(
   try {
     token = await getKisAccessToken(config, session);
   } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
     const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
@@ -166,8 +244,11 @@ async function fetchKisLiveQuotes(
   for (const target of targets) {
     try {
       const liveRow = await fetchKisLiveRow(target, token, config);
-      rows.push(toLiveQuote(target, liveRow, fetchedAt));
+      // Receipt completion, not request/batch start. The endpoint supplies no
+      // verified exchange timestamp; cutoff storage marks this as collection.
+      rows.push(toLiveQuote(target, liveRow, new Date()));
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       rows.push({
         ...toSkippedLiveQuote(target, context),
         status: "error",
@@ -220,6 +301,7 @@ async function fetchKisClosePrices(
   try {
     token = await getKisAccessToken(config, session);
   } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
     const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
@@ -241,6 +323,7 @@ async function fetchKisClosePrices(
       const historyRow = await fetchLatestCloseRow(target, token, config, context);
       rows.push(toClosePrice(target, historyRow, context, fetchedAt));
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       rows.push({
         ...toSkippedClosePrice(target, context),
         status: "error",
@@ -307,6 +390,7 @@ async function fetchKisHistoricalClosePrices(
   try {
     token = await getKisAccessToken(config, session);
   } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
     const message = redactSensitiveText(toErrorMessage(error));
     return {
       provider: "kis",
@@ -393,9 +477,17 @@ async function fetchKisHistoricalClosePrices(
             }),
           );
         } else {
-          targetSeries.push([...normalized.rows]);
+          if (context.includeAdjusted) {
+            await sleep(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds);
+            const adjustedPayload = request.market === "korea"
+              ? await fetchKoreanHistoryWindow({target,token,config,window:request.window,adjusted:true,onRequest:()=>{requestCount+=1;}})
+              : await fetchUsHistoryWindow({target,token,config,window:request.window,adjusted:true,knownExchange:knownUsExchange,onRequest:()=>{requestCount+=1;}});
+            const adjusted = normalizeKisRawHistoryPayload({target,window:request.window,rawRows:adjustedPayload.rawRows,fetchedAt:new Date(),exchange:adjustedPayload.exchange});
+            targetSeries.push(pairKisHistory(normalized.rows,adjusted.rows));
+          } else targetSeries.push([...normalized.rows]);
         }
       } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
         failures.push(
           historyFailure({
             instrument,
@@ -409,7 +501,7 @@ async function fetchKisHistoricalClosePrices(
       await sleep(KIS_RAW_HISTORY_POLICY.requestDelayMilliseconds);
     }
 
-    series.push([...mergeKisRawHistoryRows(targetSeries)]);
+    series.push(context.includeAdjusted ? mergeKisPairedHistory(targetSeries) : [...mergeKisRawHistoryRows(targetSeries)]);
   }
 
   if (invalidRowCount > 0) {
@@ -424,7 +516,7 @@ async function fetchKisHistoricalClosePrices(
     warnings.push(`collapsed exact duplicate provider rows: ${duplicateRowCount}`);
   }
   warnings.push(
-    "KIS historical rows are raw price-return evidence; adjusted-close and total-return claims remain unset",
+    context.includeAdjusted ? "Paired raw and provider-adjusted closes; dividend reinvestment and total return are not claimed" : "KIS historical rows are raw price-return evidence; adjusted-close and total-return claims remain unset",
     context.dryRun
       ? "KIS historical dry-run fetched provider evidence without database writes"
       : "KIS historical fetch completed; this provider method does not write to the database",
@@ -433,8 +525,8 @@ async function fetchKisHistoricalClosePrices(
   return {
     provider: "kis",
     fetchedAt,
-    priceBasis: KIS_RAW_HISTORY_POLICY.priceBasis,
-    rows: [...mergeKisRawHistoryRows(series)],
+    priceBasis: context.includeAdjusted ? "raw_and_provider_adjusted" : KIS_RAW_HISTORY_POLICY.priceBasis,
+    rows: context.includeAdjusted ? mergeKisPairedHistory(series) : [...mergeKisRawHistoryRows(series)],
     failures,
     requestCount,
     warnings,
@@ -445,21 +537,20 @@ async function getKisAccessToken(
   config: KisConfig,
   session: KisProviderSession,
 ) {
-  const now = Date.now();
-  if (session.tokenCache && session.tokenCache.expiresAt > now + 60_000) {
-    return session.tokenCache.accessToken;
-  }
+  const cacheKey = createHash("sha256")
+    .update(`${config.baseUrl}\u0000${config.appKey}`)
+    .digest("hex");
 
-  if (
-    config.tokenPolicy === "memory_cache" &&
-    memoryTokenCache &&
-    memoryTokenCache.expiresAt > now + 60_000
-  ) {
-    session.tokenCache = memoryTokenCache;
-    return memoryTokenCache.accessToken;
-  }
+  return getReusableKisAccessToken({
+    cacheKey,
+    policy: config.tokenPolicy,
+    session,
+    issueToken: () => issueKisAccessToken(config),
+  });
+}
 
-  const response = await fetch(`${config.baseUrl}/oauth2/tokenP`, {
+async function issueKisAccessToken(config: KisConfig) {
+  const response = await fetchKisWithBudget(config, `${config.baseUrl}/oauth2/tokenP`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -478,16 +569,10 @@ async function getKisAccessToken(
     );
   }
 
-  const expiresInSeconds = toNumber(data.expires_in) ?? 23 * 60 * 60;
-  session.tokenCache = {
+  return {
     accessToken: token,
-    expiresAt: now + expiresInSeconds * 1000,
+    expiresInSeconds: toNumber(data.expires_in) ?? 23 * 60 * 60,
   };
-  if (config.tokenPolicy === "memory_cache") {
-    memoryTokenCache = session.tokenCache;
-  }
-
-  return token;
 }
 
 async function fetchKoreanHistoryWindow(options: {
@@ -496,6 +581,7 @@ async function fetchKoreanHistoryWindow(options: {
   config: KisConfig;
   window: KisHistoryWindow;
   onRequest: () => void;
+  adjusted?: boolean;
 }): Promise<{
   rawRows: unknown;
   exchange: null;
@@ -506,10 +592,10 @@ async function fetchKoreanHistoryWindow(options: {
     fid_input_date_1: toCompactDate(options.window.startDate),
     fid_input_date_2: toCompactDate(options.window.endDate),
     fid_period_div_code: "D",
-    fid_org_adj_prc: "1",
+    fid_org_adj_prc: options.adjusted ? "0" : "1",
   });
   options.onRequest();
-  const response = await fetch(
+  const response = await fetchKisWithBudget(options.config,
     `${options.config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
     {
       headers: kisHeaders(options.config, options.token, "FHKST03010100"),
@@ -540,6 +626,7 @@ async function fetchUsHistoryWindow(options: {
   window: KisHistoryWindow;
   knownExchange: (typeof US_EXCHANGES)[number] | null;
   onRequest: () => void;
+  adjusted?: boolean;
 }): Promise<{
   rawRows: unknown;
   exchange: (typeof US_EXCHANGES)[number];
@@ -557,11 +644,11 @@ async function fetchUsHistoryWindow(options: {
         SYMB: options.target.ticker,
         GUBN: "0",
         BYMD: toCompactDate(options.window.endDate),
-        MODP: "1",
+        MODP: options.adjusted ? "1" : "0",
         KEYB: "",
       });
       options.onRequest();
-      const response = await fetch(
+      const response = await fetchKisWithBudget(options.config,
         `${options.config.baseUrl}/uapi/overseas-price/v1/quotations/dailyprice?${params}`,
         {
           headers: kisHeaders(options.config, options.token, "HHDFS76240000"),
@@ -584,6 +671,7 @@ async function fetchUsHistoryWindow(options: {
         errors.push(`${exchange}:empty`);
       }
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
@@ -627,7 +715,7 @@ async function fetchKoreanLiveQuote(
     FID_COND_MRKT_DIV_CODE: "J",
     FID_INPUT_ISCD: target.ticker,
   });
-  const response = await fetch(
+  const response = await fetchKisWithBudget(config,
     `${config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-price?${params}`,
     {
       headers: kisHeaders(config, token, "FHKST01010100"),
@@ -668,7 +756,7 @@ async function fetchUsLiveQuote(
         EXCD: exchange,
         SYMB: target.ticker,
       });
-      const response = await fetch(
+      const response = await fetchKisWithBudget(config,
         `${config.baseUrl}/uapi/overseas-price/v1/quotations/price?${params}`,
         {
           headers: kisHeaders(config, token, "HHDFS00000300"),
@@ -695,6 +783,7 @@ async function fetchUsLiveQuote(
 
       errors.push(`${exchange}:empty`);
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
@@ -720,7 +809,7 @@ async function fetchKoreanClose(
     fid_period_div_code: "D",
     fid_org_adj_prc: "1",
   });
-  const response = await fetch(
+  const response = await fetchKisWithBudget(config,
     `${config.baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
     {
       headers: kisHeaders(config, token, "FHKST03010100"),
@@ -764,10 +853,10 @@ async function fetchUsClose(
         SYMB: target.ticker,
         GUBN: "0",
         BYMD: toCompactDate(context.priceDate),
-        MODP: "1",
+        MODP: "0",
         KEYB: "",
       });
-      const response = await fetch(
+      const response = await fetchKisWithBudget(config,
         `${config.baseUrl}/uapi/overseas-price/v1/quotations/dailyprice?${params}`,
         {
           headers: kisHeaders(config, token, "HHDFS76240000"),
@@ -796,6 +885,7 @@ async function fetchUsClose(
       }
       errors.push(`${exchange}:empty`);
     } catch (error) {
+      if (isProviderCollectionDeferred(error)) throw error;
       errors.push(`${exchange}:${redactSensitiveText(toErrorMessage(error))}`);
     }
 
@@ -1061,8 +1151,8 @@ function sleep(ms: number) {
 
 function parseTokenPolicy(value: string | undefined): KisTokenPolicy {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === "memory_cache") return "memory_cache";
-  return "per_request";
+  if (normalized === "per_request") return "per_request";
+  return "memory_cache";
 }
 
 function hasEnvValue(value: string | undefined) {

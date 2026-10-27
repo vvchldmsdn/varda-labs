@@ -1,3 +1,4 @@
+import { LabText } from "./lab-text";
 import { InvestmentLabFixedMixComparisonChart } from "./investment-lab-fixed-mix-comparison-chart";
 import {
   formatInvestmentLabKrw,
@@ -20,11 +21,11 @@ export function InvestmentLabFixedMixStandardComparison({
     );
     return (
       <UnavailableMessage>
-        {blockers && blockers.length > 0
+        <LabText value={blockers && blockers.length > 0
           ? [...new Set(blockers)]
               .map(investmentLabFixedMixBlockerLabel)
               .join(" · ")
-          : "세 가지 표준 고정비중 경로를 준비할 수 없습니다."}
+          : "세 가지 표준 고정비중 경로를 준비할 수 없습니다."} />
       </UnavailableMessage>
     );
   }
@@ -37,22 +38,18 @@ export function InvestmentLabFixedMixStandardComparison({
       data-section="investment-lab-fixed-mix-comparison"
     >
       <div>
-        <h3 className="text-lg font-semibold">표준 비중 3안 비교</h3>
-        <p className="mt-1 text-sm leading-6 text-[#687064]">
-          세 안은 같은 실제 평가액 날짜, 가격·환율 근거와 매수·매도 금액을
-          사용합니다. KODEX 비중 순서로만 배치하며 성과 순위나 추천을
-          만들지 않습니다.
-        </p>
+        <h3 className="text-lg font-semibold"><LabText value="표준 비중 3안 비교" /></h3>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 세 안은 같은 실제 평가액 날짜, 가격·환율 근거와 매수·매도 금액을 사용합니다. KODEX 비중 순서로만 배치하며 성과 순위나 추천을 만들지 않습니다. " /></p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {model.scenarios.map((entry) => {
           const selected = selectedKodexWeightPct === entry.kodexWeightPct;
           return (
             <div
-              className={`rounded-lg border p-4 ${
+              className={`rounded-[4px] border p-4 ${
                 selected
-                  ? "border-[#1e3a34] bg-[#f6f9f4]"
-                  : "border-[#dfe3d5] bg-[#fbfcf7]"
+                  ? "border-[var(--ink)] bg-[var(--surface)]"
+                  : "border-[var(--line)] bg-[var(--surface)]"
               }`}
               data-fixed-mix-standard-selected={selected ? "true" : "false"}
               key={entry.id}
@@ -62,9 +59,7 @@ export function InvestmentLabFixedMixStandardComparison({
                   KODEX {entry.kodexWeightPct}% · VOO {entry.vooWeightPct}%
                 </p>
                 {selected ? (
-                  <span className="rounded-md bg-[#1e3a34] px-2 py-1 text-xs font-semibold text-white">
-                    현재 입력
-                  </span>
+                  <span className="rounded-md bg-[var(--ink)] px-2 py-1 text-xs font-semibold text-white"><LabText value=" 현재 입력 " /></span>
                 ) : null}
               </div>
               {entry.scenario.status === "ready" ? (
@@ -99,7 +94,7 @@ export function InvestmentLabFixedMixStandardComparison({
                   />
                 </dl>
               ) : (
-                <p className="mt-4 text-sm text-[#73551b]">
+                <p className="mt-4 text-sm text-[var(--warning)]">
                   {entry.scenario.blockers
                     .map(investmentLabFixedMixBlockerLabel)
                     .join(" · ")}
@@ -109,14 +104,11 @@ export function InvestmentLabFixedMixStandardComparison({
           );
         })}
       </div>
-      <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-4">
+      <div className="border-y border-[var(--line)] py-6">
         <InvestmentLabFixedMixComparisonChart scenarios={model.scenarios} />
       </div>
       {model.status === "partial" ? (
-        <p className="text-sm text-[#73551b]">
-          준비된 시나리오만 표시했습니다. 누락된 안은 해당 카드의 차단
-          사유를 확인하세요.
-        </p>
+        <p className="text-sm text-[var(--warning)]"><LabText value=" 준비된 시나리오만 표시했습니다. 누락된 안은 해당 카드의 차단 사유를 확인하세요. " /></p>
       ) : null}
     </div>
   );
@@ -137,26 +129,26 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <dt className="text-[#687064]">{label}</dt>
+      <dt className="text-[var(--muted)]"><LabText value={label} /></dt>
       <dd
         className={`text-right font-semibold tabular-nums ${
           tone === "positive"
-            ? "text-[#08784d]"
+            ? "text-[var(--brand)]"
             : tone === "negative"
-              ? "text-[#bd2929]"
-              : "text-[#111411]"
+              ? "text-[var(--negative)]"
+              : "text-[var(--ink)]"
         }`}
       >
-        {value}
+        <LabText value={value} />
       </dd>
     </div>
   );
 }
 
-function UnavailableMessage({ children }: { children: string }) {
+function UnavailableMessage({ children }: { children: import("react").ReactNode }) {
   return (
-    <p className="rounded-md border border-[#ead9b2] bg-[#fff9ea] px-4 py-3 text-sm text-[#73551b]">
-      {children}
+    <p className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
+      <LabText value={children} />
     </p>
   );
 }

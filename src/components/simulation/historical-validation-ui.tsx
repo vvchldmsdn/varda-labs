@@ -1,3 +1,4 @@
+import { SimulationText } from "@/components/simulation/simulation-text";
 export function HistoricalValidationSummaryCard({
   label,
   value,
@@ -8,10 +9,10 @@ export function HistoricalValidationSummaryCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-lg border border-[#dfe3d5] bg-[#fbfcf7] p-3">
-      <p className="text-xs text-[#687064]">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[#687064]">{detail}</p>
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
+      <p className="text-xs text-[var(--muted)]"><SimulationText ko={label} /></p>
+      <p className="mt-1 text-xl font-semibold tabular-nums"><SimulationText ko={value} /></p>
+      <p className="mt-1 text-xs text-[var(--muted)]"><SimulationText ko={detail} /></p>
     </div>
   );
 }

@@ -1,30 +1,31 @@
 import "server-only";
+import { lazyValue } from "@/lib/lazy-value";
 
 import {
   getReadOnlyTenantPortfolioStructure,
   getReadOnlyTenantPortfolioStructureForScope,
 } from "@/db/queries/portfolio-structure";
 import {
-  getActivePortfolioOwnerUserIds,
   getLatestCommonPrivateOwnerRawServiceDate,
   getReadOnlyPrivateOwnerRawHistoryValidationBatch,
 } from "@/db/queries/simulation-owner-private-history";
 import { buildSimulationOwnerHistoricalOutcomeValidation } from "@/lib/simulation-owner-historical-outcome-validation";
-import { buildSimulationOwnerInputCandidate } from "@/lib/simulation-owner-input-candidate";
-import { buildSimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
+import { buildSimulationOwnerInputCandidate } from "@/lib/shared-domain/simulation-owner-input-candidate";
+import { buildSimulationOwnerInputPreflightModel } from "@/lib/shared-domain/simulation-owner-input-preflight";
 import { buildSimulationOwnerCandidateComparison } from "@/lib/simulation-owner-candidate-comparison";
 import { buildSimulationOwnerWalkForwardValidation } from "@/lib/simulation-owner-walk-forward-validation";
 import {
   buildSimulationOwnerResearchExecution,
   resolveSimulationOwnerExecutionEndSelection,
   SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY,
-} from "@/lib/simulation-owner-research-execution";
-import { prepareSimulationResearchPaths } from "@/lib/simulation-research-execution-core";
-import { resolveSimulationResearchHorizon } from "@/lib/simulation-research-horizon";
+} from "@/lib/shared-domain/simulation-owner-research-execution";
+import { prepareSimulationResearchPaths } from "@/lib/shared-domain/simulation-research-execution-core";
+import { resolveSimulationResearchHorizon } from "@/lib/shared-domain/simulation-research-horizon";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 type SimulationOwnerResearchBaseOptions = Readonly<{
+  includeDisplayPaths?: boolean;
   tenantContext: TenantContext;
   endServiceDate?: string | string[];
   horizon?: string | string[];
@@ -58,10 +59,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
         tenantContext: options.tenantContext,
         account: options.account,
       });
-  const [portfolio, activeOwnerUserIds] = await Promise.all([
-    portfolioPromise,
-    getActivePortfolioOwnerUserIds(),
-  ]);
+  const portfolio = await portfolioPromise;
   const candidate = options.scope
     ? buildSimulationOwnerInputCandidate({
         scopeKey: options.scope.key,
@@ -75,7 +73,6 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     options.endServiceDate === undefined && candidate.selection
       ? await getLatestCommonPrivateOwnerRawServiceDate({
           tenantContext: options.tenantContext,
-          activeOwnerUserIds,
           selection: candidate.selection,
         })
       : null;
@@ -87,7 +84,6 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     candidate.selection && endSelection.status === "valid"
       ? await getReadOnlyPrivateOwnerRawHistoryValidationBatch({
           tenantContext: options.tenantContext,
-          activeOwnerUserIds,
           selection: candidate.selection,
           endServiceDate: endSelection.endServiceDate,
           currentReturnStepCount: 90,
@@ -129,6 +125,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
         })
       : undefined;
   const execution = buildSimulationOwnerResearchExecution({
+    includeDisplayPaths: options.includeDisplayPaths ?? false,
     candidate,
     inputPreflight,
     endSelection,
@@ -136,7 +133,7 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     matrix,
     preparedPaths,
   });
-  const candidateComparison = buildSimulationOwnerCandidateComparison({
+  const candidateComparison = lazyValue(() => buildSimulationOwnerCandidateComparison({
     account: candidate.account,
     prepared:
       preparedPaths?.status === "ready" ? preparedPaths : null,
@@ -144,19 +141,19 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
     currentWeights: execution.executionWeights,
     samplePathCount:
       SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.samplePathCount,
-  });
-  const walkForwardValidation = buildSimulationOwnerWalkForwardValidation({
+  }));
+  const walkForwardValidation = lazyValue(() => buildSimulationOwnerWalkForwardValidation({
     account: candidate.account,
     currentExecutionReady: execution.status === "ready",
     matrix,
     currentWeights: execution.executionWeights,
-  });
-  const historicalValidation =
+  }));
+  const historicalValidation = lazyValue(() =>
     buildSimulationOwnerHistoricalOutcomeValidation({
       execution,
       availableServiceDates,
       endpoints: historicalValidationEndpoints,
-    });
+    }));
   const parametricFactorInput =
     execution.status === "ready" && matrix?.status === "ready"
       ? Object.freeze({
@@ -170,9 +167,10 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
   return Object.freeze({
     inputPreflight,
     execution,
-    candidateComparison,
-    walkForwardValidation,
-    historicalValidation,
+    preparedPaths,
+    get candidateComparison() { return candidateComparison(); },
+    get walkForwardValidation() { return walkForwardValidation(); },
+    get historicalValidation() { return historicalValidation(); },
     parametricFactorInput,
     modelCalibrationInput: Object.freeze({
       factorAsOfServiceDate:

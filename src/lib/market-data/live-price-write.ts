@@ -6,6 +6,7 @@ import type {
 export const LIVE_PRICE_WRITE_CONTRACT = {
   updates: ["live_price_quotes by market/ticker/provider"],
   inserts: ["live_price_quotes"],
+  transactionalCapture: "snapshot_cutoff_price_observations (bounded 06:45–07:00 KST receipts)",
   snapshotWrites: false,
 } as const;
 
@@ -114,7 +115,12 @@ function validateLiveQuoteRow(
 ) {
   if (row.status !== "ok") return row.error ?? `provider_status_${row.status}`;
   if (!target) return "target_not_found";
-  if (target.assetIds.length === 0) return "target_has_no_assets";
+  if (
+    target.assetIds.length === 0 &&
+    target.authority !== "explicit_instrument"
+  ) {
+    return "target_has_no_assets";
+  }
   if (!isDecimalString(row.price)) return "invalid_live_price";
   if (!isAllowedLivePriceSource(row.source, writePolicy)) {
     return "unsupported_write_source";

@@ -5,10 +5,13 @@ import type {
 
 export type PortfolioStructureEffectiveTargetInput = Readonly<{
   account: string;
+  assetName: string;
+  assetType: string | null;
   market: string;
   currency: string;
   ticker: string | null;
   targetWeightBps: number;
+  plannedOnly?: boolean;
 }>;
 
 export type PortfolioStructureTargetProjectionStatus =
@@ -99,12 +102,13 @@ export function projectPortfolioStructureEffectiveTargets({
   const unmatchedHoldingCount = holdingRows.length - matchedHoldingCount;
   const unmatchedTargetCount =
     targetByIdentity.size - matchedTargetIdentities.size;
+  const plannedOnlyCount = targets.filter(row=>row.plannedOnly === true && !matchedTargetIdentities.has(portfolioStructureHoldingIdentityKey(row))).length;
   const status =
-    unmatchedHoldingCount === 0 && unmatchedTargetCount === 0
+    unmatchedHoldingCount === 0 && unmatchedTargetCount === plannedOnlyCount
       ? ("applied" as const)
       : ("partial" as const);
   const groupRows = structure.groupRows.map((group) => {
-    if (status !== "applied") return group;
+    if (status !== "applied" || plannedOnlyCount > 0) return group;
     const effectiveTargetPct = holdingRows
       .filter((holding) => holding.groupName === group.name)
       .reduce(
@@ -143,15 +147,23 @@ export function projectPortfolioStructureEffectiveTargets({
 export function portfolioStructureHoldingIdentityKey(row: {
   account?: string;
   accountCode?: string;
+  assetName?: string;
+  assetType?: string | null;
+  name?: string;
   market: string;
   currency: string;
   ticker: string | null;
 }) {
+  const ticker = row.ticker?.trim().toUpperCase() ?? null;
+  const tickerlessIdentity = [
+    row.assetType?.trim().toLowerCase() ?? "unknown",
+    (row.assetName ?? row.name ?? "").trim().toLowerCase(),
+  ].join(":");
   return [
     (row.account ?? row.accountCode ?? "").trim().toLowerCase(),
     row.market.trim().toLowerCase(),
     row.currency.trim().toUpperCase(),
-    row.ticker?.trim().toUpperCase() ?? "",
+    ticker ?? `tickerless:${tickerlessIdentity}`,
   ].join(":");
 }
 

@@ -1,6 +1,6 @@
 export const SELF_SERVICE_TENANT_ONBOARDING_POLICY = Object.freeze({
   policyId: "authenticated_empty_tenant_onboarding_v1",
-  provider: "neon_auth",
+  providers: Object.freeze(["neon_auth", "naver"]),
   appUserStatus: "active",
   appUserRole: "user",
   identityStatus: "active",

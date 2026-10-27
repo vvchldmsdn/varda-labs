@@ -1,3 +1,5 @@
+import { isHoldingMutationVersion } from "./holding-mutation-version.ts";
+
 export const HOLDING_LIFECYCLE_POLICY = Object.freeze({
   version: "holding_lifecycle_v1",
   semantics: "soft_archive_preserve_financial_evidence",
@@ -27,8 +29,6 @@ export type HoldingLifecycleParseResult =
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STRICT_UTC_TIMESTAMP_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 
 export function parseHoldingArchiveInput(
@@ -53,13 +53,7 @@ function parseSharedInput(formData: FormData): HoldingLifecycleParseResult {
   }
 
   const expectedUpdatedAt = textValue(formData.get("expectedUpdatedAt"));
-  const parsedUpdatedAt = new Date(expectedUpdatedAt ?? "");
-  if (
-    expectedUpdatedAt === null ||
-    !STRICT_UTC_TIMESTAMP_PATTERN.test(expectedUpdatedAt) ||
-    !Number.isFinite(parsedUpdatedAt.getTime()) ||
-    parsedUpdatedAt.toISOString() !== expectedUpdatedAt
-  ) {
+  if (!isHoldingMutationVersion(expectedUpdatedAt)) {
     return invalid("화면을 새로고침한 뒤 다시 시도해 주세요.");
   }
 

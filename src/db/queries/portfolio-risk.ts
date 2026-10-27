@@ -23,7 +23,11 @@ import {
   type PortfolioRiskReadOptions,
 } from "@/lib/portfolio-risk-read-loader";
 import type { PortfolioRiskReadRepository } from "@/lib/portfolio-risk-read-model-types";
-import { admitAdjustedHistoricalPriceRows } from "@/lib/market-data/asset-price-consumer-admission";
+import {
+  admitAdjustedHistoricalPriceRows,
+  admitSharedKisRawHistoricalPriceRows,
+  selectPreferredPrivateHistoricalPriceRows,
+} from "@/lib/market-data/asset-price-consumer-admission";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
@@ -74,11 +78,30 @@ export const loadPortfolioRiskPriceCandidates = async ({
 
 const loadSharedPortfolioRiskPrices: PortfolioRiskReadRepository["loadPrices"] =
   async (input) => {
-    return [
-      ...admitAdjustedHistoricalPriceRows(
-        await loadPortfolioRiskPriceCandidates(input),
-      ).rows,
-    ];
+    const rows = await loadPortfolioRiskPriceCandidates(input);
+    const adjustedRows = admitAdjustedHistoricalPriceRows(rows).rows;
+    const privateRawRows = admitSharedKisRawHistoricalPriceRows(rows).rows;
+    const preferred = selectPreferredPrivateHistoricalPriceRows({
+      adjustedRows,
+      privateRawRows,
+    });
+
+    return preferred.rows.map(({ row, priceBasis }) => ({
+      ticker: row.ticker,
+      market: row.market,
+      currency: row.currency,
+      priceDate: row.priceDate,
+      closePrice: row.closePrice,
+      adjustedClosePrice:
+        priceBasis === "provider_adjusted_close"
+          ? row.adjustedClosePrice
+          : null,
+      source:
+        priceBasis === "provider_adjusted_close"
+          ? row.adjustedCloseSource
+          : row.source,
+      isSample: row.isSample,
+    }));
   };
 
 export const loadPortfolioRiskFxRates: PortfolioRiskReadRepository["loadFxRates"] =

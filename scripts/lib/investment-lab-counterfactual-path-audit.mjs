@@ -7,11 +7,13 @@ import {
   INVESTMENT_LAB_EXECUTION_POLICY,
   scheduleInvestmentLabBoundaryFlows,
 } from "../../src/lib/investment-lab-execution-schedule.ts";
+import { resolvePreferredInvestmentLabCloseEvidence } from "./investment-lab-close-evidence.mjs";
 
 export function auditInvestmentLabCounterfactualPathEvidence({
   eventRows,
   closeRows,
   actualPathRows,
+  ownerRows = [],
 }) {
   const classified = eventRows.map((row) => ({
     row,
@@ -27,10 +29,8 @@ export function auditInvestmentLabCounterfactualPathEvidence({
   const eligible = classified.filter(
     ({ classification }) => classification.includedInV1,
   );
-  const closes = closeRows.map((row) => ({
-    priceDate: row.price_date,
-    adjustedClose: number(row.adjusted_close_price),
-  }));
+  const closeEvidence = resolvePreferredInvestmentLabCloseEvidence(closeRows);
+  const closes = closeEvidence.rows;
   const actualPath = actualPathRows.map((row) => ({
     serviceDate: row.service_date,
     totalMarketValueKrw: number(row.total_market_value_krw),
@@ -48,6 +48,7 @@ export function auditInvestmentLabCounterfactualPathEvidence({
   });
 
   const preEngineBlockers = [
+    ...(ownerRows.length === 1 ? [] : ["active_owner_scope_not_established"]),
     ...unsupported.map(() => "unsupported_event_evidence"),
     ...schedule.blockers.map((row) => row.reason),
   ];
@@ -79,6 +80,11 @@ export function auditInvestmentLabCounterfactualPathEvidence({
       closeRows: closes.length,
       closeStartDate: closes[0]?.priceDate ?? null,
       closeEndDate: closes.at(-1)?.priceDate ?? null,
+      priceBasis: closeEvidence.priceBasis,
+      activeOwnerCount: ownerRows.length,
+      suppliedCloseRows: closeRows.length,
+      adjustedAdmittedRows: closeEvidence.adjustedAdmittedRows,
+      privateRawAdmittedRows: closeEvidence.privateRawAdmittedRows,
       amountProvenanceDistribution: distribution(
         eligible.map(({ row }) => row.amount_provenance ?? "unresolved"),
       ),
