@@ -18,6 +18,8 @@ import type { AdditionalContributionResultPreview } from "@/lib/additional-contr
 import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
 import styles from "./contribution-stage.module.css";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type BlockedPreview = Readonly<{ status: "blocked"; blockers: readonly string[] }>;
 
@@ -46,7 +48,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
       <PortfolioPrimaryNavigation activePath="/additional-contribution" generatedAt={generatedAt} selectedScopeKey={selectedScope.key} />
       <div className={`varda-content varda-stage-content ${styles.page}`}>
         <header className={styles.header}>
-          <div className={styles.title}><h1 id="additional-contribution-title"><PortfolioText ko={"다음 투입의 균형."} /></h1>{!enableLivePriceSync ? <LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement> : null}</div>
+          <div className={styles.title}><CairnPageTitle id="additional-contribution-title"><PortfolioText ko={"다음 투입의 균형."} /></CairnPageTitle>{!enableLivePriceSync ? <LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 디자인 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 디자인 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement> : null}</div>
           <div className={styles.scopeBar}><PortfolioAnalysisScopeTabs basePath="/additional-contribution" query={{ amount: String(amountKrw), ...designQuery }} scopes={scopes} selectedScopeKey={selectedScope.key} variant="underline" /></div>
           <div className={styles.headerActions}>{enableLivePriceSync ? <PortfolioRefreshButton autoSync /> : null}{targetAction ? <ContributionTargetAction action={targetAction} /> : <LocalizedLink className={styles.textLink} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }} href={buildPortfolioTargetNavigation({ scopeKey: selectedScope.key, from: "contribution", amount: String(amountKrw), isDesignPreview: !enableLivePriceSync }).settingsHref}><Target size={16} aria-hidden="true" /><span><PortfolioText ko={"목표비중"} /></span><ArrowUpRight size={13} aria-hidden="true" /></LocalizedLink>}</div>
         </header>
@@ -73,7 +75,7 @@ function FeaturedAllocation({ preview }: { preview: AdditionalContributionResult
   const ranked = preview.rows.filter(row => row.action !== "hold").toSorted((a,b) => Math.max(b.allocationKrw,b.trimAmountKrw) - Math.max(a.allocationKrw,a.trimAmountKrw));
   const featured = ranked.slice(0,4);
   return <div className={styles.featured}>
-    <div className={styles.featuredHeading}><span>ALLOCATION</span><h2><PortfolioText ko={"주요 배분"} /></h2><p><PortfolioText ko={"금액 순"} />{" "}{featured.length}<PortfolioText ko={"종목 · 전체"} />{" "}{preview.rows.length}<PortfolioText ko="종목" en=" holdings" /></p></div>
+    <div className={styles.featuredHeading}><span>ALLOCATION</span><CairnSectionTitle><PortfolioText ko={"주요 배분"} /></CairnSectionTitle><p><PortfolioText ko={"금액 순"} />{" "}{featured.length}<PortfolioText ko={"종목 · 전체"} />{" "}{preview.rows.length}<PortfolioText ko="종목" en=" holdings" /></p></div>
     <ul>{featured.map((row,index) => <li key={row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`}><div><strong>{row.name}</strong><span>{row.accountName} · {row.currentWeightPct.toFixed(1)}% → {row.postTopupWeightPct.toFixed(1)}%</span></div><p data-action={row.action}><small><PortfolioText ko={row.action === "trim" ? "매도" : "매수"} /></small>{formatKrw(row.action === "trim" ? row.trimAmountKrw : row.allocationKrw)}</p></li>)}</ul>
     {featured.length === 0 ? <p className={styles.modalNote}><PortfolioText ko={"계산된 매수·매도 종목이 없습니다. 재원은 현금으로 유지합니다."} /></p> : null}
   </div>;
@@ -85,8 +87,8 @@ function BlockedPreview({ blockers, targetAction }: { blockers: readonly string[
       aria-labelledby="blocked-title"
     >
       <p className="text-[11px] font-medium text-[var(--muted)]">CALCULATION STATUS</p>
-      <h2 id="blocked-title" className="mt-2 text-2xl font-medium">
-        <PortfolioText ko={"지금은 배분안을 계산할 수 없습니다"} />{" "}</h2>
+      <CairnSectionTitle id="blocked-title" className="mt-2 text-2xl font-medium">
+        <PortfolioText ko={"지금은 배분안을 계산할 수 없습니다"} />{" "}</CairnSectionTitle>
       <ul className="mt-6 max-w-3xl divide-y divide-[var(--wash)] border-y border-[var(--line)] text-sm text-[var(--warning)]">
         {blockers.map((blocker) => (
           <li key={blocker} className="py-4">

@@ -5,6 +5,8 @@ import { Maximize2, X } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import styles from "./expandable-chart.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 /** Expands the mounted chart; its data and interaction state stay in place. */
 export function ExpandableChart({ children, title, enabled = true, onEscape }: { children: ReactNode; title: string; enabled?: boolean; onEscape?: () => boolean }) {
@@ -74,11 +76,11 @@ export function ExpandableChart({ children, title, enabled = true, onEscape }: {
   return <div ref={frame} className={styles.frame} data-expanded={expanded || undefined}
     role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined}
     aria-labelledby={expanded ? titleId : undefined} onKeyDownCapture={containFocus}>
-    {expanded ? <button className={styles.backdrop} tabIndex={-1} aria-label={t("닫기", "Close")} onClick={() => setExpanded(false)} /> : null}
+    {expanded ? <CairnButton variant="bare" className={styles.backdrop} tabIndex={-1} aria-label={t("닫기", "Close")} onClick={() => setExpanded(false)} /> : null}
     <div className={styles.toolbar}>
-      <h2 id={titleId} hidden={!expanded}>{title}</h2>
-      <button ref={trigger} hidden={expanded} type="button" className="varda-icon-button" aria-label={t("크게 보기", "Expand chart")} title={t("크게 보기", "Expand chart")} onClick={() => setExpanded(true)}><Maximize2 size={17} aria-hidden="true" /></button>
-      <button ref={closeButton} hidden={!expanded} type="button" className="varda-icon-button" aria-label={t("확대 차트 닫기", "Close expanded chart")} onClick={() => setExpanded(false)}><X size={20} /></button>
+      <CairnSectionTitle id={titleId} hidden={!expanded}>{title}</CairnSectionTitle>
+      <CairnButton variant="bare" ref={trigger} hidden={expanded} type="button" className="varda-icon-button" aria-label={t("크게 보기", "Expand chart")} title={t("크게 보기", "Expand chart")} onClick={() => setExpanded(true)}><Maximize2 size={17} aria-hidden="true" /></CairnButton>
+      <CairnButton variant="bare" ref={closeButton} hidden={!expanded} type="button" className="varda-icon-button" aria-label={t("확대 차트 닫기", "Close expanded chart")} onClick={() => setExpanded(false)}><X size={20} /></CairnButton>
     </div>
     {children}
   </div>;

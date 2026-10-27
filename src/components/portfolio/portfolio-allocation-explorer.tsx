@@ -12,6 +12,8 @@ import { PresentationDialog } from "@/components/presentation/presentation-dialo
 import { CairnSelect } from "@/components/presentation/cairn-select";
 import type { PortfolioStructureGroupRow, PortfolioStructureHoldingRow } from "@/lib/portfolio-structure";
 import { layoutPortfolioTreemap } from "@/lib/portfolio-structure-treemap";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function PortfolioAllocationExplorer({ compact=false, groupRows, holdingRows, accountLabels, summary, footer, serviceDate }: {
   compact?: boolean;
@@ -30,18 +32,18 @@ export function PortfolioAllocationExplorer({ compact=false, groupRows, holdingR
   const selected=keyedRows.find(({key})=>key===selectedKey)??keyedRows[0]??null;
   const rowsByKey=useMemo(()=>new Map(keyedRows.map(({key,row})=>[key,row])),[keyedRows]);
   return <section className={styles.explorer} aria-labelledby="allocation-explorer-title" data-compact={compact?"true":"false"} data-section="allocation-explorer">
-    <div className={styles.explorerHeading}><h2 id="allocation-explorer-title"><PortfolioText ko={"자산 배분"} /></h2><div className="varda-segmented" role="group" aria-label={pt("비중 시각화")}><button type="button" aria-pressed={view==="ring"} onClick={()=>setView("ring")}><ChartPie size={14} aria-hidden="true" /><PortfolioText ko={"원형"} /></button><button type="button" aria-pressed={view==="map"} onClick={()=>setView("map")}><LayoutGrid size={14} aria-hidden="true" /><PortfolioText ko={"비중 지도"} /></button></div></div>
+    <div className={styles.explorerHeading}><CairnSectionTitle id="allocation-explorer-title"><PortfolioText ko={"자산 배분"} /></CairnSectionTitle><div className="varda-segmented" role="group" aria-label={pt("비중 시각화")}><CairnButton variant="selection" type="button" aria-pressed={view==="ring"} onClick={()=>setView("ring")}><ChartPie size={14} aria-hidden="true" /><PortfolioText ko={"원형"} /></CairnButton><CairnButton variant="selection" type="button" aria-pressed={view==="map"} onClick={()=>setView("map")}><LayoutGrid size={14} aria-hidden="true" /><PortfolioText ko={"비중 지도"} /></CairnButton></div></div>
     {selected ? <div className={styles.explorerBody}>
       <aside className={styles.summaryCell} aria-label={pt("포트폴리오 핵심 수치")}>{summary}</aside>
       <div className={styles.visualCell}>
         {view==="ring" ? <PortfolioAllocationRing entries={keyedRows.map(({key,row})=>({key,name:row.name,weightPct:row.currentWeightPct}))} selectedKey={selected.key} onSelect={setSelectedKey} /> : <div className={styles.mapFrame}><div className={styles.map}>{layout.map(rect=>{
           const row=rowsByKey.get(rect.key);if(!row)return null;
           const active=rect.key===selected.key;
-          return <button key={rect.key} type="button" aria-label={pt(`${row.name}, 현재 비중 ${formatPercent(row.currentWeightPct)}`)} aria-pressed={active} onClick={()=>setSelectedKey(rect.key)} className={`absolute overflow-hidden rounded-md border p-2 text-left transition-[filter,box-shadow] duration-150 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${active?"z-10 border-[var(--ink)] shadow-[0_0_0_1px_var(--ink)]":"border-[var(--paper)] hover:brightness-[0.97]"}`} style={tileStyle(rect,row.driftPct)}>
+          return <CairnButton variant="selection" key={rect.key} type="button" aria-label={pt(`${row.name}, 현재 비중 ${formatPercent(row.currentWeightPct)}`)} aria-pressed={active} onClick={()=>setSelectedKey(rect.key)} className={`absolute overflow-hidden rounded-md border p-2 text-left transition-[filter,box-shadow] duration-150 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${active?"z-10 border-[var(--ink)] shadow-[0_0_0_1px_var(--ink)]":"border-[var(--paper)] hover:brightness-[0.97]"}`} style={tileStyle(rect,row.driftPct)}>
             {rect.width>=11&&rect.height>=10?<span className="block truncate text-[10px] font-semibold leading-4 text-[var(--ink)]">{row.name}</span>:null}
             {rect.width>=15&&rect.height>=15?<span className="mt-1 block truncate text-[9px] text-[var(--muted)]"><PortfolioText ko={accountLabel(row.account, accountLabels)} /> · {row.ticker ?? <PortfolioText ko="종목 코드 없음" />}</span>:null}
             {rect.width>=9&&rect.height>=8?<span className="absolute bottom-2 left-2 text-[9px] tabular-nums">{formatPercent(row.currentWeightPct)}</span>:null}
-          </button>;
+          </CairnButton>;
         })}</div><div className={styles.mapLegend}><LegendSwatch color="var(--brand)" label="목표보다 낮음" /><LegendSwatch color="var(--line)" label="목표 근접" /><LegendSwatch color="var(--negative-mid)" label="목표보다 높음" /><LegendSwatch color="var(--wash)" label="목표 없음" /></div></div>}
       </div>
       <aside className={styles.selectedDetail} aria-label={pt("선택 종목 근거")}>
@@ -51,7 +53,7 @@ export function PortfolioAllocationExplorer({ compact=false, groupRows, holdingR
       </aside>
     </div> : <p className="py-12 text-sm text-[var(--muted)]"><PortfolioText ko={"현재 표시할 수 있는 보유 종목이 없습니다."} /></p>}
     <footer className={styles.explorerFooter}><span><PortfolioText ko={"기준일"} />{" "}<PortfolioText ko={serviceDate??"근거 없음"} /> {" "}<PortfolioText ko={"· 읽기 전용 분석"} /></span><div className={styles.launchers}>
-      <PresentationDialog label="종목·그룹 비중" labelEn={portfolioEnglish("종목·그룹 비중")} title="선택 종목과 그룹별 비중" titleEn={portfolioEnglish("선택 종목과 그룹별 비중")} wide>{selected?<SelectedHoldingEvidence row={selected.row} accountLabels={accountLabels}/>:null}{groupRows.length?<section className={styles.modalSection}><h3><PortfolioText ko={"그룹 비중 · 현재 / 승인 목표"} /></h3><div className={styles.groupRows}>{groupRows.map(row=><GroupAllocationRow key={row.name} row={row}/>)}</div></section>:null}</PresentationDialog>
+      <PresentationDialog label="종목·그룹 비중" labelEn={portfolioEnglish("종목·그룹 비중")} title="선택 종목과 그룹별 비중" titleEn={portfolioEnglish("선택 종목과 그룹별 비중")} wide>{selected?<SelectedHoldingEvidence row={selected.row} accountLabels={accountLabels}/>:null}{groupRows.length?<section className={styles.modalSection}><CairnSectionTitle level="h3"><PortfolioText ko={"그룹 비중 · 현재 / 승인 목표"} /></CairnSectionTitle><div className={styles.groupRows}>{groupRows.map(row=><GroupAllocationRow key={row.name} row={row}/>)}</div></section>:null}</PresentationDialog>
       {footer}
     </div></footer>
   </section>;
@@ -59,7 +61,7 @@ export function PortfolioAllocationExplorer({ compact=false, groupRows, holdingR
 
 function SelectedHoldingEvidence({row, accountLabels}:{row:PortfolioStructureHoldingRow; accountLabels: Readonly<Record<string, string>>}) {
   const pt = usePortfolioText();
-  return <section className={styles.holdingEvidence}><h3>{row.name}</h3><p className={styles.holdingIdentity}><PortfolioText ko={accountLabel(row.account, accountLabels)} /> · {row.ticker ?? <PortfolioText ko="종목 코드 없음" />} · {row.currency}</p><dl className={styles.holdingFacts}><DetailRow label="평가액" value={formatKrw(row.currentValueKrw)}/><DetailRow label="현재 비중" value={formatPercent(row.currentWeightPct)}/><DetailRow label="목표 비중" value={pt(formatPercent(row.effectiveTargetPct))}/><DetailRow label="편차" tone={row.driftPct} value={formatSignedPercent(row.driftPct)}/></dl><div className={styles.targetComparison}><div><span><PortfolioText ko={"현재 / 목표"} /></span><strong>{formatPercent(row.currentWeightPct)} / <PortfolioText ko={formatPercent(row.effectiveTargetPct)} /></strong></div><div className={styles.targetTrack}><div style={{width:`${Math.min(100,row.currentWeightPct)}%`}}/>{row.effectiveTargetPct!==null?<span aria-hidden="true" style={{left:`${Math.min(100,row.effectiveTargetPct)}%`}}/>:null}</div></div><p className={styles.holdingNote}><PortfolioText ko={row.targetPolicyStatus==="approved_policy"?"승인된 목표비중과 현재 평가액을 비교한 읽기 전용 근거입니다.":"현재 범위에 적용된 승인 목표가 없어 보유 근거만 표시합니다."} /></p></section>;
+  return <section className={styles.holdingEvidence}><CairnSectionTitle level="h3">{row.name}</CairnSectionTitle><p className={styles.holdingIdentity}><PortfolioText ko={accountLabel(row.account, accountLabels)} /> · {row.ticker ?? <PortfolioText ko="종목 코드 없음" />} · {row.currency}</p><dl className={styles.holdingFacts}><DetailRow label="평가액" value={formatKrw(row.currentValueKrw)}/><DetailRow label="현재 비중" value={formatPercent(row.currentWeightPct)}/><DetailRow label="목표 비중" value={pt(formatPercent(row.effectiveTargetPct))}/><DetailRow label="편차" tone={row.driftPct} value={formatSignedPercent(row.driftPct)}/></dl><div className={styles.targetComparison}><div><span><PortfolioText ko={"현재 / 목표"} /></span><strong>{formatPercent(row.currentWeightPct)} / <PortfolioText ko={formatPercent(row.effectiveTargetPct)} /></strong></div><div className={styles.targetTrack}><div style={{width:`${Math.min(100,row.currentWeightPct)}%`}}/>{row.effectiveTargetPct!==null?<span aria-hidden="true" style={{left:`${Math.min(100,row.effectiveTargetPct)}%`}}/>:null}</div></div><p className={styles.holdingNote}><PortfolioText ko={row.targetPolicyStatus==="approved_policy"?"승인된 목표비중과 현재 평가액을 비교한 읽기 전용 근거입니다.":"현재 범위에 적용된 승인 목표가 없어 보유 근거만 표시합니다."} /></p></section>;
 }
 function GroupAllocationRow({ row }: { row: PortfolioStructureGroupRow }) {
   return (

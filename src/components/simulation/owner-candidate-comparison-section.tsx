@@ -7,6 +7,8 @@ import {
   resolveResearchFanChartValueDomain,
 } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyComparison = Extract<
   SimulationOwnerCandidateComparisonResult,
@@ -33,8 +35,8 @@ export function OwnerCandidateComparisonSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko="현재안과 동일한 전체 경로" en="The same complete paths as current weights" />{" "}</p>
-          <h2 className="mt-1 text-lg font-semibold" id="owner-candidate-comparison-title">
-            <SimulationText ko={"변동성 완화 후보 비교"} />{" "}</h2>
+          <CairnSectionTitle className="mt-1 text-lg font-semibold" id="owner-candidate-comparison-title">
+            <SimulationText ko={"변동성 완화 후보 비교"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"최근 90개 공동 수익률에서 변동성이 낮았던 비중을 찾고, 현재 비중과 동일한 날짜 추출·무작위 경로로 나란히 계산합니다. 회전율과 외화 비중 변화를 제한한 연구 후보이며 투자 추천이 아닙니다."} />{" "}</p>
         </div>
@@ -203,9 +205,9 @@ function ComparisonCard({
 }) {
   return (
     <article className="overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]">
-      <h3 className="border-b border-[var(--line)] px-4 py-3 font-semibold">
+      <CairnSectionTitle level="h3" className="border-b border-[var(--line)] px-4 py-3 font-semibold">
         <SimulationText ko={label} />
-      </h3>
+      </CairnSectionTitle>
       <SimulationTerminalRiskMetrics compact terminal={execution.terminal} />
       <ResearchFanChart execution={execution} valueDomain={valueDomain} />
     </article>

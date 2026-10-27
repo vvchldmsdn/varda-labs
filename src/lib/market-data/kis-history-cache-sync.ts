@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 
 import { db, sqlClient } from "@/db/client";
 import { writeKisPairedHistory, type KisHistoryClaim } from "./kis-paired-history-write";
+import { kisHistoryIdentity } from "./kis-history-revision-policy";
 import { marketDataSyncRuns } from "@/db/schema";
 import { applyAssetPriceSnapshotRows } from "@/lib/market-data/asset-price-snapshot-repository";
 import {
@@ -33,9 +34,11 @@ export const KIS_HISTORY_CACHE_SYNC_POLICY = Object.freeze({
   userOwnership: "shared_reference_no_owner_column",
 } as const);
 
-export const KIS_PAIRED_HISTORY_CACHE_SYNC_POLICY = Object.freeze({...KIS_HISTORY_CACHE_SYNC_POLICY,version:"kis_paired_history_cache_sync_v1",priceBasis:"raw_and_provider_adjusted",adjustedCloseMutation:"paired_provenance_claim_fenced_only"} as const);
+export const KIS_PAIRED_HISTORY_CACHE_SYNC_POLICY = Object.freeze({...KIS_HISTORY_CACHE_SYNC_POLICY,version:"kis_paired_history_cache_sync_v2",priceBasis:"raw_and_provider_adjusted",adjustedCloseMutation:"paired_provenance_claim_fenced_confirmed_revision"} as const);
 
 export type KisHistoryCacheSyncResult = {
+  pendingFinalizationCount: number;
+  retryableRevisionCount: number;
   runId: string;
   status: "completed";
   provider: "kis";
@@ -112,7 +115,7 @@ export async function runKisHistoryCacheSync(options: {
   let providerDiagnostics: KisHistoryProviderDiagnostics | null = null;
 
   try {
-    const providerResult =
+    let providerResult =
       options.prefetchedResult ??
       (await options.provider.fetchHistoricalClosePrices(options.targets, {
         dryRun: false,
@@ -131,12 +134,15 @@ export async function runKisHistoryCacheSync(options: {
       throw new Error("KIS history returned an unsupported price basis");
     }
     if (providerResult.rows.length === 0) {
+      if(providerResult.pendingFinalizationCount)throw Object.assign(new Error("provider_daily_bar_unfinalized"),{
+        code:"provider_history_pending",retryAfterSeconds:900,
+      });
       throw new Error(
         formatKisHistoryNoRowsError(providerDiagnostics),
       );
     }
 
-    const writeSummary = options.pairedClaim
+    let writeSummary = options.pairedClaim
       ? await writeKisPairedHistory((text,params)=>sqlClient.query(text,params),options.pairedClaim,providerResult.rows)
       : await applyAssetPriceSnapshotRows({
       rows: [...providerResult.rows],
@@ -145,6 +151,24 @@ export async function runKisHistoryCacheSync(options: {
       writePolicy: "kis",
       allowWrite: true,
     });
+    // Re-query only eligible provider discrepancies, never manual/foreign values
+    // or differences beyond the existing operational review limit.
+    if (options.pairedClaim && writeSummary.results.some(row => row.reason === "raw_revision_requires_matching_requery")) {
+      const firstObservation = providerResult.rows;
+      const confirmation = await options.provider.fetchHistoricalClosePrices(options.targets, {
+        dryRun: false, includeAdjusted: true, requestedAt: new Date(),
+        startDate: options.startDate, endDate: options.endDate,
+      });
+      const expected = new Set(firstObservation.map(kisHistoryIdentity));
+      if (confirmation.provider === "kis" && confirmation.priceBasis === "raw_and_provider_adjusted" &&
+        confirmation.failures.length === 0 && confirmation.rows.length === expected.size &&
+        confirmation.rows.every(row => expected.has(kisHistoryIdentity(row)))) {
+        writeSummary = await writeKisPairedHistory((text, params) => sqlClient.query(text, params),
+          options.pairedClaim, confirmation.rows, firstObservation);
+        providerResult = { ...confirmation, requestCount: providerResult.requestCount + confirmation.requestCount,
+          warnings: [...providerResult.warnings, ...confirmation.warnings] };
+      }
+    }
     const failedCount =
       providerResult.failures.length + writeSummary.failedCount + writeSummary.conflictCount;
     const finishedAt = new Date();
@@ -169,6 +193,7 @@ export async function runKisHistoryCacheSync(options: {
           requestCount: providerResult.requestCount,
           fetchedRowCount: providerResult.rows.length,
           providerFailureCount: providerResult.failures.length,
+          pendingFinalizationCount: providerResult.pendingFinalizationCount ?? 0,
           priceBasis: providerResult.priceBasis,
           insertedCount: writeSummary.insertedCount,
           updatedCount: writeSummary.updatedCount,
@@ -184,6 +209,8 @@ export async function runKisHistoryCacheSync(options: {
       .where(eq(marketDataSyncRuns.id, run.id));
 
     return {
+      pendingFinalizationCount:providerResult.pendingFinalizationCount??0,
+      retryableRevisionCount:writeSummary.results.filter(row=>row.reason==="raw_revision_requires_matching_requery").length,
       runId: run.id,
       status: "completed",
       provider: "kis",

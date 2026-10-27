@@ -434,7 +434,7 @@
 .varda-presentation-page .varda-history-chart {
   height: 220px;
 }
-.varda-page-title {
+.varda-page-title:not([data-cairn-heading]) {
   font-size: 24px;
   font-weight: 500;
   line-height: 1.3;
@@ -765,7 +765,7 @@
 .varda-home-history section > div:first-child {
   margin-bottom: 8px;
 }
-.varda-home-history section > div:first-child h2 {
+.varda-home-history section > div:first-child h2:not([data-cairn-heading]) {
   font-size: 13px;
 }
 .varda-home-history section > div:first-child p:first-child {
@@ -774,22 +774,22 @@
 .varda-home-history [aria-label="조회 기간"] {
   gap: 10px;
 }
-.varda-home-history [aria-label="조회 기간"] button {
+.varda-home-history [aria-label="조회 기간"] button:not([data-cairn-button]) {
   min-height: 28px;
   font-size: 10px;
 }
 .varda-compact-fx > div {
   border: 0;
 }
-.varda-compact-fx > div > button {
+.varda-compact-fx > div > button:not([data-cairn-button]) {
   min-height: 40px;
   padding: 9px 0 0;
 }
-.varda-compact-fx > div > button > span:nth-child(2) {
+.varda-compact-fx > div > button:not([data-cairn-button]) > span:nth-child(2) {
   margin-top: 5px;
   font-size: 14px;
 }
-.varda-compact-fx > div > button > span:nth-child(3) {
+.varda-compact-fx > div > button:not([data-cairn-button]) > span:nth-child(3) {
   margin-top: 2px;
   font-size: 10px;
 }
@@ -944,7 +944,7 @@
   border-radius: 5px;
   background: var(--wash);
 }
-.varda-segmented button {
+.varda-segmented button:not([data-cairn-button]) {
   display: inline-flex;
   justify-content: center;
   align-items: center;
@@ -955,7 +955,7 @@
   font-size: 12px;
   color: var(--muted);
 }
-.varda-segmented button[aria-pressed="true"] {
+.varda-segmented button:not([data-cairn-button])[aria-pressed="true"] {
   background: var(--surface);
   color: var(--brand);
   box-shadow: 0 1px 4px #191b2008;
@@ -1072,12 +1072,12 @@
   padding-top: 24px;
   padding-bottom: 28px;
 }
-.varda-secondary-page h1 {
+.varda-secondary-page h1:not([data-cairn-heading]) {
   font-size: 28px;
   font-weight: 500;
   line-height: 1.35;
 }
-.varda-secondary-page h2 {
+.varda-secondary-page h2:not([data-cairn-heading]) {
   font-weight: 500;
 }
 .varda-secondary-page dl > div {
@@ -1206,7 +1206,7 @@
     min-height: 64px;
     margin-bottom: 16px;
   }
-  .varda-page-title {
+  .varda-page-title:not([data-cairn-heading]) {
     font-size: 22px;
   }
   .varda-summary-stage {
@@ -1247,7 +1247,7 @@
     gap: 10px;
     padding: 12px 0;
   }
-  .varda-history-controls [aria-label="그래프 지표"] button {
+  .varda-history-controls [aria-label="그래프 지표"] button:not([data-cairn-button]) {
     min-width: 60px;
     padding: 7px 10px;
     font-size: 12px;
@@ -1255,7 +1255,7 @@
   .varda-history-controls [aria-label="조회 기간"] {
     gap: 12px;
   }
-  .varda-history-controls [aria-label="조회 기간"] button {
+  .varda-history-controls [aria-label="조회 기간"] button:not([data-cairn-button]) {
     font-size: 12px;
   }
   .varda-history-heading .varda-primary-number {

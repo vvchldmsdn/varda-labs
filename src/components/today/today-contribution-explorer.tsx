@@ -14,6 +14,8 @@ import {
   formatSignedKrw,
   toneClass,
 } from "@/components/home/portfolio-format";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export type TodayContributionDisplayRow = Readonly<{
   accountLabel: string;
@@ -101,7 +103,7 @@ export function TodayContributionExplorer({
               >
                 <ContributionRowContent row={row} maximum={maxMagnitude} active={activeRow?.key === row.key} />
               </Link>
-              <button
+              <CairnButton variant="selection"
                 type="button"
                 className={`${styles.contributionRow} ${interaction.mobileRow}`}
                 data-today-select-holding={row.key}
@@ -112,7 +114,7 @@ export function TodayContributionExplorer({
                 style={{ "--row-delay": `${Math.min(rowIndex * 35, 280)}ms` } as CSSProperties}
               >
                 <ContributionRowContent row={row} maximum={maxMagnitude} active={mobileSelectedRow?.key === row.key} />
-              </button>
+              </CairnButton>
               </div>
             );
           })}
@@ -121,9 +123,9 @@ export function TodayContributionExplorer({
 
       <aside className={`${styles.activeContribution} ${interaction.desktopSummary}`} aria-live="polite">
         <p className={styles.eyebrow}>CONTRIBUTION DETAIL</p>
-        <h3 key={`name:${activeRow?.key}`} className={styles.activeValue}>
+        <CairnSectionTitle level="h3" key={`name:${activeRow?.key}`} className={styles.activeValue}>
           {activeRow?.name ?? "-"}
-        </h3>
+        </CairnSectionTitle>
         <strong key={`value:${activeRow?.key}`} className={`${styles.activeValue} ${toneClass(activeRow?.changeKrw ?? null)}`}>
           {<T ko={formatSignedKrw(activeRow?.changeKrw ?? null)} en={translateHomeHistory(formatSignedKrw(activeRow?.changeKrw ?? null))}/>}
         </strong>

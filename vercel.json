@@ -21,6 +21,10 @@
     {
       "path": "/api/cron/simulation-executions",
       "schedule": "0 20 * * *"
+    },
+    {
+      "schedule": "15 5 * * *",
+      "path": "/api/cron/market-history/run"
     }
   ]
 }

@@ -10,6 +10,8 @@ import { useEffect, useRef, useState } from "react";
 import { Workflow, X } from "lucide-react";
 
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function AdditionalContributionLogicDialog({
   preview,
@@ -32,12 +34,12 @@ export function AdditionalContributionLogicDialog({
 
   return (
     <>
-      <button
+      <CairnButton variant="secondary"
         type="button"
         className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-[var(--brand)]"
         onClick={() => { dialogRef.current?.showModal(); setOpen(true); }}
       >
-        <Workflow size={16} aria-hidden="true" /> {" "}<PortfolioText ko={"계산 로직 보기"} />{" "}</button>
+        <Workflow size={16} aria-hidden="true" /> {" "}<PortfolioText ko={"계산 로직 보기"} />{" "}</CairnButton>
 
       <dialog
         ref={dialogRef}
@@ -52,25 +54,25 @@ export function AdditionalContributionLogicDialog({
           <header className="varda-dialog-header flex shrink-0 items-start justify-between gap-5">
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">CALCULATION LOGIC</p>
-              <h2 id="contribution-logic-title" className="mt-1 text-xl font-medium">
-                <PortfolioText ko={"이번 추가 투입안이 만들어진 과정"} />{" "}</h2>
+              <CairnSectionTitle id="contribution-logic-title" className="mt-1 text-xl font-medium">
+                <PortfolioText ko={"이번 추가 투입안이 만들어진 과정"} />{" "}</CairnSectionTitle>
               <p className="mt-1 text-sm text-[var(--muted)]">
                 <PortfolioText ko={"실제 주문이 아닌 읽기 전용 계산입니다. 각 단계의 재원과 종목별 판단을 그대로 표시합니다."} />{" "}</p>
             </div>
-            <button
+            <CairnButton variant="ghost"
               type="button"
               aria-label={pt("계산 로직 닫기")}
               className="varda-icon-button"
               onClick={() => dialogRef.current?.close()}
             >
               <X size={18} aria-hidden="true" />
-            </button>
+            </CairnButton>
           </header>
 
           <div className="varda-dialog-content min-h-0 overflow-y-auto overscroll-contain">
             <MethodDetails topic="contribution" />
             <section aria-labelledby="calculation-flow-title">
-              <h3 id="calculation-flow-title" className="text-sm font-medium"><PortfolioText ko={"금액 흐름"} /></h3>
+              <CairnSectionTitle level="h3" id="calculation-flow-title" className="text-sm font-medium"><PortfolioText ko={"금액 흐름"} /></CairnSectionTitle>
               <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)] sm:grid-cols-5">
                 <FlowStep index="01" label="신규 투입금" value={formatKrw(preview.cashAmountKrw)} />
                 <FlowStep index="02" label="계산상 매도" value={`+${formatKrw(preview.totalTrimProceedsKrw)}`} />
@@ -131,7 +133,7 @@ export function AdditionalContributionLogicDialog({
             <details className="mt-4" aria-labelledby="holding-calculation-title">
               <summary className="min-h-11 cursor-pointer py-3">
                 <div>
-                  <h3 id="holding-calculation-title" className="text-sm font-medium"><PortfolioText ko={"종목별 계산 근거"} /></h3>
+                  <CairnSectionTitle level="h3" id="holding-calculation-title" className="text-sm font-medium"><PortfolioText ko={"종목별 계산 근거"} /></CairnSectionTitle>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     <T ko="기본 배분과 조정 후 최종 금액을 비교합니다." en="Compare the base allocation with the final adjusted amounts." />{" "}</p>
                 </div>
@@ -178,7 +180,7 @@ export function AdditionalContributionLogicDialog({
             </details>
 
             <section className="mt-6 border-l-2 border-[var(--warning)] pl-4 text-sm">
-              <h3 className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></h3>
+              <CairnSectionTitle level="h3" className="font-medium"><PortfolioText ko={"현재 계산 범위"} /></CairnSectionTitle>
               <p className="mt-1 leading-6 text-[var(--muted)]">
                 <T ko="확인된 근거만 반영합니다. 근거가 없는 감액은 미적용으로 표시하며, 수수료·세금·실제 주문 단위는 포함하지 않습니다." en="Only verified evidence is applied. Missing evidence is marked as not applied. Fees, taxes and actual order sizes are excluded." /></p>
             </section>

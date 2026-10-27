@@ -1,5 +1,7 @@
 import { LabText } from "./lab-text";
 import type { InvestmentLabPreperiodMinVolatility } from "@/lib/investment-lab-preperiod-min-volatility";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabPreperiodMinVolatilityView({
   model,
@@ -35,7 +37,7 @@ export function InvestmentLabPreperiodMinVolatilityView({
               <p className="text-[11px] font-medium text-[var(--muted)]">
                 PRE-PERIOD MODEL
               </p>
-              <h2 className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" 기간 시작 전 최소변동성 비교 " /></h2>
+              <CairnSectionTitle className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" 기간 시작 전 최소변동성 비교 " /></CairnSectionTitle>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 선택한 비교 기간보다 앞선 KODEX 200·VOO 공동 관측 60개만으로 비중을 한 번 산정하고, 이후 실제와 같은 외부 입출금을 적용한 연구 경로입니다. " /></p>
             </div>
             <p className="text-sm font-semibold text-[var(--muted)]">

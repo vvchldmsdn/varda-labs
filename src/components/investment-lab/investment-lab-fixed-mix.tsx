@@ -28,6 +28,8 @@ import {
   buildPortfolioAnalysisScopeHref,
   type PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabFixedMix({
   comparison,
@@ -89,7 +91,7 @@ export function InvestmentLabFixedMix({
             <p className="text-[11px] font-medium text-[var(--muted)]">
               ALLOCATION SANDBOX
             </p>
-            <h2 className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" KODEX 200·VOO 고정 배분 실험 " /></h2>
+            <CairnSectionTitle className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" KODEX 200·VOO 고정 배분 실험 " /></CairnSectionTitle>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 초기 평가액과 실제 매수·매도 금액을 선택 비율로 나눠 두 종목에 적용합니다. 이후 가격 변동에 따른 비중 변화는 그대로 두며 중간 재리밸런싱은 하지 않습니다. " /></p>
           </div>
           <MixForm
@@ -126,7 +128,7 @@ export function InvestmentLabFixedMix({
           !isInvestmentLabStandardFixedMixPreset(selection.kodexWeightPct) &&
           model?.status === "ready" ? (
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold"><LabText value="직접 입력한 비중 상세" /></h3>
+            <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value="직접 입력한 비중 상세" /></CairnSectionTitle>
             <FixedMixResult model={model} />
           </div>
         ) : null}
@@ -150,7 +152,7 @@ function MixForm({
   vooWeightPct: number;
 }) {
   return (
-    <form
+    <CairnForm
       action="/investment-lab"
       className="flex flex-wrap items-end gap-2"
       method="get"
@@ -158,8 +160,8 @@ function MixForm({
       <input name="scope" type="hidden" value={scopeKey} />
       <InvestmentLabQueryFields />
       <PeriodHiddenInputs period={period} />
-      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" KODEX 200 배분 " /><span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
-          <input
+      <CairnField className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" KODEX 200 배분 " /><span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
+          <CairnInput
             className="h-10 w-24 bg-transparent px-3 text-right text-sm tabular-nums outline-none"
             defaultValue={kodexWeightPct}
             max={99}
@@ -171,15 +173,15 @@ function MixForm({
           />
           <span className="pr-3 text-sm">%</span>
         </span>
-      </label>
+      </CairnField>
       <div className="h-10 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm tabular-nums">
         VOO {vooWeightPct}%
       </div>
-      <button
+      <CairnButton variant="primary"
         className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
-      ><LabText value=" 계산 " /></button>
-    </form>
+      ><LabText value=" 계산 " /></CairnButton>
+    </CairnForm>
   );
 }
 

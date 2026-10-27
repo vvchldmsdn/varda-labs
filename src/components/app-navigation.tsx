@@ -14,6 +14,8 @@ import { ArrowUpRight, ChartNoAxesCombined, ChartPie, ChevronLeft, ChevronRight,
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { formatKstTime } from "@/components/home/portfolio-format";
 import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 const navigation = [
   { title: "포트폴리오", items: [
@@ -146,9 +148,9 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           {!preview && !researchHref ? <a className={betaSwitchStyles.link} href={buildBetaFrontendHref(params, selectedScopeKey)} aria-label={t("베타로 보기", "Try beta")}>
             <span>{t("베타 보기", "Try beta")}</span><ArrowUpRight size={14} aria-hidden="true" />
           </a> : null}
-          <button type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")} aria-haspopup="dialog">
+          <CairnButton variant="secondary" type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")} aria-haspopup="dialog">
             <Menu size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("메뉴", "Menu")}</span>
-          </button>
+          </CairnButton>
         </div>
       </div>
       <nav className="varda-mobile-bottom" aria-label={t("빠른 메뉴", "Quick navigation")}>
@@ -162,7 +164,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         onClick={(event) => { if (event.target === event.currentTarget) menuRef.current?.close(); }}>
         <div className="varda-mobile-menu-inner">
           <div className="varda-mobile-menu-heading"><span className="varda-wordmark"><BrandLogo /></span>
-            <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></button>
+            <CairnButton variant="ghost" type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></CairnButton>
           </div>
           {links}
           {!preview && !researchHref ? <a className="varda-menu-account" href={buildBetaFrontendHref(params, selectedScopeKey)} onClick={() => menuRef.current?.close()}>

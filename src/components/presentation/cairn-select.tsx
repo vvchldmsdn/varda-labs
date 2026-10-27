@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import styles from "./cairn-select.module.css";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 export type CairnSelectOption = Readonly<{ value: string; label: string; disabled?: boolean }>;
 
@@ -97,13 +99,13 @@ export function CairnSelect({ id, label, value, options, onValueChange, disabled
   return <div ref={root} className={`${styles.root} ${className}`} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
   }}>
-    <button ref={trigger} id={controlId} type="button" role="combobox" aria-label={label}
+    <CairnButton variant="secondary" ref={trigger} id={controlId} type="button" role="combobox" aria-label={label}
       aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined}
       aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
       disabled={disabled || enabled.length === 0} className={styles.trigger}
       onClick={() => open ? setOpen(false) : show()} onKeyDown={onKeyDown}>
       <span title={selected?.label}>{selected?.label ?? label}</span><ChevronDown size={15} aria-hidden="true" />
-    </button>
+    </CairnButton>
     {open ? <ul id={listId} role="listbox" aria-label={label} className={styles.options}
       data-above={placement.above} style={{ maxHeight: placement.height }}>
       {options.map((option, index) => <li key={option.value} id={`${listId}-${index}`} role="option"

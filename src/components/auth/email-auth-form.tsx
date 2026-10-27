@@ -11,6 +11,8 @@ import { AUTH_TRANSPORT_SESSION_PATH } from "@/lib/auth/auth-transport-routes";
 import { AuthPasswordField } from "./auth-password-field";
 import { EmailVerificationForm } from "./email-verification-form";
 import styles from "./auth-experience.module.css";
+import { Button as CairnButton, Field as CairnField, Fieldset as CairnFieldset, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function EmailAuthForm({
   mode,
@@ -96,13 +98,13 @@ export function EmailAuthForm({
       className={styles.emailForm}
       aria-label={signingUp ? "이메일 회원가입" : "이메일 로그인"}
     >
-      <fieldset
+      <CairnFieldset
         className={styles.form}
         disabled={pending || (!enabled && !preview)}
       >
         {signingUp ? (
           <div className={styles.field}>
-            <label htmlFor="auth-name"><AuthText>{"이름"}</AuthText></label>
+            <CairnField htmlFor="auth-name"><AuthText>{"이름"}</AuthText></CairnField>
             <AuthElement as="input"
               id="auth-name"
               name="name"
@@ -116,7 +118,7 @@ export function EmailAuthForm({
           </div>
         ) : null}
         <div className={styles.field}>
-          <label htmlFor="auth-email"><AuthText>{"이메일"}</AuthText></label>
+          <CairnField htmlFor="auth-email"><AuthText>{"이메일"}</AuthText></CairnField>
           <AuthElement as="input"
             id="auth-email"
             name="email"
@@ -140,16 +142,16 @@ export function EmailAuthForm({
           />
         ) : null}
         {error ? (
-          <p role="alert" className={styles.error}>
+          <CairnStatus as="p" tone="danger" role="alert" className={styles.error}>
             <AuthText>{error}</AuthText>
-          </p>
+          </CairnStatus>
         ) : null}
         {notice ? (
-          <p role="status" className={styles.notice}>
+          <CairnStatus as="p" tone="neutral" role="status" className={styles.notice}>
             <AuthText>{notice}</AuthText>
-          </p>
+          </CairnStatus>
         ) : null}
-        <button
+        <CairnButton variant="primary"
           className={styles.primaryButton}
           type="submit"
           aria-busy={pending}
@@ -170,8 +172,8 @@ export function EmailAuthForm({
           ) : (
             <ArrowRight size={17} aria-hidden="true" />
           )}
-        </button>
-      </fieldset>
+        </CairnButton>
+      </CairnFieldset>
       {!enabled && !preview ? (
         <p className={styles.note}><AuthText>{"이메일 로그인은 준비 중입니다."}</AuthText></p>
       ) : null}

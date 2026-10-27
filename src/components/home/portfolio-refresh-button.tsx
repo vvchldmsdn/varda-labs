@@ -10,6 +10,8 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { TENANT_LIVE_PRICE_SYNC_POLICY } from "@/lib/market-data/tenant-live-price-sync-policy";
 import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 type SyncState = "idle" | "syncing" | "fresh" | "partial" | "cooldown" | "queued" | "waiting" | "error";
 type SyncResponse = {
@@ -100,7 +102,7 @@ export function PortfolioRefreshButton({
   }, [autoSync, designPreview, sync]);
 
   return (
-    <button
+    <CairnButton variant="secondary"
       type="button"
       aria-label={t("실시간 시세 갱신", "Refresh live prices")}
       className={
@@ -116,7 +118,7 @@ export function PortfolioRefreshButton({
         <RefreshCw size={15} strokeWidth={1.5} />
       </span>
       {compact ? null : <span aria-live="polite">{<T ko={syncLabel(displayState)} en={displayState === "queued" ? "Refresh queued" : displayState === "waiting" ? "Pending · check again" : translateHomeHistory(syncLabel(displayState))}/>}</span>}
-    </button>
+    </CairnButton>
   );
 }
 

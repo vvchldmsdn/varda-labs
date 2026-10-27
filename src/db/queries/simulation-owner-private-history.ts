@@ -1,5 +1,4 @@
 import "server-only";
-import {findVerifiedHistoricalWindow} from "@/lib/shared-domain/simulation-verified-window";
 
 import {
   and,
@@ -58,7 +57,9 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
           and ${assetPriceSnapshots.adjustedCloseBasis}='provider_adjusted_close_v1'
           and ${assetPriceSnapshots.adjustedCloseProvider}='kis'
           and right(${assetPriceSnapshots.adjustedCloseSource},12)=':adjusted_v1'
-          and ${assetPriceSnapshots.adjustedCloseFetchedAt} is not null)`,
+        and ${assetPriceSnapshots.adjustedCloseFetchedAt} is not null
+        and (lower(trim(${assetPriceSnapshots.market})) <> 'us' or
+          ${assetPriceSnapshots.priceDate} < (${assetPriceSnapshots.adjustedCloseFetchedAt} at time zone 'America/New_York')::date))`,
         providerBindingCount: sql<number>`count(distinct (upper(trim(${assetPriceSnapshots.providerSymbol})) || '|' || upper(trim(${assetPriceSnapshots.providerExchange}))))`,
       })
       .from(assetPriceSnapshots)

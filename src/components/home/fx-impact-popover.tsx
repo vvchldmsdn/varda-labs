@@ -6,6 +6,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatDate, formatPercent, formatSignedKrw, toneClass } from "@/components/home/portfolio-format";
 import type { DashboardFxTrendPoint } from "@/lib/fx-trend";
 import styles from "./fx-impact-popover.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const CHART_WIDTH = 960;
 const CHART_HEIGHT = 280;
@@ -29,7 +31,7 @@ export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactP
   const chart = useMemo(() => buildChart(points), [points]);
   const latest = points.at(-1) ?? null;
   return <div className={styles.root}>
-    <button ref={triggerRef} type="button" aria-expanded={open} aria-controls={panelId}
+    <CairnButton variant="bare" ref={triggerRef} type="button" aria-expanded={open} aria-controls={panelId}
       className={compact ? styles.trigger : styles.impactTrigger}
       onClick={() => setOpen(value => !value)}>
           {compact ? <><T ko="환율 추세 살펴보기" en="Explore the exchange rate"/> <span aria-hidden="true">{open ? "−" : "+"}</span></> : <>
@@ -42,17 +44,17 @@ export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactP
             {formatPercent(impactPct, true)}
           </span>
           </>}
-    </button>
+    </CairnButton>
     {open ? <section ref={panelRef} id={panelId} aria-label={t("원 달러 환율 추세", "USD/KRW exchange rate trend")} className={styles.panel}>
           <div className="flex items-start justify-between gap-5">
             <div>
               <p className="text-[11px] font-medium text-[var(--muted)]">USD / KRW</p>
-              <h3 className="mt-1 text-base font-semibold text-[var(--ink)]"><T ko="원/달러 추세" en="USD/KRW trend"/></h3>
+              <CairnSectionTitle level="h3" className="mt-1 text-base font-semibold text-[var(--ink)]"><T ko="원/달러 추세" en="USD/KRW trend"/></CairnSectionTitle>
               <p className="mt-1 text-[11px] text-[var(--faint)]">
                 {<T ko={latest ? `${formatDate(latest.date)} · 최근 ${points.length}개 관측치` : "저장 이력 없음"} en={translateHomeHistory(latest ? `${formatDate(latest.date)} · 최근 ${points.length}개 관측치` : "저장 이력 없음")}/>}
               </p>
             </div>
-            <button
+            <CairnButton variant="bare"
               type="button"
               aria-label={t("환율 추세 닫기", "Close exchange rate trend")}
               className="grid h-8 w-8 place-items-center rounded-full text-xl text-[var(--muted)] hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-[var(--brand)]"
@@ -62,7 +64,7 @@ export function FxImpactPopover({ basisDate, compact = false, impactKrw, impactP
               }}
             >
               ×
-            </button>
+            </CairnButton>
           </div>
 
           {latest && chart ? (

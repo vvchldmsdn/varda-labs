@@ -29,6 +29,8 @@ import {
 } from "./observed-return-series-panel";
 import { WalkForwardMinimumVolatilitySection } from "./walk-forward-min-volatility-section";
 import { WalkForwardStabilityHistorySection } from "./walk-forward-stability-history-section";
+import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 type InputReadiness = SimulationInputReadinessPageModel["inputs"][number];
 type HistoryRow = SimulationInputReadinessPageModel["history"][number];
@@ -70,7 +72,7 @@ export function SimulationDetailView({
 }) {
   if (!model) {
     return <div className={styles.details} data-simulation-partial-detail={panel}>
-      <p role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"고정 종목의 연구 입력을 읽지 못했습니다. 준비된 보유 구성의 분석 결과는 계속 확인할 수 있습니다."} /></p>
+      <CairnStatus as="p" tone="warning" role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"고정 종목의 연구 입력을 읽지 못했습니다. 준비된 보유 구성의 분석 결과는 계속 확인할 수 있습니다."} /></CairnStatus>
       {ownerCandidateComparison}
       {ownerWalkForwardValidation}
       {ownerHistoricalValidation}
@@ -293,11 +295,11 @@ function ReadinessHistory({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2
+          <CairnSectionTitle
             id="simulation-readiness-history-title"
             className="text-lg font-semibold"
           >
-            <SimulationText ko={"최근 기준일 검사"} />{" "}</h2>
+            <SimulationText ko={"최근 기준일 검사"} />{" "}</CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]">
             <SimulationText ko={"저장된 실행 기록이 아니라, 최근 7개 기준일을 현재 저장 증거로 다시 검사한 결과입니다."} />{" "}</p>
         </div>
@@ -437,9 +439,9 @@ function InputPanel({
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={input.marketLabel} /> · {input.currency}
           </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-normal">
+          <CairnSectionTitle className="mt-1 text-xl font-semibold tracking-normal">
             {input.ticker} · {input.name}
-          </h2>
+          </CairnSectionTitle>
         </div>
         <span
           className={
@@ -503,9 +505,9 @@ function InputPanel({
       ) : null}
 
       <div className="border-t border-[var(--line)] p-4">
-        <h3 className="text-sm font-semibold">
+        <CairnSectionTitle level="h3" className="text-sm font-semibold">
           <SimulationText ko={ready ? "증거 결손" : "확인할 항목"} />
-        </h3>
+        </CairnSectionTitle>
         {input.issues.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--brand)]"><SimulationText ko={"확인된 결손이 없습니다."} /></p>
         ) : (

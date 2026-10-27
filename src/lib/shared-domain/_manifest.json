@@ -8,6 +8,7 @@
     "investment-lab-current-holding-scope.ts": "bf682a0b2a0ada8549a181aa6b7eb71c1a0000184a0226332e767c62d0c9df92",
     "investment-lab-special-holding-authority.ts": "b85f46c5be7d500bcbfb6e0ada85d87a230ee27b6008cbd37c1875e8245e0a97",
     "market-data/asset-price-consumer-admission.ts": "a34ccd79a168c051fac288f6f596792da8d9f01d75a04fb99e3c04ecd9930e5e",
+    "market-data/kis-history-finalization.ts": "3deacf6bcbf0b7eb344b6d8566073cb88dc8c60a00733ba1f383762f1022f722",
     "market-data/manual-asset-price.ts": "03ada871c57c92f8e11dbbd292d19701e393c10beb817f053ae67043294b4663",
     "market-data/providers/types.ts": "ae8989d3098a5ac9fb7242965e1f5f22a369174b63bfdab2bda4b69fe4990972",
     "portfolio-account-scope.ts": "6128b6f1ff1c5905cc77bea884fe5b82711a463609af7e029e84a5e81d660e68",
@@ -50,7 +51,7 @@
     "simulation-period-request-resolver.ts": "86904818d880c4645abcae95cbafeb0870f5d6842f2c61564eea5e944c32a4e4",
     "simulation-period-request-types.ts": "290a89fd6fdeb7b3ce897261cd6e452b6bef1d28845d2e4e6ed25fe65dc81cb3",
     "simulation-portfolio-historical-evidence-summary.ts": "9ec2c1c75fb84f8193fe654f34f50cdaeb813928583a8bb36fc5376c9c8e5fa5",
-    "simulation-private-owner-raw-history.ts": "51c93ef83ea63254e31476a7e9928c98fade550c466e7f3e8be5c02401f26e4f",
+    "simulation-private-owner-raw-history.ts": "7b5203d457a347cd98ec092d6e73409629062d30b5e0949d5c3634acf8424955",
     "simulation-prng.ts": "81825d63d7c1ba015631fc25d76ce188cb324bd7805afd13cb832530a03ebc42",
     "simulation-research-execution-core.ts": "c4f7c38a74182071946f411b2392a7d56ebce6089d945b28c2e9fa2bffcf37cb",
     "simulation-research-horizon.ts": "3de68934add1390973213f15b91399e8fa69c92e4573c7b6326a98d3bc75c895",
@@ -78,7 +79,7 @@
     "simulation-terminal-loss-probability-types.ts": "18c099f82c38d65e55fd015944061475a137046c3f4fbfdbc3fcaa105110f387",
     "simulation-terminal-loss-probability-validation.ts": "6e05f8a062e9768980cce08fa90667b41c002f1039bdbe15c799cd8bfb783b81",
     "simulation-terminal-loss-probability.ts": "9ae0ae9a6acca721442e0aacdafcc99eb875a2a476df1900046f0498d1e44d51",
-    "snapshots/market-calendar.ts": "62e71c29b80e9fc5911edc3482fa3f48ac28fee533d046b1e1266355a163b5e9",
-    "simulation-verified-window.ts": "e1612dd65939ae89c24c83e31371675fa0850efc703743ca4fbae0a7448ea058"
+    "simulation-verified-window.ts": "e1612dd65939ae89c24c83e31371675fa0850efc703743ca4fbae0a7448ea058",
+    "snapshots/market-calendar.ts": "62e71c29b80e9fc5911edc3482fa3f48ac28fee533d046b1e1266355a163b5e9"
   }
 }

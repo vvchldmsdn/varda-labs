@@ -11,6 +11,8 @@ import {
   type InvestmentLabEtfShockResult,
 } from "@/lib/investment-lab-etf-shock";
 import type { InvestmentLabEtfXrayComponentRow } from "@/lib/investment-lab-etf-xray";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Select as CairnSelect } from "@/components/cairn-ui";
+
 
 export function InvestmentLabEtfShock({
   components,
@@ -79,7 +81,7 @@ export function InvestmentLabEtfShock({
     >
       <div className="flex flex-col gap-1 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold"><LabText value="단일 구성종목 충격 실험" /></h3>
+          <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value="단일 구성종목 충격 실험" /></CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 선택한 종목 가격만 지정한 비율로 움직인다고 가정해 직접 보유와 ETF 경유 노출의 정적 1차 영향을 합산합니다. " /></p>
         </div>
         <p className="text-xs font-semibold text-[var(--muted)]"><LabText value="입력값 저장 안 함" /></p>
@@ -87,11 +89,11 @@ export function InvestmentLabEtfShock({
 
       {defaultComponent ? (
         <>
-          <form
+          <CairnForm
             className="mt-5 grid items-end gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.6fr)_auto]"
             onSubmit={calculate}
           >
-            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 구성종목 " /><select
+            <CairnField className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 구성종목 " /><CairnSelect
                 className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 onChange={(event) => {
                   setSelectedKey(event.target.value);
@@ -107,10 +109,10 @@ export function InvestmentLabEtfShock({
                     {component.symbol} · {component.name}
                   </option>
                 ))}
-              </select>
-            </label>
+              </CairnSelect>
+            </CairnField>
 
-            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 가격 충격 (%) " /><input
+            <CairnField className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 가격 충격 (%) " /><CairnInput
                 className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 inputMode="decimal"
                 max={INVESTMENT_LAB_ETF_SHOCK_POLICY.maximumShockPct}
@@ -123,13 +125,13 @@ export function InvestmentLabEtfShock({
                 type="number"
                 value={shockPctText}
               />
-            </label>
+            </CairnField>
 
-            <button
+            <CairnButton variant="primary"
               className="h-10 rounded-[4px] bg-[var(--ink)] px-5 text-sm font-semibold text-white hover:bg-[var(--ink)]"
               type="submit"
-            ><LabText value=" 계산 " /></button>
-          </form>
+            ><LabText value=" 계산 " /></CairnButton>
+          </CairnForm>
 
           <ShockResult result={result} />
         </>

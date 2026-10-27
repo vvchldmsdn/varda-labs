@@ -11,6 +11,8 @@ import { buildSimulationHref } from "@/lib/simulation-navigation";
 
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { Button as CairnButton, Field as CairnField, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyExecution = Extract<
   FixedMixResearchSimulationResult,
@@ -47,8 +49,8 @@ export function FixedMixResearchExecutionSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="fixed-mix-research-title" className="text-lg font-semibold">
-            <SimulationText ko={"명시 비중 공동 포트폴리오 연구"} />{" "}</h2>
+          <CairnSectionTitle id="fixed-mix-research-title" className="text-lg font-semibold">
+            <SimulationText ko={"명시 비중 공동 포트폴리오 연구"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"KODEX 200과 VOO의 같은 기준일 수익률 쌍을 한 행으로 묶어 함께 재표본합니다. 선택한 최초 비중만 적용하고 이후에는 리밸런싱하지 않아, 두 자산의 성과에 따라 비중이 자연스럽게 달라지는 buy-and-hold 경로입니다."} />{" "}</p>
         </div>
@@ -113,7 +115,7 @@ function ReadyPanel({ execution }: { execution: ReadyExecution }) {
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"공통 날짜쌍 공동 재표본"} />{" "}</p>
-          <h3 className="mt-1 text-lg font-semibold">{execution.name}</h3>
+          <CairnSectionTitle level="h3" className="mt-1 text-lg font-semibold">{execution.name}</CairnSectionTitle>
           <p className="mt-1 text-xs text-[var(--muted)]">
             069500 {formatBps(execution.weights[0].weightBps)} · VOO{" "}
             {formatBps(execution.weights[1].weightBps)} {" "}<SimulationText ko={"· 최초 배분 후 리밸런싱 없음"} />{" "}</p>
@@ -193,9 +195,9 @@ function MixForm({
           value={researchUniverse}
         />
       ) : null}
-      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
+      <CairnField className="grid gap-1 text-xs font-semibold text-[var(--muted)]">
         <SimulationText ko={"KODEX 200 최초 비중"} />{" "}<span className="flex items-center overflow-hidden rounded-md border border-[var(--line)] bg-white">
-          <input
+          <CairnInput
             className="h-10 w-24 bg-transparent px-3 text-right text-sm tabular-nums outline-none"
             defaultValue={kodexWeightPct}
             max={99}
@@ -207,15 +209,15 @@ function MixForm({
           />
           <span className="pr-3 text-sm">%</span>
         </span>
-      </label>
+      </CairnField>
       <div className="h-10 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm tabular-nums">
         VOO {vooWeightPct}%
       </div>
-      <button
+      <CairnButton variant="primary"
         className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
       >
-        <SimulationText ko={"이 비중으로 계산"} />{" "}</button>
+        <SimulationText ko={"이 비중으로 계산"} />{" "}</CairnButton>
     </Form>
   );
 }

@@ -9,6 +9,8 @@ import {
   formatSignedReturn,
   formatSimulationDate,
 } from "./simulation-view-formatters";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ObservedReturnComparison =
   SimulationInputReadinessPageModel["observedReturnComparison"];
@@ -26,11 +28,11 @@ export function ObservedReturnComparisonPanel({
         aria-labelledby="observed-return-comparison-title"
         className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
       >
-        <h2
+        <CairnSectionTitle
           id="observed-return-comparison-title"
           className="text-lg font-semibold tracking-normal"
         >
-          <SimulationText ko={"90개 관측구간 누적지수 비교"} />{" "}</h2>
+          <SimulationText ko={"90개 관측구간 누적지수 비교"} />{" "}</CairnSectionTitle>
         <p className="mt-2 text-sm text-[var(--warning)]">
           <SimulationText ko={formatUnavailableReason(comparison.reason)} />
         </p>
@@ -86,11 +88,11 @@ export function ObservedReturnComparisonPanel({
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2
+          <CairnSectionTitle
             id="observed-return-comparison-title"
             className="text-lg font-semibold tracking-normal"
           >
-            <SimulationText ko={"90개 관측구간 누적지수 비교"} />{" "}</h2>
+            <SimulationText ko={"90개 관측구간 누적지수 비교"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"두 독립 연구 입력의 과거 KRW 수익률을 각각 시작 100으로 누적했습니다. 휴장일에는 아래 정렬 근거의 허용 범위 안에서 직전 저장값이 적용될 수 있습니다. 포트폴리오 조합·예측·시뮬레이션 경로가 아닙니다."} />{" "}</p>
         </div>

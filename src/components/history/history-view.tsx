@@ -34,6 +34,8 @@ import {
 } from "./history-tables";
 import { TenantHistoryEvents } from "./tenant-history-events";
 import styles from "./history-modern.module.css";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function HistoryView({
   events,
@@ -75,7 +77,7 @@ export function HistoryView({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.page}>
           <header className={styles.header}>
-            <h1 className="varda-page-title"><T ko="히스토리" en="History"/></h1>
+            <CairnPageTitle className="varda-page-title"><T ko="히스토리" en="History"/></CairnPageTitle>
             <PortfolioAnalysisScopeTabs basePath="/history" query={detailParams.preview === "design" ? { preview: "design" } : undefined} scopes={history.analysisScopes} selectedScopeKey={history.selectedScope.key} variant="underline" />
           </header>
 
@@ -93,7 +95,7 @@ export function HistoryView({
             <LocalizedElement as="aside" en={{"aria-label": "History insights and verification sources"}} className={styles.insights} aria-label="히스토리 인사이트와 검증 근거">
               {recordedOverview?.status === "ready" ? (
                 <section className="varda-rail-section" data-history-recorded-insights="saved">
-                  <h2 className="text-base font-semibold"><T ko="기록에서 발견한 변화" en="Changes in your records"/></h2>
+                  <CairnSectionTitle className="text-base font-semibold"><T ko="기록에서 발견한 변화" en="Changes in your records"/></CairnSectionTitle>
                   <dl className="varda-rail-metrics mt-3">
                     <RailInsight label="저장 저점" value={formatHistoryKrw(recordedOverview.lowestValueKrw)} detail={formatDisplayDate(recordedOverview.lowestDate)} />
                     <RailInsight label="최대 상승" value={formatMovement(recordedOverview.bestMovement?.amountKrw ?? null)} detail={movementDetail(recordedOverview.bestMovement)} valueClass={tone(recordedOverview.bestMovement?.amountKrw ?? null)} />
@@ -104,7 +106,7 @@ export function HistoryView({
               ) : <p className="text-sm leading-6 text-[var(--muted)]"><T ko="아직 저장된 평가 기록이 없습니다. 오늘의 현재 평가는 그래프에서 확인할 수 있으며, 저장 스냅샷이 생기면 기록 간 변화를 요약합니다." en="No saved valuations yet. Today's current value is available in the chart; changes between records will appear once snapshots are saved." /></p>}
 
               <section className="varda-rail-section">
-                  <h2 className="text-sm font-medium"><T ko="저장 근거 확인" en="Check recorded sources"/></h2>
+                  <CairnSectionTitle className="text-sm font-medium"><T ko="저장 근거 확인" en="Check recorded sources"/></CairnSectionTitle>
                 <div className="mt-4 grid gap-2">
                   <HistoryDetailLink changes={{ detail: "raw" }}><T ko="원시 기록 검증" en="Inspect raw records"/></HistoryDetailLink>
                 </div>
@@ -316,7 +318,7 @@ function RawSection({
   return (
     <section>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-lg font-semibold">{<T ko={title} en={translateHomeHistory(title)}/>}</h2>
+        <CairnSectionTitle className="text-lg font-semibold">{<T ko={title} en={translateHomeHistory(title)}/>}</CairnSectionTitle>
         <p className="text-xs text-[var(--muted)]">{<T ko={detail} en={translateHomeHistory(detail)}/>}</p>
       </div>
       {children}

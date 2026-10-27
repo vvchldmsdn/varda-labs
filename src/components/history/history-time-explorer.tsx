@@ -31,6 +31,8 @@ import type {
   HistoryOverviewModel,
   HistoryOverviewPoint,
 } from "@/lib/history-overview";
+import { Button as CairnButton, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const RANGE_OPTIONS: readonly Readonly<{
   key: HistoryExplorerRange;
@@ -93,7 +95,7 @@ export function HistoryTimeExplorer({
     return (
       <section className="border-y border-[var(--line)] py-16 text-center">
         <p className="text-xs font-medium text-[var(--muted)]">HISTORY</p>
-        <h1 className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></h1>
+        <CairnPageTitle className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></CairnPageTitle>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]"><T ko="평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다." en="Values are not interpolated. Once daily portfolio snapshots are recorded, you can explore values and events by date here."/></p>
         {details ? <div className="mt-6 flex justify-center">{details}</div> : null}
       </section>
@@ -135,7 +137,7 @@ export function HistoryTimeExplorer({
               <ModeButton active={mode === "return"} disabled={!returnAvailable} label={t("수익률", "Return")} onClick={() => changeMode("return")} />
             </div>
             <div className={styles.periodControls} aria-label={t("조회 기간", "Time range")}>
-              {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</button>)}
+              {RANGE_OPTIONS.map((option) => <CairnButton variant="selection" key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</CairnButton>)}
             </div>
           </div>
           <p className={styles.railNote}>{scopeLabel} · {integratedReturn ? returnTimeline.filter(p => p.returnPct !== null).length : rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br />{integratedReturn ? "같은 날짜 축에서 저장 수익률과 복구한 기간 수익률을 살펴봅니다. 기준이 바뀌는 지점은 구분합니다." : hasLiveValuation ? <T ko="과거 저장 기록에 오늘의 현재 평가를 연결합니다. 오늘 값은 저장 스냅샷이 아닙니다." en="Recorded history connects to today's current valuation. Today's point is not a saved snapshot."/> : <T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/>}</p>
@@ -143,7 +145,7 @@ export function HistoryTimeExplorer({
         </aside>
         <div className={styles.plot}>
           <div className={styles.chartTitle}>
-            <h2 id="history-time-explorer-title">{<T ko={mode === "value" ? "자산의 흐름" : "수익률의 흐름"} en={translateHomeHistory(mode === "value" ? "자산의 흐름" : "수익률의 흐름")}/>}</h2>
+            <CairnSectionTitle id="history-time-explorer-title">{<T ko={mode === "value" ? "자산의 흐름" : "수익률의 흐름"} en={translateHomeHistory(mode === "value" ? "자산의 흐름" : "수익률의 흐름")}/>}</CairnSectionTitle>
             <p><T ko="날짜를 따라 탐색" en="Explore by date"/></p>
           </div>
           {integratedReturn ? <ReturnTimelineChart stored={storedReturns} curve={recoveredReturn!} rangeDays={returnRangeDays} selectedDate={selectedDate} onSelect={setSelectedDate} onInspect={setInspectedDate} hideReadout /> : <div className="varda-history-canvas">
@@ -234,7 +236,7 @@ function ModeButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <CairnButton variant="selection"
       type="button"
       aria-pressed={active}
       className={`min-h-10 min-w-20 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -246,7 +248,7 @@ function ModeButton({
       onClick={onClick}
     >
       {<T ko={label} en={translateHomeHistory(label)}/>}
-    </button>
+    </CairnButton>
   );
 }
 
@@ -352,9 +354,9 @@ function SelectedDayEvidence({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             SELECTED DATE
           </p>
-          <h2 className="mt-1 text-xl font-semibold">
+          <CairnSectionTitle className="mt-1 text-xl font-semibold">
             {<T ko={formatDate(point.date)} en={translateHomeHistory(formatDate(point.date))}/>}
-          </h2>
+          </CairnSectionTitle>
         </div>
         <p className="text-xs text-[var(--muted)]">
           {<T ko={historySourceLabel(point.source)} en={translateHomeHistory(historySourceLabel(point.source))}/>}
@@ -490,7 +492,7 @@ function HistoryCalendar({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             VALUE RHYTHM
           </p>
-          <h2 className="mt-1 text-base font-semibold"><T ko="기록 리듬" en="Record calendar"/></h2>
+          <CairnSectionTitle className="mt-1 text-base font-semibold"><T ko="기록 리듬" en="Record calendar"/></CairnSectionTitle>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-[var(--muted)]">
           <span><T ko="하락" en="Down"/></span>
@@ -510,7 +512,7 @@ function HistoryCalendar({
           }}
         >
           {layout.cells.map((cell) => (
-            <button
+            <CairnButton variant="selection"
               key={cell.point.date}
               type="button"
               title={t(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`, translateHomeHistory(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`))}
@@ -557,7 +559,7 @@ function StoredRiskHistory({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             STORED RISK
           </p>
-          <h2 className="mt-1 text-base font-semibold"><T ko="저장된 위험 기록" en="Recorded risk metrics"/></h2>
+          <CairnSectionTitle className="mt-1 text-base font-semibold"><T ko="저장된 위험 기록" en="Recorded risk metrics"/></CairnSectionTitle>
         </div>
         <p className="text-xs text-[var(--muted)]"><T ko="저장값이 있는" en="Recorded on"/>{riskPoints.length}<T ko="개 날짜" en=" dates"/></p>
       </div>

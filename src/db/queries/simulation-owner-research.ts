@@ -1,4 +1,5 @@
 import "server-only";
+import { simulationPriceFrontier } from "@/lib/shared-domain/market-data/kis-history-finalization";
 import { lazyValue } from "@/lib/lazy-value";
 
 import {
@@ -167,6 +168,11 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
   return Object.freeze({
     inputPreflight,
     execution,
+    priceFrontier: simulationPriceFrontier({
+      endServiceDate: execution.source?.endServiceDate ?? null,
+      hasUs: candidate.selection?.instruments.some(row=>row.market==="us"&&row.weightBps>0)??false,
+      isLatest: endSelection.source==="latest_common_stored",now:options.now??new Date(),
+    }),
     preparedPaths,
     get candidateComparison() { return candidateComparison(); },
     get walkForwardValidation() { return walkForwardValidation(); },

@@ -1,6 +1,7 @@
 "use client";
 
-import { createElement, type JSX, type ReactNode } from "react";
+import { type JSX, type ReactNode } from "react";
+import { createLocalizedUiElement } from "@/components/i18n/native-ui-element";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { translateAuthCopy } from "./auth-copy";
 
@@ -15,5 +16,5 @@ export function AuthElement<Tag extends keyof JSX.IntrinsicElements>({as,...prop
   if (locale === "en") for (const key of ["aria-label", "title", "placeholder", "alt"]) {
     if (typeof attributes[key] === "string") attributes[key] = translateAuthCopy(attributes[key]);
   }
-  return createElement(as, attributes);
+  return createLocalizedUiElement(as, attributes);
 }

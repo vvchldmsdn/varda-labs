@@ -32,6 +32,8 @@ import {
   type PortfolioAnalysisScope,
   type PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function PortfolioDashboard({
   data,
@@ -80,7 +82,7 @@ export function PortfolioDashboard({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.stage}>
           <header className={styles.stageHeader}>
-            <h1 id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></h1>
+            <CairnPageTitle id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></CairnPageTitle>
             <div className={styles.stageScope}>
             <PortfolioAnalysisScopeTabs
               basePath="/"
@@ -156,7 +158,7 @@ export function PortfolioDashboard({
               <LocalizedElement as="aside" en={{"aria-label": "Today's changes and their sources"}} className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
               <div>
                 <div className={styles.panelHeader}>
-                  <h2 className={styles.panelTitle}><T ko="오늘의 핵심 근거" en="Today's key sources"/></h2>
+                  <CairnSectionTitle className={styles.panelTitle}><T ko="오늘의 핵심 근거" en="Today's key sources"/></CairnSectionTitle>
                   <LocalizedLink en={{"aria-label": translateHomeHistory("오늘 변동 상세 보기"), "title": translateHomeHistory("오늘 변동 상세 보기")}} className="varda-icon-button" href={scopedHref("/today", data.selectedScope.key, designPreview)} aria-label="오늘 변동 상세 보기" title="오늘 변동 상세 보기">
                     <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.6} />
                   </LocalizedLink>
@@ -191,7 +193,7 @@ export function PortfolioDashboard({
           </footer>
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
-          <h2><T ko="보유종목" en="Holdings" /></h2>
+          <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
           {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{row.name}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions assetId={row.id} name={row.name} quantity={String(row.quantity)} /></div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}

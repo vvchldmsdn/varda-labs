@@ -3,6 +3,8 @@ import { useState, type PointerEvent } from 'react';
 import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
 import { buildReturnTimeline, returnTimelineSegments, returnTimelineLabel, type StoredReturnPoint } from '@/lib/return-timeline';
 import styles from './return-timeline-chart.module.css';
+import { Input as CairnInput } from "@/components/cairn-ui";
+
 
 export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays, selectedDate, onSelect, onInspect, hideReadout = false }: {
   stored: readonly StoredReturnPoint[]; curve: RecoveredReturnCurve; compact?: boolean; rangeDays?: number;
@@ -60,7 +62,7 @@ export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays,
     </svg>
     </div>
     <div className={styles.dates}><span>{points[0].date.replaceAll('-', '.')}</span><span>{points.at(-1)!.date.replaceAll('-', '.')}</span></div>
-    {!compact && <input className={styles.slider} type="range" aria-label="히스토리 그래프 날짜 탐색" min="0" max={points.length - 1} value={index} aria-valuetext={`${current.date} ${returnTimelineLabel(current)} ${percent(current.returnPct)}`} onChange={event => { leave(); choose(points[Number(event.target.value)].date); }}/>}
+    {!compact && <CairnInput className={styles.slider} type="range" aria-label="히스토리 그래프 날짜 탐색" min="0" max={points.length - 1} value={index} aria-valuetext={`${current.date} ${returnTimelineLabel(current)} ${percent(current.returnPct)}`} onChange={event => { leave(); choose(points[Number(event.target.value)].date); }}/>}
     <p className={styles.note}>{current.returnPct === null ? `${current.date} · 종가가 없어 계산하지 않았습니다.` : `${gaps.length ? `회색 구간 ${gaps.length}일 · 종가 미확인` : '확인된 날짜별 기록'} · 서로 다른 계산 기준은 선으로 연결하지 않습니다.`}</p>
     {!compact && <details className={styles.details}><summary>계산 기준과 공백 이유</summary><p>검은 선은 기존에 저장된 매입원가 대비 수익률입니다. 주황 선은 {curve.baseDate} 평가액을 시작점으로, 이후 매수·매도 체결금액을 조정해 계산한 원화 투자자산 기간 수익률입니다. 기존 수익률에 더하거나 곱하지 않습니다.</p><p>일부 보유 종목의 해당 거래일 종가가 저장돼 있지 않아 전체 평가액과 수익률을 계산할 수 없는 날짜입니다. 휴장일에는 직전 거래일 종가가 필요합니다. 회색 구간을 선택하면 날짜를 확인할 수 있습니다.</p><p>복구 범위는 {curve.endDate}까지입니다. 현금은 제외하며, 거래 시각은 일말로 가정합니다. 수수료·세금·배당은 별도로 복원하지 않았고 금은 기존 평가를 유지합니다. 두 번째 계좌는 제공된 VOO 거래와 기존 원장 범위만 포함합니다.</p></details>}
   </figure>;

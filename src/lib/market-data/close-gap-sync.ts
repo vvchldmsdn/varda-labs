@@ -1,6 +1,6 @@
 import 'server-only';
 import { sqlClient } from '@/db/client';
-import { runKisHistoryCacheSync } from './kis-history-cache-sync';
+import { writeKisMissingRawCloses } from './kis-missing-raw-write';
 import type { MarketDataProvider } from './providers/types';
 import type { ClaimedCollectionJob } from './collection-queue';
 import { isMarketCollectionClaimCurrent } from './collection-queue';
@@ -22,7 +22,8 @@ export async function syncMissingRawCloses(job: ClaimedCollectionJob,provider: M
   if(!await isMarketCollectionClaimCurrent(job))throw Error('raw_close_claim_expired');
   const freshPresent=new Set((await read()).map(p=>String(p.date)));
   result.rows=result.rows.filter(p=>p.ticker===job.ticker&&p.market===job.market&&p.currency===job.currency&&missing.includes(p.priceDate)&&!freshPresent.has(p.priceDate));
-  const write=result.rows.length ? await runKisHistoryCacheSync({targets:[target],provider,startDate:missing[0],endDate:missing.at(-1)!,prefetchedResult:result}):null;
+  const write=result.rows.length ? await writeKisMissingRawCloses((text,params)=>sqlClient.query(text,params),job,result.rows):null;
   const final=new Set((await read()).map(p=>String(p.date)));
-  return {complete:dates.every(d=>final.has(d)),insertedCount:write?.insertedCount??0};
+  return {complete:dates.every(d=>final.has(d)),insertedCount:write?.insertedCount??0,
+    pendingFinalizationCount:result.pendingFinalizationCount??0};
 }

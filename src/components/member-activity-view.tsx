@@ -2,14 +2,16 @@ import Link from "next/link";
 import { ACTIVITY_FEATURES, type ActivityFeature } from "@/lib/member-activity";
 import type { MemberActivityReport } from "@/db/queries/member-activity";
 import styles from "./member-activity.module.css";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 const integer = new Intl.NumberFormat("ko-KR");
 const date = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 export function MemberActivityView({ report }: { report: MemberActivityReport }) {
   return <main className={styles.page}>
     <nav className={styles.nav}><Link href="/">CAIRN LABS</Link><Link href="/auth/session?view=account">내 계정</Link></nav>
-    <header className={styles.header}><div><p className={styles.eyebrow}>MEMBERS · 관리자</p><h1>회원 활동</h1><p>최근 접속과 기능 이용을 한눈에.</p></div><Link className={styles.refresh} href="/management/members">새로 확인 ↻</Link></header>
+    <header className={styles.header}><div><p className={styles.eyebrow}>MEMBERS · 관리자</p><CairnPageTitle>회원 활동</CairnPageTitle><p>최근 접속과 기능 이용을 한눈에.</p></div><Link className={styles.refresh} href="/management/members">새로 확인 ↻</Link></header>
     <div className={styles.stats}>{[["연결된 회원",report.total],["24시간 내 활동",report.recent],["90일 내 재방문",report.returning]].map(([label,value]) => <div key={label}><span>{label}</span><strong>{integer.format(Number(value))}<small>명</small></strong></div>)}</div>
-    <div className={styles.heading}><h2>회원별 기록</h2><span>최근 90일 · 한국시간</span></div>
+    <div className={styles.heading}><CairnSectionTitle>회원별 기록</CairnSectionTitle><span>최근 90일 · 한국시간</span></div>
     <div className={styles.list}>{report.rows.length ? report.rows.map(row => <article key={row.id} className={styles.row}>
       <div className={styles.identity}><strong>{row.name || row.email || `회원 ${row.id.slice(0,8)}`}</strong>{row.email && row.name ? <span>{row.email}</span> : null}<small>{row.visits > 1 ? "재방문" : row.visits === 1 ? "첫 방문" : "최근 기록 없음"}</small></div>
       <div><span className={styles.label}>최근 접속</span><time dateTime={row.lastSeen ?? undefined}>{row.lastSeen ? date.format(new Date(row.lastSeen)) : "아직 집계 전"}</time></div>

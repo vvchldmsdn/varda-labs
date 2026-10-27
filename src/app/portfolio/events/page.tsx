@@ -14,6 +14,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +52,7 @@ export default async function TenantEventsPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-normal"><ManagementText>{"소유 계정 이벤트"}</ManagementText></h1>
+            <CairnPageTitle className="mt-2 text-2xl font-semibold tracking-normal"><ManagementText>{"소유 계정 이벤트"}</ManagementText></CairnPageTitle>
             <p className="mt-2 text-sm text-[var(--muted)]"><ManagementText>{"소유권이 확인된 계정 연결을 통해 읽은 거래 및 자산 상태 근거"}</ManagementText></p>
           </div>
           <ManagementElement as="nav" className="flex flex-wrap gap-2" aria-label="관련 근거 화면">

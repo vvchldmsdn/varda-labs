@@ -1,5 +1,7 @@
 "use client";
 
+import { useActionFormReset } from "@/components/cairn-ui/client";
+
 import { AuthText, AuthElement } from "./auth-localized";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,6 +10,8 @@ import { createFirstAccount } from "@/app/portfolio/onboarding/actions";
 import type { AccountManagementActionState } from "@/lib/account-management";
 import styles from "./auth-experience.module.css";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 const initialState: AccountManagementActionState = {
   status: "idle",
@@ -33,8 +37,9 @@ export function OnboardingAccountForm({
     createFirstAccount,
     initialState,
   );
+  const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state);
   return (
-    <form
+    <CairnForm
       action={preview ? undefined : action}
       className={styles.form}
       onSubmit={
@@ -44,13 +49,13 @@ export function OnboardingAccountForm({
               router.push("/portfolio/onboarding?preview=design&step=holding");
             }
           : undefined
-      }
+      } onReset={actionFormOnReset} ref={actionFormRef}
     >
       <input type="hidden" name="name" value={name.trim() || t("나의 증권 계좌", "My investment account")} />
       <p className={styles.notice}>{t("‘나의 증권 계좌’로 바로 시작할 수 있어요. 이름은 나중에 바꿀 수 있습니다.", "Start with ‘My investment account’. You can rename it later.")}</p>
       <details className={styles.disclosure}>
         <summary>{t("계좌 이름 직접 정하기 (선택)", "Choose an account name (optional)")}</summary>
-      <label className={styles.field} htmlFor="onboarding-account-name"><AuthText>{"계좌 이름"}</AuthText><AuthElement as="input"
+      <CairnField className={styles.field} htmlFor="onboarding-account-name"><AuthText>{"계좌 이름"}</AuthText><AuthElement as="input"
           id="onboarding-account-name"
           className={styles.input}
           type="text"
@@ -65,15 +70,15 @@ export function OnboardingAccountForm({
             state.status in messages ? "account-error" : undefined
           }
         />
-      </label>
+      </CairnField>
       </details>
       <p className={styles.notice}><AuthText>{"이 계좌의 기준 통화는 KRW입니다. 미국 종목도 종목별 거래 통화로 기록할 수 있습니다."}</AuthText></p>
       {state.status in messages ? (
-        <p id="account-error" role="alert" className={styles.error}>
+        <CairnStatus as="p" tone="danger" id="account-error" role="alert" className={styles.error}>
           <AuthText>{messages[state.status as keyof typeof messages]}</AuthText>
-        </p>
+        </CairnStatus>
       ) : null}
-      <button
+      <CairnButton variant="primary"
         type="submit"
         className={styles.primaryButton}
         disabled={pending}
@@ -89,7 +94,7 @@ export function OnboardingAccountForm({
         ) : (
           <ArrowRight size={17} aria-hidden="true" />
         )}
-      </button>
-    </form>
+      </CairnButton>
+    </CairnForm>
   );
 }

@@ -1,4 +1,5 @@
 import { simulationExpectedServiceDates } from "./simulation-market-calendar.ts";
+import { isFinalizedKisPriceEvidence } from "./market-data/kis-history-finalization.ts";
 import {
   admitSharedKisRawHistoricalPriceRows,
   admitAdjustedHistoricalPriceRows,
@@ -66,7 +67,8 @@ export function buildPrivateOwnerRawHistory(input: {
   const scopeRows = input.priceRows.filter(row => modeledInstruments.some(instrument => matchesInstrument(row, instrument)));
   const scopeAdmission = admitSharedKisRawHistoricalPriceRows(scopeRows);
   const adjustedRows=scopeRows.filter((row):row is RawHistoricalPriceConsumerEvidenceRow & AdjustedHistoricalPriceConsumerEvidenceRow=>
-    row.adjustedCloseProvider==="kis" && row.adjustedCloseSource?.endsWith(":adjusted_v1")===true);
+    row.adjustedCloseProvider==="kis" && row.adjustedCloseSource?.endsWith(":adjusted_v1")===true &&
+    isFinalizedKisPriceEvidence(row,row.adjustedCloseFetchedAt));
   const adjustedAdmission=admitAdjustedHistoricalPriceRows(adjustedRows);
   const useAdjusted=adjustedRows.length>0 && adjustedAdmission.rows.length===scopeRows.length && adjustedAdmission.issues.length===0;
 
@@ -120,7 +122,7 @@ export function buildPrivateOwnerRawHistory(input: {
 
   return Object.freeze({
     policy: useAdjusted || input.requireAdjusted ? Object.freeze({...PRIVATE_OWNER_RAW_HISTORY_POLICY,
-      version:"simulation_private_owner_adjusted_history_v4",providerBoundary:"stored_complete_kis_paired_adjusted_only",priceBasis:"provider_adjusted_close",corporateActionAdjustment:"provider_claimed"}) : PRIVATE_OWNER_RAW_HISTORY_POLICY,
+      version:"simulation_private_owner_adjusted_history_v5",providerBoundary:"stored_complete_kis_finalized_paired_adjusted_only",priceBasis:"provider_adjusted_close",corporateActionAdjustment:"provider_claimed"}) : PRIVATE_OWNER_RAW_HISTORY_POLICY,
     requestedEndServiceDate: input.requestedEndServiceDate,
     requestedReturnStepCount: returnStepCount,
     status:
@@ -375,3 +377,4 @@ function uniqueSorted(values: readonly (string | null | undefined)[]) {
     ...new Set(values.filter((value): value is string => Boolean(value))),
   ].sort();
 }
+

@@ -8,12 +8,14 @@ import { clearPlanReturnCookies, planReturnIntentCookies } from "@/lib/auth/plan
 import { trackFirstVisit } from "@/lib/first-visit-events";
 import { useI18n } from "@/components/i18n/locale-provider";
 import styles from "./quick-portfolio.module.css";
+import { Button as CairnButton, PageTitle as CairnPageTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function ContinueWithPortfolio({ draft, signedIn = false, preview = false }: { draft: QuickDraft; signedIn?: boolean; preview?: boolean }) {
   const { t } = useI18n();
   const router = useRouter();
   const [error, setError] = useState("");
-  return <><button type="button" disabled={preview} className={styles.primary} onClick={() => {
+  return <><CairnButton variant="primary" type="button" disabled={preview} className={styles.primary} onClick={() => {
     if (preview) return;
     try {
       localStorage.setItem(QUICK_STORAGE_KEY, JSON.stringify(draft));
@@ -21,7 +23,7 @@ export function ContinueWithPortfolio({ draft, signedIn = false, preview = false
       for (const cookie of planReturnIntentCookies("quick", location.protocol === "https:")) document.cookie = cookie;
       router.push("/portfolio/activate");
     } catch { setError("storage"); }
-  }}>{signedIn ? t("저장하고 Home으로", "Save and open Home") : t("가입하고 이 자산으로 시작", "Sign up and keep my portfolio")}</button>{error ? <p role="alert">{t("입력을 보관할 수 없어요. 브라우저의 사이트 저장 권한을 확인해 주세요.", "Allow site storage in your browser to keep these inputs through sign-in.")}</p> : null}</>;
+  }}>{signedIn ? t("저장하고 Home으로", "Save and open Home") : t("가입하고 이 자산으로 시작", "Sign up and keep my portfolio")}</CairnButton>{error ? <CairnStatus as="p" tone="danger" role="alert">{t("입력을 보관할 수 없어요. 브라우저의 사이트 저장 권한을 확인해 주세요.", "Allow site storage in your browser to keep these inputs through sign-in.")}</CairnStatus> : null}</>;
 }
 
 export function PortfolioActivation() {
@@ -78,8 +80,8 @@ export function PortfolioActivation() {
   }
   useEffect(() => { const frame = requestAnimationFrame(() => { void resume(); }); return () => cancelAnimationFrame(frame); }, []);
   return <section className={styles.workspace} aria-busy={pending}>
-    <h1>{pending ? t("내 자산을 가져오고 있어요", "Bringing your portfolio along") : t("잠시 확인해 주세요", "Let’s check one thing")}</h1>
-    {pending ? <p role="status">{t("곧 Home으로 이동합니다.", "Opening Home shortly.")}</p> : <><p role="alert">{t(error, activationErrors[error] ?? "Could not save your input. Try again or check your inputs below.")}</p><div className={styles.actions}><button className={styles.primary} onClick={() => void resume()}>{t("다시 시도", "Try again")}</button><Link href="/try/analyze" onClick={() => {
+    <CairnPageTitle>{pending ? t("내 자산을 가져오고 있어요", "Bringing your portfolio along") : t("잠시 확인해 주세요", "Let’s check one thing")}</CairnPageTitle>
+    {pending ? <CairnStatus as="p" tone="neutral" role="status">{t("곧 Home으로 이동합니다.", "Opening Home shortly.")}</CairnStatus> : <><CairnStatus as="p" tone="danger" role="alert">{t(error, activationErrors[error] ?? "Could not save your input. Try again or check your inputs below.")}</CairnStatus><div className={styles.actions}><CairnButton variant="primary" className={styles.primary} onClick={() => void resume()}>{t("다시 시도", "Try again")}</CairnButton><Link href="/try/analyze" onClick={() => {
       try { localStorage.removeItem(ACTIVATION_STORAGE_KEY); } catch {}
       for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
     }}>{t("내 입력 확인", "Check my inputs")}</Link><Link href="/plans">{t("내 기록", "My records")}</Link></div></>}

@@ -1,0 +1,32 @@
+.scope {
+  --cairn-ui-ink: var(--cairn-v2-ink, #20211f);
+  --cairn-ui-muted: var(--cairn-v2-muted, #6c6d68);
+  --cairn-ui-paper: var(--cairn-v2-paper, #f7f7f5);
+  --cairn-ui-surface: #eeefea;
+  --cairn-ui-line: var(--cairn-v2-line, #e1e1dc);
+  --cairn-ui-brand: var(--cairn-v2-brand, #c64623);
+  --cairn-ui-positive: #c64623;
+  --cairn-ui-negative: #4672a9;
+  --cairn-ui-sage: #8b9d89;
+  --cairn-ui-sand: #cda680;
+  --cairn-ui-slate: #80909b;
+  --cairn-ui-space-1: 4px;
+  --cairn-ui-space-2: 8px;
+  --cairn-ui-space-3: 12px;
+  --cairn-ui-space-4: 16px;
+  --cairn-ui-space-5: 24px;
+  --cairn-ui-space-6: 32px;
+  --cairn-ui-radius-small: 10px;
+  --cairn-ui-radius-control: 14px;
+  --cairn-ui-radius-panel: 24px;
+  --cairn-ui-caption-size: 11px;
+  --cairn-ui-body-size: 13px;
+  --cairn-ui-card-title-size: 13px;
+  --cairn-ui-section-title-size: 15px;
+  --cairn-ui-detail-title-size: clamp(22px, 2vw, 28px);
+  --cairn-ui-title-weight: 550;
+  --cairn-ui-metric-size: clamp(23px, 2.2vw, 30px);
+  --cairn-ui-hero-size: clamp(34px, 4.5vw, 56px);
+  --cairn-ui-focus: 2px solid var(--cairn-ui-brand);
+}
+

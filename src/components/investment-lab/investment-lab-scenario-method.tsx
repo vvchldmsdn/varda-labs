@@ -4,6 +4,8 @@ import { InvestmentLabEvidenceGroup } from "./investment-lab-evidence-group";
 import { LabText } from "./lab-text";
 import { labScenarioLabel } from "./investment-lab-chart-presentation";
 import styles from "./investment-lab-explanation.module.css";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type Copy = Readonly<{ ko: string; en: string }>;
 const scenarioMethods: Record<InvestmentLabScenarioMatrixId, Copy> = {
@@ -23,7 +25,7 @@ const scenarioMethods: Record<InvestmentLabScenarioMatrixId, Copy> = {
 export function InvestmentLabScenarioMethod({ scenarioId }: { scenarioId: InvestmentLabScenarioMatrixId }) {
   return <div className={styles.method}>
     <div className={styles.methodLead}>
-      <h3><LabText value={labScenarioLabel(scenarioId)} /></h3>
+      <CairnSectionTitle level="h3"><LabText value={labScenarioLabel(scenarioId)} /></CairnSectionTitle>
       <p><T {...scenarioMethods[scenarioId]} /></p>
     </div>
     <dl className={styles.methodFacts}>

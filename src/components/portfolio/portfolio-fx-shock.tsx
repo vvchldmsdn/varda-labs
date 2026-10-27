@@ -11,6 +11,8 @@ import {
   PORTFOLIO_FX_SHOCK_POLICY,
   type PortfolioFxShockReason,
 } from "@/lib/portfolio-fx-shock";
+import { Field as CairnField, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function PortfolioFxShock({
   baseline,
@@ -62,17 +64,17 @@ export function PortfolioFxShock({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             WHAT IF / FX
           </p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="portfolio-fx-shock-title"
           >
-            <PortfolioText ko={"직접 보유 USD 환율 충격 실험"} />{" "}</h2>
+            <PortfolioText ko={"직접 보유 USD 환율 충격 실험"} />{" "}</CairnSectionTitle>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <PortfolioText ko={"USD 직접 보유 종목의 현지 가격은 고정하고 USD/KRW만 바뀐다고 가정합니다. 원화 상장 ETF의 해외 구성 종목은 추정하지 않습니다."} />{" "}</p>
         </div>
-        <label className="flex w-full max-w-52 flex-col gap-1 text-xs font-semibold text-[var(--muted)]">
+        <CairnField className="flex w-full max-w-52 flex-col gap-1 text-xs font-semibold text-[var(--muted)]">
           <PortfolioText ko={"USD/KRW 변동률"} />{" "}<span className="flex items-center gap-2">
-            <input
+            <CairnInput
               className="min-w-0 flex-1 border-b border-[var(--faint)] bg-transparent px-2 py-2 text-right text-sm tabular-nums outline-none focus:border-[var(--ink)]"
               inputMode="decimal"
               max={PORTFOLIO_FX_SHOCK_POLICY.maxShockPct}
@@ -84,7 +86,7 @@ export function PortfolioFxShock({
             />
             <span>%</span>
           </span>
-        </label>
+        </CairnField>
       </div>
 
       {result.status === "ready" ? (

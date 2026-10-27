@@ -6,6 +6,8 @@ import type {
   PortfolioSpecialHoldingsModel,
 } from "@/lib/portfolio-special-holdings";
 import type { ReactNode } from "react";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function SpecialHoldingsCoverage({
   model,
@@ -29,11 +31,11 @@ export function SpecialHoldingsCoverage({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             SPECIAL HOLDINGS
           </p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="special-holdings-coverage-title"
           >
-            <PortfolioText ko={"특수 보유자산 커버리지·조정 가능성"} />{" "}</h2>
+            <PortfolioText ko={"특수 보유자산 커버리지·조정 가능성"} />{" "}</CairnSectionTitle>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             <PortfolioText ko={"저장된 상품 유형과 상장 식별 근거만 사용합니다. 이름으로 상품 유형을 추론하지 않으며, 이 표시는 추천·주문 권한이 아닙니다."} />{" "}</p>
         </div>

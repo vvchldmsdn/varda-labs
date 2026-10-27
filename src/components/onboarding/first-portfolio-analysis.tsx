@@ -6,6 +6,8 @@ import { getReadOnlyTenantFirstPortfolioAnalysis, type FirstPortfolioAnalysisQue
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import styles from "./first-portfolio-analysis.module.css";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export async function FirstPortfolioAnalysis({ scope, serviceDate, tenantContext }: {
   scope: PortfolioAnalysisScope; serviceDate: string; tenantContext: TenantContext;
@@ -30,11 +32,11 @@ export function FirstPortfolioAnalysisView({ result, scopeKey, designPreview = f
   return <div className={styles.content}>
     <header className={styles.heading}>
       <span className={styles.eyebrow}>YOUR FIRST LOOK</span>
-      <h1><T ko="지금 가진 것부터, 한눈에." en="Your portfolio, at a glance." /></h1>
+      <CairnPageTitle><T ko="지금 가진 것부터, 한눈에." en="Your portfolio, at a glance." /></CairnPageTitle>
       <p><T ko="매입가와 과거 거래가 없어도 현재 구성을 살펴볼 수 있어요. 시장의 과거 가격은 서비스가 공유하는 자료를 사용합니다." en="Explore what you own without entering purchase prices or past trades. Historical market prices come from shared reference data." /></p>
     </header>
     {designPreview ? <p className={styles.preview}><T ko="예시 포트폴리오 · 실제 자산이 아니며 데이터를 저장하지 않습니다." en="Example portfolio · These are sample holdings. No data is saved." /></p> : null}
-    {summary?.state === "empty" ? <section className={styles.empty}><ChartNoAxesCombined size={30} aria-hidden="true" /><h2><T ko="종목 하나로 시작해 보세요." en="Start with one holding." /></h2><p><T ko="종목 이름으로 찾고 보유 수량을 입력하면 첫 분석을 볼 수 있어요. 매입가는 나중에 추가할 수 있습니다." en="Find a holding by name and enter its quantity. You can add its purchase price later." /></p><Link className={styles.primary} href="/portfolio/onboarding"><T ko="첫 종목 추가" en="Add your first holding" /><ArrowUpRight size={17} aria-hidden="true" /></Link></section> : <>
+    {summary?.state === "empty" ? <section className={styles.empty}><ChartNoAxesCombined size={30} aria-hidden="true" /><CairnSectionTitle><T ko="종목 하나로 시작해 보세요." en="Start with one holding." /></CairnSectionTitle><p><T ko="종목 이름으로 찾고 보유 수량을 입력하면 첫 분석을 볼 수 있어요. 매입가는 나중에 추가할 수 있습니다." en="Find a holding by name and enter its quantity. You can add its purchase price later." /></p><Link className={styles.primary} href="/portfolio/onboarding"><T ko="첫 종목 추가" en="Add your first holding" /><ArrowUpRight size={17} aria-hidden="true" /></Link></section> : <>
       <section className={styles.overview}>
         <div className={styles.value}>
           <span className={styles.label}><T ko="등록한 투자자산 평가액" en="Value of registered investments" /></span>
@@ -49,13 +51,13 @@ export function FirstPortfolioAnalysisView({ result, scopeKey, designPreview = f
         </div>
       </section>
       {summary && summary.rows.length > 0 ? <section className={styles.holdings}>
-        <div className={styles.sectionTitle}><h2 id="first-portfolio-composition"><T ko="내 포트폴리오 구성" en="What you own" /></h2><Link href={href("/portfolio/holdings")}><T ko="보유종목 관리" en="Manage holdings" /><ArrowUpRight size={15} aria-hidden="true" /></Link></div>
+        <div className={styles.sectionTitle}><CairnSectionTitle id="first-portfolio-composition"><T ko="내 포트폴리오 구성" en="What you own" /></CairnSectionTitle><Link href={href("/portfolio/holdings")}><T ko="보유종목 관리" en="Manage holdings" /><ArrowUpRight size={15} aria-hidden="true" /></Link></div>
         {summary.state === "complete" ? <div className={styles.allocation} role="img" aria-labelledby="first-portfolio-composition">{summary.rows.map((row, index) => <span key={row.key} title={`${row.name} ${row.weightPct?.toFixed(1)}%`} style={{ width: `${row.weightPct}%`, background: `var(--first-allocation-${index % 4})` }} />)}</div> : null}
         <div className={styles.holdingRows}>{summary.rows.slice(0, 5).map((row) => <div key={row.key}><span><b>{row.name}</b><small>{row.ticker}</small></span><strong>{row.weightPct === null ? money(row.valueKrw) : `${row.weightPct.toFixed(1)}%`}</strong></div>)}</div>
         {summary.rows.length > 5 ? <Link className={styles.more} href={href("/portfolio/holdings")}><T ko={`전체 ${summary.rows.length}종목 보기`} en={`View all ${summary.rows.length} holdings`} /><ArrowUpRight size={14} aria-hidden="true" /></Link> : null}
       </section> : null}
       <section className={styles.next}>
-        <div className={styles.sectionTitle}><h2><T ko="이제 무엇을 볼까요?" en="What would you like to explore?" /></h2></div>
+        <div className={styles.sectionTitle}><CairnSectionTitle><T ko="이제 무엇을 볼까요?" en="What would you like to explore?" /></CairnSectionTitle></div>
         <div className={styles.nextRows}>
           <Link href={href("/")}><ChartNoAxesCombined size={21} aria-hidden="true" /><span><b><T ko="홈에서 종목 가격 등락 보기" en="See price moves on your dashboard" /></b><small><T ko="현재 시세와 직전 종가가 준비되면 개인 기록 없이도 종목별 등락을 확인할 수 있어요." en="See each holding's price change when current quotes and prior closes are ready, without waiting for personal snapshots." /></small></span><ArrowUpRight size={19} aria-hidden="true" /></Link>
           <Link href={href("/simulation")}><ChartNoAxesCombined size={21} aria-hidden="true" /><span><b><T ko="지금 구성의 가능한 미래" en="Possible paths for this portfolio" /></b><small><T ko="개인 기록을 기다리지 않고 시장의 가격 이력으로 계산" en="Uses market price history, without waiting for your personal record" /></small></span><ArrowUpRight size={19} aria-hidden="true" /></Link>
@@ -64,7 +66,7 @@ export function FirstPortfolioAnalysisView({ result, scopeKey, designPreview = f
         </div>
       </section>
       <section className={styles.readiness}>
-        <div className={styles.sectionTitle}><h2><T ko="시장 자료 준비 상태" en="Market data readiness" /></h2>{readiness.state === "ready" && entries.length > 0 ? <span><Check size={15} aria-hidden="true" />{preparedCount}/{entries.length}</span> : null}</div>
+        <div className={styles.sectionTitle}><CairnSectionTitle><T ko="시장 자료 준비 상태" en="Market data readiness" /></CairnSectionTitle>{readiness.state === "ready" && entries.length > 0 ? <span><Check size={15} aria-hidden="true" />{preparedCount}/{entries.length}</span> : null}</div>
         <p><T ko="아래 일수는 가입 후 기록한 기간이 아니라 시장에서 가져온 가격 기록 수입니다. 종목별 자료가 준비되어도 공통 날짜와 환율이 부족하면 일부 분석은 제한될 수 있어요." en="These counts refer to market price records, not days since you joined. Even with individual histories ready, analysis can be limited by shared dates or exchange-rate coverage." /></p>
         {readiness.state !== "ready" ? <p className={styles.warning}><T ko="시장 자료 상태를 확인하지 못했습니다. 현재 구성은 계속 살펴볼 수 있어요." en="Market data readiness could not be checked. You can still explore your current composition." /></p> : null}
         {unprepared.length > 0 ? <div className={styles.preparation}>{unprepared.map((entry) => <div key={entry.holdingId}><b>{entry.name}</b>{designPreview ? <small><T ko={`${entry.readiness.observationCount}개 가격 기록 · 예시에서는 조회하지 않습니다.`} en={`${entry.readiness.observationCount} price records · Preparation is disabled in this example.`} /></small> : <HoldingAnalysisDataForm holdingId={entry.holdingId} readiness={entry.readiness} />}</div>)}</div> : readiness.state === "ready" && entries.length > 0 ? <p className={styles.ready}><Check size={17} aria-hidden="true" /><T ko="등록한 종목의 가격 이력이 준비되어 있습니다." en="Historical prices are available for your registered holdings." /></p> : null}

@@ -13,6 +13,8 @@ import {
 } from "@/db/queries/market-context";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import type { MarketRegimeDuplicateGroup } from "@/lib/market-context";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -51,9 +53,9 @@ export default async function MarketPage() {
               <p className="text-xs font-semibold text-[var(--muted)]">
                 Cairn Labs
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
+              <CairnPageTitle className="mt-1 text-2xl font-semibold tracking-normal">
                 Market Context
-              </h1>
+              </CairnPageTitle>
             </div>
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
               <Link
@@ -141,7 +143,7 @@ function SummaryCell({
 function SectionHeader({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-      <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
+      <CairnSectionTitle className="text-lg font-semibold tracking-normal">{title}</CairnSectionTitle>
       <p className="text-xs font-semibold text-[var(--muted)]">{detail}</p>
     </div>
   );
@@ -315,9 +317,9 @@ function GlobalFactorFamilies({
           className="rounded-md border border-[var(--wash)] bg-white p-3"
         >
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold tracking-normal">
+            <CairnSectionTitle level="h3" className="text-base font-semibold tracking-normal">
               {family.family}
-            </h3>
+            </CairnSectionTitle>
             <p className="text-xs font-semibold text-[var(--muted)]">
               {family.factors.length} factors
             </p>

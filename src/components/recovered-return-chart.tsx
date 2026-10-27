@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
+import { Field as CairnField, Input as CairnInput } from "@/components/cairn-ui";
+
 
 export function RecoveredReturnChart({ curve, compact = false }: { curve: RecoveredReturnCurve; compact?: boolean }) {
   const [selected, setSelected] = useState(curve.points.length - 1);
@@ -29,7 +31,7 @@ export function RecoveredReturnChart({ curve, compact = false }: { curve: Recove
       {current.returnPct !== null && <circle cx={x(current.date)} cy={y(current.returnPct)} r="4" fill="#c64623" stroke="#f7f8f3" strokeWidth="2" />}
       <text x="28" y="188" fontSize="10" fill="#777a73">{curve.baseDate.slice(5)}</text><text x="628" y="188" textAnchor="end" fontSize="10" fill="#777a73">{curve.endDate.slice(5)}</text>
     </svg>
-    {!compact && <label style={{ display: 'block', fontSize: 12 }}>조회 날짜 · {current.date}<input aria-label="복구 수익률 날짜" type="range" min="0" max={curve.points.length - 1} value={selected} onChange={e => setSelected(Number(e.target.value))} style={{ display: 'block', width: '100%', accentColor: '#c64623' }} /></label>}
+    {!compact && <CairnField style={{ display: 'block', fontSize: 12 }}>조회 날짜 · {current.date}<CairnInput aria-label="복구 수익률 날짜" type="range" min="0" max={curve.points.length - 1} value={selected} onChange={e => setSelected(Number(e.target.value))} style={{ display: 'block', width: '100%', accentColor: '#c64623' }} /></CairnField>}
     <p style={{ color: '#777a73', fontSize: compact ? 9 : 12, lineHeight: 1.6, margin: '6px 0 0' }}>매수·매도 금액 반영 · 현금 제외{compact ? ` · ${curve.missingDays}일 종가 미확인` : ` · ${curve.missingDays}일 종가 미확인으로 공백`}</p>
     {!compact && <details style={{ fontSize: 12, color: '#777a73', lineHeight: 1.7, marginTop: 8 }}><summary>복구 기준 보기</summary><p>확인한 잔고에서 거래를 역산한 수량과 날짜별 종가·환율로 계산했습니다. 날짜만 확인된 거래는 해당 날짜 말의 투자 유입·회수로 처리합니다. 매수·매도 금액 자체를 수익으로 계산하지 않습니다.</p><p>시작일 대비 기간 성과이며, 매입원가 대비 손익률과 다릅니다. 수수료·세금·배당은 별도로 반영하지 않습니다. 금은 기존 수동 평가 기록을 유지합니다. 두 증권 계좌 중 두 번째 계좌는 제공된 VOO 거래만 포함합니다. 확인되지 않은 날짜의 값을 만들거나 공백을 연결하지 않습니다.</p></details>}
   </figure>;

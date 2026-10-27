@@ -24,6 +24,8 @@ import { RegimeBootstrapResearchSection } from "./regime-bootstrap-research-sect
 import { ResearchUniversePreflightSection } from "./research-universe-preflight-section";
 import { EconomicDetailPanel } from "./economic-detail-panel";
 import { SimulationLoading } from "./simulation-loading";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export default function SimulationRemotePanel({ query }: { query: string }) {
   const { data, error, retry } = useResearchDetail<SimulationDetailData>("/api/research/simulation", query);
@@ -35,7 +37,7 @@ export default function SimulationRemotePanel({ query }: { query: string }) {
   if (data.pathModel === "economic") return protect("economic-detail", <EconomicDetailPanel data={data} />);
   if (data.panel === "weights" && data.candidateComparison) return <div id="simulation-weight-experiment">{protect("OwnerCandidateComparisonSection", <OwnerCandidateComparisonSection comparison={data.candidateComparison} instruments={data.instruments} />)}</div>;
   return <>
-    {data.unavailableSections.length ? <p role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"읽지 못한 근거:"} />{" "}{data.unavailableSections.join(", ")}<SimulationText ko={". 준비된 결과는 아래에 표시합니다."} /></p> : null}
+    {data.unavailableSections.length ? <CairnStatus as="p" tone="warning" role="status" className="py-3 text-sm text-[var(--warning)]"><SimulationText ko={"읽지 못한 근거:"} />{" "}{data.unavailableSections.join(", ")}<SimulationText ko={". 준비된 결과는 아래에 표시합니다."} /></CairnStatus> : null}
     {protect("simulation-detail", <SimulationDetailView panel={data.panel} model={data.model} scopeCatalog={data.scopeCatalog} selectedScopeKey={data.selectedScope.key} researchUniverse={data.preservedQuery.researchUniverse}
       ownerWalkForwardValidation={data.walkForwardValidation && protect("OwnerWalkForwardValidationSection", <OwnerWalkForwardValidationSection result={data.walkForwardValidation} />)}
       ownerHistoricalValidation={data.historicalValidation && protect("OwnerHistoricalOutcomeValidationSection", <OwnerHistoricalOutcomeValidationSection result={data.historicalValidation} />)}

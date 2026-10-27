@@ -10,6 +10,8 @@ import { EconomicExecutionSection } from "./economic-execution-section";
 import { economicResearchPresentation } from "@/db/queries/simulation-owner-economic";
 import { registerSimulationPath } from "@/lib/server/simulation-path-details";
 import { bootstrapPathSnapshot, economicPathSnapshot } from "@/lib/simulation-path-snapshot";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function SimulationDesignPreview({
   query,
@@ -31,7 +33,7 @@ export function SimulationDesignPreview({
         selectedScopeKey={portfolio.selectedScope.key}
         researchUniverse={null}
         ownerResearchExecution={
-          economic ? <EconomicExecutionSection pathDetail={pathDetail} result={economicResearchPresentation(economic)} baseline={execution} /> : pathModel === "bootstrap" ? <OwnerResearchExecutionSection pathDetail={pathDetail} execution={execution} selectedScopeKey={portfolio.selectedScope.key} /> : <p role="alert">Invalid simulation model</p>
+          economic ? <EconomicExecutionSection pathDetail={pathDetail} result={economicResearchPresentation(economic)} baseline={execution} /> : pathModel === "bootstrap" ? <OwnerResearchExecutionSection pathDetail={pathDetail} execution={execution} selectedScopeKey={portfolio.selectedScope.key} /> : <CairnStatus as="p" tone="danger" role="alert">Invalid simulation model</CairnStatus>
         }
 
       />

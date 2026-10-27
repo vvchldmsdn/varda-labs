@@ -5,10 +5,12 @@ import { PresentationDialog } from "@/components/presentation/presentation-dialo
 import { T } from "@/components/i18n/localized-text";
 import type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
 import type { ContributionMarketContext } from "@/lib/contribution-market-context";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 const AdjustmentPanel = dynamic(() => import("./contribution-adjustment-panel").then((module) => module.ContributionAdjustmentPanel), {
   ssr: false,
-  loading: () => <p role="status"><T ko="비교 화면을 준비하고 있습니다." en="Preparing the comparison." /></p>,
+  loading: () => <CairnStatus as="p" tone="neutral" role="status"><T ko="비교 화면을 준비하고 있습니다." en="Preparing the comparison." /></CairnStatus>,
 });
 
 export function ContributionAdjustmentDialog({ preview, context }: {

@@ -5,6 +5,8 @@ import type { FixedResearchSimulationResult } from "@/lib/simulation-fixed-resea
 
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyExecution = Extract<
   FixedResearchSimulationResult,
@@ -35,8 +37,8 @@ export function FixedResearchExecutionSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="fixed-research-execution-title" className="text-lg font-semibold">
-            <SimulationText ko={"서비스 기준일 수익률"} />{" "}{researchHorizon}<SimulationText ko={"단계 연구 시뮬레이션"} />{" "}</h2>
+          <CairnSectionTitle id="fixed-research-execution-title" className="text-lg font-semibold">
+            <SimulationText ko={"서비스 기준일 수익률"} />{" "}{researchHorizon}<SimulationText ko={"단계 연구 시뮬레이션"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"선택한 기준일까지의 90개 수익률을 평균 5단계 블록의 stationary bootstrap으로 재표본해 서비스 기준일 수익률"} />{" "}{researchHorizon}<SimulationText ko={"단계 경로 500개를 계산합니다. 두 종목은 각각 100% 보유한 경우로 독립 실행합니다. 두 결과의 차이는 공동 초과확률이나 순위를 뜻하지 않습니다."} />{" "}</p>
         </div>
@@ -88,9 +90,9 @@ function ResearchExecutionPanel({ execution }: { execution: ReadyExecution }) {
       <header className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-4">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]"><SimulationText ko={"단일 종목 100%"} /></p>
-          <h3 className="mt-1 text-lg font-semibold">
+          <CairnSectionTitle level="h3" className="mt-1 text-lg font-semibold">
             {execution.ticker} · {execution.name}
-          </h3>
+          </CairnSectionTitle>
         </div>
         <span className="rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
           <SimulationText ko={"계산 완료"} />{" "}</span>
@@ -126,9 +128,9 @@ function UnavailableExecutionPanel({
       data-research-unavailable-reason={execution.reason}
     >
       <p className="text-xs font-semibold text-[var(--warning)]"><SimulationText ko={"단일 종목 100%"} /></p>
-      <h3 className="mt-1 text-lg font-semibold">
+      <CairnSectionTitle level="h3" className="mt-1 text-lg font-semibold">
         {execution.ticker} · {execution.name}
-      </h3>
+      </CairnSectionTitle>
       <p className="mt-3 text-sm leading-6 text-[var(--warning)]">
         <SimulationText ko={unavailableReasonLabel(execution.reason)} />
       </p>

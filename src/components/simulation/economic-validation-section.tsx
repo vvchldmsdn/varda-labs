@@ -1,17 +1,19 @@
 import type { SimulationOwnerEconomicValidationResult } from "@/lib/simulation-owner-economic-validation";
 import { SimulationText } from "./simulation-text";
+import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function EconomicValidationSection({ result }: { result: SimulationOwnerEconomicValidationResult | null }) {
   const ready = result?.rows.filter((row) => row.status === "ready") ?? [];
   return <section data-economic-validation={result?.status ?? "unavailable"}>
-    <h3 className="text-lg font-medium"><SimulationText ko="과거 시점에서 다시 시작해 보기" en="Restarting from historical dates" /></h3>
+    <CairnSectionTitle level="h3" className="text-lg font-medium"><SimulationText ko="과거 시점에서 다시 시작해 보기" en="Restarting from historical dates" /></CairnSectionTitle>
     <ol className="my-5 grid gap-3 border-y border-[var(--line)] py-4 text-sm sm:grid-cols-3">
       <li><span className="mr-2 text-[var(--brand)]">01</span><SimulationText ko="90개 관측으로 모형 학습" en="Fit on 90 observations" /></li>
       <li><span className="mr-2 text-[var(--brand)]">02</span><SimulationText ko="미래를 보기 전에 비중 탐색" en="Search weights before seeing outcomes" /></li>
       <li><span className="mr-2 text-[var(--brand)]">03</span><SimulationText ko="다음 21개 실제 관측과 대조" en="Compare with the next 21 observations" /></li>
     </ol>
     <p className="text-sm leading-7 text-[var(--muted)]"><SimulationText ko="현재 보유 종목과 비중을 과거에 적용한 연구입니다. 겹치지 않는 최대 3개 구간을 사용하며, 경제지표 모형에서 고른 후보가 실제로 나빠진 구간도 그대로 표시합니다. 실제 과거 계좌 성과를 재현하는 기록은 아닙니다." en="This applies today's holdings and weights retrospectively over up to three non-overlapping periods. Candidate results remain visible even when they underperform. It is not a reconstruction of historical account performance." /></p>
-    {!ready.length ? <p role="status" className="my-6 border-l-2 border-[var(--warning)] pl-4 text-sm leading-7"><SimulationText ko="학습과 이후 결과를 분리할 만큼의 공통 가격·환율·금리 이력이 아직 없습니다. 점검하지 못한 정확도를 좋다고 표시하지 않습니다." en="There is not enough aligned price, FX and yield history to separate training from later outcomes. No accuracy score is claimed for missing validation." /></p> : <>
+    {!ready.length ? <CairnStatus as="p" tone="warning" role="status" className="my-6 border-l-2 border-[var(--warning)] pl-4 text-sm leading-7"><SimulationText ko="학습과 이후 결과를 분리할 만큼의 공통 가격·환율·금리 이력이 아직 없습니다. 점검하지 못한 정확도를 좋다고 표시하지 않습니다." en="There is not enough aligned price, FX and yield history to separate training from later outcomes. No accuracy score is claimed for missing validation." /></CairnStatus> : <>
       <p className="my-4 text-xs text-[var(--muted)]">{ready.length} / {result?.summary.endpointCount} <SimulationText ko="구간 확인 · 적은 표본만으로 예측력 우열을 판정하지 않습니다." en="periods available · Too few observations to establish forecasting superiority." /></p>
       <div className="overflow-x-auto"><table className="w-full min-w-[430px] text-right text-sm"><thead><tr className="border-b border-[var(--line)] text-xs text-[var(--muted)]"><th className="py-3 text-left"><SimulationText ko="현재 비중의 모형 비교" en="Model check at current weights" /></th><th><SimulationText ko="경제 상태 조건부" en="State-conditioned" /></th><th><SimulationText ko="무조건 요인 모형" en="Unconditional factor" /></th></tr></thead><tbody>
         <tr><td className="py-3 text-left"><SimulationText ko="P10~P90 실제 포함률" en="Observed P10–P90 coverage" /></td><td>{number(result?.summary.economic.bandCoveragePct, "%")}</td><td>{number(result?.summary.baseline.bandCoveragePct, "%")}</td></tr>

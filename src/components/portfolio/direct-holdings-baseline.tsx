@@ -2,6 +2,8 @@ import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import type { PortfolioDirectHoldingsBaseline } from "@/lib/portfolio-direct-holdings";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const ACCOUNT_LABELS: Record<
   PortfolioDirectHoldingsBaseline["selectedAccount"],
@@ -38,11 +40,11 @@ export function DirectHoldingsBaseline({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             CONCENTRATION / CURRENCY
           </p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-xl font-medium tracking-normal sm:text-2xl"
             id="direct-holdings-baseline-title"
           >
-            <PortfolioText ko={"직접 보유 집중도·통화 노출"} />{" "}</h2>
+            <PortfolioText ko={"직접 보유 집중도·통화 노출"} />{" "}</CairnSectionTitle>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             {scopeLabel ?? ACCOUNT_LABELS[model.selectedAccount]}<PortfolioText ko={"의 현재 평가액을 직접 보유 종목 기준으로 계산했습니다. ETF 내부 구성, 목표비중, 추천, 주문은 포함하지 않습니다."} />{" "}</p>
         </div>
@@ -82,7 +84,7 @@ export function DirectHoldingsBaseline({
           </div>
 
           <div className="mt-8">
-            <h3 className="text-sm font-medium text-[var(--ink)]"><PortfolioText ko={"통화별 노출"} /></h3>
+            <CairnSectionTitle level="h3" className="text-sm font-medium text-[var(--ink)]"><PortfolioText ko={"통화별 노출"} /></CairnSectionTitle>
             <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
               {metrics.currencyExposures.map((row) => (
                 <div

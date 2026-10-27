@@ -30,11 +30,11 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
   const partition=options.partition??{provider:'kis' as const};
   const budgetMs=Math.max(0,Math.min(120000,options.budgetMs??MARKET_COLLECTION_POLICY.workerBudgetMs));
   let processed = 0, failed = 0, cacheHits = 0;
+  await maintainMarketCollection(partition);
   if (!await hasReadyMarketCollection(partition)) return { processed, failed, cacheHits, status: "idle" as const };
   if (!getKisProviderPolicy().configured) return { processed, failed, cacheHits, status: "provider_unavailable" as const };
   try {
     await withKisCollectionLease(() => withKisCollectionDeadline(async () => {
-      await maintainMarketCollection(partition);
       const deadline = Date.now() + budgetMs;
       const session = createKisProviderRequestSession();
       const provider = createKisMarketDataProvider(session);
@@ -56,6 +56,7 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
           } else if(job.kind==='history'&&job.key.startsWith('kis:history:raw_close_v1:')){
             const result=await syncMissingRawCloses(job,provider);
             ok=result.complete;failureCode='raw_close_still_missing';
+            if(!ok&&result.pendingFinalizationCount){deferred=true;failureCode='history_finalization_pending';retryAfterSeconds=900;}
           } else if (job.kind === "history" && job.startDate && job.endDate) {
             if (!job.key.startsWith("kis:history:paired_v1:")) throw new Error("history_policy_changed");
             const result = await runKisHistoryCacheSync({ targets: [{ key: job.key, ticker: job.ticker,
@@ -63,7 +64,11 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
               startDate: job.startDate, endDate: job.endDate, provider,
               pairedClaim: job.key.startsWith("kis:history:paired_v1:") ? job : undefined });
             ok = result.failedCount === 0 && result.fetchedRowCount > 0;
-            if (result.conflictCount > 0) { terminal = true; failureCode = "paired_history_conflict"; }
+            if (result.conflictCount > result.retryableRevisionCount) {
+              terminal = true; failureCode = "paired_history_protected_v2";
+            } else if(result.retryableRevisionCount>0 || result.pendingFinalizationCount>0) {
+              ok=false;deferred=true;failureCode="history_finalization_pending";retryAfterSeconds=900;
+            }
           } else if (job.kind === "fx") {
             const now = new Date();
             cacheHit = await fxCacheIsFresh();
@@ -80,13 +85,14 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
         } catch (error) {
           ok = false;
           deferred = isProviderCollectionDeferred(error);
+          if(typeof error==="object"&&error!==null&&"code" in error&&error.code==="provider_history_pending")failureCode="history_finalization_pending";
           const wait = typeof error === "object" && error !== null && "retryAfterSeconds" in error ? Number(error.retryAfterSeconds) : 0;
           if (Number.isFinite(wait) && wait > 0) retryAfterSeconds = Math.max(retryAfterSeconds, Math.min(3600, Math.ceil(wait)));
         }
-        await finishMarketCollection(job, { ok, deferred, terminal, code: ok ? cacheHit ? "cache_fresh" : "collected" : deferred ? "provider_budget_wait" : failureCode, retryAfterSeconds: ok ? 0 : retryAfterSeconds });
+        await finishMarketCollection(job, { ok, deferred, terminal, code: ok ? cacheHit ? "cache_fresh" : "collected" : deferred && failureCode!=="history_finalization_pending" ? "provider_budget_wait" : failureCode, retryAfterSeconds: ok ? 0 : retryAfterSeconds });
         processed++; if (!ok) failed++; if (cacheHit) cacheHits++;
         // One failed provider operation yields fairly instead of probing every queued symbol.
-        if (!ok) break;
+        if (!ok && failureCode!=="history_finalization_pending") break;
       }
     },budgetMs));
   } catch (error) {

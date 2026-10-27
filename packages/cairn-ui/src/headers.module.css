@@ -1,0 +1,10 @@
+.pageTitle[data-cairn-page-title]{margin:0;font-size:clamp(25px,3.2vw,36px);font-weight:550;line-height:1.3;letter-spacing:-.04em;color:var(--cairn-ui-ink,var(--ink,#20211f))}
+.sectionTitle[data-cairn-section-title]{margin:0;font-size:17px;font-weight:550;line-height:1.5;letter-spacing:-.02em;color:var(--cairn-ui-ink,var(--ink,#20211f))}
+.pageHeader[data-cairn-page-header],.sectionHeader[data-cairn-section-header]{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;min-width:0;color:var(--cairn-ui-ink,var(--ink,#20211f));margin-bottom:28px}
+.pageHeader[data-cairn-page-header] h1,.pageHeader[data-cairn-page-header] h2{margin:0;font-size:clamp(25px,3.2vw,36px);font-weight:550;line-height:1.3;letter-spacing:-.04em}
+.sectionHeader[data-cairn-section-header] h2,.sectionHeader[data-cairn-section-header] h3{margin:0;font-size:17px;font-weight:550;line-height:1.5;letter-spacing:-.02em}
+.sectionHeader[data-cairn-section-header]{align-items:center;margin-bottom:18px}
+.copy{min-width:0}.pageHeader .eyebrow{margin:0 0 8px;color:var(--cairn-ui-muted,#6c6d68);font-size:11px;line-height:1.5}
+.pageHeader .description,.sectionHeader .description{margin:9px 0 0;color:var(--cairn-ui-muted,#6c6d68);font-size:13px;line-height:1.75;max-width:68ch}
+.actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:10px 16px;flex-shrink:0;font-size:12px}
+@media(max-width:699px){.pageHeader[data-cairn-page-header],.sectionHeader[data-cairn-section-header]{gap:14px;flex-wrap:wrap;margin-bottom:22px}.actions{justify-content:flex-start;max-width:100%}.pageHeader[data-cairn-page-header] h1,.pageHeader[data-cairn-page-header] h2{font-size:26px}}

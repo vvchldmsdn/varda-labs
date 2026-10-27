@@ -10,6 +10,8 @@ import { useEffect, useId, useRef, useTransition, type KeyboardEvent, type React
 import { Maximize2, X } from "lucide-react";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { historyDetailHref, type HistoryDetailPanel } from "./history-detail-state";
+import { Button as CairnButton, Form as CairnForm, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 /** Children are built by the authenticated server page only for the requested panel. */
 export function HistoryRecordsDialog({ panel, children }: { panel: HistoryDetailPanel; children?: ReactNode }) {
@@ -52,9 +54,9 @@ export function HistoryRecordsDialog({ panel, children }: { panel: HistoryDetail
   }
 
   return <>
-    <button className="varda-presentation-detail-trigger" type="button" ref={triggerRef} aria-disabled={pending} aria-busy={pending} onClick={() => { if (!pending) navigate({ detail: "records" }); }}>
+    <CairnButton variant="secondary" className="varda-presentation-detail-trigger" type="button" ref={triggerRef} aria-disabled={pending} aria-busy={pending} onClick={() => { if (!pending) navigate({ detail: "records" }); }}>
       <span>{<T ko={pending ? "기록 불러오는 중…" : "기록·이벤트"} en={translateHomeHistory(pending ? "기록 불러오는 중…" : "기록·이벤트")}/>}</span><Maximize2 aria-hidden="true" size={15} strokeWidth={1.6} />
-    </button>
+    </CairnButton>
     <dialog ref={dialogRef} aria-labelledby={titleId} className="varda-dialog varda-presentation-dialog varda-presentation-dialog-wide"
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
       onKeyDown={keepFocusInside}
@@ -68,8 +70,8 @@ export function HistoryRecordsDialog({ panel, children }: { panel: HistoryDetail
       }}>
       {panel ? <div className="varda-presentation-dialog-shell">
         <header className="varda-dialog-header flex shrink-0 items-start justify-between gap-5">
-          <div><p className="varda-kicker">DETAIL VIEW</p><h2 className="mt-2 text-xl font-medium" id={titleId}>{<T ko={panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화"} en={translateHomeHistory(panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화")}/>}</h2></div>
-          <button aria-label={t("닫기", "Close")} autoFocus className="varda-icon-button" type="button" onClick={close}><X aria-hidden="true" size={18} /></button>
+          <div><p className="varda-kicker">DETAIL VIEW</p><CairnSectionTitle className="mt-2 text-xl font-medium" id={titleId}>{<T ko={panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화"} en={translateHomeHistory(panel === "raw" ? "히스토리 원시 기록" : "기록에서 발견한 변화")}/>}</CairnSectionTitle></div>
+          <CairnButton variant="ghost" aria-label={t("닫기", "Close")} autoFocus className="varda-icon-button" type="button" onClick={close}><X aria-hidden="true" size={18} /></CairnButton>
         </header>
         <div className="varda-dialog-content varda-presentation-dialog-content">{children}</div>
       </div> : null}
@@ -97,7 +99,7 @@ export function HistoryEvidenceForm({ children, className }: { children: ReactNo
   const router = useRouter();
   const current = useSearchParams();
   const [pending, startTransition] = useTransition();
-  return <form action="/history" method="get" className={className} aria-busy={pending} onSubmit={(event) => {
+  return <CairnForm action="/history" method="get" className={className} aria-busy={pending} onSubmit={(event) => {
     event.preventDefault();
     const changes: Record<string, string | null> = { detail: "raw", positionDate: null, positionSource: null };
     for (const [key, value] of new FormData(event.currentTarget)) {
@@ -107,5 +109,5 @@ export function HistoryEvidenceForm({ children, className }: { children: ReactNo
   }}>
     <input type="hidden" name="detail" value="raw" />
     {children}
-  </form>;
+  </CairnForm>;
 }

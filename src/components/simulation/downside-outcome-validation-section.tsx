@@ -8,6 +8,8 @@ import {
   historicalValidationReasonLabel,
 } from "@/components/simulation/historical-validation-ui";
 import type { SimulationHistoricalOutcomeValidationResult } from "@/lib/simulation-historical-outcome-validation";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function DownsideOutcomeValidationSection({
   result,
@@ -29,11 +31,11 @@ export function DownsideOutcomeValidationSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"Stationary bootstrap · 하락위험 과거 관측 검증"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             id="downside-outcome-validation-title"
             className="mt-1 text-lg font-semibold"
           >
-            <SimulationText ko={"종료 손실확률·최대낙폭 검증"} />{" "}</h2>
+            <SimulationText ko={"종료 손실확률·최대낙폭 검증"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"확률밴드와 동일한 90개 학습 구간과 500개 완전 경로를 사용합니다. 예측 종료 손실확률과 MDD P50·P90을, 바로 이어진 실제"} />{" "}
             <SimulationText ko={result.horizon ?? "선택"} /><SimulationText ko={"개 관측값의 종료 손실 여부와 MDD에 대조합니다."} />{" "}</p>

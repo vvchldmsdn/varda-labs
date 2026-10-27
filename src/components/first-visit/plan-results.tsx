@@ -4,6 +4,8 @@ import { formatMoney, type Currency } from "@/lib/money";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { intlLocale, type Locale } from "@/lib/i18n/locale";
 import styles from "./first-visit.module.css";
+import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function planErrorCopy(error: string, currency: Currency, locale: Locale) {
   if (/추가 투자금/.test(error)) return locale === "en"
@@ -25,16 +27,16 @@ export function planErrorCopy(error: string, currency: Currency, locale: Locale)
 export function PlanResults({ input, sample = false }: { input: PlanInput; sample?: boolean }) {
   const { locale, t } = useI18n();
   const calculation = calculatePlan(input);
-  if (!calculation.ok) return <p role="alert">{planErrorCopy(calculation.error, input.currency, locale)}</p>;
+  if (!calculation.ok) return <CairnStatus as="p" tone="danger" role="alert">{planErrorCopy(calculation.error, input.currency, locale)}</CairnStatus>;
   const { rows, totalAllocated, residualCash } = calculation;
   const money = (value: number) => formatMoney(value, input.currency, intlLocale(locale));
   const reached = rows.every(row => Math.abs(row.afterPct - row.targetPct) < 0.01);
   return <section className={styles.results} aria-label={sample ? t("샘플 계산 결과", "Sample allocation") : t("내 계산 결과", "My allocation")}>
     <p className={styles.eyebrow}>{sample ? t("예시 배분 결과", "SAMPLE ALLOCATION") : t("내가 입력한 자산의 배분", "YOUR ALLOCATION")} · {input.currency}</p>
-    <h2>{t("이번 투자금", "Allocate")} <strong>{money(input.amount)}</strong>{t("의 배분", "")}</h2>
+    <CairnSectionTitle>{t("이번 투자금", "Allocate")} <strong>{money(input.amount)}</strong>{t("의 배분", "")}</CairnSectionTitle>
     <p>{reached ? t("목표 비중에 가까워졌어요. 반올림 차이는 남을 수 있습니다.", "Close to your targets. Small rounding differences may remain.") : t("목표보다 부족한 자산에 배분합니다. 목표 비중과 차이는 남을 수 있어요.", "New money goes to underweight assets. Some gaps may remain.")}</p>
     <div className={styles.resultRows}>{rows.map((row, i) => <article key={i}>
-      <div className={styles.rowTitle}><h3>{row.name}</h3><strong>+{money(row.allocation)}</strong></div>
+      <div className={styles.rowTitle}><CairnSectionTitle level="h3">{row.name}</CairnSectionTitle><strong>+{money(row.allocation)}</strong></div>
       <div className={styles.bar} aria-hidden="true"><span style={{ width: `${row.afterPct}%` }} /><i style={{ left: `${row.targetPct}%` }} /></div>
       <div className={styles.stats}><span>{t("현재", "Now")} {row.beforePct === null ? "—" : `${row.beforePct.toFixed(2)}%`} → {t("배분 후", "After")} {row.afterPct.toFixed(2)}%</span><span>{t("목표", "Target")} {row.targetPct.toFixed(2)}% · {t("차이", "Gap")} {(row.afterPct - row.targetPct).toFixed(2)}{t("%p", " pp")}</span></div>
     </article>)}</div>

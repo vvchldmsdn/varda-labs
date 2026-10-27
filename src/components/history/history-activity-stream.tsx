@@ -5,6 +5,8 @@ import type { TenantEventLedgerQueryResult } from "@/db/queries/tenant-events";
 import { BrokerEvidenceDetails } from "@/components/events/broker-evidence-details";
 
 import { formatHistoryKrw } from "./history-format";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function HistoryActivityStream({
   result,
@@ -23,7 +25,7 @@ export function HistoryActivityStream({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">ACTIVITY TAPE</p>
-          <h2 id="history-activity-title" className="mt-1 text-xl font-semibold"><T ko="기록된 활동" en="Recorded activity"/></h2>
+          <CairnSectionTitle id="history-activity-title" className="mt-1 text-xl font-semibold"><T ko="기록된 활동" en="Recorded activity"/></CairnSectionTitle>
         </div>
         <p className="text-xs text-[var(--muted)]">
           {<T ko={events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준"} en={translateHomeHistory(events.length > 0 ? `최근 ${events.length}건` : "저장 이벤트 기준")}/>}
