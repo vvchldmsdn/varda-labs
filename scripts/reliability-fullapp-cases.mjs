@@ -275,20 +275,6 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await visitValuation('/history?currency=KRW');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     });
-    await check('fullapp-default-fractional-execution-preserves-cash-and-roundtrips-holdings', async () => {
-      const ctx = { ownerUserId: other, role: 'user' };
-      const before = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
-      for (const action of ['buy', 'sell']) {
-        await page.goto(url + `/portfolio/ledger?accountId=${otherAccount}&assetId=${otherAsset}&action=${action}`);
-        await page.getByLabel('체결 수량', { exact: true }).fill('0.010709');
-        await page.getByLabel('체결 단가 · KRW', { exact: true }).fill('10000.123456');
-        await page.getByRole('button', { name: action === 'buy' ? '매수 기록 저장' : '매도 기록 저장', exact: true }).click();
-        await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.', { exact: true })).toBeVisible();
-        const after = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
-        assert.deepEqual(after.cash, before.cash, 'Execution-only records must not invent cash settlement');
-        assert.equal(after.positions[0].quantity, action === 'buy' ? '10.010709' : before.positions[0].quantity);
-      }
-    });
     await runContributionUiCases({page,check,admin,owner:other,account:otherAccount,asset:otherAsset,url,output});
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
@@ -424,6 +410,23 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       }finally{await stale.close();}
     });
     await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
+    // Execution-only evidence intentionally leaves cash unconfirmed; run after cash-dependent journeys.
+    await check('fullapp-default-fractional-execution-preserves-cash-and-roundtrips-holdings', async () => {
+      await setIdentity(sessionTokens[1]);
+      await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
+      const ctx = { ownerUserId: other, role: 'user' };
+      const before = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
+      for (const action of ['buy', 'sell']) {
+        await page.goto(url + `/portfolio/ledger?accountId=${otherAccount}&assetId=${otherAsset}&action=${action}`);
+        await page.getByLabel('체결 수량', { exact: true }).fill('0.010709');
+        await page.getByLabel('체결 단가 · KRW', { exact: true }).fill('10000.123456');
+        await page.getByRole('button', { name: action === 'buy' ? '매수 기록 저장' : '매도 기록 저장', exact: true }).click();
+        await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.', { exact: true })).toBeVisible();
+        const after = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
+        assert.deepEqual(after.cash, before.cash, 'Execution-only records must not invent cash settlement');
+        assert.equal(after.positions[0].quantity, action === 'buy' ? '10.010709' : before.positions[0].quantity);
+      }
+    });
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };
