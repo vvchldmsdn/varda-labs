@@ -1,1 +1,4 @@
 drizzle/*.sql text eol=lf
+
+src/lib/shared-domain/** text eol=lf
+packages/cairn-research-domain/** text eol=lf
