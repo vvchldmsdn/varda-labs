@@ -7,6 +7,8 @@ import {
   RegimeScenarioCard,
   type ReadyRegimeScenario,
 } from "./regime-scenario-card";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyModel = Extract<SimulationRegimeResearchResult, { status: "ready" }>;
 
@@ -37,8 +39,8 @@ export function RegimeBootstrapResearchSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="regime-bootstrap-research-title" className="text-lg font-semibold">
-            <SimulationText ko={"시장 국면 사후 연구"} />{" "}</h2>
+          <CairnSectionTitle id="regime-bootstrap-research-title" className="text-lg font-semibold">
+            <SimulationText ko={"시장 국면 사후 연구"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"저장된 환율·미국 금리·장단기 금리차로 선택 기준일과 유사한 과거 구간을 찾아 교차시장 수익률 블록을 뽑습니다. 공개시각과 revision vintage가 없어 당시 예측을 재현한 결과는 아니며, 기존 stationary bootstrap의 결손을 대신하지 않습니다."} />{" "}</p>
         </div>
@@ -136,7 +138,7 @@ export function RegimeBootstrapResearchSection({
 
       {model.status === "ready" ? (
         <div className="mt-5 border-t border-[var(--line)] pt-5">
-            <h3 className="text-base font-semibold"><SimulationText ko={"단일 종목·직접 입력 참고 경로"} /></h3>
+            <CairnSectionTitle level="h3" className="text-base font-semibold"><SimulationText ko={"단일 종목·직접 입력 참고 경로"} /></CairnSectionTitle>
             <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
               <SimulationText ko={"단일 종목 두 경로와 25·50·75 이외의 직접 입력 비중만 별도로 표시합니다. 고정 비중 3안과 같은 국면 상태와 추출 계획을 사용합니다."} />{" "}</p>
             <div className="mt-4 grid gap-4 xl:grid-cols-3">

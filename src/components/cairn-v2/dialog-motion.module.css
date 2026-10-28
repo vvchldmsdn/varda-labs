@@ -1,0 +1,7 @@
+/* The scrim fades with the panel; removing the native top layer must not flash it off. */
+dialog.motionDialog,
+dialog.motionDialog[data-reduced] {background:transparent;}
+dialog.motionDialog::backdrop {background:transparent;}
+dialog.motionDialog:not([open]) {display:none;}
+.scrim {position:fixed;inset:0;background:#20211f33;pointer-events:none;}
+.panel {transform-origin:top left;}

@@ -7,3 +7,7 @@
 .selectedAccount{font-size:13px;color:var(--muted);margin:0}.cashDetails>summary{display:none}.compact .cashDetails>summary{display:block;min-height:36px;padding:6px 0}.compact .form{margin-top:12px;gap:12px}.compact .settlement{margin:0;padding:10px 0}.compact .actions{position:sticky;bottom:-1px;background:var(--paper);padding:12px 0;margin:0;z-index:1}.compact .actions>.primary{width:100%}
 
 .form>.entryFields{display:contents;border:0;padding:0;margin:0}
+/* Trade mode explanations stay beside the choice, including narrow dialogs. */
+.tradeGuide{border-left:2px solid var(--accent);padding-left:12px;font-size:12px;line-height:1.65;color:var(--muted)}.tradeGuide strong{font-size:13px;font-weight:550;color:var(--ink)}.tradeGuide p{margin:4px 0 0}.tradeModeOptions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}.tradeModeOptions button{display:flex;justify-content:space-between;align-items:center;gap:12px;min-width:0;width:100%;padding:12px;text-align:left}.tradeModeOptions button>span{flex-shrink:0}.tradeModeOptions small{font-size:12px;line-height:1.5;text-align:right}
+
+.tradeModeOptions button[aria-pressed="true"] small{color:inherit}

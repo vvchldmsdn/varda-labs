@@ -153,10 +153,12 @@ describe("owned portfolio currency view", () => {
     const Client = () => null;
     const [{ CurrencyPortfolioSurface }] = await importUiWithPorts(["src/components/currency-portfolio-surface.tsx"], {
       "@/components/currency-portfolio-surface-client": { CurrencyPortfolioSurfaceClient: Client },
+      "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => { throw new Error("All-scope surface must not reread tenant"); } },
+      "@/db/queries/period-return-recovery": { readRecoveredReturnCurve: async () => { throw new Error("All-scope surface must not read account recovery"); } },
     });
     const evidence = { ...trackedCurrencyFixture(), ledgerComplete: true, cashFlows: [], realizedTrades: [], realizedTradesComplete: true };
     const scope = { kind: "all", key: "all", label: "All" };
-    const tree = CurrencyPortfolioSurface({ evidence, surface: "home", scopes: [scope], selectedScope: scope });
+    const tree = await CurrencyPortfolioSurface({ evidence, surface: "home", scopes: [scope], selectedScope: scope });
     assert.equal(tree.type, Client);
     const assertPlain = value => {
       assert.notEqual(typeof value, "bigint"); assert.notEqual(typeof value, "function");
@@ -170,7 +172,7 @@ describe("owned portfolio currency view", () => {
     const changed = structuredClone(evidence); changed.ownerId = "second-owner";
     for (const frame of [changed.current, ...changed.history]) for (const position of frame.positions) position.ownerId = changed.ownerId;
     changed.current.positions[0].observation.price = "900";
-    const second = CurrencyPortfolioSurface({ evidence: changed, surface: "home", scopes: [scope], selectedScope: scope });
+    const second = await CurrencyPortfolioSurface({ evidence: changed, surface: "home", scopes: [scope], selectedScope: scope });
     assert.equal(second.props.reports.USD.current.total, "900", "server results must not be cached across owners or evidence refreshes");
     assert.equal(tree.props.reports.USD.current.total, "1100");
   });

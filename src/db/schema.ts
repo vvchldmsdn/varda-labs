@@ -89,6 +89,25 @@ export const nativeContributionPlans = pgTable("native_contribution_plans", {
   deletePolicy: pgPolicy("native_contribution_plans_tenant_delete_v1", { for: "delete", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
 })).enableRLS();
 
+export const contributionEffects = pgTable('contribution_effects', {
+  ownerUserId: uuid('owner_user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+  id: uuid('id').notNull(),
+  accountId: uuid('account_id').notNull().references(() => accounts.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  revision: integer('revision').default(0).notNull(),
+  document: jsonb('document').notNull(),
+  tradeIds: jsonb('trade_ids').default([]).notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.id] }),
+  ownerAccountIdx: index('contribution_effects_owner_account_idx').on(table.ownerUserId, table.accountId, table.createdAt),
+  revisionCheck: check('contribution_effects_revision_check', sql`${table.revision}>=0`),
+  documentCheck: check('contribution_effects_document_check', sql`jsonb_typeof(${table.document})='object' and octet_length(${table.document}::text)<=524288 and ${table.document}->>'version'='contribution_effect_v1' and ${table.document}->>'accountId'=${table.accountId}::text`),
+  linksCheck: check('contribution_effects_trade_ids_check', sql`jsonb_typeof(${table.tradeIds})='array' and jsonb_array_length(${table.tradeIds})<=100`),
+  tenantPolicy: pgPolicy('contribution_effects_tenant_v1', { for: 'all', to: tenantDatabaseRole,
+    using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()`,
+    withCheck: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active() and exists(select 1 from accounts a where a.id=${table.accountId} and a.canonical_owner_user_id=${table.ownerUserId} and a.is_active)` }),
+})).enableRLS();
+
 export const portfolioDrafts = pgTable("portfolio_drafts", {
   ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
   id: uuid("id").notNull(),
@@ -3336,3 +3355,17 @@ export const holdingsSnapshotRepairArchive = pgTable("holdings_snapshot_repair_a
 },t=>[uniqueIndex("holdings_snapshot_repair_archive_portfolio_id_revision_key").on(t.portfolioId,t.revision),
  check("holdings_snapshot_repair_archive_revision_check",sql`${t.revision}>0`),
  check("holdings_snapshot_repair_archive_check",sql`jsonb_typeof(${t.portfolio})='object' AND jsonb_typeof(${t.positions})='array'`)]).enableRLS();
+
+export { instrumentCatalog } from "@/db/instrument-catalog-schema";
+
+export const recoveredCloseValuations=pgTable('recovered_close_valuations',{
+ canonicalOwnerUserId:uuid('canonical_owner_user_id').notNull().references(()=>appUsers.id),
+ accountId:uuid('account_id').notNull(),revision:integer('revision').notNull(),
+ valuationDate:date('valuation_date').notNull(),valueKrw:decimal('value_krw',{precision:36,scale:12}).notNull(),
+ evidence:jsonb('evidence').notNull(),createdAt:timestamp('created_at',{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>[primaryKey({columns:[t.accountId,t.revision,t.valuationDate]}),
+ foreignKey({columns:[t.accountId,t.canonicalOwnerUserId],foreignColumns:[accounts.id,accounts.canonicalOwnerUserId]}).onDelete('restrict'),
+ check('recovered_close_valuations_revision_check',sql`${t.revision}>0`),
+ check('recovered_close_valuations_value_krw_check',sql`${t.valueKrw}>0`),
+ check('recovered_close_valuations_evidence_check',sql`jsonb_typeof(${t.evidence})='object'`),
+ pgPolicy('recovered_close_valuations_owner',{for:'select',to:tenantDatabaseRole,using:currentTenantOwns(t.canonicalOwnerUserId)})]).enableRLS();

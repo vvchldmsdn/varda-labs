@@ -1,4 +1,5 @@
 import "server-only";
+import { buildCurrentHoldingMovement, type CurrentHoldingMovement } from "./current-holding-movement";
 import { resolveCurrentUsdKrwRate } from "@/lib/market-data/fx-rate-admission";
 
 import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
@@ -161,6 +162,7 @@ export type DashboardEventActivity = {
 };
 
 export type DashboardData = {
+  currentHoldingMovement?: CurrentHoldingMovement;
   selectedScope: PortfolioAnalysisScope;
   analysisScopes: readonly PortfolioAnalysisScope[];
   generatedAt: string;
@@ -375,6 +377,11 @@ export async function getPortfolioDashboard(
     usdKrwRate,
     movementCycle,
   });
+  const currentHoldingMovement = buildCurrentHoldingMovement({
+    holdings: holdingsBase, positionRows: baselineIsDelayed ? [] : latestPositionRows,
+    priceRows: baselineIsDelayed ? [] : recentPriceRows,
+    baselineDate: activeMovementBaselineDate, usdKrwRate, movementCycle,
+  });
   // A current-quantity close comparison cannot replace a snapshot valuation
   // across trades, nor resolve an ambiguous trade-to-position identity.
   const canUsePreviousCloseFallback = !eventRows.some((event) =>
@@ -478,6 +485,7 @@ export async function getPortfolioDashboard(
 
   return {
     selectedScope: scope,
+    currentHoldingMovement,
     analysisScopes,
     generatedAt: new Date().toISOString(),
     usdKrwRate,

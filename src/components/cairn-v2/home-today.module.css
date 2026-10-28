@@ -1,0 +1,6 @@
+.body {min-width:0;display:flex;flex-direction:column;gap:5px;padding-top:16px;}
+.label,.note {font-size:10px;color:var(--cairn-v2-muted);line-height:1.55;}
+.headline {font-size:clamp(28px,2.8vw,38px);line-height:1.2;letter-spacing:-.045em;font-weight:400;font-variant-numeric:tabular-nums;}
+.amount {font-size:13px;font-variant-numeric:tabular-nums;}
+.note {margin-top:5px!important;}
+@media(max-width:699px) {.body {padding-top:12px;}.headline {font-size:36px;}}

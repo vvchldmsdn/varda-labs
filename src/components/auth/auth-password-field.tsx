@@ -8,6 +8,8 @@ import {
   AUTH_MIN_NEW_PASSWORD_LENGTH,
 } from "@/lib/auth/auth-methods";
 import styles from "./auth-experience.module.css";
+import { Field as CairnField } from "@/components/cairn-ui";
+
 
 export function AuthPasswordField({
   id,
@@ -21,7 +23,7 @@ export function AuthPasswordField({
   const [visible, setVisible] = useState(false);
   return (
     <div className={styles.field}>
-      <label htmlFor={id}><AuthText>{label}</AuthText></label>
+      <CairnField htmlFor={id}><AuthText>{label}</AuthText></CairnField>
       <div className={styles.passwordField}>
         <AuthElement as="input"
           id={id}

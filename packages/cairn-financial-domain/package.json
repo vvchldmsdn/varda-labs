@@ -1,0 +1,6 @@
+{
+  "name": "@cairn/financial-domain-source",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Canonical source templates for Cairn's shared financial calculations"
+}

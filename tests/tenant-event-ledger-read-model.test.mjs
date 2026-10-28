@@ -308,6 +308,7 @@ async function recoveryQueryFixture() {
     },
   };
   const [query] = await importWithPorts(["src/db/queries/tenant-events.ts"], {
+    "@/db/client": { sqlClient: { query: async () => { throw new Error("Unexpected investment market SQL in legacy event fixture"); } } },
     "@/db/tenant-client": { getTenantSqlClient: () => tenantClient },
     "./tenant-client": { getTenantSqlClient: () => tenantClient },
   });

@@ -6,6 +6,8 @@ import {
   type ResearchFanChartValueDomain,
 } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export type ReadyRegimeScenario = Extract<
   SimulationRegimeScenarioResult,
@@ -46,7 +48,7 @@ export function RegimeScenarioCard({
       <header className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-4">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">{eyebrow}</p>
-          <h3 className="mt-1 text-lg font-semibold">{scenario.name}</h3>
+          <CairnSectionTitle level="h3" className="mt-1 text-lg font-semibold">{scenario.name}</CairnSectionTitle>
           <p className="mt-1 text-xs text-[var(--muted)]">
             069500 {formatBps(scenario.weightsBps[0])} · VOO{" "}
             {formatBps(scenario.weightsBps[1])} {" "}<SimulationText ko={"· 최초 배분 후 리밸런싱 없음"} />{" "}</p>

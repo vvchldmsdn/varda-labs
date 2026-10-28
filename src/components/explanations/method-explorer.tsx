@@ -4,11 +4,13 @@ import { useId } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import type { MethodFigure, MethodGuide } from "./method-types";
 import styles from "./method.module.css";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export default function MethodExplorer({ guide }: { guide: MethodGuide }) {
   const { locale, t } = useI18n();
   return <section className={styles.explorer} aria-label={guide.title[locale]}>
-    <header><p className={styles.eyebrow}>METHODOLOGY</p><h3>{guide.title[locale]}</h3><p>{guide.intro[locale]}</p></header>
+    <header><p className={styles.eyebrow}>METHODOLOGY</p><CairnSectionTitle level="h3">{guide.title[locale]}</CairnSectionTitle><p>{guide.intro[locale]}</p></header>
     <p className={styles.exampleNotice}>{t("도식의 숫자는 원리를 보여주는 검산 예시이며 내 포트폴리오 결과가 아닙니다. 수익률은 별도 표시가 없으면 소수 단위입니다: 0.03 = 3%.", "Diagram numbers are worked examples, not your portfolio results. Returns are decimal fractions unless marked otherwise: 0.03 = 3%.")}</p>
     {guide.sections.map((section, index) => <details key={section.id} className={styles.section} open={index === 0}>
       <summary><span className={styles.index}>{String(index + 1).padStart(2, "0")}</span><h4>{section.title[locale].replace(/^\d{1,2}\s*[.·]\s*/, "")}</h4><span className={styles.expand} aria-hidden="true">＋</span></summary>

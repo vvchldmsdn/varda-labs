@@ -12,6 +12,8 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 export type PresentationSceneDefinition = Readonly<{
   id: string;
@@ -140,7 +142,7 @@ export function PresentationDeck({
       </div>
 
       <div className="varda-presentation-controls">
-        <button
+        <CairnButton variant="secondary"
           aria-label="이전 장면"
           className="varda-presentation-arrow"
           disabled={activeIndex === 0}
@@ -149,12 +151,12 @@ export function PresentationDeck({
           type="button"
         >
           <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.6} />
-        </button>
+        </CairnButton>
         <div aria-label={`${ariaLabel} 장면`} className="varda-presentation-tabs" role="tablist">
           {scenes.map((scene, index) => {
             const active = index === activeIndex;
             return (
-              <button
+              <CairnButton variant="secondary"
                 aria-controls={`${instanceId}-${scene.id}-panel`}
                 aria-selected={active}
                 className="varda-presentation-tab"
@@ -170,11 +172,11 @@ export function PresentationDeck({
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="varda-presentation-tab-label">{scene.label}</span>
-              </button>
+              </CairnButton>
             );
           })}
         </div>
-        <button
+        <CairnButton variant="secondary"
           aria-label="다음 장면"
           className="varda-presentation-arrow"
           disabled={activeIndex === scenes.length - 1}
@@ -183,7 +185,7 @@ export function PresentationDeck({
           type="button"
         >
           <ChevronRight aria-hidden="true" size={18} strokeWidth={1.6} />
-        </button>
+        </CairnButton>
         <p aria-live="polite" className="sr-only">
           {activeScene?.label}, {activeIndex + 1}/{scenes.length}
         </p>

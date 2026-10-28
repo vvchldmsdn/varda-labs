@@ -1,3 +1,4 @@
+import { parseSaleExclusionKeys } from './additional-contribution-sale-exclusions.ts';
 import { contributionFxPriority, contributionMinimumRatio, resolveContributionMultipliers, type ContributionEvidence, type ContributionFxExposure, type ContributionModifiers } from './additional-contribution-modifiers.ts';
 
 export const ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY = Object.freeze({
@@ -48,6 +49,7 @@ export type AdditionalContributionMa120Status =
   | "unavailable";
 
 export type AdditionalContributionPolicyBlocker =
+  | "invalid_sale_exclusions"
   | "invalid_cash_amount"
   | "empty_valuation_universe"
   | "invalid_current_value"
@@ -89,6 +91,7 @@ type MaAdjustmentReason =
   | "evidence_unavailable";
 
 type TrimReason =
+  | "user_sale_excluded"
   | "eligible_overweight"
   | "eligible_zero_target_exit"
   | "not_overweight"
@@ -122,17 +125,23 @@ type WorkingRow<T> = AdditionalContributionPolicyRow<T> & {
 
 export function calculateExplainableAdditionalContribution<T>({
   cashAmountKrw,
+  excludedSellKeys,
   minimumExecutionRatioPct,
   rows: sourceRows,
   trimDriftThresholdPct,
   modifiers,
 }: {
   cashAmountKrw: number;
+  excludedSellKeys?: readonly string[];
   minimumExecutionRatioPct: number;
   rows: readonly AdditionalContributionPolicyRow<T>[];
   trimDriftThresholdPct: number;
   modifiers?: ContributionModifiers;
 }) {
+  const saleSelection = parseSaleExclusionKeys(excludedSellKeys);
+  if (!saleSelection.ok || saleSelection.keys.some(key => !sourceRows.some(row => row.allocationKey === key))) return blocked(new Set(["invalid_sale_exclusions"]));
+  const excludedSales = new Set(saleSelection.keys);
+
   const blockers = validateInputs({
     cashAmountKrw,
     minimumExecutionRatioPct,
@@ -158,7 +167,7 @@ export function calculateExplainableAdditionalContribution<T>({
     const unrealizedReturnPct = row.costBasisKrw !== null && row.costBasisKrw > 0
       ? ((row.currentValueKrw - row.costBasisKrw) / row.costBasisKrw) * 100
       : null;
-    const trim = resolveTrim({
+    const trim = excludedSales.has(row.allocationKey) ? { amountKrw: 0, reason: "user_sale_excluded" as const, triggered: false } : resolveTrim({
       currentValueKrw: row.currentValueKrw,
       driftRatioPct,
       postContributionTotalKrw,

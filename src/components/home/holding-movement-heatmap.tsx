@@ -28,10 +28,13 @@ import type {
   PortfolioDashboardHeatmapCell,
   PortfolioDashboardHoldingHistory,
 } from "@/lib/portfolio-dashboard-history";
+import { holdingHistoryMissingEvidence } from "@/lib/holding-history-evidence";
 import { buildHoldingConnectionGraph } from "@/lib/holding-connection-graph";
 import { HoldingDatePicker } from "./holding-date-picker";
 import { MobileHoldingConnections } from "./mobile-holding-connections";
 import styles from "@/components/home/portfolio-overview.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type HeatmapMode = "movement" | "allocation" | "connections";
 
@@ -62,7 +65,7 @@ export function HoldingMovementHeatmap({
     <section aria-labelledby="holding-heatmap-title" className={stage ? styles.stageHeatmap : "relative min-w-0"}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 id="holding-heatmap-title" className={styles.panelTitle}><T ko="종목 흐름" en="Holding history"/></h2>
+          <CairnSectionTitle id="holding-heatmap-title" className={styles.panelTitle}><T ko="종목 흐름" en="Holding history"/></CairnSectionTitle>
           <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="오늘 변동과 같은 원화 평가 기준입니다. 과거는 저장된 일별 변동입니다." en="Today uses the same KRW valuation basis as Today. Past dates show recorded daily changes."/></p>
         </div>
         <div className={`cairn-tabs ${styles.chartRanges}`} aria-label={t("종목 흐름 보기 방식", "Holding history view")}>
@@ -126,7 +129,7 @@ export function HoldingMovementHeatmap({
               {selectedCell.basis === "live_price" ? <T ko=" · 거래통화 기준 가격 등락" en=" · Price change in the trading currency"/> : null}
             </p>
             </div>
-            <button
+            <CairnButton variant="bare"
               aria-label={t("선택한 종목 정보 닫기", "Close selected holding details")}
               className="varda-icon-button -mr-2 -mt-2"
               onClick={() => setSelection(null)}
@@ -134,12 +137,12 @@ export function HoldingMovementHeatmap({
               type="button"
             >
               <X aria-hidden="true" size={15} />
-            </button>
+            </CairnButton>
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-[var(--wash)] pt-4 text-xs sm:grid-cols-5">
             <HeatmapDetail
               label={selectedCell.basis === "live_movement" || selectedCell.priceReturnEvidence ? t("평가액 변동률", "Value change (%)") : t("등락", "Change")}
-              value={t(selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true), translateHomeHistory(selectedCell.changePct === null ? "미수집" : formatPercent(selectedCell.changePct, true)))}
+              value={selectedCell.changePct === null ? missingChangeText(selectedCell, t) : formatPercent(selectedCell.changePct, true)}
               tone={selectedCell.changePct}
             />
             <HeatmapDetail label={t("평가액", "Value")} value={t(formatKrw(selectedCell.marketValueKrw), translateHomeHistory(formatKrw(selectedCell.marketValueKrw)))} tone={null} />
@@ -147,6 +150,7 @@ export function HoldingMovementHeatmap({
             <HeatmapDetail label={t("가격 영향", "Price impact")} value={t(formatKrw(selectedCell.priceChangeKrw), translateHomeHistory(formatKrw(selectedCell.priceChangeKrw)))} tone={selectedCell.priceChangeKrw} />
             <HeatmapDetail label={t("환율 영향", "FX impact")} value={t(formatKrw(selectedCell.fxChangeKrw), translateHomeHistory(formatKrw(selectedCell.fxChangeKrw)))} tone={selectedCell.fxChangeKrw} />
           </dl>
+          {selectedCell.changePct === null ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]" data-heatmap-missing-reason>{missingChangeExplanation(selectedCell, t)}</p> : null}
           {selectedCell.priceReturnEvidence ? <div className="mt-3 border-t border-[var(--wash)] pt-3 text-[11px] leading-5 text-[var(--muted)]" data-heatmap-price-evidence>
             <p><T ko="가격 등락 · 거래통화 기준" en="Price change · trading currency"/> <strong className={toneClass(selectedCell.priceReturnEvidence.changePct)}>{formatPercent(selectedCell.priceReturnEvidence.changePct, true)}</strong></p>
             {selectedCell.priceReturnEvidence.reason === null ? <>
@@ -223,14 +227,14 @@ function MovementMatrix({
               const cell = row.cells[cellIndex];
               const selected = selection?.rowIndex === rowIndex && selection.cellIndex === cellIndex;
               return (
-                <button key={row.holdingId} type="button" className={styles.mobileMovementRow}
+                <CairnButton variant="bare" key={row.holdingId} type="button" className={styles.mobileMovementRow}
                   aria-pressed={selected} aria-controls={selected ? "holding-heatmap-selection" : undefined}
                   disabled={!cell} onClick={() => onSelect(rowIndex, cellIndex)}>
                   <i aria-hidden="true" style={cell ? heatmapStyle(cell) : missingCellStyle} />
                   <span><strong>{row.name}</strong><small>{row.ticker || formatPercent(row.currentWeight)}</small></span>
-                  <span><strong className={toneClass(cell?.changePct ?? null)}>{<T ko={cell?.changePct == null ? "미수집" : formatPercent(cell.changePct, true)} en={translateHomeHistory(cell?.changePct == null ? "미수집" : formatPercent(cell.changePct, true))}/>}</strong>
-                    <small><span className={toneClass(cell?.changeKrw ?? null)}>{<T ko={formatSignedKrw(cell?.changeKrw ?? null)} en={translateHomeHistory(formatSignedKrw(cell?.changeKrw ?? null))}/>}</span></small></span>
-                </button>
+                  <span><strong className={toneClass(cell?.changePct ?? null)}>{cell?.changePct == null ? (cell ? missingChangeText(cell, t) : t("기록 없음", "No record")) : formatPercent(cell.changePct, true)}</strong>
+                    <small>{cell?.changePct == null && cell?.changeKrw == null && cell?.priceReturnEvidence?.changePct != null ? <span data-heatmap-price-summary>{t("가격", "Price")} <span className={toneClass(cell.priceReturnEvidence.changePct)}>{formatPercent(cell.priceReturnEvidence.changePct, true)}</span></span> : <span className={toneClass(cell?.changeKrw ?? null)}>{t(formatSignedKrw(cell?.changeKrw ?? null), translateHomeHistory(formatSignedKrw(cell?.changeKrw ?? null)))}</span>}</small></span>
+                </CairnButton>
               );
             })}
           </div>
@@ -284,7 +288,7 @@ function MovementMatrix({
         </div>
         <span><T ko="상승" en="Up"/></span>
         <span className="ml-2 inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-4 rounded-[4px]" style={missingCellStyle} /><T ko="미수집" en="Unavailable"/></span>
+          <span className="h-2.5 w-4 rounded-[4px]" style={missingCellStyle} /><T ko="비교 불가" en="Not comparable"/></span>
       </div>
     </div>
   );
@@ -314,10 +318,10 @@ function HeatmapRow({
       {row.cells.map((cell, cellIndex) => {
         const selected = selection?.rowIndex === rowIndex && selection.cellIndex === cellIndex;
         const evidenceLabel = cell.changePct === null
-          ? "미수집"
+          ? missingChangeText(cell, t)
           : formatPercent(cell.changePct, true);
         return (
-          <button
+          <CairnButton variant="bare"
             key={`${row.holdingId}:${cell.date}`}
             type="button"
             aria-label={`${row.name} ${formatDate(cell.date)} ${cell.basis === "live_movement" || cell.priceReturnEvidence ? t("평가액 변동률", "Value change (%)") : ""} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
@@ -343,11 +347,21 @@ function HeatmapRow({
             title={`${row.name}\n${formatDate(cell.date)}\n${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
           >
             {cell.changePct === null ? "·" : null}
-          </button>
+          </CairnButton>
         );
       })}
     </>
   );
+}
+
+function missingChangeText(cell: PortfolioDashboardHeatmapCell, t: (ko: string, en?: string) => string) {
+  const evidence = holdingHistoryMissingEvidence(cell);
+  return evidence ? t(evidence.ko, evidence.en) : "—";
+}
+
+function missingChangeExplanation(cell: PortfolioDashboardHeatmapCell, t: (ko: string, en?: string) => string) {
+  const evidence = holdingHistoryMissingEvidence(cell);
+  return evidence ? t(evidence.detailKo, evidence.detailEn) : "";
 }
 
 function priceReturnReason(reason: "missing_current_quote" | "missing_previous_close" | "conflicting_previous_close", locale: "ko" | "en") {
@@ -403,14 +417,14 @@ function ModeButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <CairnButton variant="bare"
       type="button"
       aria-pressed={active}
       className={styles.rangeButton}
       onClick={onClick}
     >
       {children}
-    </button>
+    </CairnButton>
   );
 }
 

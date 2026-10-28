@@ -1,0 +1,38 @@
+.surface{min-width:0;margin-top:8px;color:var(--cairn-v2-ink)}
+.caption,.message{font-size:11px;line-height:1.6;color:var(--cairn-v2-muted)}.message{padding:24px 0}
+.viewport{min-width:0;max-height:min(55dvh,580px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;margin-top:8px;padding:2px}
+.surface[data-compact=true] .viewport{max-height:168px}
+.matrix{display:grid;gap:3px;min-width:100%;width:max-content}
+.row{display:contents}.corner,.date{position:sticky;top:0;z-index:2;white-space:nowrap;font-size:10px;color:var(--cairn-v2-muted);background:var(--cairn-v2-paper);padding:4px 2px;text-align:center}.corner{left:0;z-index:4;text-align:left}
+.label{position:sticky;left:0;z-index:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--cairn-v2-paper);font-size:11px;line-height:1.3;padding:3px 6px 3px 0;display:flex;flex-direction:column;justify-content:center}.label small{font-size:10px;color:var(--cairn-v2-muted);font-weight:400}
+.surface .cell{scroll-margin:32px 6px 6px calc(var(--heatmap-label-width,132px) + 6px);min-width:28px;min-height:28px;border-radius:2px;font-size:11px;color:var(--cairn-v2-muted);position:relative}.surface .cell[aria-pressed=true]{outline:1px solid var(--cairn-v2-ink);outline-offset:-1px}.surface .cell:focus-visible{outline:2px solid var(--cairn-v2-brand);outline-offset:-2px;z-index:3}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;font-size:10px;color:var(--cairn-v2-muted)}.legend span{display:flex;gap:4px;align-items:center}.legend i{width:14px;height:5px;background:var(--wash,#e5e7e1)}.legend .up{background:var(--accent,#ef5a32)}.legend .down{background:var(--negative,#4772a9)}.legend .missing{background:repeating-linear-gradient(135deg,#efefeb 0 4px,#a5aaa0 4px 5px)}
+.readout{padding-top:10px;font-size:12px;line-height:1.6;min-height:44px;overflow-wrap:anywhere}.readout p{margin:0}.readout p:first-child{display:flex;align-items:center;gap:4px;flex-wrap:wrap}.readout button{margin-left:auto;min-width:32px;min-height:32px;font-size:20px}.facts{display:flex;gap:24px;flex-wrap:wrap;margin:12px 0}.facts dt{color:var(--cairn-v2-muted);font-size:11px}.facts dd{margin:0;font-variant-numeric:tabular-nums;white-space:nowrap}.evidence{font-size:12px;color:var(--cairn-v2-muted);margin-top:14px}.evidence summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.evidence p{margin-block:8px}
+@media(max-width:600px){.matrix{--heatmap-cell-width:44px}.surface .cell{min-width:44px;min-height:44px}.surface[data-compact=true] .viewport{max-height:190px}.label{font-size:12px}.date{font-size:11px}.readout button{min-width:44px;min-height:44px}}
+
+.surface[data-compact=true] .readout[data-empty=true]{min-height:0;padding-top:0}
+@media(min-width:700px){
+ .compactGrid{min-height:0}
+ .compactCard{display:flex;flex-direction:column;min-height:0}
+ .compactCard>header{flex:none}
+ .compactCard .surface[data-compact=true]{display:flex;flex-direction:column;flex:1;min-height:0}
+ .compactCard .surface[data-compact=true] .viewport{flex:1;min-height:72px;max-height:none}
+ .compactCard .caption,.compactCard .legend,.compactCard .readout{flex:none}
+}
+
+/* Home is a compact matrix; the expanded view retains labels and evidence. */
+.visuallyHidden{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important}
+.name{display:block;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.surface[data-compact=true]{--heatmap-label-width:84px;margin-top:0}
+.surface[data-compact=true] .viewport{margin-top:0;padding:1px}
+.surface[data-compact=true] .date,.surface[data-compact=true] .corner{padding-block:2px}
+.compactCard[data-minimal=true]{position:relative;padding:8px 0 0}
+.compactCard[data-minimal=true]>header{position:absolute;right:0;top:0;min-height:0;z-index:5}
+@media(max-width:600px){.surface[data-compact=true]{--heatmap-label-width:84px}.surface[data-compact=true] .label{font-size:12px}.compactCard[data-minimal=true]{padding-top:8px}}
+
+/* Transparent home axes move with the cells so scrolled colors cannot overlap text.
+   The expanded evidence view keeps its original sticky axes. */
+.surface[data-compact=true] .matrix{gap:1px}
+.surface[data-compact=true] .label,.surface[data-compact=true] .date,.surface[data-compact=true] .corner{position:static;background:transparent;z-index:auto}
+.surface[data-compact=true] .name{max-width:100%;white-space:nowrap}
+.surface[data-compact=true] .cell{scroll-margin:6px}

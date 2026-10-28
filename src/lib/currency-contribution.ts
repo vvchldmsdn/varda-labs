@@ -8,6 +8,7 @@ export const CURRENCY_CONTRIBUTION_VERSION = "explainable_contribution_currency_
 export type ContributionMoneyEvidence = { amount: string; currency: Currency; at: string; source: string; kind?: "new_money" | "native_cash"; accountId?: string };
 type MoneyEvidence = ContributionMoneyEvidence;
 export type CurrencyContributionInput = {
+  excludedSellKeys?: readonly string[];
   reportingCurrency: Currency; asOf: string; fx: readonly FxEvidence[]; maxFxAgeMs: number;
   funds: readonly MoneyEvidence[]; trimDriftThresholdPct: number; minimumExecutionRatioPct: number;
   modifiers?:ContributionModifiers;
@@ -56,7 +57,7 @@ function calculateCurrencyContributionChecked(input: CurrencyContributionInput) 
   }
   // TRIM precedes the overlay. Its proceeds are funds too, and can be USD even
   // when the new contribution and reporting display are KRW.
-  const policyInput = { rows, cashAmountKrw: Number(units), trimDriftThresholdPct: input.trimDriftThresholdPct, minimumExecutionRatioPct: input.minimumExecutionRatioPct };
+  const policyInput = { ...(input.excludedSellKeys?.length ? {excludedSellKeys:input.excludedSellKeys} : {}), rows, cashAmountKrw: Number(units), trimDriftThresholdPct: input.trimDriftThresholdPct, minimumExecutionRatioPct: input.minimumExecutionRatioPct };
   const baseline = calculateExplainableAdditionalContribution(policyInput);
   if (baseline.status !== "ready") return { status: "blocked" as const, reason: baseline.blockers.join(",") };
   const foreignProceeds = baseline.rows.some(row => row.trimAmountKrw > 0 && input.rows.find(original => original.allocationKey === row.allocationKey)?.value.currency !== 'KRW');

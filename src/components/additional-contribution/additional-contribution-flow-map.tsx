@@ -6,6 +6,8 @@ import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfoli
 import { useMemo, useState } from "react";
 
 import type { AdditionalContributionFlowRow } from "@/lib/additional-contribution-view";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type FlowMode = "final" | "strategic";
 
@@ -37,8 +39,8 @@ export function AdditionalContributionFlowMap({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             ALLOCATION FLOW
           </p>
-          <h2 id="allocation-flow-title" className="mt-1 text-xl font-medium">
-            <PortfolioText ko={"투입금 흐름"} />{" "}</h2>
+          <CairnSectionTitle id="allocation-flow-title" className="mt-1 text-xl font-medium">
+            <PortfolioText ko={"투입금 흐름"} />{" "}</CairnSectionTitle>
           <p className="mt-2 text-xs text-[var(--muted)]">
             <PortfolioText ko={"신규"} />{" "}{formatKrw(cashAmountKrw)} {" "}<PortfolioText ko={"· 계산상 매도"} />{" "}
             {formatKrw(trimProceedsKrw)}
@@ -146,7 +148,7 @@ export function AdditionalContributionFlowMap({
 
       <div className="mt-6 divide-y divide-[var(--wash)] border-y border-[var(--line)] lg:hidden">
         {layout.map(({ amountKrw, row }) => (
-          <button
+          <CairnButton variant="secondary"
             key={row.id}
             type="button"
             className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-1 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
@@ -182,7 +184,7 @@ export function AdditionalContributionFlowMap({
                 <span><PortfolioText ko={"최종 배분 후"} />{" "}{formatPercent(row.postTopupWeightPct)}</span>
               </span>
             ) : null}
-          </button>
+          </CairnButton>
         ))}
       </div>
     </section>
@@ -199,7 +201,7 @@ function ModeButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <CairnButton variant="selection"
       type="button"
       aria-pressed={active}
       className={`border-b py-2 font-medium focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--brand)] ${
@@ -210,7 +212,7 @@ function ModeButton({
       onClick={onClick}
     >
       <PortfolioText ko={label} />
-    </button>
+    </CairnButton>
   );
 }
 

@@ -1,4 +1,7 @@
 "use client";
+import { ReturnTimelineChart } from '@/components/return-timeline-chart';
+import { buildReturnTimeline, returnTimelineLabel } from '@/lib/return-timeline';
+import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -28,6 +31,8 @@ import type {
   HistoryOverviewModel,
   HistoryOverviewPoint,
 } from "@/lib/history-overview";
+import { Button as CairnButton, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const RANGE_OPTIONS: readonly Readonly<{
   key: HistoryExplorerRange;
@@ -44,21 +49,23 @@ export function HistoryTimeExplorer({
   scopeLabel,
   details,
   status,
+  recoveredReturn,
 }: {
   model: HistoryOverviewModel;
   scopeLabel: string;
   details?: ReactNode;
   status?: ReactNode;
+  recoveredReturn?: RecoveredReturnCurve | null;
 }) {
   const { t } = useI18n();
-  const returnAvailable = historyPointsWithMetric(model.points, "return").length > 0;
+  const returnAvailable = !!recoveredReturn || historyPointsWithMetric(model.points, "return").length > 0;
   const [mode, setMode] = useState<HistoryExplorerMode>(
     "value",
   );
   const [range, setRange] = useState<HistoryExplorerRange>("90D");
   const visiblePoints = useMemo(
-    () => selectHistoryRange(historyPointsWithMetric(model.points, mode), range),
-    [model.points, mode, range],
+    () => selectHistoryRange(mode === "return" && recoveredReturn ? model.points.map(p => p.rowKind === "live" && p.recordedPoint ? p.recordedPoint : p).filter(p => p.rowKind !== "live") : historyPointsWithMetric(model.points, mode), range),
+    [model.points, mode, range, recoveredReturn],
   );
   const rangeSummary = useMemo(
     () => summarizeHistoryRange(visiblePoints),
@@ -74,13 +81,21 @@ export function HistoryTimeExplorer({
     selectablePoints.at(-1) ??
     null;
   const inspectedPoint = selectablePoints.find((point) => point.date === inspectedDate) ?? selectedPoint;
+  const storedReturns = useMemo(() => model.points.map(point => point.rowKind === 'live' && point.recordedPoint ? point.recordedPoint : point).filter(point => point.rowKind !== 'live').map(point => ({ date: point.date, returnPct: point.totalReturnPct })), [model.points]);
+  const returnRangeDays = range === 'ALL' ? undefined : range === '30D' ? 30 : range === '90D' ? 90 : 365;
+  const returnTimeline = useMemo(() => recoveredReturn ? buildReturnTimeline(storedReturns, recoveredReturn, returnRangeDays) : [], [storedReturns, recoveredReturn, returnRangeDays]);
+  const returnPoint = returnTimeline.find(p => p.date === (inspectedDate ?? selectedDate)) ?? returnTimeline.at(-1);
+  const integratedReturn = mode === 'return' && !!recoveredReturn && !!returnPoint;
+  const heroDate = integratedReturn ? returnPoint!.date : inspectedPoint?.date ?? null;
+  const heroReturn = integratedReturn ? returnPoint!.returnPct : inspectedPoint?.totalReturnPct ?? null;
+  const heroReturnLabel = integratedReturn ? returnTimelineLabel(returnPoint!) : '저장 수익률';
   const hasLiveValuation = visiblePoints.some(point => point.rowKind === "live");
 
   if (model.status === "no_data") {
     return (
       <section className="border-y border-[var(--line)] py-16 text-center">
         <p className="text-xs font-medium text-[var(--muted)]">HISTORY</p>
-        <h1 className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></h1>
+        <CairnPageTitle className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></CairnPageTitle>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]"><T ko="평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다." en="Values are not interpolated. Once daily portfolio snapshots are recorded, you can explore values and events by date here."/></p>
         {details ? <div className="mt-6 flex justify-center">{details}</div> : null}
       </section>
@@ -93,7 +108,7 @@ export function HistoryTimeExplorer({
     const nextMetricPoints = historyPointsWithMetric(nextPoints, mode);
     setRange(nextRange);
     setSelectedDate(
-      nextMetricPoints.at(-1)?.date ?? nextPoints.at(-1)?.date ?? null,
+      mode === "return" && recoveredReturn ? recoveredReturn.endDate : nextMetricPoints.at(-1)?.date ?? nextPoints.at(-1)?.date ?? null,
     );
   }
 
@@ -103,7 +118,7 @@ export function HistoryTimeExplorer({
     const nextMetricPoints = selectHistoryRange(historyPointsWithMetric(model.points, nextMode), range);
     setMode(nextMode);
     setSelectedDate(
-      nextMetricPoints.at(-1)?.date ?? visiblePoints.at(-1)?.date ?? null,
+      nextMode === "return" && recoveredReturn ? recoveredReturn.endDate : nextMetricPoints.at(-1)?.date ?? visiblePoints.at(-1)?.date ?? null,
     );
   }
 
@@ -112,9 +127,9 @@ export function HistoryTimeExplorer({
       <div className={styles.stageMain}>
         <aside className={styles.hero} aria-label={t("선택한 날짜", "Selected date")}>
           <div className={styles.heroNumbers}>
-            <p className={styles.heroDate}>{<T ko={formatDate(inspectedPoint?.date ?? null)} en={translateHomeHistory(formatDate(inspectedPoint?.date ?? null))}/>}</p>
-            <p className={styles.heroValue} data-history-inspected-value>{<T ko={mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </p>
-            <p className={styles.heroCaption}>{<T ko={mode === "value" ? "총평가액" : "저장 수익률"} en={translateHomeHistory(mode === "value" ? "총평가액" : "저장 수익률")}/>}<span className={tone(inspectedPoint?.movementKrw ?? null)}><T ko="이전 대비" en="Previous change"/> {<T ko={formatSignedKrw(inspectedPoint?.movementKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.movementKrw ?? null))}/>}</span></p>
+            <p className={styles.heroDate}>{<T ko={formatDate(heroDate)} en={translateHomeHistory(formatDate(heroDate))}/>}</p>
+            <p className={styles.heroValue} data-history-inspected-value>{<T ko={mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(heroReturn)} en={translateHomeHistory(mode === "value" ? formatHistoryKrw(inspectedPoint?.valueKrw ?? null) : formatSignedPercent(heroReturn))}/>} </p>
+            <p className={styles.heroCaption}>{<T ko={mode === "value" ? "총평가액" : heroReturnLabel} en={translateHomeHistory(mode === "value" ? "총평가액" : heroReturnLabel)}/>}{!integratedReturn && <span className={tone(inspectedPoint?.movementKrw ?? null)}><T ko="이전 대비" en="Previous change"/> {<T ko={formatSignedKrw(inspectedPoint?.movementKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.movementKrw ?? null))}/>}</span>}</p>
           </div>
           <div className={styles.controls}>
             <div className={styles.modeControls} aria-label={t("그래프 지표", "Chart metric")}>
@@ -122,37 +137,37 @@ export function HistoryTimeExplorer({
               <ModeButton active={mode === "return"} disabled={!returnAvailable} label={t("수익률", "Return")} onClick={() => changeMode("return")} />
             </div>
             <div className={styles.periodControls} aria-label={t("조회 기간", "Time range")}>
-              {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</button>)}
+              {RANGE_OPTIONS.map((option) => <CairnButton variant="selection" key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</CairnButton>)}
             </div>
           </div>
-          <p className={styles.railNote}>{scopeLabel} · {rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br />{hasLiveValuation ? <T ko="과거 저장 기록에 오늘의 현재 평가를 연결합니다. 오늘 값은 저장 스냅샷이 아닙니다." en="Recorded history connects to today's current valuation. Today's point is not a saved snapshot."/> : <T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/>}</p>
+          <p className={styles.railNote}>{scopeLabel} · {integratedReturn ? returnTimeline.filter(p => p.returnPct !== null).length : rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br />{integratedReturn ? "같은 날짜 축에서 저장 수익률과 복구한 기간 수익률을 살펴봅니다. 기준이 바뀌는 지점은 구분합니다." : hasLiveValuation ? <T ko="과거 저장 기록에 오늘의 현재 평가를 연결합니다. 오늘 값은 저장 스냅샷이 아닙니다." en="Recorded history connects to today's current valuation. Today's point is not a saved snapshot."/> : <T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/>}</p>
           {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{typeof status === "string" ? <T ko={status} en={translateHomeHistory(status)}/> : status}</div> : null}
         </aside>
         <div className={styles.plot}>
           <div className={styles.chartTitle}>
-            <h2 id="history-time-explorer-title">{<T ko={mode === "value" ? "자산의 흐름" : "수익률의 흐름"} en={translateHomeHistory(mode === "value" ? "자산의 흐름" : "수익률의 흐름")}/>}</h2>
+            <CairnSectionTitle id="history-time-explorer-title">{<T ko={mode === "value" ? "자산의 흐름" : "수익률의 흐름"} en={translateHomeHistory(mode === "value" ? "자산의 흐름" : "수익률의 흐름")}/>}</CairnSectionTitle>
             <p><T ko="날짜를 따라 탐색" en="Explore by date"/></p>
           </div>
-          <div className="varda-history-canvas">
+          {integratedReturn ? <ReturnTimelineChart stored={storedReturns} curve={recoveredReturn!} rangeDays={returnRangeDays} selectedDate={selectedDate} onSelect={setSelectedDate} onInspect={setInspectedDate} hideReadout /> : <div className="varda-history-canvas">
             <HistoryPerformanceChart key={`${mode}-${range}`} mode={mode} onSelect={setSelectedDate} onInspect={setInspectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
-          </div>
+          </div>}
         </div>
       </div>
       <footer className={styles.stageFooter}>
-        <p>{hasLiveValuation ? <T ko="저장 기록 + 현재 평가 · 현금흐름 미보정" en="Records + current valuation · Not adjusted for cash flows"/> : <T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/>}</p>
+        <p>{integratedReturn ? "저장 수익률과 복구 기간 수익률 · 계산 기준 구분" : hasLiveValuation ? <T ko="저장 기록 + 현재 평가 · 현금흐름 미보정" en="Records + current valuation · Not adjusted for cash flows"/> : <T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/>}</p>
         <div>
           <PresentationDialog mountOnOpen label="날짜별 기록" labelEn={"Records by date"} title="날짜별 기록과 현재 평가" titleEn={"Records and current valuation by date"}>
             <HistorySnapshotRail onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
           </PresentationDialog>
           <PresentationDialog mountOnOpen label="기간 요약·근거" labelEn={"Period summary and sources"} title="히스토리 계산 근거" titleEn={"History calculation sources"} description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." descriptionEn={"Review changes over the selected period and the records behind each date."} wide>
             <dl className={styles.overview}>
-              <div><dt className={styles.label}><T ko="저장 수익률" en="Recorded return"/></dt><dd className={`${styles.value} ${tone(inspectedPoint?.totalReturnPct ?? null)}`}>{<T ko={formatSignedPercent(inspectedPoint?.totalReturnPct ?? null)} en={translateHomeHistory(formatSignedPercent(inspectedPoint?.totalReturnPct ?? null))}/>} </dd><dd className={styles.note}><T ko="손익" en="Gain/loss"/> {<T ko={formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null))}/>}</dd></div>
+              <div><dt className={styles.label}><T ko={heroReturnLabel} en={heroReturnLabel}/></dt><dd className={`${styles.value} ${tone(heroReturn)}`}>{<T ko={formatSignedPercent(heroReturn)} en={translateHomeHistory(formatSignedPercent(heroReturn))}/>} </dd>{!integratedReturn && <dd className={styles.note}><T ko="손익" en="Gain/loss"/> {<T ko={formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null))}/>}</dd>}</div>
               <div><dt className={styles.label}><T ko="기간 평가액 변화" en="Period value change"/></dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{<T ko={formatRangeComparison(rangeSummary, "changeKrw")} en={translateHomeHistory(formatRangeComparison(rangeSummary, "changeKrw"))}/>}</dd><dd className={styles.note}><T ko="현금흐름 미보정" en="Not adjusted for cash flows"/></dd></div>
               <div><dt className={styles.label}><T ko="기간 최대 낙폭" en="Period maximum drawdown"/></dt><dd className={`${styles.value} ${tone(rangeSummary.maxDrawdownPct)}`}>{<T ko={formatRangeComparison(rangeSummary, "maxDrawdownPct")} en={translateHomeHistory(formatRangeComparison(rangeSummary, "maxDrawdownPct"))}/>} </dd><dd className={styles.note}>{<T ko={formatDate(rangeSummary.maxDrawdownDate)} en={translateHomeHistory(formatDate(rangeSummary.maxDrawdownDate))}/>}</dd></div>
             </dl>
             <RangeMetrics summary={rangeSummary} className="grid" />
             <RangeSummary summary={rangeSummary} />
-            <SelectedDayEvidence point={selectedPoint} />
+            {integratedReturn ? <p>{returnPoint!.date} · {heroReturnLabel} · {recoveredReturn!.baseDate} 복구 시작. 매입원가 대비 수익률과 별개입니다.</p> : <SelectedDayEvidence point={selectedPoint} />}
             <HistoryCalendar onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
             {model.riskPointCount > 0 ? <StoredRiskHistory points={visiblePoints} /> : null}
           </PresentationDialog>
@@ -221,7 +236,7 @@ function ModeButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <CairnButton variant="selection"
       type="button"
       aria-pressed={active}
       className={`min-h-10 min-w-20 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -233,7 +248,7 @@ function ModeButton({
       onClick={onClick}
     >
       {<T ko={label} en={translateHomeHistory(label)}/>}
-    </button>
+    </CairnButton>
   );
 }
 
@@ -339,9 +354,9 @@ function SelectedDayEvidence({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             SELECTED DATE
           </p>
-          <h2 className="mt-1 text-xl font-semibold">
+          <CairnSectionTitle className="mt-1 text-xl font-semibold">
             {<T ko={formatDate(point.date)} en={translateHomeHistory(formatDate(point.date))}/>}
-          </h2>
+          </CairnSectionTitle>
         </div>
         <p className="text-xs text-[var(--muted)]">
           {<T ko={historySourceLabel(point.source)} en={translateHomeHistory(historySourceLabel(point.source))}/>}
@@ -477,7 +492,7 @@ function HistoryCalendar({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             VALUE RHYTHM
           </p>
-          <h2 className="mt-1 text-base font-semibold"><T ko="기록 리듬" en="Record calendar"/></h2>
+          <CairnSectionTitle className="mt-1 text-base font-semibold"><T ko="기록 리듬" en="Record calendar"/></CairnSectionTitle>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-[var(--muted)]">
           <span><T ko="하락" en="Down"/></span>
@@ -497,7 +512,7 @@ function HistoryCalendar({
           }}
         >
           {layout.cells.map((cell) => (
-            <button
+            <CairnButton variant="selection"
               key={cell.point.date}
               type="button"
               title={t(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`, translateHomeHistory(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`))}
@@ -544,7 +559,7 @@ function StoredRiskHistory({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             STORED RISK
           </p>
-          <h2 className="mt-1 text-base font-semibold"><T ko="저장된 위험 기록" en="Recorded risk metrics"/></h2>
+          <CairnSectionTitle className="mt-1 text-base font-semibold"><T ko="저장된 위험 기록" en="Recorded risk metrics"/></CairnSectionTitle>
         </div>
         <p className="text-xs text-[var(--muted)]"><T ko="저장값이 있는" en="Recorded on"/>{riskPoints.length}<T ko="개 날짜" en=" dates"/></p>
       </div>

@@ -155,9 +155,9 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
     render, submissions, submittedAccountIds,
     add(ticker) {
       render().find(node => node.type === InstrumentSearch).props.onSelect({ id: "", ticker, name: ticker, market: "us", currency: "USD", assetType: "stock" });
-      const quantity = render().find(node => node.props?.className === "varda-onboarding-quantity");
+      const quantity = render().find(node => node.props?.className?.split(" ").includes("varda-onboarding-quantity"));
       elements(quantity).find(node => node.type === "input").props.onChange({ target: { value: "1" } });
-      render().find(node => node.type === "button" && node.props.className === "varda-onboarding-secondary").props.onClick();
+      render().find(node => node.type === "button" && node.props.className?.split(" ").includes("varda-onboarding-secondary")).props.onClick();
     },
     async submit() {
       const data = new FormData();
@@ -168,7 +168,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
 }
 
 const waitingPrice = { status: "price_unavailable", message: "Price lookup queued" };
-const partialNotice = nodes => nodes.find(node => node.props?.role === "status" && node.props.className === "varda-onboarding-hint")?.props.children;
+const partialNotice = nodes => nodes.find(node => node.props?.role === "status" && node.props.className?.split(" ").includes("varda-onboarding-hint"))?.props.children;
 
 describe("holding batch completion notices", () => {
   it("keeps the submitted second account through action resets, partial retries and completion", async () => {
@@ -213,7 +213,7 @@ describe("holding batch completion notices", () => {
       h.add("AAPL"); h.add("MSFT");
       await h.submit();
       const nodes = h.render();
-      assert.equal(nodes.some(node => node.props?.className === "varda-onboarding-success"), false);
+      assert.equal(nodes.some(node => node.props?.className?.split(" ").includes("varda-onboarding-success")), false);
       assert.match(partialNotice(nodes), locale === "ko" ? /아직 저장된 종목이 없습니다.*가격 확인/ : /No holdings have been saved yet.*prices/);
       const retryRows = JSON.parse(nodes.find(node => node.type === "input" && node.props.name === "holdings").props.value);
       assert.deepEqual(retryRows.map(row => row.ticker), ["AAPL", "MSFT"]);
@@ -226,11 +226,11 @@ describe("holding batch completion notices", () => {
       ]);
       h.add("AAPL"); h.add("MSFT");
       await h.submit();
-      assert.equal(h.render().some(node => node.props?.className === "varda-onboarding-success"), true);
+      assert.equal(h.render().some(node => node.props?.className?.split(" ").includes("varda-onboarding-success")), true);
       await h.submit();
       assert.deepEqual(h.submissions[1].map(row => row.ticker), ["MSFT"]);
       const nodes = h.render();
-      assert.equal(nodes.some(node => node.props?.className === "varda-onboarding-success"), true);
+      assert.equal(nodes.some(node => node.props?.className?.split(" ").includes("varda-onboarding-success")), true);
       assert.match(partialNotice(nodes), locale === "ko" ? /^저장된 종목은 유지/ : /^Saved holdings are kept/);
     });
   }
@@ -254,7 +254,7 @@ describe("holding batch completion notices", () => {
     assert.equal(waitingGuidance(h.render()), true);
     await h.submit();
     const nodes = h.render();
-    assert.equal(nodes.some(node => node.props?.className === "varda-onboarding-success"), true);
+    assert.equal(nodes.some(node => node.props?.className?.split(" ").includes("varda-onboarding-success")), true);
     assert.equal(waitingGuidance(nodes), false, "completed saves supersede a previous polling timeout");
     const remaining = JSON.parse(nodes.find(node => node.type === "input" && node.props.name === "holdings").props.value);
     assert.deepEqual(remaining, []);

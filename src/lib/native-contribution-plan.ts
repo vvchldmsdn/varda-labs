@@ -1,3 +1,4 @@
+import { parseSaleExclusionKeys } from './additional-contribution-sale-exclusions.ts';
 import { calculateCurrencyContribution, type CurrencyContributionInput, type ContributionMoneyEvidence } from "./currency-contribution.ts";
 import { Decimal, isCurrency, parseMoneyInput, type Currency } from "./money.ts";
 
@@ -11,7 +12,7 @@ export type NativeContributionContext = {
   names: Record<string, string>;
 };
 export type NativeContributionContextResult = NativeContributionContext | { status: "blocked"; reason: string };
-export type NativeContributionRequest = { id: string; scopeKey: string; reportingCurrency: Currency; newMoney: { amount: string; currency: Currency }; useAvailableCash: boolean; previewEvidenceVersion?:string };
+export type NativeContributionRequest = { id: string; scopeKey: string; reportingCurrency: Currency; newMoney: { amount: string; currency: Currency }; useAvailableCash: boolean; previewEvidenceVersion?:string; excludedSellKeys?: string[] };
 export type NativeContributionDocument = { version: "native_contribution_plan_v1"; request: NativeContributionRequest; basis: NativeContributionContext; result: Extract<ReturnType<typeof calculateCurrencyContribution>, { status: "ready" }> };
 export type SavedNativeContributionPlan = { id: string; createdAt: string; document: NativeContributionDocument };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -19,7 +20,7 @@ export const isNativeContributionPlanId = (value: unknown): value is string => t
 export function validNativeContributionRequest(value: unknown): value is NativeContributionRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const v = value as NativeContributionRequest;
-  return Object.keys(v).every(key => ["id", "scopeKey", "reportingCurrency", "newMoney", "useAvailableCash", "previewEvidenceVersion"].includes(key)) && (v.previewEvidenceVersion===undefined || /^[a-f0-9]{64}$/.test(v.previewEvidenceVersion)) && UUID.test(v.id ?? "") && typeof v.scopeKey === "string" && (v.scopeKey === "all" || /^(account|portfolio):/.test(v.scopeKey) && UUID.test(v.scopeKey.split(":")[1]) && v.scopeKey.split(":").length === 2) && isCurrency(v.reportingCurrency) && typeof v.useAvailableCash === "boolean" && !!v.newMoney && typeof v.newMoney === "object" && Object.keys(v.newMoney).every(key => ["amount", "currency"].includes(key)) && isCurrency(v.newMoney.currency) && typeof v.newMoney.amount === "string" && v.newMoney.amount.length <= 24 && /^\d+(?:\.\d+)?$/.test(v.newMoney.amount) && parseMoneyInput(v.newMoney.amount, v.newMoney.currency) !== null && Decimal.from(v.newMoney.amount).compare(0) >= 0;
+  return (v.excludedSellKeys===undefined || Array.isArray(v.excludedSellKeys)&&parseSaleExclusionKeys(v.excludedSellKeys).ok) && Object.keys(v).every(key => ["id", "scopeKey", "reportingCurrency", "newMoney", "useAvailableCash", "previewEvidenceVersion", "excludedSellKeys"].includes(key)) && (v.previewEvidenceVersion===undefined || /^[a-f0-9]{64}$/.test(v.previewEvidenceVersion)) && UUID.test(v.id ?? "") && typeof v.scopeKey === "string" && (v.scopeKey === "all" || /^(account|portfolio):/.test(v.scopeKey) && UUID.test(v.scopeKey.split(":")[1]) && v.scopeKey.split(":").length === 2) && isCurrency(v.reportingCurrency) && typeof v.useAvailableCash === "boolean" && !!v.newMoney && typeof v.newMoney === "object" && Object.keys(v.newMoney).every(key => ["amount", "currency"].includes(key)) && isCurrency(v.newMoney.currency) && typeof v.newMoney.amount === "string" && v.newMoney.amount.length <= 24 && /^\d+(?:\.\d+)?$/.test(v.newMoney.amount) && parseMoneyInput(v.newMoney.amount, v.newMoney.currency) !== null && Decimal.from(v.newMoney.amount).compare(0) >= 0;
 }
 export function buildNativeContributionPlan(context: NativeContributionContextResult, request: NativeContributionRequest) {
   if (!validNativeContributionRequest(request)) return { status: "blocked" as const, reason: "invalid_request" };
@@ -31,6 +32,9 @@ export function buildNativeContributionPlan(context: NativeContributionContextRe
     const fundingAccounts = [...holdingAccounts, ...selectedCash.map(fund => fund.accountId)];
     if (fundingAccounts.some(id => !id) || new Set(fundingAccounts).size > 1) return { status: 'blocked' as const, reason: 'choose_account_for_funding' };
   }
+  const selection = parseSaleExclusionKeys(request.excludedSellKeys);
+  if (!selection.ok || selection.keys.some(key=>!context.input.rows.some(row=>row.allocationKey===key))) return {status:"blocked" as const,reason:"invalid_sale_exclusions"};
+  request = canonicalNativeContributionRequest(request);
   const amount = Decimal.from(request.newMoney.amount);
   const funds: ContributionMoneyEvidence[] = [
     ...(amount.compare(0) > 0 ? [{ amount: amount.toExactString(), currency: request.newMoney.currency, at: context.input.asOf, source: "user_new_contribution", kind: "new_money" as const }] : []),
@@ -38,7 +42,9 @@ export function buildNativeContributionPlan(context: NativeContributionContextRe
   ];
   // Zero new cash still permits a funded rebalance from actual profitable sales.
   if (!funds.length) funds.push({ amount: "0", currency: request.newMoney.currency, at: context.input.asOf, source: "user_new_contribution", kind: "new_money" });
-  const result = calculateCurrencyContribution({ ...context.input, funds });
+  const result = calculateCurrencyContribution({ ...context.input, funds, ...(selection.keys.length?{excludedSellKeys:selection.keys}:{}) });
   if (result.status !== "ready") return result;
   return { status: "ready" as const, document: { version: "native_contribution_plan_v1" as const, request, basis: context, result } };
 }
+
+export function canonicalNativeContributionRequest(request:NativeContributionRequest):NativeContributionRequest {const {excludedSellKeys,...rest}=request;const parsed=parseSaleExclusionKeys(excludedSellKeys);return parsed.ok&&parsed.keys.length?{...rest,excludedSellKeys:parsed.keys}:rest;}

@@ -37,7 +37,7 @@ describe("owner-scoped holding state correction", () => {
     const [component] = await importUiWithPorts(["src/components/holding-state-correction-form.tsx"], {
       "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
       "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
-      react: { useActionState: (_action, state) => [state, () => {}, false] },
+      react: { useActionState: (_action, state) => [state, () => {}, false], useRef: initial => ({ current: initial }), useCallback: callback => callback, useEffect: () => {} },
       "@/app/portfolio/holdings/actions": { correctHoldingState: () => {} },
       "@/components/i18n/management-text": { ManagementText: () => null, ManagementElement: () => null },
       "@/components/i18n/localized-text": { T: () => null },

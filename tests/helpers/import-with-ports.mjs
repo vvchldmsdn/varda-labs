@@ -23,6 +23,9 @@ export async function importWithPorts(paths, ports) {
   const hook = registerHooks({
     resolve(specifier, context, nextResolve) {
       if (specifier === "server-only") return { url: "data:text/javascript,export {};", shortCircuit: true };
+      const canonical = specifier.startsWith(".") && context.parentURL?.startsWith(new URL("src/", root).href)
+        ? "@/" + new URL(specifier, context.parentURL).pathname.slice(new URL("src/", root).pathname.length).replace(/\.ts$/, "") : specifier.replace(/\.ts$/, "");
+      if (stubs.has(canonical)) return { url: stubs.get(canonical), shortCircuit: true };
       if (stubs.has(specifier)) return { url: stubs.get(specifier), shortCircuit: true };
       if (specifier.startsWith("@/")) return nextResolve(sourceUrl(`src/${specifier.slice(2)}.ts`), context);
       if ((specifier.startsWith("./") || specifier.startsWith("../")) && context.parentURL?.startsWith(new URL("src/", root).href)) {

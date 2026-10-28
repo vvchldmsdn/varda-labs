@@ -7,6 +7,8 @@ import type { SimulationStorageError, StoredSimulationExecution } from "@/lib/si
 import { useSimulationText } from "./simulation-text";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import styles from "./simulation-storage-manager.module.css";
+import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function SimulationStorageManager() {
   const t = useSimulationText();
@@ -17,7 +19,7 @@ export function SimulationStorageManager() {
       <PresentationDialog label="보관 실행 관리" labelEn="Manage stored runs" title="보관 중인 시뮬레이션" titleEn="Stored simulations" mountOnOpen>
         <StoredExecutionList />
       </PresentationDialog>
-      <button type="button" disabled={pending} onClick={() => startTransition(() => router.refresh())}>{t("다시 시도", "Retry")}</button>
+      <CairnButton variant="secondary" type="button" disabled={pending} onClick={() => startTransition(() => router.refresh())}>{t("다시 시도", "Retry")}</CairnButton>
     </div>
   </div>;
 }
@@ -89,20 +91,20 @@ function StoredExecutionList() {
 
   return <section className={styles.list} aria-label={t("보관 중인 시뮬레이션", "Stored simulations")} aria-busy={pending}>
       <p className={styles.caption}>{t("최근 완료된 실행 2개를 자동으로 보관합니다. 새 저장이 끝나면 가장 오래된 실행을 교체하며, 저장 중에는 기존 결과를 유지합니다.", "The two latest completed runs are retained automatically. A new run replaces the oldest only after saving successfully; previous results stay available during upload.")}</p>
-      {pending && rows === null ? <p role="status">{t("보관 실행을 확인하는 중…", "Checking stored runs…")}</p> : null}
-      {error ? <div role="alert"><p>{errorMessage(error)}</p><button type="button" disabled={pending} onClick={load}>{t("목록 다시 확인", "Reload list")}</button></div> : null}
+      {pending && rows === null ? <CairnStatus as="p" tone="neutral" role="status">{t("보관 실행을 확인하는 중…", "Checking stored runs…")}</CairnStatus> : null}
+      {error ? <CairnStatus as="div" tone="danger" role="alert"><p>{errorMessage(error)}</p><CairnButton variant="secondary" type="button" disabled={pending} onClick={load}>{t("목록 다시 확인", "Reload list")}</CairnButton></CairnStatus> : null}
       {rows?.length === 0 && !deleted ? <p>{t("보관 중인 실행이 없어요. 잠시 후 다시 시도해 주세요.", "No stored runs. Please retry shortly.")}</p> : null}
       {rows?.map(row => <div key={row.id} className={styles.row}>
         <div><strong>{row.model === "economic" ? t("경제지표 경로", "Economic paths") : t("과거 수익률 경로", "Historical paths")} · {row.horizon}{t("단계", " steps")}</strong>
           <time dateTime={new Date(row.createdAt).toISOString()}>{new Date(row.createdAt).toLocaleString(t("ko-KR", "en-US"), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
           {row.state === "creating" ? <span className={styles.caption}>{t("저장 중", "Saving")}</span> : null}
         </div>
-        <button type="button" disabled={pending} onClick={() => setSelected(row.id)} aria-label={t(`${row.horizon}단계 실행 삭제 선택`, `Select ${row.horizon}-step run for deletion`)}>{t("삭제", "Delete")}</button>
+        <CairnButton variant="secondary" type="button" disabled={pending} onClick={() => setSelected(row.id)} aria-label={t(`${row.horizon}단계 실행 삭제 선택`, `Select ${row.horizon}-step run for deletion`)}>{t("삭제", "Delete")}</CairnButton>
         {selected === row.id ? <div className={styles.confirm}>
           <p>{t("이 실행의 경로 설명을 삭제할까요?", "Delete this run’s path details?")}</p>
-          <div className={styles.actions}><button type="button" disabled={pending} onClick={() => remove(row.id)}>{t("삭제하고 다시 시도", "Delete and retry")}</button><button type="button" disabled={pending} onClick={() => setSelected(null)}>{t("취소", "Cancel")}</button></div>
+          <div className={styles.actions}><CairnButton variant="secondary" type="button" disabled={pending} onClick={() => remove(row.id)}>{t("삭제하고 다시 시도", "Delete and retry")}</CairnButton><CairnButton variant="secondary" type="button" disabled={pending} onClick={() => setSelected(null)}>{t("취소", "Cancel")}</CairnButton></div>
         </div> : null}
       </div>)}
-      {deleted ? <p role="status">{t("삭제했어요. 현재 실행을 다시 준비합니다.", "Deleted. Preparing the current run again.")}</p> : null}
+      {deleted ? <CairnStatus as="p" tone="neutral" role="status">{t("삭제했어요. 현재 실행을 다시 준비합니다.", "Deleted. Preparing the current run again.")}</CairnStatus> : null}
     </section>;
 }

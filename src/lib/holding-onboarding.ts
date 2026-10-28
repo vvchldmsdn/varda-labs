@@ -99,7 +99,7 @@ export function parseHoldingOnboardingInput(
   }
 
   const instrumentId = textValue(formData.get("instrumentId"));
-  if (instrumentId && !/^(?:etf|stock):[0-9a-f-]{36}$/i.test(instrumentId)) {
+  if (instrumentId && !/^(?:etf|stock|catalog):[0-9a-f-]{36}$/i.test(instrumentId)) {
     return invalid("instrumentId", "검색 결과에서 종목을 다시 선택해 주세요.");
   }
 

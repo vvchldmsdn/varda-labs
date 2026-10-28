@@ -1,4 +1,5 @@
 import "server-only";
+import { admittedContributionCostBasisKrw } from "@/lib/additional-contribution-cost-basis";
 
 import { getReadOnlyTenantAdditionalContributionMa120Evidence } from "@/db/queries/additional-contribution-ma120";
 import { getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfolio-target-policy";
@@ -114,11 +115,13 @@ async function buildLegacyPreviewFromEvidence({
 }
 
 export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
+  excludedSellKeys,
   cashAmountKrw,
   scope,
   tenantContext,
   now = new Date(),
 }: {
+  excludedSellKeys?: readonly string[];
   cashAmountKrw: number;
   scope: PortfolioAnalysisScope;
   tenantContext: TenantContext;
@@ -191,6 +194,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
       now,
     });
     return adaptLegacyPreview({
+    excludedSellKeys,
       model,
       policyParameters,
       preview: legacyPreview,
@@ -216,6 +220,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
     ma120Read = additionalContributionMa120ReadFailure(model.rows.length);
   }
   const result = calculateExplainableAdditionalContribution({
+    excludedSellKeys,
     cashAmountKrw,
     minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
     trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
@@ -245,12 +250,14 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
 }
 
 function adaptLegacyPreview({
+  excludedSellKeys,
   model,
   policyParameters,
   preview,
   scope,
   modifierRead,
 }: {
+  excludedSellKeys?: readonly string[];
   model: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>;
   policyParameters: ReturnType<typeof resolvePolicyParameters>;
   preview: Awaited<
@@ -274,6 +281,7 @@ function adaptLegacyPreview({
   });
   if (match.status !== "ready") return scopedBlocked(scope, preview.serviceDate, match.blockers);
   const result = calculateExplainableAdditionalContribution({
+    excludedSellKeys,
     cashAmountKrw: preview.cashAmountKrw,
     minimumExecutionRatioPct: policyParameters.minimumExecutionRatioPct,
     trimDriftThresholdPct: policyParameters.trimDriftThresholdPct,
@@ -352,7 +360,7 @@ function buildPolicyRows({
       ...modifierRead.rows[`${row.accountId}:${row.assetId}`],
       assetType: row.assetType ?? null,
       buyable: row.buyability === "buyable",
-      costBasisKrw: row.currency === 'KRW' ? row.costBasisKrw ?? null : null,
+      costBasisKrw: admittedContributionCostBasisKrw(row),
       currentValueKrw: row.currentValueKrw ?? Number.NaN,
       ma120Evidence: Object.freeze({
         distanceFromMaPct: evidence.distanceFromMaPct,

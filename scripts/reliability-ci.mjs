@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const JOBS = ['lint-type', 'unit-tests', 'production-build', 'postgres-integration', 'browser-journeys'];
-export const SOURCE_DIRECTORIES = ['.agents', '.github', 'docs', 'drizzle', 'e2e', 'operator-inputs', 'public', 'scripts', 'src', 'tests'];
+export const SOURCE_DIRECTORIES = ['.agents', '.github', 'docs', 'drizzle', 'e2e', 'operator-inputs', 'packages', 'public', 'scripts', 'src', 'tests'];
 export const SOURCE_FILES = ['AGENTS.md', 'CLAUDE.md', 'README.md', '.gitignore', '.gitattributes', '.vercelignore', 'package.json', 'package-lock.json', 'tsconfig.json', 'next.config.ts', 'eslint.config.mjs', 'postcss.config.mjs', 'playwright.config.ts', 'drizzle.config.ts', 'vercel.json'];
 const DEAD_DATABASE = 'postgresql://synthetic:synthetic@127.0.0.1:1/isolated_ci';
 

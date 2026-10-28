@@ -148,8 +148,10 @@ describe("portfolio group management", () => {
     assert.match(actionSource, /revalidatePath\(path\)/);
     assert.match(componentSource, /"use client"/);
     assert.match(componentSource, /function PortfolioGroupEditor/);
-    assert.match(componentSource, /useActionState\(\s*savePortfolioGroup/);
-    assert.match(componentSource, /useActionState\(\s*archivePortfolioGroup/);
+    assert.match(componentSource, /useActionState\(\s*submitSave/);
+    assert.match(componentSource, /saveAction:\s*submitSave\s*=\s*savePortfolioGroup/);
+    assert.match(componentSource, /useActionState\(\s*submitArchive/);
+    assert.match(componentSource, /archiveAction:\s*submitArchive\s*=\s*archivePortfolioGroup/);
     assert.match(pageSource, /resolveCurrentTenantContext\(\)/);
     assert.doesNotMatch(componentSource, /canonicalOwnerUserId|ownerUserId/);
     assert.doesNotMatch(pageSource, /\bfetch\s*\(/);

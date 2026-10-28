@@ -90,7 +90,7 @@ describe("beginner simulation calculation guide", () => {
       ...base, status: "ready", executionWeights: [], samplePaths: [],
       assumptions: { horizon: 63, pathCount: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY.pathCount },
       source: { endServiceDate: "2026-09-01", returnStepCount: 90, priceBasis: "raw_price_return" },
-      terminal: { p50ReturnPct: 0, lossProbabilityPct: 0, maxDrawdownP90Pct: 0 },
+      terminal: { p50ReturnPct: 0, lossProbabilityPct: 0, maxDrawdownP50Pct: 0, maxDrawdownP90Pct: 0 },
       bands: [{ stepIndex: 0, p10: 100, p50: 100, p90: 100 }],
     };
     const blocked = { ...base, status: "unavailable", reason: "input_matrix_unavailable", assumptions: null };

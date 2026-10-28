@@ -1,3 +1,4 @@
+import { parseSaleExclusionKeys } from '@/lib/additional-contribution-sale-exclusions';
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
 import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-ledger";
@@ -23,6 +24,7 @@ type AdditionalContributionPageProps = {
   searchParams: Promise<{
     account?: string | string[];
     amount?: string | string[];
+    excludeSell?: string | string[];
     preview?: string | string[];
     scope?: string | string[];
     currency?: string | string[];
@@ -35,6 +37,7 @@ export default async function AdditionalContributionPage({
   const generatedAt = new Date().toISOString();
   const params = await searchParams;
   const amountKrw = normalizeAmount(params.amount);
+  const saleSelection = parseSaleExclusionKeys(params.excludeSell);
 
   if (
     process.env.NODE_ENV === "development" &&
@@ -98,12 +101,11 @@ export default async function AdditionalContributionPage({
     return <CurrencyPortfolioSurface surface="contribution" evidence={evidence} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
   }
   const [preview, marketContext] = await Promise.all([
-    getReadOnlyTenantAdditionalContributionPreviewForScope({
-      cashAmountKrw: amountKrw,
-      scope: selectedScope,
-      tenantContext: resolution.tenantContext,
-    }),
-    getContributionMarketContext(new Date(generatedAt)),
+    saleSelection.ok ? getReadOnlyTenantAdditionalContributionPreviewForScope({
+      excludedSellKeys: saleSelection.keys, cashAmountKrw: amountKrw,
+      scope: selectedScope, tenantContext: resolution.tenantContext,
+    }) : Promise.resolve({status: "blocked" as const, blockers: ["invalid_sale_exclusions"]}),
+    saleSelection.ok ? getContributionMarketContext(new Date(generatedAt)) : Promise.resolve(undefined),
   ]);
 
   return (
@@ -111,6 +113,7 @@ export default async function AdditionalContributionPage({
       amountKrw={amountKrw}
       generatedAt={generatedAt}
       preview={preview}
+      excludedSellKeys={saleSelection.ok?saleSelection.keys:[]}
       marketContext={marketContext}
       scopes={scopeContext.catalog.scopes}
       selectedScope={selectedScope}

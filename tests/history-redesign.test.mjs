@@ -24,7 +24,8 @@ describe("history redesign boundaries", () => {
     assert.match(view, /<PortfolioPrimaryNavigation/);
     assert.match(view, /<PortfolioAnalysisScopeTabs/);
     assert.match(view, /buildHistoryOverview/);
-    assert.match(view, /<HistoryTimeExplorer/);
+    assert.match(view, /<RecoveredHistoryExplorer/);
+    assert.match(read("src/components/recovered-return-section.tsx"), /<HistoryTimeExplorer/);
     assert.match(view, /scopeLabel=\{history\.selectedScope\.label\}/);
     assert.match(view, /<HistoryActivityStream/);
     assert.match(view, /<HistoryTrajectoryChart/);

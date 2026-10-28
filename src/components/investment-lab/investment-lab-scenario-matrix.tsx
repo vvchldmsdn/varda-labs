@@ -13,6 +13,8 @@ import {
   type InvestmentLabScenarioPriceBasis,
 } from "@/lib/investment-lab-scenario-matrix";
 import { diagnoseInvestmentLabScenario } from "@/lib/investment-lab-scenario-diagnostics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const MINIMUM_VOLATILITY_PERIODS =
   INVESTMENT_LAB_PATH_RISK_POLICY.minimumAnnualizedVolatilityPeriods;
@@ -57,7 +59,7 @@ export function InvestmentLabScenarioMatrix({
       <div className="border-b border-[var(--wash)] px-4 py-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold"><LabText value="시나리오 한눈에 비교" /></h2>
+            <CairnSectionTitle className="text-lg font-semibold"><LabText value="시나리오 한눈에 비교" /></CairnSectionTitle>
             <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 이미 계산된 경로만 같은 기간으로 맞춰 표시합니다. 순위나 추천이 아니라 계산 근거와 불가 사유를 확인하는 연구용 비교표입니다. " /></p>
           </div>
           <p className="text-xs leading-5 text-[var(--muted)]">

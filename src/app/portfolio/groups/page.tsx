@@ -11,6 +11,8 @@ import {
 import { getReadOnlyTenantPortfolioGroupManagementModel } from "@/db/queries/portfolio-group-management";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { PageHeader, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -45,18 +47,15 @@ export default async function PortfolioGroupsPage() {
       <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-[1200px] space-y-4">
         <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal"><ManagementText>{"분석 범위 관리"}</ManagementText></h1>
-              <p className="mt-2 text-sm text-[var(--muted)]"><ManagementText>{"실제 계좌와 별개로, 함께 분석할 계좌와 종목을 묶습니다."}</ManagementText></p>
-            </div>
+          <PageHeader eyebrow="Cairn Labs" title={<ManagementText>{"분석 범위 관리"}</ManagementText>}
+            description={<ManagementText>{"실제 계좌와 별개로, 함께 분석할 계좌와 종목을 묶습니다."}</ManagementText>}
+            actions={
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
               <NavLink href="/">홈</NavLink>
               <NavLink href="/portfolio/holdings">보유종목</NavLink>
               <NavLink href="/portfolio/holdings/new">보유종목 추가</NavLink>
             </nav>
-          </div>
+          } />
           <dl className="mt-4 grid grid-cols-[1.3fr_1fr_1.3fr] divide-x divide-[var(--line)] border-y border-[var(--line)] py-3">
             <SummaryCell
               label="기준일"
@@ -82,7 +81,7 @@ export default async function PortfolioGroupsPage() {
         ) : (
           <>
             <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-              <h2 className="text-lg font-semibold"><ManagementText>{"새 분석 범위"}</ManagementText></h2>
+              <CairnSectionTitle className="text-lg font-semibold"><ManagementText>{"새 분석 범위"}</ManagementText></CairnSectionTitle>
               <p className="mt-1 text-sm text-[var(--muted)]"><ManagementText>{"빈 범위도 만들 수 있으며 구성은 언제든 바꿀 수 있습니다."}</ManagementText></p>
               <div className="mt-4">
                 <PortfolioGroupCreateForm
@@ -94,7 +93,7 @@ export default async function PortfolioGroupsPage() {
 
             <section className="space-y-3">
               <div className="px-1">
-                <h2 className="text-lg font-semibold"><ManagementText>{"기존 분석 범위"}</ManagementText></h2>
+                <CairnSectionTitle className="text-lg font-semibold"><ManagementText>{"기존 분석 범위"}</ManagementText></CairnSectionTitle>
                 <p className="mt-1 text-sm text-[var(--muted)]"><ManagementText>{"변경일 이후의 홈, 오늘 변동, 추가 투입, 위험, 투자랩과 시뮬레이션에 같은 범위가 적용됩니다."}</ManagementText></p>
               </div>
               {model.groups.length === 0 ? (

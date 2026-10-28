@@ -26,6 +26,7 @@ async function fixture(options = {}) {
     return builder;
   } };
   const [route] = await importWithPorts(["src/app/api/portfolio/live-prices/sync/route.ts"], {
+    "@/lib/market-data/close-gap-sync": { syncMissingRawCloses: async () => { throw new Error("historical gap collection is outside live quote fixture"); } },
     "next/server": { NextResponse: { json: (body, init) => Response.json(body, init) }, after: callback => callbacks.push(callback) },
     "@/db/client": { db, sqlClient: { query: async (sql, parameters) => {
       if (sql.startsWith("select")) {

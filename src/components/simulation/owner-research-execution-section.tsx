@@ -10,6 +10,8 @@ import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 import { simulationReturnLabel, simulationReturnTone } from "./simulation-presentation";
 import styles from "./simulation-workspace.module.css";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyExecution = Extract<
   SimulationOwnerResearchExecutionResult,
@@ -38,11 +40,11 @@ export function OwnerResearchExecutionSection({
     >
       <div className={`${styles.executionHeader} flex flex-wrap items-start justify-between gap-4`}>
         <div>
-          <h2
+          <CairnSectionTitle
             className="text-base font-semibold sm:text-lg"
             id="owner-research-execution-title"
           >
-            <SimulationText ko={"내 포트폴리오 확률 경로"} />{" "}</h2>
+            <SimulationText ko={"내 포트폴리오 확률 경로"} />{" "}</CairnSectionTitle>
         </div>
         <div className="flex flex-wrap items-center gap-1">
         <SimulationDialog
@@ -62,27 +64,27 @@ export function OwnerResearchExecutionSection({
             <summary className="cursor-pointer text-sm font-medium"><SimulationText ko="계산 기준 상세" en="Detailed calculation criteria" /></summary>
           <div className="mt-4 grid gap-6 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
             <div>
-              <h3 className="mb-2 font-medium text-[var(--ink)]">
+              <CairnSectionTitle level="h3" className="mb-2 font-medium text-[var(--ink)]">
                 P10 · P50 · P90
-              </h3>
+              </CairnSectionTitle>
               <p>
                 <SimulationText ko={"각 시점에서 계산 경로의 아래 10%, 중앙 50%, 위 90% 경계입니다. P10~P90은 모형 안에서 약 80%의 경로가 위치하는 구간이며, 실제 미래에 대한 80% 보장 구간은 아닙니다."} />{" "}</p>
             </div>
             <div>
-              <h3 className="mb-2 font-medium text-[var(--ink)]">
-                <SimulationText ko={"손실 확률과 최대 낙폭"} />{" "}</h3>
+              <CairnSectionTitle level="h3" className="mb-2 font-medium text-[var(--ink)]">
+                <SimulationText ko={"손실 확률과 최대 낙폭"} />{" "}</CairnSectionTitle>
               <p>
                 <SimulationText ko={"손실 종료 확률은 종료값이 시작값보다 작은 경로의 비율입니다. MDD는 경로 안에서 고점 대비 가장 크게 하락한 폭입니다. P90 MDD는 더 큰 손실 쪽 경계입니다."} />{" "}</p>
             </div>
             <div>
-              <h3 className="mb-2 font-medium text-[var(--ink)]">
-                <SimulationText ko={`${execution.policy.pathCount.toLocaleString("ko-KR")}개 경로 · 전체 표시`} en={`${execution.policy.pathCount.toLocaleString("en-US")} paths · All displayed`} />{" "}</h3>
+              <CairnSectionTitle level="h3" className="mb-2 font-medium text-[var(--ink)]">
+                <SimulationText ko={`${execution.policy.pathCount.toLocaleString("ko-KR")}개 경로 · 전체 표시`} en={`${execution.policy.pathCount.toLocaleString("en-US")} paths · All displayed`} />{" "}</CairnSectionTitle>
               <p>
                 <SimulationText ko={`최근 90개 공동 수익률을 평균 5단계 블록으로 재표본 추출합니다. 최초 배분 후 리밸런싱 없이 ${execution.policy.pathCount.toLocaleString("ko-KR")}개 경로를 계산하며, 메인 차트에는 전체 경로와 분포를 표시합니다. 비중 후보 차트의 표본선과 달리 지표는 전체 경로로 계산합니다.`} en={`Resample the latest 90 joint returns in blocks averaging five steps. Calculate ${execution.policy.pathCount.toLocaleString("en-US")} paths with no rebalancing after initial allocation. The main chart displays every path and the distribution. Candidate charts show sample lines, while metrics use every path.`} />{" "}</p>
             </div>
             <div>
-              <h3 className="mb-2 font-medium text-[var(--ink)]">
-                <SimulationText ko={"포함 범위와 가정"} />{" "}</h3>
+              <CairnSectionTitle level="h3" className="mb-2 font-medium text-[var(--ink)]">
+                <SimulationText ko={"포함 범위와 가정"} />{" "}</CairnSectionTitle>
               <p>
                 <SimulationText ko={"현재 평가액의"} />{" "}
                 {execution.coverage.modeledCurrentValuePct.toFixed(2)}<SimulationText ko={"%가 계산 대상입니다. 제외한 비중은 이력을 꾸며내지 않고 남겨 두며, 포함 종목만 100%로 다시 환산합니다. 수수료·세금·현금수익률 미포함, 조회 시 계산 · 저장 안 함."} />{" "}</p>
@@ -151,8 +153,8 @@ export function OwnerResearchExecutionSection({
           </div>
           {execution.status === "ready" ? (
             <div className="mt-8">
-              <h3 className="text-lg font-medium text-[var(--ink)]">
-                <SimulationText ko={"위험과 계산 근거"} />{" "}</h3>
+              <CairnSectionTitle level="h3" className="text-lg font-medium text-[var(--ink)]">
+                <SimulationText ko={"위험과 계산 근거"} />{" "}</CairnSectionTitle>
               <div className="mt-4 border-y border-[var(--line)]">
                 <SimulationTerminalRiskMetrics terminal={execution.terminal} />
               </div>
@@ -245,9 +247,9 @@ function ReadyOwnerExecution({ execution, pathDetail, pathDetailNotice }: { exec
           <p><SimulationText ko="마지막 값이 출발점보다 낮은 비율" en="Share ending below their starting value" /></p>
         </div>
         <div>
-          <dt><SimulationText ko="중간 최대 하락 · MDD" en="Largest drop along the way" /></dt>
-          <dd className="text-[var(--negative)]">{execution.terminal.maxDrawdownP90Pct.toFixed(1)}%</dd>
-          <p><SimulationText ko="약 10% 경로는 이보다 더 하락" en="About 10% of paths had a larger drop" /></p>
+          <dt><SimulationText ko="최대 낙폭 중앙값 · P50" en="Median maximum drawdown · P50" /></dt>
+          <dd className="text-[var(--negative)]">{execution.terminal.maxDrawdownP50Pct.toFixed(1)}%</dd>
+          <p><SimulationText ko={`P90 ${execution.terminal.maxDrawdownP90Pct.toFixed(1)}% · 약 10% 경로는 이보다 더 하락`} en={`P90 ${execution.terminal.maxDrawdownP90Pct.toFixed(1)}% · About 10% of paths had a larger drawdown`} /></p>
         </div>
       </dl>
       <ResearchFanChart pathDetail={pathDetail} pathDetailNotice={pathDetailNotice} large execution={execution} />

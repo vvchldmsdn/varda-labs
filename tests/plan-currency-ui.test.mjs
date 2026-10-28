@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
@@ -14,16 +14,13 @@ const source = readFileSync(new URL("../src/components/first-visit/plan-experien
 const helperSource = source.slice(source.indexOf("export function quickInputForPlan"), source.indexOf("export function PlanExperience"));
 const compiledHelper = ts.transpileModule(helperSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const quickInputForPlan = new Function("exports", "analyzeQuickPortfolio", "Decimal", "moneyFromMinor", compiledHelper + ";return exports.quickInputForPlan;")({}, analyzeQuickPortfolio, money.Decimal, money.moneyFromMinor);
-const require = createRequire(import.meta.url);
-const resultsSource = readFileSync(new URL("../src/components/first-visit/plan-results.tsx", import.meta.url), "utf8");
-function resultComponent(locale) {
-  const code = ts.transpileModule(resultsSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+async function resultComponent(locale) {
   const ports = {
     "@/lib/investment-plan": plans, "@/lib/money": money,
     "@/components/i18n/locale-provider": { useI18n: () => ({ locale, t: (ko, en) => locale === "en" ? en ?? ko : ko }) },
     "@/lib/i18n/locale": { intlLocale }, "./first-visit.module.css": { default: {} },
   };
-  return new Function("require", "exports", code + ";return exports;")((key) => ports[key] ?? require(key), {});
+  return (await importUiWithPorts(["src/components/first-visit/plan-results.tsx"], ports))[0];
 }
 
 const asOf = "2020-09-14T00:00:00Z";
@@ -62,10 +59,10 @@ describe("Plan currency UI: no network, no DB", () => {
     assert.deepEqual(quickInputForPlan(input).rows, [{ name: "A", value: "3000000", target: "" }]);
   });
 
-  it("renders dollars rather than internal minor units and keeps public totals consistent", () => {
+  it("renders dollars rather than internal minor units and keeps public totals consistent", async () => {
     const result = plans.calculatePlan(usdPlan);
     assert.equal(result.ok, true);
-    const html = renderToStaticMarkup(createElement(resultComponent("en").PlanResults, { input: usdPlan }));
+    const html = renderToStaticMarkup(createElement((await resultComponent("en")).PlanResults, { input: usdPlan }));
     assert.match(html, /\$500\.05/);
     assert.match(html, new RegExp(money.formatMoney(result.totalAllocated, "USD", "en-US").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(html, /\$50,005|원|KRW/);
@@ -73,10 +70,10 @@ describe("Plan currency UI: no network, no DB", () => {
     assert.equal(money.moneyMinor(result.totalAllocated, "USD") + money.moneyMinor(result.residualCash, "USD"), 50005);
   });
 
-  it("changes language without changing currency, values, or the saved plan", () => {
+  it("changes language without changing currency, values, or the saved plan", async () => {
     const before = JSON.stringify(usdPlan);
-    const ko = renderToStaticMarkup(createElement(resultComponent("ko").PlanResults, { input: usdPlan }));
-    const en = renderToStaticMarkup(createElement(resultComponent("en").PlanResults, { input: usdPlan }));
+    const ko = renderToStaticMarkup(createElement((await resultComponent("ko")).PlanResults, { input: usdPlan }));
+    const en = renderToStaticMarkup(createElement((await resultComponent("en")).PlanResults, { input: usdPlan }));
     assert.match(ko, /USD/); assert.match(en, /USD/);
     assert.match(ko, /500\.05/); assert.match(en, /500\.05/);
     assert.equal(JSON.stringify(usdPlan), before);
@@ -84,8 +81,8 @@ describe("Plan currency UI: no network, no DB", () => {
     assert.deepEqual(sample.rows.map(row => row.allocation), [0, 433333, 66667]);
   });
 
-  it("shows localized validation without won-specific instructions for USD", () => {
-    const component = resultComponent("en");
+  it("shows localized validation without won-specific instructions for USD", async () => {
+    const component = await resultComponent("en");
     const html = renderToStaticMarkup(createElement(component.PlanResults, { input: { ...usdPlan, amount: 0.001 } }));
     assert.match(html, /role="alert"/);
     assert.doesNotMatch(html, /원|정수/);

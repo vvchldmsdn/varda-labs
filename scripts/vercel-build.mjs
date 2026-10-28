@@ -6,6 +6,7 @@ import { isIsolatedReleasePreview } from "../src/lib/deployment/isolated-release
 const PREVIEW_ENVIRONMENT = "preview";
 
 export function getVercelBuildSteps(vercelEnvironment, env = {}) {
+  if (vercelEnvironment === 'production' && env.CAIRN_CONTRIBUTION_EFFECTS_MIGRATE === '1') return ['build', 'db:release:contribution-effects'];
   if (vercelEnvironment === PREVIEW_ENVIRONMENT && env.BC_ISOLATED_PREVIEW_ENABLED === "true") {
     if (!isIsolatedReleasePreview(env)) throw new Error("Isolated release Preview target verification failed.");
     return ["db:preview:release-verify", "build"];

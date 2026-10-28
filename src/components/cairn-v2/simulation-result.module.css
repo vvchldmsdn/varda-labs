@@ -1,0 +1,48 @@
+.result { min-width:0; color:var(--cairn-v2-ink); padding:var(--cairn-space-6,32px) var(--cairn-space-7,44px); }
+.context { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; margin:20px 0 24px; color:var(--cairn-v2-muted); font-size:12px; }
+.context>span+span { white-space:nowrap; }
+.metrics { gap:24px; padding:22px 0; margin:24px 0 28px; border-block:1px solid var(--cairn-v2-line); }
+.chartSection { min-width:0; }
+.coverage { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; gap:32px; margin:32px 0 24px; padding:24px; background:var(--cairn-v2-wash,#eeeee9); border-radius:16px; }
+.coverageBar { height:8px; border-radius:8px; overflow:hidden; background:var(--cairn-v2-line); margin-top:16px; }
+.coverageBar>span { display:block; height:100%; background:var(--cairn-v2-sage,#899b85); border-radius:inherit; }
+.coverageCaption { display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--cairn-v2-muted); margin:8px 0 0; }
+.coverageCaption strong { color:var(--cairn-v2-ink); font-weight:500; }
+.coverageCopy { font-size:12px; color:var(--cairn-v2-muted); line-height:1.8; margin:0; }
+.disclosure { border-top:1px solid var(--cairn-v2-line); }
+.disclosure>summary { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:60px; cursor:pointer; list-style:none; font-size:13px; font-weight:500; }
+.disclosure>summary::-webkit-details-marker { display:none; }
+.disclosure>summary>span { color:var(--cairn-v2-muted); font-size:18px; }
+.disclosure[open]>summary>span { transform:rotate(45deg); }
+.disclosure>summary:focus-visible,.disclosure a:focus-visible,.tableScroll:focus-visible { outline:2px solid var(--cairn-v2-brand); outline-offset:4px; }
+.disclosure p { color:var(--cairn-v2-muted); font-size:12px; line-height:1.8; margin:12px 0 20px; max-width:80em; }
+.tableScroll { overflow:auto; max-width:100%; margin-bottom:20px; }
+.tableScroll table { border-collapse:collapse; width:100%; min-width:540px; font-size:12px; }
+.tableScroll caption { text-align:left; color:var(--cairn-v2-muted); padding:4px 0 12px; }
+.tableScroll th,.tableScroll td { padding:14px 12px; border-bottom:1px solid var(--cairn-v2-line); text-align:right; vertical-align:middle; font-variant-numeric:tabular-nums; }
+.tableScroll th:first-child { text-align:left; padding-left:0; }
+.tableScroll th { font-weight:500; }
+.tableScroll thead { color:var(--cairn-v2-muted); }
+.tableScroll small { display:block; margin-top:5px; color:var(--cairn-v2-muted); font-size:11px; font-weight:400; }
+.methodGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin:8px 0 20px; }
+.methodGrid dt { font-size:12px; font-weight:500; margin-bottom:6px; }
+.methodGrid dd { font-size:12px; color:var(--cairn-v2-muted); line-height:1.8; margin:0; }
+.textLink { display:inline-flex; align-items:center; min-height:44px; color:var(--cairn-v2-ink); font-size:12px; text-decoration:underline; text-underline-offset:5px; margin-bottom:12px; }
+.currencyNote { color:var(--cairn-v2-muted); font-size:12px; line-height:1.7; }
+@media(max-width:700px) {
+ .result { padding:28px 22px; }
+ .context { margin:12px 0 16px; gap:6px 12px; font-size:11px; }
+ .metrics { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:16px 0; margin-bottom:20px; }
+ .metrics>[data-cairn-metric][data-size=default]>dd:first-of-type { font-size:22px; margin-top:8px; letter-spacing:-.04em; }
+ .metrics>[data-cairn-metric]>dt { font-size:11px; min-height:33px; }
+ .metrics>[data-cairn-metric]>dd+dd { font-size:10px; line-height:1.5; }
+ .coverage { grid-template-columns:1fr; gap:16px; padding:20px; margin-top:24px; }
+ .methodGrid { grid-template-columns:1fr; gap:18px; }
+}
+
+.priceEvidence[data-price-frontier]{margin:18px 0 24px;padding:12px 16px;font-size:12px}
+.priceEvidence[data-price-frontier]>p{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;margin:0}
+.priceEvidence strong{font-weight:550;color:var(--cairn-ui-ink,var(--ink,#20211f))}
+.priceEvidence details{margin-top:4px}.priceEvidence summary{cursor:pointer;padding:8px 0;min-height:40px;display:flex;align-items:center;list-style:revert}
+.priceEvidence summary:focus-visible{outline:2px solid var(--cairn-ui-brand,#c64623);outline-offset:3px}
+.priceEvidence details p{margin:0 0 5px;max-width:80ch}

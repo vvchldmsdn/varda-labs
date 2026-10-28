@@ -8,6 +8,8 @@ import { authErrorMessage } from "@/lib/auth/auth-error-message";
 import { AUTH_EMAIL_VERIFIED_PATH } from "@/lib/auth/auth-methods";
 import { AuthElement, AuthText } from "./auth-localized";
 import styles from "./auth-experience.module.css";
+import { Button as CairnButton, Field as CairnField, Fieldset as CairnFieldset, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function EmailVerificationForm({
   initialEmail = "",
@@ -110,10 +112,10 @@ export function EmailVerificationForm({
 
   if (step === "complete") return (
     <div className={styles.stack}>
-      <p className={styles.verificationState} role="status">
+      <CairnStatus as="p" tone="neutral" className={styles.verificationState} role="status">
         <Check size={22} aria-hidden="true" />
         <AuthText>{preview ? "인증 완료 화면 미리보기" : "이메일 인증을 완료했습니다."}</AuthText>
-      </p>
+      </CairnStatus>
       <p className={styles.note}><AuthText>{preview
         ? "화면 미리보기입니다. 메일 전송과 실제 인증은 수행하지 않습니다."
         : "가입할 때 설정한 비밀번호로 로그인해 주세요."}</AuthText></p>
@@ -138,10 +140,10 @@ export function EmailVerificationForm({
           } else void sendCode();
         }}
       >
-        <fieldset className={styles.form} disabled={!!pending || unavailable}>
+        <CairnFieldset className={styles.form} disabled={!!pending || unavailable}>
           {step === "email" ? (
             <div className={styles.field}>
-              <label htmlFor={`${id}-email`}><AuthText>{"이메일"}</AuthText></label>
+              <CairnField htmlFor={`${id}-email`}><AuthText>{"이메일"}</AuthText></CairnField>
               <AuthElement as="input" id={`${id}-email`} type="email" name="email"
                 value={email} onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email" inputMode="email" autoCapitalize="none"
@@ -159,7 +161,7 @@ export function EmailVerificationForm({
                 <br /><AuthText>{"메일에 있는 6자리 숫자를 입력해 주세요. 만료된 코드는 다시 요청할 수 있습니다."}</AuthText>
               </p>
               <div className={styles.field}>
-                <label htmlFor={`${id}-otp`}><AuthText>{"인증 코드"}</AuthText></label>
+                <CairnField htmlFor={`${id}-otp`}><AuthText>{"인증 코드"}</AuthText></CairnField>
                 <AuthElement as="input" id={`${id}-otp`} name="otp" type="text"
                   value={otp} onChange={(event) => setOtp(event.target.value.replace(/\s/g, ""))}
                   onPaste={(event) => {
@@ -177,30 +179,30 @@ export function EmailVerificationForm({
               </div>
             </>
           )}
-          {error ? <p className={styles.error} role="alert"><AuthText>{error}</AuthText></p> : null}
-          {notice ? <p className={styles.notice} role="status"><AuthText>{notice}</AuthText></p> : null}
-          <button type="submit" className={styles.primaryButton} aria-busy={!!pending}
+          {error ? <CairnStatus as="p" tone="danger" className={styles.error} role="alert"><AuthText>{error}</AuthText></CairnStatus> : null}
+          {notice ? <CairnStatus as="p" tone="neutral" className={styles.notice} role="status"><AuthText>{notice}</AuthText></CairnStatus> : null}
+          <CairnButton variant="primary" type="submit" className={styles.primaryButton} aria-busy={!!pending}
             disabled={step === "email" ? seconds > 0 : !/^[0-9]{6}$/.test(otp)}>
             <AuthText>{pending === "verify" ? "확인 중" : pending === "send" ? "요청 중" : step === "code" ? "인증하고 계속" : "인증 코드 요청"}</AuthText>
             {pending ? <LoaderCircle size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <ArrowRight size={17} aria-hidden="true" />}
-          </button>
-          {step === "email" ? <button type="submit" value="existing" className={styles.textLink}>
+          </CairnButton>
+          {step === "email" ? <CairnButton variant="primary" type="submit" value="existing" className={styles.textLink}>
             <AuthText>{"이미 받은 코드 입력"}</AuthText>
-          </button> : null}
-        </fieldset>
+          </CairnButton> : null}
+        </CairnFieldset>
       </AuthElement>
       {unavailable ? <p className={styles.note}><AuthText>{"이메일 인증은 준비 중입니다."}</AuthText></p> : null}
       {step === "code" ? (
         <>
-          <button type="button" className={styles.secondaryButton} onClick={sendCode}
+          <CairnButton variant="secondary" type="button" className={styles.secondaryButton} onClick={sendCode}
             disabled={!!pending || seconds > 0 || unavailable}>
             <AuthText>{pending === "send" ? "요청 중" : seconds > 0 ? `${seconds}초 후 재전송` : "인증 코드 재전송"}</AuthText>
-          </button>
-          <button type="button" className={styles.textLink} onClick={changeEmail} disabled={!!pending}>
+          </CairnButton>
+          <CairnButton variant="secondary" type="button" className={styles.textLink} onClick={changeEmail} disabled={!!pending}>
             <AuthText>{"다른 이메일 사용"}</AuthText>
-          </button>
+          </CairnButton>
         </>
-      ) : seconds > 0 ? <p className={styles.note} role="status"><AuthText>{`${seconds}초 후 재전송`}</AuthText></p> : null}
+      ) : seconds > 0 ? <CairnStatus as="p" tone="neutral" className={styles.note} role="status"><AuthText>{`${seconds}초 후 재전송`}</AuthText></CairnStatus> : null}
       <Link href={`/auth/sign-in${preview ? "?preview=design" : ""}`} className={styles.textLink}>
         <AuthText>{"로그인으로 돌아가기"}</AuthText>
       </Link>

@@ -53,7 +53,7 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
   const [query, model] = await importWithPorts([
     "src/db/queries/portfolio-dashboard.ts", "src/lib/portfolio-dashboard.ts",
   ], {
-    "@/db/client": { db },
+    "@/db/client": { db, sqlClient: { query: async () => { throw new Error("Unexpected market SQL in legacy dashboard fixture"); } } },
     "@/db/queries/portfolio-analysis-scope-targets": { getPortfolioAnalysisScopeTargets: async () => targets ?? ({ includesAllOwnedAccounts: true, wholeAccountIds: [], directAssetIds: [] }) },
     "@/db/queries/tenant-group-reads": { loadActiveTenantAllocationGroups: async () => [] },
     "@/db/queries/tenant-settings": { loadLatestTenantPortfolioSettingsRows: async () => { await settingsGate?.promise; return [{ usdKrwRate: "1400" }]; } },
@@ -139,6 +139,7 @@ describe("dashboard query demand and independent market reads", () => {
       "src/components/portfolio-dashboard.tsx", "src/components/holding-state-correction-form.tsx", "src/components/i18n/locale-provider.tsx",
     ], {
       "@/app/portfolio/holdings/actions": { correctHoldingState: async () => { throw new Error("SSR must not submit a correction"); } },
+      "@/components/recovered-return-section": { RecoveredPortfolioHistoryChart: () => null },
       "next/dynamic": { default: () => () => null },
       "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() {} }) },
       "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },
@@ -194,6 +195,7 @@ describe("dashboard query demand and independent market reads", () => {
     const [{ PortfolioDashboard }, { TodayMovement }, { LocaleProvider }] = await importUiWithPorts([
       "src/components/portfolio-dashboard.tsx", "src/components/today-movement.tsx", "src/components/i18n/locale-provider.tsx",
     ], {
+      "@/components/recovered-return-section": { RecoveredPortfolioHistoryChart: () => null },
       "next/dynamic": { default: () => () => null },
       "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() { throw new Error("SSR must not refresh"); } }) },
       "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },

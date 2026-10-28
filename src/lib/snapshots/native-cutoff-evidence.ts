@@ -1,3 +1,4 @@
+import { hasUnsettledTrades } from "../native-portfolio-ledger.ts";
 import { Decimal } from "../money.ts";
 import { buildCycleForSnapshotDate } from "./market-calendar.ts";
 import type { NativeStoredAccount, NativeStoredEntry } from "../../db/queries/native-portfolio-ledger.ts";
@@ -43,6 +44,7 @@ export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger
     // An opening first observed after the cutoff cannot establish past ownership.
     if (!selected || !account.state || selected.data.state.accountId !== account.id) return null;
     const state = selected.data.state;
+    if (hasUnsettledTrades(state)) return null; // No fabricated cash-inclusive cutoff.
     sequences[account.id] = state.sequence;
     for (const holding of state.positions) {
       if (Decimal.from(holding.quantity).compare(0) === 0) continue;

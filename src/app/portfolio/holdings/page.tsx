@@ -21,6 +21,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { readNativeManagementAccounts } from "@/db/queries/native-account-management";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { PageHeader } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -96,19 +98,20 @@ export default async function TenantHoldingsPage({
     <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-8 text-[var(--ink)]">
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-5xl">
-        <header className="border-b border-[var(--line)] pb-6">
+        <section className="border-b border-[var(--line)] pb-6">
           <Link href="/portfolio/manage" className="text-sm text-[var(--muted)]"><T ko="← 관리" en="← Manage" /></Link>
-          <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0"><h1 className="text-2xl font-medium"><T ko="보유 종목" en="Your holdings" /></h1><p className="mt-2 text-sm leading-6 text-[var(--muted)]"><T ko="수량과 매입가를 확인하고 수정하세요. 매입가는 나중에 입력해도 됩니다." en="Review quantities and average costs. You can add missing purchase costs later." /></p></div>
+          <PageHeader className="mt-5" title={<T ko="보유 종목" en="Your holdings" />}
+            description={<T ko="수량과 매입가를 확인하고 수정하세요. 매입가는 나중에 입력해도 됩니다." en="Review quantities and average costs. You can add missing purchase costs later." />}
+            actions={
             <Link href="/portfolio/holdings/new" className="inline-flex min-h-11 items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)]"><T ko="종목 추가" en="Add holding" /></Link>
-          </div>
+          } />
           <details className="mt-4 text-sm"><summary className="w-fit cursor-pointer py-2 text-[var(--muted)]"><T ko="계좌·관련 기록" en="Accounts & related records" /></summary><nav className="mt-2 flex flex-wrap gap-x-5 gap-y-3 text-sm">
             <Link href="/portfolio/accounts"><T ko="계좌 관리" en="Accounts" /></Link>
             <Link href="/portfolio/groups"><T ko="분석 범위" en="Analysis scopes" /></Link>
             <Link href="/portfolio/position-snapshots?account=all"><T ko="종목별 기록" en="Holding records" /></Link>
             <Link href="/portfolio/portfolio-snapshots?account=all"><T ko="포트폴리오 기록" en="Portfolio records" /></Link>
           </nav></details>
-        </header>
+        </section>
         <div className="my-6 min-w-0">
           {scopeContext?.state === "ready" ? <PortfolioAnalysisScopeTabs basePath="/portfolio/holdings" scopes={scopeContext.catalog.scopes} selectedScopeKey={selectedScope?.key ?? null} /> : null}
           <p className="mt-4 text-sm font-medium"><ManagementText>{selectedScope?.label ?? "범위를 확인할 수 없습니다"}</ManagementText></p>

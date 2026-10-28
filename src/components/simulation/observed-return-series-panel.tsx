@@ -10,6 +10,8 @@ import {
   formatSignedReturn,
   formatSimulationDate,
 } from "./simulation-view-formatters";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type InputReadiness = SimulationInputReadinessPageModel["inputs"][number];
 type ObservedReturn = NonNullable<InputReadiness["observedReturns"]>[number];
@@ -61,11 +63,11 @@ export function ObservedReturnSeriesPanel({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3
+          <CairnSectionTitle level="h3"
             id={`observed-returns-${input.id}`}
             className="text-sm font-semibold"
           >
-            {rows.length}<SimulationText ko={"개 관측 수익률"} />{" "}</h3>
+            {rows.length}<SimulationText ko={"개 관측 수익률"} />{" "}</CairnSectionTitle>
           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
             <SimulationText ko={"저장된 조정종가와 기준일별 환율로 계산한 과거 KRW 단순수익률입니다."} />{" "}</p>
         </div>

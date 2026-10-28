@@ -1,5 +1,7 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationInputReadinessPageModel } from "@/lib/simulation-input-readiness";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type AlignmentEvidence =
   SimulationInputReadinessPageModel["observedReturnAlignmentEvidence"];
@@ -18,11 +20,11 @@ export function ObservedReturnAlignmentEvidencePanel({
     >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2
+          <CairnSectionTitle
             id="cross-market-alignment-title"
             className="text-lg font-semibold tracking-normal"
           >
-            <SimulationText ko={"교차시장 정렬 근거"} />{" "}</h2>
+            <SimulationText ko={"교차시장 정렬 근거"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"공통 서비스 날짜에 정확한 관측값이 없으면 가격은 최대 7일, USD/KRW는 최대 3일 범위에서 직전 저장값을 사용합니다. 휴장일을 실제 거래일로 간주하거나 미래 값을 당겨 쓰지 않습니다."} />{" "}</p>
         </div>

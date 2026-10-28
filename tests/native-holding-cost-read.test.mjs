@@ -89,7 +89,17 @@ it("reads only owned current state and the effective state before the requested 
       for (const query of queries) rows.push((await pg.query(query.text, query.params)).rows);
       return rows;
     } };
-    const [module] = await importWithPorts(["src/db/queries/native-legacy-trades.ts"], { "@/db/tenant-client": { getTenantSqlClient: () => sql } });
+    // Isolate the separately tested investment replay while exercising the real
+    // owner/cutoff SQL and its join to the matching projected source sequence.
+    const [module] = await importWithPorts(["src/db/queries/native-legacy-trades.ts"], {
+      "@/db/tenant-client": { getTenantSqlClient: () => sql },
+      "@/db/queries/native-investment-basis": { loadNativeInvestmentBasis: async (tenant, asOf, inclusive) => {
+        if (tenant.ownerUserId !== owner || (asOf && Date.parse(asOf) <= Date.parse(start))) return [];
+        const isEarly = asOf && (Date.parse(asOf) < Date.parse(at) || (Date.parse(asOf) === Date.parse(at) && !inclusive));
+        return [{ accountId, sourceSequence: isEarly ? early.sequence : late.sequence,
+          positions: [{ assetId, currency: "KRW", quantity: "10", costKrw: isEarly ? "700" : "1000" }], trades: [], basis: "executed_consideration_excluding_cash_v1" }];
+      } },
+    });
     const current = await module.loadNativeHoldingCosts({ ownerUserId: owner });
     assert.equal(current.length, 1);
     assert.equal(current[0].costKrw, "1000");

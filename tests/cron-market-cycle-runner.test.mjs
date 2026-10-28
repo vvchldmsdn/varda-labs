@@ -308,6 +308,7 @@ async function fixture({ noLegacyTargets=false, nativeResult={ status: "complete
   const now = new Date("2026-09-09T22:58:55.000Z");
   const completeSync = { requestedCount: 1, successCount: 1, failedCount: 0, skippedCount: 0, insertedCount: 1, updatedCount: 0, conflictCount: 0, targetFilterSummary: { filteredPriceTargetCount: 1 } };
   const [runner] = await importWithPorts(["src/lib/cron-market-cycle-runner.ts"], {
+    "@/lib/market-data/close-gap-collection": { scheduleRecentCloseCollection: () => {} },
     "@/lib/snapshots/native-daily-job": { async runNativeDailySnapshotJob() { events.push("native-snapshot"); assert.ok(!events.includes("fx"),"native cutoff must precede FX replacement"); assert.ok(!events.includes("live"),"native cutoff must precede live quote replacement"); return nativeResult; } },
     "node:perf_hooks": { performance: { now: () => elapsedMs } },
     "node:timers/promises": { async setTimeout(ms) { events.push(`wait:${ms / 1000}`); elapsedMs += ms + sleepOvershootMs; } },

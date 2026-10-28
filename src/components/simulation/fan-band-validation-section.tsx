@@ -9,6 +9,8 @@ import {
   historicalValidationReasonLabel,
 } from "@/components/simulation/historical-validation-ui";
 import type { SimulationHistoricalOutcomeValidationResult } from "@/lib/simulation-historical-outcome-validation";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function FanBandValidationSection({
   result,
@@ -30,11 +32,11 @@ export function FanBandValidationSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"Stationary bootstrap · 과거 관측 검증"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             id="fan-band-validation-title"
             className="mt-1 text-lg font-semibold"
           >
-            <SimulationText ko={"종료수익률 P10~P90 확률밴드 검증"} />{" "}</h2>
+            <SimulationText ko={"종료수익률 P10~P90 확률밴드 검증"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"KODEX 200 50%와 VOO 50%를 처음 한 번 배분하고 리밸런싱하지 않은 연구 포트폴리오입니다. 각 행은 앞선 90개 공동 KRW 수익률로 500개 경로를 만들고, 이어진 실제"} />{" "}<SimulationText ko={result.horizon ?? "선택"} /><SimulationText ko={"개 관측값과 비교합니다."} />{" "}</p>
         </div>

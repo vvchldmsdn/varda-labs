@@ -11,6 +11,8 @@ import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
 import { PLAN_RETURN_COOKIE, PLAN_RETURN_SOURCE_COOKIE, planReturnDestination } from "@/lib/auth/plan-return";
 import { PlanReturnNotice } from "./plan-return-notice";
 import styles from "./auth-experience.module.css";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export async function AuthEntry({
   mode,
@@ -67,7 +69,7 @@ export async function AuthEntry({
         {planIntent ? <PlanReturnNotice source={planSource} /> : null}
         {sessionState === "invalid" ? (
           <div className={styles.stack}>
-            <p role="alert" className={styles.notice}><AuthText>{"여러 로그인 정보가 함께 남아 있습니다. 로그아웃 후 사용할 계정 하나로 다시 로그인해 주세요."}</AuthText></p>
+            <CairnStatus as="p" tone="danger" role="alert" className={styles.notice}><AuthText>{"여러 로그인 정보가 함께 남아 있습니다. 로그아웃 후 사용할 계정 하나로 다시 로그인해 주세요."}</AuthText></CairnStatus>
             <SignOutButton />
           </div>
         ) : runtime.state === "ready" || designPreview ? (
@@ -78,10 +80,10 @@ export async function AuthEntry({
               </p>
             ) : null}
             {verified ? (
-              <p role="status" className={styles.entryNotice}><AuthText>{"메일의 인증 결과를 확인한 뒤 로그인해 주세요."}</AuthText></p>
+              <CairnStatus as="p" tone="neutral" role="status" className={styles.entryNotice}><AuthText>{"메일의 인증 결과를 확인한 뒤 로그인해 주세요."}</AuthText></CairnStatus>
             ) : null}
             {callbackError ? (
-              <p role="alert" className={styles.entryNotice}><AuthText>{"로그인을 완료하지 못했습니다. 다시 시도하거나 다른 방법을 선택해 주세요."}</AuthText></p>
+              <CairnStatus as="p" tone="danger" role="alert" className={styles.entryNotice}><AuthText>{"로그인을 완료하지 못했습니다. 다시 시도하거나 다른 방법을 선택해 주세요."}</AuthText></CairnStatus>
             ) : null}
             <SocialSignInButtons
               mode={mode}
@@ -98,7 +100,7 @@ export async function AuthEntry({
             />
           </>
         ) : (
-          <p role="alert" className={styles.notice}><AuthText>{"지금은 로그인에 연결할 수 없습니다. 잠시 후 다시 방문해 주세요."}</AuthText></p>
+          <CairnStatus as="p" tone="danger" role="alert" className={styles.notice}><AuthText>{"지금은 로그인에 연결할 수 없습니다. 잠시 후 다시 방문해 주세요."}</AuthText></CairnStatus>
         )}
         <div className={styles.divider} />
         <p className={styles.switchLine}>

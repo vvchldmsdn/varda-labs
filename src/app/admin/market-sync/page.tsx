@@ -12,6 +12,8 @@ import type {
   AdminSyncTarget,
   CloseCoverageTarget,
 } from "@/lib/admin-market-sync-status";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +34,9 @@ export default async function AdminMarketSyncPage() {
               <p className="text-xs font-semibold text-[var(--muted)]">
                 Cairn Labs Admin
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
+              <CairnPageTitle className="mt-1 text-2xl font-semibold tracking-normal">
                 Market Sync Status
-              </h1>
+              </CairnPageTitle>
               <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
                 Status-only console. This page reads stored database state and
                 does not call providers, dry-run routes, or write routes.
@@ -237,7 +239,7 @@ function Panel({
   return (
     <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
+        <CairnSectionTitle className="text-lg font-semibold tracking-normal">{title}</CairnSectionTitle>
         <p className="text-xs font-semibold text-[var(--muted)]">{detail}</p>
       </div>
       <div className="mt-3">{children}</div>

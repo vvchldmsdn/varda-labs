@@ -5,6 +5,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import styles from "./today-interaction.module.css";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 export function HoldingDetailDrawer({ children, closeHref }: { children: ReactNode; closeHref: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -76,7 +78,7 @@ export function HoldingDetailDrawer({ children, closeHref }: { children: ReactNo
     >
       <div className={styles.dialogToolbar}>
         <span>{t("종목 상세", "Holding details")}</span>
-        <button ref={closeButtonRef} type="button" onClick={close} className={styles.closeButton} aria-label={t("종목 상세 닫기", "Close holding details")}><span>{t("닫기", "Close")}</span><X size={18} aria-hidden="true"/></button>
+        <CairnButton variant="ghost" ref={closeButtonRef} type="button" onClick={close} className={styles.closeButton} aria-label={t("종목 상세 닫기", "Close holding details")}><span>{t("닫기", "Close")}</span><X size={18} aria-hidden="true"/></CairnButton>
       </div>
       <div className={styles.dialogBody} data-holding-dialog-body>{children}</div>
     </dialog>

@@ -1,4 +1,6 @@
 import { ManagementElement, ManagementText } from "@/components/i18n/management-text";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 export type AnalysisJourneyItem = Readonly<{
   description: string;
   href: `#${string}`;
@@ -59,7 +61,7 @@ export function AnalysisJourneyNav({
       data-analysis-journey-nav
     >
       <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold text-[var(--ink)]"><ManagementText>{title}</ManagementText></h2>
+        <CairnSectionTitle className="text-sm font-semibold text-[var(--ink)]"><ManagementText>{title}</ManagementText></CairnSectionTitle>
       </div>
       <nav className="grid border-t border-[var(--wash)] sm:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => (

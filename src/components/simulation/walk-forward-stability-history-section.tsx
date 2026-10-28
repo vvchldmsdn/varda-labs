@@ -1,5 +1,7 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationWalkForwardStabilityHistoryResult } from "@/lib/simulation-walk-forward-stability-history";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type StabilityRow = SimulationWalkForwardStabilityHistoryResult["rows"][number];
 
@@ -24,11 +26,11 @@ export function WalkForwardStabilityHistorySection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"같은 정책 반복 점검 · 겹치는 기간"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-lg font-semibold"
             id="walk-forward-stability-title"
           >
-            <SimulationText ko={"워크포워드 기준일 안정성"} />{" "}</h2>
+            <SimulationText ko={"워크포워드 기준일 안정성"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"선택 기준일과 직전 6개 날짜에 같은 60/10/3 정책을 독립적으로 적용합니다. 날짜에 따라 결과가 크게 달라지는지 확인하는 진단이며, 가장 좋은 날짜나 설정을 고르는 기능이 아닙니다."} />{" "}</p>
         </div>

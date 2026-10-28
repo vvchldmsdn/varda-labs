@@ -1,5 +1,7 @@
 "use client";
 
+import { useActionFormReset } from "@/components/cairn-ui/client";
+
 import { ManagementText } from "@/components/i18n/management-text";
 import { useActionState } from "react";
 import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
@@ -9,6 +11,8 @@ import type {
   HoldingAnalysisDataPreparationActionState,
   HoldingAnalysisDataReadiness,
 } from "@/lib/holding-analysis-data-readiness";
+import { Button as CairnButton, Form as CairnForm , Status as CairnStatus } from "@/components/cairn-ui";
+
 
 const INITIAL_STATE: HoldingAnalysisDataPreparationActionState = Object.freeze({
   status: "idle",
@@ -26,6 +30,7 @@ export function HoldingAnalysisDataForm({
     prepareHoldingAnalysisData,
     INITIAL_STATE,
   );
+  const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state);
   const messageId = `holding-analysis-data-${holdingId}`;
   const collectionState = useMarketCollectionPolling(state.status === "queued" && readiness?.state !== "ready", state, true);
 
@@ -50,19 +55,19 @@ export function HoldingAnalysisDataForm({
         </>
       ) : null}
       {readiness.canPrepare ? (
-        <form action={action} className="mt-2">
+        <CairnForm action={action} className="mt-2" onReset={actionFormOnReset} ref={actionFormRef}>
           <input name="holdingId" type="hidden" value={holdingId} />
-          <button
+          <CairnButton variant="primary"
             aria-describedby={messageId}
             className="rounded-md border border-[var(--faint)] bg-white px-2.5 py-1.5 font-semibold text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={pending}
             type="submit"
           >
             <ManagementText>{pending ? "가격 확인 중" : "과거 가격 준비"}</ManagementText>
-          </button>
-        </form>
+          </CairnButton>
+        </CairnForm>
       ) : null}
-      <p
+      <CairnStatus as="p" tone={state.status === "success" ? "success" : state.message ? "warning" : "neutral"}
         aria-live="polite"
         className={[
           "mt-1 min-h-4 leading-5",
@@ -73,7 +78,7 @@ export function HoldingAnalysisDataForm({
         id={messageId}
       >
         <ManagementText>{collectionState === "waiting" ? "준비 요청이 대기 중입니다. 과거 가격 준비를 눌러 다시 확인할 수 있습니다." : state.message}</ManagementText>
-      </p>
+      </CairnStatus>
     </div>
   );
 }

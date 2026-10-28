@@ -7,6 +7,8 @@ import styles from "./auth-experience.module.css";
 import { AuthOrbit } from "./auth-orbit";
 import { LanguageSwitch } from "@/components/i18n/language-switch";
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { PageHeader, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function AuthShell({
   children,
@@ -41,7 +43,7 @@ export function AuthShell({
       <div className={`${styles.stage} ${compact ? styles.compactStage : ""}`}>
         {!compact ? <aside className={styles.introduction}>
           <p className={styles.introEyebrow}>A CLEARER VIEW OF YOUR WEALTH</p>
-          <h2><AuthText>{"나의 자산을,"}</AuthText><br /><AuthText>{"더 선명하게."}</AuthText></h2>
+          <CairnSectionTitle><AuthText>{"나의 자산을,"}</AuthText><br /><AuthText>{"더 선명하게."}</AuthText></CairnSectionTitle>
           <p><AuthText>{"흩어진 자산의 오늘을 살펴보고,"}</AuthText><br /><AuthText>{"기록을 바탕으로 다음을 계획하세요."}</AuthText></p>
           <AuthOrbit />
           <div className={styles.introFeatures}>
@@ -72,10 +74,8 @@ export function AuthHeading({
   description: ReactNode;
 }) {
   return (
-    <header className={styles.heading}>
-      <p className={styles.eyebrow}>{eyebrow}</p>
-      <h1><AuthText>{title}</AuthText></h1>
-      <p className={styles.description}><AuthText>{description}</AuthText></p>
-    </header>
+    <PageHeader className={styles.heading} eyebrow={eyebrow}
+      title={<AuthText>{title}</AuthText>}
+      description={<AuthText>{description}</AuthText>} />
   );
 }

@@ -9,6 +9,8 @@ import { authErrorMessage } from "@/lib/auth/auth-error-message";
 import { AUTH_PASSWORD_RESET_PATH } from "@/lib/auth/auth-methods";
 import { AuthPasswordField } from "./auth-password-field";
 import styles from "./auth-experience.module.css";
+import { Button as CairnButton, Field as CairnField, Fieldset as CairnFieldset, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export type EmailRecoveryMode =
   | "forgot-password"
@@ -97,8 +99,8 @@ export function EmailRecoveryForm({
   if (resetting && sent)
     return (
       <div className={styles.stack}>
-        <p className={styles.verificationState} role="status">
-          <Check size={20} aria-hidden="true" /><AuthText>{"비밀번호를 변경했습니다."}</AuthText></p>
+        <CairnStatus as="p" tone="neutral" className={styles.verificationState} role="status">
+          <Check size={20} aria-hidden="true" /><AuthText>{"비밀번호를 변경했습니다."}</AuthText></CairnStatus>
         <Link href="/auth/sign-in" className={styles.primaryButton}><AuthText>{"로그인"}</AuthText><ArrowRight size={16} aria-hidden="true" />
         </Link>
       </div>
@@ -106,7 +108,7 @@ export function EmailRecoveryForm({
   if (resetting && !token && !preview)
     return (
       <div className={styles.stack}>
-        <p className={styles.notice} role="alert"><AuthText>{"유효한 재설정 링크가 필요합니다. 새 메일을 요청해 주세요."}</AuthText></p>
+        <CairnStatus as="p" tone="danger" className={styles.notice} role="alert"><AuthText>{"유효한 재설정 링크가 필요합니다. 새 메일을 요청해 주세요."}</AuthText></CairnStatus>
         <Link href="/auth/forgot-password" className={styles.primaryButton}><AuthText>{"재설정 메일 요청"}</AuthText></Link>
       </div>
     );
@@ -116,7 +118,7 @@ export function EmailRecoveryForm({
       className={styles.emailForm}
       aria-label={resetting ? "비밀번호 재설정" : "인증 메일 요청"}
     >
-      <fieldset
+      <CairnFieldset
         className={styles.form}
         disabled={pending || (!enabled && !preview)}
       >
@@ -135,7 +137,7 @@ export function EmailRecoveryForm({
           </>
         ) : (
           <div className={styles.field}>
-            <label htmlFor="recovery-email"><AuthText>{"이메일"}</AuthText></label>
+            <CairnField htmlFor="recovery-email"><AuthText>{"이메일"}</AuthText></CairnField>
             <AuthElement as="input"
               id="recovery-email"
               name="email"
@@ -152,19 +154,19 @@ export function EmailRecoveryForm({
           </div>
         )}
         {sent && !resetting ? (
-          <p className={styles.notice} role="status"><AuthText>{"입력한 이메일에 연결된 계정이 있다면 안내 메일을 보냈습니다. 스팸함도 확인해 주세요."}</AuthText></p>
+          <CairnStatus as="p" tone="neutral" className={styles.notice} role="status"><AuthText>{"입력한 이메일에 연결된 계정이 있다면 안내 메일을 보냈습니다. 스팸함도 확인해 주세요."}</AuthText></CairnStatus>
         ) : null}
         {error ? (
-          <p className={styles.error} role="alert">
+          <CairnStatus as="p" tone="danger" className={styles.error} role="alert">
             <AuthText>{error}</AuthText>
-          </p>
+          </CairnStatus>
         ) : null}
         {notice ? (
-          <p className={styles.notice} role="status">
+          <CairnStatus as="p" tone="neutral" className={styles.notice} role="status">
             <AuthText>{notice}</AuthText>
-          </p>
+          </CairnStatus>
         ) : null}
-        <button
+        <CairnButton variant="primary"
           type="submit"
           disabled={seconds > 0}
           className={styles.primaryButton}
@@ -188,8 +190,8 @@ export function EmailRecoveryForm({
           ) : (
             <ArrowRight size={17} aria-hidden="true" />
           )}
-        </button>
-      </fieldset>
+        </CairnButton>
+      </CairnFieldset>
       {!enabled && !preview ? (
         <p className={styles.note}><AuthText>{"이메일 인증은 준비 중입니다."}</AuthText></p>
       ) : null}

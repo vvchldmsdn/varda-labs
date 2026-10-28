@@ -19,12 +19,14 @@ export function InvestmentLabComparisonChart({
   rows,
   scenarioLabel,
   title,
+  palette = { actual: "var(--ink)", scenario: "var(--negative)", axis: "var(--line)", surface: "var(--surface)" },
 }: {
   chartId: string;
   description: string;
   rows: readonly InvestmentLabComparisonChartRow[];
   scenarioLabel: string;
   title: string;
+  palette?: { actual: string; scenario: string; axis: string; surface: string };
 }) {
   const values = rows.flatMap((row) => [
     row.actualMarketValueKrw,
@@ -52,8 +54,8 @@ export function InvestmentLabComparisonChart({
   return (
     <div>
       <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--muted)]">
-        <Legend color="var(--ink)" label="실제 포트폴리오" />
-        <Legend color="var(--negative)" label={scenarioLabel} />
+        <Legend color={palette.actual} label="실제 포트폴리오" />
+        <Legend color={palette.scenario} label={scenarioLabel} />
         <span><LabText value="원 표시는 지연 체결 비교일" /></span>
       </div>
       <svg
@@ -73,7 +75,7 @@ export function InvestmentLabComparisonChart({
               x2={WIDTH - PADDING_X}
               y1={lineY}
               y2={lineY}
-              stroke="var(--line)"
+              stroke={palette.axis}
               strokeDasharray="4 6"
               strokeWidth="1"
             />
@@ -82,7 +84,7 @@ export function InvestmentLabComparisonChart({
         <polyline
           fill="none"
           points={actualPoints}
-          stroke="var(--ink)"
+          stroke={palette.actual}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
@@ -90,7 +92,7 @@ export function InvestmentLabComparisonChart({
         <polyline
           fill="none"
           points={scenarioPoints}
-          stroke="var(--negative)"
+          stroke={palette.scenario}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="4"
@@ -101,9 +103,9 @@ export function InvestmentLabComparisonChart({
               key={row.serviceDate}
               cx={x(index)}
               cy={y(row.scenarioMarketValueKrw)}
-              fill="var(--surface)"
+              fill={palette.surface}
               r="7"
-              stroke="var(--negative)"
+              stroke={palette.scenario}
               strokeWidth="3"
             />
           ) : null,

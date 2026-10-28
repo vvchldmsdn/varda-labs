@@ -9,7 +9,11 @@ const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const accountId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const scope = { kind: "account", key: `account:${accountId}`, label: "Fixture", accountId, accountCode: "brokerage" };
 let currentQuery = new URLSearchParams();
+const [{ HistoryTimeExplorer }] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx"], {});
 const routingPorts = {
+  "@/components/recovered-return-section": { RecoveredHistoryExplorer: HistoryTimeExplorer },
+  "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => { throw new Error("Unexpected history UI tenant read"); } },
+  "@/db/queries/period-return-recovery": { readRecoveredReturnCurve: async () => { throw new Error("Unexpected history UI recovery read"); } },
   "next/link": { default: ({ href, children, ...props }) => { delete props.prefetch; delete props.scroll; return React.createElement("a", { ...props, href }, children); } },
   "next/navigation": { useSearchParams: () => currentQuery, useRouter: () => ({ push() {}, replace() {} }), usePathname: () => "/history" },
   "@/components/portfolio-primary-navigation": { PortfolioPrimaryNavigation: () => React.createElement("nav", null, "Fixture navigation") },

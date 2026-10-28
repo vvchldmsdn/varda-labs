@@ -1,4 +1,6 @@
 import "server-only";
+import { loadNativeInvestmentBasis } from "./native-investment-basis";
+
 import { loadNativeLegacyTrades, loadNativeHoldingCosts } from "./native-legacy-trades";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
@@ -310,6 +312,11 @@ async function loadDashboardContextSources({
     serviceDate,
   );
 
+  let investmentBasis: Awaited<ReturnType<typeof loadNativeInvestmentBasis>> = [];
+  if (allAccountRows.some(row => row.nativeState != null)) {
+    try { investmentBasis = await loadNativeInvestmentBasis(tenantContext); }
+    catch { /* Preserve current valuation; unavailable cost is never fabricated. */ }
+  }
   return {
     accountRows,
     assetGroupRows,
@@ -324,10 +331,10 @@ async function loadDashboardContextSources({
     historyAssetIds,
     recentPortfolioRows,
     nativeHoldingCosts: allAccountRows.some(row => row.nativeState != null)
-      ? await loadNativeHoldingCosts(tenantContext) : [],
+      ? await loadNativeHoldingCosts(tenantContext, { investmentBasis }) : [],
     eventRows: [
       ...eventRows.filter(row => row.nativeData == null),
-      ...(allAccountRows.some(row => row.nativeState != null) ? await loadNativeLegacyTrades(tenantContext) : [])
+      ...(allAccountRows.some(row => row.nativeState != null) ? await loadNativeLegacyTrades(tenantContext, { investment: true, investmentBasis }) : [])
         .filter(row => row.eventDate <= serviceDate && row.accountId && (wholeAccountIds.includes(row.accountId) || (row.assetId && directAssetIds.has(row.assetId)))),
     ],
     unmatchedSnapshotCountRows,

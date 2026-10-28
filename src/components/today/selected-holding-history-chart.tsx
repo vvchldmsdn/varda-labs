@@ -15,6 +15,8 @@ import {
 } from "@/components/home/portfolio-format";
 import type { TodayHoldingHistoryPoint } from "@/lib/today-movement-view";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const WIDTH = 900;
 const HEIGHT = 250;
@@ -47,9 +49,9 @@ export function SelectedHoldingHistoryChart({
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">HOLDING HISTORY</p>
-          <h3 className="mt-1 text-base font-medium">
+          <CairnSectionTitle level="h3" className="mt-1 text-base font-medium">
             {<T ko={basis === "normalized_return" ? "종목 흐름" : "평가액 흐름"} en={translateHomeHistory(basis === "normalized_return" ? "종목 흐름" : "평가액 흐름")}/>}
-          </h3>
+          </CairnSectionTitle>
         </div>
         <p className="text-xs text-[var(--muted)]">
           {<T ko={basis === "normalized_return"

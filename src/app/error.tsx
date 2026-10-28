@@ -4,6 +4,8 @@ import { ManagementText } from "@/components/i18n/management-text";
 import Link from "next/link";
 import { RotateCcw } from "lucide-react";
 import { useEffect } from "react";
+import { Button as CairnButton, PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export default function AppError({
   error,
@@ -22,15 +24,15 @@ export default function AppError({
         <p className="text-xs font-semibold text-[var(--muted)]">CAIRN LABS / RECOVERY</p>
         <section className="max-w-2xl py-20" aria-labelledby="app-error-title">
           <p className="text-xs text-[var(--brand)]"><ManagementText>{"요청을 끝까지 처리하지 못했습니다"}</ManagementText></p>
-          <h1 id="app-error-title" className="mt-4 text-3xl font-semibold sm:text-5xl"><ManagementText>{"이 화면만 다시 불러옵니다."}</ManagementText></h1>
+          <CairnPageTitle id="app-error-title" className="mt-4 text-3xl font-semibold sm:text-5xl"><ManagementText>{"이 화면만 다시 불러옵니다."}</ManagementText></CairnPageTitle>
           <p className="mt-5 max-w-xl text-sm leading-7 text-[var(--muted)]"><ManagementText>{"저장된 포트폴리오 데이터는 변경하지 않았습니다. 같은 문제가 반복되면 아래 확인 코드를 함께 알려 주세요."}</ManagementText></p>
           {error.digest ? (
             <p className="mt-4 font-mono text-xs text-[var(--faint)]"><ManagementText>{"확인 코드"}</ManagementText><ManagementText>{error.digest}</ManagementText>
             </p>
           ) : null}
           <div className="mt-8 flex flex-wrap gap-3">
-            <button className="varda-action" onClick={reset} type="button">
-              <RotateCcw size={16} aria-hidden="true" /><ManagementText>{"다시 시도"}</ManagementText></button>
+            <CairnButton variant="primary" className="varda-action" onClick={reset} type="button">
+              <RotateCcw size={16} aria-hidden="true" /><ManagementText>{"다시 시도"}</ManagementText></CairnButton>
             <Link className="varda-action" href="/"><ManagementText>{"홈으로"}</ManagementText></Link>
           </div>
         </section>

@@ -99,6 +99,34 @@ const LEGACY_EXCLUDED_TRANSITION = {
 
 export const TENANT_WRITER_REGISTRY = [
   {
+    id: "session_contribution_effects", classification: "user_owned", authorization: "server_verified_session",
+    entrypoints: ["/api/contribution-effects"],
+    implementationPaths: ["src/db/contribution-effect-sql.ts"],
+    targets: [userTarget("contribution_effects", "insert", "update")],
+    transition: USER_API_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "contribution_effects_release_migration", classification: "admin_system", authorization: "migration_cli",
+    entrypoints: ["scripts/migrate-contribution-effects.mjs"],
+    implementationPaths: ["scripts/migrate-contribution-effects.mjs"],
+    targets: [adminTarget("drizzle.__drizzle_migrations", "insert")],
+    transition: SHARED_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "instrument_catalog_refresh", classification: "shared_reference", authorization: "migration_cli",
+    entrypoints: ["scripts/refresh-instrument-catalog.mjs"],
+    implementationPaths: ["scripts/lib/instrument-catalog-refresh.mjs"],
+    targets: [sharedTarget("instrument_catalog", "insert", "update")],
+    transition: SHARED_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
+  },
+  {
+    id: "missing_raw_close_collection", classification: "mixed", authorization: "machine_admin",
+    entrypoints: ["src/lib/market-data/kis-missing-raw-write.ts"],
+    implementationPaths: ["src/lib/market-data/kis-missing-raw-write.ts"],
+    targets: [sharedTarget("asset_price_snapshots", "insert"), adminTarget("market_data_sync_runs", "insert")],
+    transition: SHARED_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "approved_broker_evidence_recovery",
     classification: "user_owned",
     authorization: "migration_cli",

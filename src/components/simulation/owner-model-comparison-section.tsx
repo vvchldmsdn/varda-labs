@@ -6,6 +6,8 @@ import {
   resolveResearchFanChartValueDomain,
 } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyComparison = Extract<
   SimulationOwnerModelComparisonResult,
@@ -30,8 +32,8 @@ export function OwnerModelComparisonSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"같은 보유 비중 · 다른 확률 가정"} />{" "}</p>
-          <h2 className="mt-1 text-lg font-semibold" id="owner-model-comparison-title">
-            <SimulationText ko={"두 확률모형 비교"} />{" "}</h2>
+          <CairnSectionTitle className="mt-1 text-lg font-semibold" id="owner-model-comparison-title">
+            <SimulationText ko={"두 확률모형 비교"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"과거 수익률 구간을 다시 뽑는 모형과 환율·금리 관계를 추정하는 모형을 같은 계정·기준일·기간에서 나란히 봅니다. 어느 한쪽을 정답으로 고르거나 두 확률을 평균내지 않습니다."} />{" "}</p>
         </div>
@@ -112,9 +114,9 @@ function ReadyModelComparison({ result }: { result: ReadyComparison }) {
             className="overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]"
             key={model.id}
           >
-            <h3 className="border-b border-[var(--line)] px-4 py-3 font-semibold">
+            <CairnSectionTitle level="h3" className="border-b border-[var(--line)] px-4 py-3 font-semibold">
               {model.name}
-            </h3>
+            </CairnSectionTitle>
             <SimulationTerminalRiskMetrics compact terminal={model.terminal} />
             <ResearchFanChart execution={model} valueDomain={valueDomain} />
           </article>

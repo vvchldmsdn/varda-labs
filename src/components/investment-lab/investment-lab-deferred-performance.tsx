@@ -2,6 +2,8 @@
 
 import { LabText } from "./lab-text";
 import dynamic from "next/dynamic";
-const Details = dynamic(() => import("./investment-lab-performance-resource"), { loading: () => <p role="status" className="py-4 text-sm"><LabText value="계산 근거를 불러오고 있습니다." /></p> });
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
+const Details = dynamic(() => import("./investment-lab-performance-resource"), { loading: () => <CairnStatus as="p" tone="neutral" role="status" className="py-4 text-sm"><LabText value="계산 근거를 불러오고 있습니다." /></CairnStatus> });
 /** Mounted by the already-open performance dialog, never by its closed shell. */
 export function InvestmentLabDeferredPerformance() { return <Details />; }

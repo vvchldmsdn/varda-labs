@@ -1,5 +1,6 @@
 "use client";
-import {createElement,type JSX,type ReactNode} from "react";
+import {type JSX,type ReactNode} from "react";
+import { createLocalizedUiElement } from "./native-ui-element";
 import {useI18n} from "./locale-provider";
 import {translateManagementCopy} from "@/lib/i18n/management-copy";
 
@@ -13,5 +14,5 @@ export function ManagementElement<Tag extends keyof JSX.IntrinsicElements>({as,.
   if(locale === "en") for(const key of ["aria-label","title","placeholder","alt"]) {
     if(typeof attributes[key] === "string") attributes[key]=translateManagementCopy(attributes[key]);
   }
-  return createElement(as,attributes);
+  return createLocalizedUiElement(as,attributes);
 }

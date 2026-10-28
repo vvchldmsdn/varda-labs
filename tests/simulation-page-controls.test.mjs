@@ -103,6 +103,8 @@ test("simulation page returns authenticated controls while owner research is pen
   let scopeAllowed = true;
   const component = () => null;
   const ports = {
+    "@/components/simulation/simulation-price-evidence": { SimulationPriceEvidence: component },
+    "@/components/cairn-ui": { Status: component },
     "@/lib/server/simulation-path-details": { registerTenantSimulationPath: () => { throw new Error("detail registration must wait for the execution"); } },
     "@/lib/simulation-path-snapshot": { bootstrapPathSnapshot: () => { throw new Error("snapshot must wait for the execution"); }, economicPathSnapshot: () => { throw new Error("snapshot must wait for the execution"); } },
     "@/db/queries/native-portfolio-ledger": { requiresNativePortfolioSurface: async () => false },

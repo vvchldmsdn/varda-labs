@@ -2,6 +2,8 @@ import { LabText } from "./lab-text";
 import type { InvestmentLabCashComparison } from "@/lib/investment-lab-cash-comparison";
 
 import { InvestmentLabComparisonChart } from "./investment-lab-comparison-chart";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabCashComparisonView({
   comparison,
@@ -15,7 +17,7 @@ export function InvestmentLabCashComparisonView({
         data-cash-comparison-status="unavailable"
         data-section="investment-lab-cash-comparison"
       >
-        <h2 className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 제로수익 동일흐름 기준선 " /></h2>
+        <CairnSectionTitle className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 제로수익 동일흐름 기준선 " /></CairnSectionTitle>
         <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" 동일 자금 흐름으로 제로수익 기준선을 계산할 수 없습니다. " /></p>
       </section>
     );
@@ -35,7 +37,7 @@ export function InvestmentLabCashComparisonView({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold"><LabText value="제로수익 동일흐름 기준선" /></h2>
+          <CairnSectionTitle className="text-lg font-semibold"><LabText value="제로수익 동일흐름 기준선" /></CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 첫 평가액과 실제 매수·매도 원화 금액은 같게 두고, 가격 수익은 0%라고 가정합니다. " /></p>
         </div>
         <p className="text-sm font-semibold text-[var(--brand)]"><LabText value="계산 완료" /></p>

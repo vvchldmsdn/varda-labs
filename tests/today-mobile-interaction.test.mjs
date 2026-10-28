@@ -134,8 +134,13 @@ async function drawerHarness(test) {
   document.querySelectorAll = () => [fallback];
   const dialog = { open: false, showModal() { this.open = true; }, close() { this.open = false; },
     getBoundingClientRect: () => ({ left: 24, top: 40, right: 366, bottom: 804 }), querySelectorAll: () => [closeButton, lastControl] };
-  Object.defineProperty(globalThis, "document", { configurable: true, value: document });
-  Object.defineProperty(globalThis, "HTMLElement", { configurable: true, value: Element });
+  Object.defineProperty(globalThis, "document", { configurable: true, writable: true, value: document });
+  Object.defineProperty(globalThis, "HTMLElement", { configurable: true, writable: true, value: Element });
+  let cleanup;
+  test.after(() => {
+    cleanup?.();
+    for (const [key, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; }
+  });
   const [component] = await importUiWithPorts(["src/components/today/holding-detail-drawer.tsx"], {
     ...copyPorts, "next/navigation": { useRouter: () => ({ push: (...args) => pushes.push(args) }) }, "lucide-react": { X: () => null },
     react: { useRef: initial => ({ current: initial }), useEffect: callback => { effects.push(callback); } },
@@ -145,11 +150,6 @@ async function drawerHarness(test) {
   const closeControl = elements(tree).find(element => element.type === "button");
   tree.props.ref.current = dialog;
   closeControl.props.ref.current = closeButton;
-  let cleanup;
-  test.after(() => {
-    cleanup?.();
-    for (const [key, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; }
-  });
   return { tree, dialog, document, trigger, fallback, closeButton, closeControl, lastControl, pushes, closeHref,
     mount() { cleanup = effects[0](); }, pointer(clientX, clientY, target = dialog) { return { clientX, clientY, target, currentTarget: dialog }; } };
 }

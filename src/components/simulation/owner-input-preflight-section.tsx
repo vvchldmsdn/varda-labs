@@ -5,6 +5,8 @@ import type {
   PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
 import type { SimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function OwnerInputPreflightSection({
   model,
@@ -32,8 +34,8 @@ export function OwnerInputPreflightSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"로그인 사용자 보유종목 기준"} />{" "}</p>
-          <h2 className="mt-1 text-lg font-semibold" id="owner-simulation-input-title">
-            <SimulationText ko={"내 포트폴리오 입력 점검"} />{" "}</h2>
+          <CairnSectionTitle className="mt-1 text-lg font-semibold" id="owner-simulation-input-title">
+            <SimulationText ko={"내 포트폴리오 입력 점검"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"현재 보유 구성과 저장된 과거 가격 이력을 계좌별로 점검합니다. 이 비중은 아래의 일회성 연구 계산에만 사용하며 저장된 목표 비중, 최적화, 추천 또는 주문 근거로 사용하지 않습니다."} />{" "}</p>
         </div>
@@ -139,7 +141,7 @@ export function OwnerInputPreflightSection({
 
       {model.valuationGaps.length > 0 ? (
         <div className="mt-4" data-owner-simulation-valuation-gaps>
-          <h3 className="text-sm font-semibold"><SimulationText ko={"평가액을 확인하지 못한 보유종목"} /></h3>
+          <CairnSectionTitle level="h3" className="text-sm font-semibold"><SimulationText ko={"평가액을 확인하지 못한 보유종목"} /></CairnSectionTitle>
           <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.valuationGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>
@@ -152,7 +154,7 @@ export function OwnerInputPreflightSection({
 
       {model.identityGaps.length > 0 ? (
         <div className="mt-4" data-owner-simulation-identity-gaps>
-          <h3 className="text-sm font-semibold"><SimulationText ko={"종목 식별을 완료하지 못한 보유종목"} /></h3>
+          <CairnSectionTitle level="h3" className="text-sm font-semibold"><SimulationText ko={"종목 식별을 완료하지 못한 보유종목"} /></CairnSectionTitle>
           <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.identityGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>

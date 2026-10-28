@@ -6,6 +6,8 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import type { CalculationGuideDefinition, GuideCopy } from "./calculation-guide-types";
 import styles from "./calculation-guide.module.css";
 import { MethodDetails } from "./method-details";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export default function CalculationGuide({ guide }: { guide: CalculationGuideDefinition }) {
   const { locale, t } = useI18n();
@@ -32,10 +34,10 @@ export default function CalculationGuide({ guide }: { guide: CalculationGuideDef
     {guide.methodTopic ? <MethodDetails topic={guide.methodTopic} /> : null}
     <ol ref={stepsRef} className={styles.steps} aria-label={t("계산 순서", "Calculation steps")}>
       {guide.steps.map((item, index) => <li key={item.id}>
-        <button type="button" aria-current={index === stepIndex ? "step" : undefined} aria-controls={panelId} onClick={() => showStep(index)}>
+        <CairnButton variant="secondary" type="button" aria-current={index === stepIndex ? "step" : undefined} aria-controls={panelId} onClick={() => showStep(index)}>
           <span className={styles.number}>{String(index + 1).padStart(2, "0")}</span>
           <span>{copy(item.label)}</span>
-        </button>
+        </CairnButton>
       </li>)}
     </ol>
 
@@ -43,7 +45,7 @@ export default function CalculationGuide({ guide }: { guide: CalculationGuideDef
       <article key={step.id} className={styles.stage}>
         <div className={styles.explanation}>
           <p className={styles.kicker}>{t("계산 과정", "HOW IT WORKS")} · {stepIndex + 1} / {guide.steps.length}</p>
-          <h3>{copy(step.title)}</h3>
+          <CairnSectionTitle level="h3">{copy(step.title)}</CairnSectionTitle>
           <p>{copy(step.body)}</p>
           {step.example ? <div className={styles.example}><strong>{copy(step.example.label)}</strong><p>{copy(step.example.body)}</p></div> : null}
         </div>
@@ -62,9 +64,9 @@ export default function CalculationGuide({ guide }: { guide: CalculationGuideDef
     </div>
     {step.detail ? <details className={styles.detail} key={step.id}><summary>{t("정확한 계산 방식 보기", "See the exact method")}</summary><p>{copy(step.detail)}</p></details> : null}
     <nav className={styles.pager} aria-label={t("설명 단계 이동", "Guide navigation")}>
-      <button type="button" disabled={stepIndex === 0} onClick={() => showStep(Math.max(0, stepIndex - 1))}><ArrowLeft size={16} aria-hidden="true" />{t("이전", "Previous")}</button>
+      <CairnButton variant="secondary" type="button" disabled={stepIndex === 0} onClick={() => showStep(Math.max(0, stepIndex - 1))}><ArrowLeft size={16} aria-hidden="true" />{t("이전", "Previous")}</CairnButton>
       <span>{stepIndex + 1} / {guide.steps.length}</span>
-      <button type="button" disabled={stepIndex === guide.steps.length - 1} onClick={() => showStep(Math.min(guide.steps.length - 1, stepIndex + 1))}>{t("다음", "Next")}<ArrowRight size={16} aria-hidden="true" /></button>
+      <CairnButton variant="secondary" type="button" disabled={stepIndex === guide.steps.length - 1} onClick={() => showStep(Math.min(guide.steps.length - 1, stepIndex + 1))}>{t("다음", "Next")}<ArrowRight size={16} aria-hidden="true" /></CairnButton>
     </nav>
     {guide.notes?.length ? <details className={styles.detail}>
       <summary>{t("용어와 해석할 때 주의할 점", "Terms and interpretation")}</summary>

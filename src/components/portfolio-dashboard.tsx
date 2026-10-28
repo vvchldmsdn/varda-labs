@@ -1,4 +1,5 @@
 import { QuickTradeActions } from "@/components/quick-trade-actions";
+import { RecoveredPortfolioHistoryChart } from "@/components/recovered-return-section";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
 
@@ -11,7 +12,7 @@ import styles from "@/components/home/portfolio-overview.module.css";
 
 import { FxImpactPopover } from "@/components/home/fx-impact-popover";
 import { HoldingMovementHeatmap } from "@/components/home/holding-movement-heatmap";
-import { PortfolioHistoryChart } from "@/components/home/portfolio-history-chart";
+
 import {
   formatDate,
   formatKrw,
@@ -31,6 +32,8 @@ import {
   type PortfolioAnalysisScope,
   type PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function PortfolioDashboard({
   data,
@@ -79,7 +82,7 @@ export function PortfolioDashboard({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.stage}>
           <header className={styles.stageHeader}>
-            <h1 id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></h1>
+            <CairnPageTitle id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></CairnPageTitle>
             <div className={styles.stageScope}>
             <PortfolioAnalysisScopeTabs
               basePath="/"
@@ -100,7 +103,7 @@ export function PortfolioDashboard({
           <div className={styles.homeStageMain}>
           <section className={styles.stageSummary} aria-labelledby="portfolio-overview-title">
             <div className={styles.balance}>
-              <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="현재 평가액" en="Current value"/></span>
+              <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="투자자산 평가액" en="Invested asset value"/></span>
               <strong>{<T ko={formatKrw(data.totalValueKrw)} en={translateHomeHistory(formatKrw(data.totalValueKrw))}/>}</strong>
               <p><T ko={`${data.holdings.length}개 보유 종목 · ${data.accountSummaries.length}개 계좌`} en={`${data.holdings.length} holdings · ${data.accountSummaries.length} accounts`}/></p>
             </div>
@@ -112,9 +115,9 @@ export function PortfolioDashboard({
               <dd className={styles.status}><T ko={baselineIsDelayed ? "마지막 기준일" : "기준일"} en={baselineIsDelayed ? "Last baseline" : "As of"}/> {<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</dd>
             </dl>
             <dl className={styles.summaryMetric}>
-              <dt><T ko="누적 수익률" en="Total return"/></dt>
+              <dt><T ko="투자자산 수익률" en="Investment return"/></dt>
               <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
-              <dd className={styles.status}>{data.totalReturnPct === null ? <T ko="원가·거래 근거 부족" en="Cost or trade evidence is incomplete" /> : <T ko={`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)} />}</dd>
+              <dd className={styles.status}><T ko="현금 제외 · " en="Excludes cash · " />{data.totalReturnPct === null ? <T ko="원가·거래 근거 부족" en="Cost or trade evidence is incomplete" /> : <T ko={`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)} />}</dd>
             </dl>
             <div className={`${styles.stageNote} ${baselineIsDelayed ? styles.stageWarning : ""}`}>
               <span><T ko={baselineIsDelayed ? "오늘 변동" : "오늘의 최대 기여"} en={baselineIsDelayed ? "Today's change" : "Largest contributor today"}/></span>
@@ -129,11 +132,12 @@ export function PortfolioDashboard({
           </div>
           </div>
 
+
           <footer className={styles.stageFooter}>
             <div className={styles.stageLaunchers}>
               <PresentationDialog label="평가액 흐름" labelEn={"Value history"} title="포트폴리오 평가액 흐름" titleEn={"Portfolio value history"} description="저장된 실제 평가액과 입출금·매매 기록을 함께 확인합니다." descriptionEn={"Review recorded portfolio values alongside cash flows and trades."} wide>
               <LocalizedElement as="section" en={{"aria-label": "Asset history"}} className={styles.chartPanel} aria-label="자산 이력">
-              <PortfolioHistoryChart
+              <RecoveredPortfolioHistoryChart accountId={!designPreview && data.selectedScope.kind === 'account' ? data.selectedScope.accountId : undefined}
                 key={data.selectedScope.key}
                 events={data.eventActivity.map((event) => ({
                   id: event.id,
@@ -154,7 +158,7 @@ export function PortfolioDashboard({
               <LocalizedElement as="aside" en={{"aria-label": "Today's changes and their sources"}} className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
               <div>
                 <div className={styles.panelHeader}>
-                  <h2 className={styles.panelTitle}><T ko="오늘의 핵심 근거" en="Today's key sources"/></h2>
+                  <CairnSectionTitle className={styles.panelTitle}><T ko="오늘의 핵심 근거" en="Today's key sources"/></CairnSectionTitle>
                   <LocalizedLink en={{"aria-label": translateHomeHistory("오늘 변동 상세 보기"), "title": translateHomeHistory("오늘 변동 상세 보기")}} className="varda-icon-button" href={scopedHref("/today", data.selectedScope.key, designPreview)} aria-label="오늘 변동 상세 보기" title="오늘 변동 상세 보기">
                     <ArrowUpRight aria-hidden="true" size={16} strokeWidth={1.6} />
                   </LocalizedLink>
@@ -189,7 +193,7 @@ export function PortfolioDashboard({
           </footer>
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
-          <h2><T ko="보유종목" en="Holdings" /></h2>
+          <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
           {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{row.name}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions assetId={row.id} name={row.name} quantity={String(row.quantity)} /></div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}

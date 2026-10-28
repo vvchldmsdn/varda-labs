@@ -1,3 +1,4 @@
+import { loadNativeInvestmentBasis } from "@/db/queries/native-investment-basis";
 import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
 import { getSnapshotFxExposureType } from "./fx-exposure";
@@ -606,12 +607,13 @@ export async function runDailySnapshot(
       { snapshotDate, eventIds: changedEventsAfterCutoff }, 409,
     );
   }
-  const nativeTrades = eventRows.some(row => row.nativeData != null) ? await loadNativeLegacyTrades(options.tenantContext, { asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [];
+  const investmentBasis = eventRows.some(row => row.nativeData != null) ? await loadNativeInvestmentBasis(options.tenantContext, cycle.cycleEndAt.toISOString(), Boolean(executionValuation)) : [];
+  const nativeTrades = eventRows.some(row => row.nativeData != null) ? await loadNativeLegacyTrades(options.tenantContext, { investment: true, investmentBasis, asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [];
   const calculationEvents = [...eventRows.filter(row => row.nativeData == null), ...nativeTrades.filter(row => row.eventDate <= snapshotDate)];
   const returnMetrics = buildReturnMetricsSummary(calculationEvents, investmentAssetRows, fx.usdKrw ?? 0, {
     asOfDate: snapshotDate,
     nativeHoldingCosts: eventRows.some(row => row.nativeData != null)
-      ? await loadNativeHoldingCosts(options.tenantContext, { asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [],
+      ? await loadNativeHoldingCosts(options.tenantContext, { investmentBasis, asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [],
   });
   const realizedReturn = buildRealizedReturnRunSummary(
     returnMetrics,

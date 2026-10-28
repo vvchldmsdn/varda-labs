@@ -12,6 +12,8 @@ import {
   type PortfolioAnalysisScopeKey,
   type PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const WIDTH = 1000;
 const HEIGHT = 300;
@@ -55,7 +57,7 @@ export function InvestmentLabObservedHistoryView({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold"><LabText value="선택 구간 관측 경로" /></h2>
+            <CairnSectionTitle className="text-lg font-semibold"><LabText value="선택 구간 관측 경로" /></CairnSectionTitle>
             <span className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-2 py-1 text-xs font-semibold text-[var(--warning)]"><LabText value=" 부분 표시 " /></span>
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 저장 방식이 바뀐 지점은 연결하지 않았습니다. 아래 선은 실제로 저장된 평가액만 표시하며, 비어 있는 날짜의 평균값 생성이나 외부 API 보충은 하지 않습니다. " /></p>

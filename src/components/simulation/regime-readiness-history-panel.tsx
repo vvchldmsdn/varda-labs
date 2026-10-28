@@ -1,5 +1,7 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationRegimeReadinessHistory } from "@/lib/simulation-regime-readiness-history";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function RegimeReadinessHistoryPanel({
   model,
@@ -17,11 +19,11 @@ export function RegimeReadinessHistoryPanel({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2
+          <CairnSectionTitle
             id="regime-readiness-history-title"
             className="text-lg font-semibold"
           >
-            <SimulationText ko={"체제 데이터 시점 검증"} />{" "}</h2>
+            <SimulationText ko={"체제 데이터 시점 검증"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"선택 기준일과 직전 6개 서비스 날짜를 독립적으로 점검합니다. 날짜를 자동으로 되돌리지 않으며, 사후 연구 가능 여부와 당시 실제 이용 가능성이 입증됐는지를 분리합니다."} />{" "}</p>
         </div>

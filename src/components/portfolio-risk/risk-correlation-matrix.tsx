@@ -6,6 +6,8 @@ import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfoli
 import { useState, type CSSProperties } from "react";
 import styles from "./risk-workspace.module.css";
 import stageStyles from "./risk-stage.module.css";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 type Instrument = Readonly<{ instrumentKey: string; ticker: string; names: readonly string[] }>;
 
@@ -39,7 +41,7 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
               const value = raw !== null && Number.isFinite(raw) ? raw : null;
               const isSelected = row === rowIndex && col === columnIndex;
               return <td key={column.instrumentKey} className={styles.correlationCell}>
-                <button type="button" tabIndex={isSelected ? 0 : -1} data-matrix-cell aria-label={pt(`${instrumentName(instrument)} / ${instrumentName(column)}: ${value === null ? "계산 근거 없음" : value.toFixed(2)}`)} aria-pressed={isSelected} data-crosshair={row === rowIndex || col === columnIndex} data-diagonal={row === col} onPointerEnter={(event) => { if (event.pointerType !== "touch") setSelected([row, col]); }} onFocus={() => setSelected([row, col])} onClick={() => setSelected([row, col])} onKeyDown={(event) => {
+                <CairnButton variant="selection" type="button" tabIndex={isSelected ? 0 : -1} data-matrix-cell aria-label={pt(`${instrumentName(instrument)} / ${instrumentName(column)}: ${value === null ? "계산 근거 없음" : value.toFixed(2)}`)} aria-pressed={isSelected} data-crosshair={row === rowIndex || col === columnIndex} data-diagonal={row === col} onPointerEnter={(event) => { if (event.pointerType !== "touch") setSelected([row, col]); }} onFocus={() => setSelected([row, col])} onClick={() => setSelected([row, col])} onKeyDown={(event) => {
                   const steps: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
                   const step = steps[event.key];
                   if (!step) return;
@@ -49,7 +51,7 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
                   event.currentTarget.closest("table")?.querySelectorAll<HTMLButtonElement>("[data-matrix-cell]")[nextRow * instruments.length + nextCol]?.focus();
                 }} style={{ background: correlationFill(value, row === col), "--cell-delay": `${Math.min(row + col, 12) * 18}ms` } as CSSProperties}>
                   {value === null ? "—" : value.toFixed(2)}
-                </button>
+                </CairnButton>
               </td>;
             })}
           </tr>)}</tbody>

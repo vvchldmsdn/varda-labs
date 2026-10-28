@@ -7,6 +7,8 @@ import { CurrencyResearchView } from "@/components/currency-research-view";
 import { currencyResearchFixture } from "@/lib/currency-research-fixture";
 import { getLocale } from "@/lib/i18n/server";
 import { isPlanId } from "@/lib/investment-plan";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Portfolio research | CAIRN LABS", robots: { index: false, follow: false } };
@@ -19,5 +21,5 @@ export default async function ReportingResearchPage({ searchParams }: { searchPa
   if (!resolution.ok) redirect("/auth/sign-in");
   const input = params.draft && !isPlanId(params.draft) ? null : await getSavedCurrencyResearch(resolution.tenantContext, params.draft);
   const en = await getLocale() === "en";
-  return <><SecondaryPageHeader researchHref={params.draft && isPlanId(params.draft) ? `/portfolio/research?draft=${encodeURIComponent(params.draft)}` : "/portfolio/research"} />{input ? <CurrencyResearchView evidence={input} /> : <main className="mx-auto max-w-4xl px-6 py-12"><h1 className="text-3xl">{en ? "Start with your assets" : "내 자산으로 시작하세요"}</h1><Link href="/try/analyze" className="mt-6 inline-block underline">{en ? "Enter amounts →" : "금액 입력하기 →"}</Link></main>}</>;
+  return <><SecondaryPageHeader researchHref={params.draft && isPlanId(params.draft) ? `/portfolio/research?draft=${encodeURIComponent(params.draft)}` : "/portfolio/research"} />{input ? <CurrencyResearchView evidence={input} /> : <main className="mx-auto max-w-4xl px-6 py-12"><CairnPageTitle className="text-3xl">{en ? "Start with your assets" : "내 자산으로 시작하세요"}</CairnPageTitle><Link href="/try/analyze" className="mt-6 inline-block underline">{en ? "Enter amounts →" : "금액 입력하기 →"}</Link></main>}</>;
 }

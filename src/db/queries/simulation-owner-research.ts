@@ -1,4 +1,5 @@
 import "server-only";
+import { simulationPriceFrontier } from "@/lib/shared-domain/market-data/kis-history-finalization";
 import { lazyValue } from "@/lib/lazy-value";
 
 import {
@@ -10,17 +11,17 @@ import {
   getReadOnlyPrivateOwnerRawHistoryValidationBatch,
 } from "@/db/queries/simulation-owner-private-history";
 import { buildSimulationOwnerHistoricalOutcomeValidation } from "@/lib/simulation-owner-historical-outcome-validation";
-import { buildSimulationOwnerInputCandidate } from "@/lib/simulation-owner-input-candidate";
-import { buildSimulationOwnerInputPreflightModel } from "@/lib/simulation-owner-input-preflight";
+import { buildSimulationOwnerInputCandidate } from "@/lib/shared-domain/simulation-owner-input-candidate";
+import { buildSimulationOwnerInputPreflightModel } from "@/lib/shared-domain/simulation-owner-input-preflight";
 import { buildSimulationOwnerCandidateComparison } from "@/lib/simulation-owner-candidate-comparison";
 import { buildSimulationOwnerWalkForwardValidation } from "@/lib/simulation-owner-walk-forward-validation";
 import {
   buildSimulationOwnerResearchExecution,
   resolveSimulationOwnerExecutionEndSelection,
   SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY,
-} from "@/lib/simulation-owner-research-execution";
-import { prepareSimulationResearchPaths } from "@/lib/simulation-research-execution-core";
-import { resolveSimulationResearchHorizon } from "@/lib/simulation-research-horizon";
+} from "@/lib/shared-domain/simulation-owner-research-execution";
+import { prepareSimulationResearchPaths } from "@/lib/shared-domain/simulation-research-execution-core";
+import { resolveSimulationResearchHorizon } from "@/lib/shared-domain/simulation-research-horizon";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -167,6 +168,11 @@ export async function getReadOnlyTenantSimulationOwnerResearch(
   return Object.freeze({
     inputPreflight,
     execution,
+    priceFrontier: simulationPriceFrontier({
+      endServiceDate: execution.source?.endServiceDate ?? null,
+      hasUs: candidate.selection?.instruments.some(row=>row.market==="us"&&row.weightBps>0)??false,
+      isLatest: endSelection.source==="latest_common_stored",now:options.now??new Date(),
+    }),
     preparedPaths,
     get candidateComparison() { return candidateComparison(); },
     get walkForwardValidation() { return walkForwardValidation(); },

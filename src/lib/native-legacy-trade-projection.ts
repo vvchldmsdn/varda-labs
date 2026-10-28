@@ -87,8 +87,10 @@ export function projectNativeLegacyTrade<T extends object>(
     const afterQuantity = Decimal.from(position.quantity);
     const beforeQuantity = afterQuantity.sub(quantityDelta);
     if (beforeQuantity.compare(0) < 0) return null;
-    const settlementKrw = execution.settlement.currency === "KRW" ? execution.settlement.amount : null;
-    let price = execution.executionUnitPrice?.amount ?? null;
+    const settlementKrw = execution.settlement?.currency === "KRW" ? execution.settlement.amount : null;
+    // Legacy consumers use price as a cash-flow fallback. Unknown settlement
+    // must never become quantity × displayed unit price; preserve reported price in nativeData.
+    let price = execution.settlement ? execution.executionUnitPrice?.amount ?? null : null;
     // An exact average of a known same-currency settlement is valid execution
     // evidence; a repeating rational average remains in nativeData instead.
     if (price === null && execution.average) {
@@ -128,7 +130,7 @@ export function projectNativeLegacyTrade<T extends object>(
       quantityDelta,
       amountKrw: settlementKrw,
       price,
-      fxRate: event.currency === "KRW" ? "1" : null,
+      fxRate: execution.settlement && event.currency === "KRW" ? "1" : null,
       beforeValue: { account: account.code, currency: event.currency, quantity: beforeQuantity.toExactString() },
       afterValue: {
         account: account.code, currency: event.currency, quantity: afterQuantity.toExactString(),
@@ -136,6 +138,7 @@ export function projectNativeLegacyTrade<T extends object>(
       },
       memo: null,
       nativeProjection,
+      nativeSettlementStatus: execution.settlement ? "confirmed" as const : "unconfirmed" as const,
       nativeCostBasisStatus,
       nativeRemainingCostKrw: remainingCostKrw,
       nativeData: entry.data,

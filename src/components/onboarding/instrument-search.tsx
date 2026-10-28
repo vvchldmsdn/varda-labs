@@ -3,6 +3,8 @@
 import { useEffect, useId, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { Button as CairnButton, Field as CairnField, Input as CairnInput } from "@/components/cairn-ui";
+
 
 export type InstrumentChoice = {
   id: string; name: string; ticker: string;
@@ -43,9 +45,9 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, preview, privateQuery]);
   return <div className="varda-instrument-search">
-    <label htmlFor={id}>{t(label?.ko ?? "어떤 종목을 가지고 있나요?", label?.en ?? "What do you hold?")}</label>
+    <CairnField htmlFor={id}>{t(label?.ko ?? "어떤 종목을 가지고 있나요?", label?.en ?? "What do you hold?")}</CairnField>
     <div className="varda-instrument-search-input"><Search size={20} aria-hidden="true" />
-      <input id={id} value={query} maxLength={80} disabled={disabled} autoComplete="off"
+      <CairnInput id={id} value={query} maxLength={80} disabled={disabled} autoComplete="off"
         placeholder={t("종목 이름 또는 티커 검색", "Search a name or ticker")}
         onChange={event => { setQuery(event.target.value); setResults([]); setStatus(event.target.value.trim() ? "loading" : "idle"); }}
         aria-describedby={`${id}-status`} />
@@ -57,9 +59,9 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
         status === "idle" && manualEntryAvailable ? t("등록된 한국·미국 종목을 검색합니다. 시장과 통화는 자동으로 채워집니다.", "Search the available Korean and US catalog. Market and currency are filled in for you.") : null}
     </div>
     {results.length > 0 && <ul className="varda-instrument-results" aria-label={t("검색 결과", "Search results")}>
-      {results.map(row => <li key={row.id}><button type="button" disabled={disabled} onClick={() => { onSelect(row); setQuery(""); setResults([]); setStatus("idle"); }}>
+      {results.map(row => <li key={row.id}><CairnButton variant="secondary" type="button" disabled={disabled} onClick={() => { onSelect(row); setQuery(""); setResults([]); setStatus("idle"); }}>
         <span><strong>{row.name}</strong><small>{row.ticker} · {row.market === "korea" ? "KR" : "US"} · {row.currency}</small></span><span>{row.assetType.toUpperCase()} ↗</span>
-      </button></li>)}
+      </CairnButton></li>)}
     </ul>}
   </div>;
 }

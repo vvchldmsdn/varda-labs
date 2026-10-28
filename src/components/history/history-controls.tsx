@@ -9,6 +9,8 @@ import {
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 
 import { historyLaneLabel } from "./history-format";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Select as CairnSelect } from "@/components/cairn-ui";
+
 
 export function HistoryControls({
   lane,
@@ -27,13 +29,13 @@ export function HistoryControls({
         scopes={scopes}
         selectedScopeKey={selectedScope.key}
       />
-      <form
+      <CairnForm
         action="/history"
         method="get"
         className="grid gap-3 sm:grid-cols-[220px_auto]"
       >
         <input type="hidden" name="scope" value={selectedScope.key} />
-        <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><T ko="기록 구분" en="Record type"/><select
+        <CairnField className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><T ko="기록 구분" en="Record type"/><CairnSelect
             name="lane"
             defaultValue={lane}
             className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)]"
@@ -43,15 +45,15 @@ export function HistoryControls({
                 {<T ko={historyLaneLabel(option)} en={translateHomeHistory(historyLaneLabel(option))}/>}
               </option>
             ))}
-          </select>
-        </label>
+          </CairnSelect>
+        </CairnField>
         <div className="flex items-end">
-          <button
+          <CairnButton variant="primary"
             type="submit"
             className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)]"
-          ><T ko="적용" en="Apply"/></button>
+          ><T ko="적용" en="Apply"/></CairnButton>
         </div>
-      </form>
+      </CairnForm>
     </div>
   );
 }

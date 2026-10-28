@@ -3,6 +3,7 @@
   "buildCommand": "npm run build:vercel",
   "git": {
     "deploymentEnabled": {
+      "integrate/cairn-master-20261028": false,
       "codex/ui-convergence-release": false,
       "codex/cutoff-release-20260928": false,
       "codex/bc-production-release-20260920": false,
@@ -21,6 +22,10 @@
     {
       "path": "/api/cron/simulation-executions",
       "schedule": "0 20 * * *"
+    },
+    {
+      "schedule": "15 5 * * *",
+      "path": "/api/cron/market-history/run"
     }
   ]
 }

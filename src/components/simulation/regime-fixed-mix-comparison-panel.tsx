@@ -4,6 +4,8 @@ import type { SimulationRegimeFixedMixComparisonResult } from "@/lib/simulation-
 
 import { resolveResearchFanChartValueDomain } from "./research-fan-chart";
 import { RegimeScenarioCard } from "./regime-scenario-card";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyComparison = Extract<
   SimulationRegimeFixedMixComparisonResult,
@@ -26,11 +28,11 @@ export function RegimeFixedMixComparisonPanel({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3
+          <CairnSectionTitle level="h3"
             id="regime-fixed-mix-comparison-title"
             className="text-base font-semibold"
           >
-            <SimulationText ko={"국면별 고정 비중 3안 공통 경로"} />{" "}</h3>
+            <SimulationText ko={"국면별 고정 비중 3안 공통 경로"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"25:75, 50:50, 75:25를 같은 시장 상태·과거 후보·500개 추출 계획으로 계산합니다. 최초 배분 뒤에는 리밸런싱하지 않아 종목별 등락에 따른 비중 변화를 그대로 둡니다."} />{" "}</p>
         </div>

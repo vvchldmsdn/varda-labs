@@ -21,6 +21,8 @@ import {
   type InvestmentLabFixedMixContributionResult,
 } from "@/lib/investment-lab-fixed-mix-contribution";
 import type { InvestmentLabFixedMixWeights } from "@/lib/investment-lab-fixed-mix-types";
+import { Button as CairnButton, Field as CairnField, Fieldset as CairnFieldset, Form as CairnForm, SectionTitle as CairnSectionTitle, Select as CairnSelect } from "@/components/cairn-ui";
+
 
 type ContributionSelectionId = InvestmentLabContributionScenarioId | "fixed_mix";
 type ContributionResult =
@@ -127,7 +129,7 @@ export function InvestmentLabContributionExperiment({
     >
       <div className="flex flex-col gap-1 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold"><LabText value="과거 추가 투입 효과 실험" /></h2>
+          <CairnSectionTitle className="text-lg font-semibold"><LabText value="과거 추가 투입 효과 실험" /></CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 선택한 관측일에 추가 원금이 고정 시나리오에 함께 반영됐다면 종료 평가액이 어떻게 달라졌는지 계산합니다. " /></p>
         </div>
         <p className="text-xs font-semibold text-[var(--muted)]"><LabText value=" 입력값 저장 안 함 " /></p>
@@ -135,15 +137,15 @@ export function InvestmentLabContributionExperiment({
 
       {points && points.length > 0 ? (
         <>
-          <form
+          <CairnForm
             className="mt-5 grid items-end gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_auto]"
             onSubmit={calculate}
           >
-            <fieldset className="min-w-0">
+            <CairnFieldset className="min-w-0">
               <legend className="mb-2 text-xs font-semibold text-[var(--muted)]"><LabText value=" 고정 시나리오 " /></legend>
               <div className="flex min-h-10 max-w-full gap-5 overflow-x-auto border-b border-[var(--line)]">
                 {fixedMixWeights ? (
-                  <button
+                  <CairnButton variant="secondary"
                     className={
                       scenarioId === "fixed_mix"
                         ? "min-w-max border-b-2 border-[var(--ink)] px-1 py-2 text-sm font-semibold text-[var(--ink)]"
@@ -156,10 +158,10 @@ export function InvestmentLabContributionExperiment({
                     <LabText value={fixedMixEvidence
                       ? `선택 배분 ${fixedMixEvidence.weights.kodexWeightBps / 100}:${fixedMixEvidence.weights.vooWeightBps / 100}`
                       : "선택 배분 준비 안 됨"} />
-                  </button>
+                  </CairnButton>
                 ) : null}
                 {scenarios.map((candidate) => (
-                  <button
+                  <CairnButton variant="secondary"
                     className={
                       candidate.scenarioId === scenarioId
                         ? "min-w-max border-b-2 border-[var(--ink)] px-1 py-2 text-sm font-semibold text-[var(--ink)]"
@@ -170,12 +172,12 @@ export function InvestmentLabContributionExperiment({
                     type="button"
                   >
                     <LabText value={scenarioLabel(candidate.scenarioId)} />
-                  </button>
+                  </CairnButton>
                 ))}
               </div>
-            </fieldset>
+            </CairnFieldset>
 
-            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 관측 기준일 " /><select
+            <CairnField className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 관측 기준일 " /><CairnSelect
                 className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 onChange={(event) => {
                   setServiceDate(event.target.value);
@@ -188,10 +190,10 @@ export function InvestmentLabContributionExperiment({
                     {formatDate(point.serviceDate)}
                   </option>
                 ))}
-              </select>
-            </label>
+              </CairnSelect>
+            </CairnField>
 
-            <label className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 추가 원금 (KRW) " /><LocalizedElement as="input"
+            <CairnField className="min-w-0 text-xs font-semibold text-[var(--muted)]"><LabText value=" 추가 원금 (KRW) " /><LocalizedElement as="input"
                 className="mt-2 h-10 w-full rounded-[4px] border border-[var(--line)] bg-white px-3 text-sm font-normal text-[var(--ink)]"
                 inputMode="numeric"
                 min="1"
@@ -204,13 +206,13 @@ export function InvestmentLabContributionExperiment({
                 type="number"
                 value={amount} en={{"placeholder": labEnglish("예: 1000000")}}
               />
-            </label>
+            </CairnField>
 
-            <button
+            <CairnButton variant="primary"
               className="h-10 rounded-[4px] bg-[var(--ink)] px-5 text-sm font-semibold text-white hover:bg-[var(--ink)]"
               type="submit"
-            ><LabText value=" 계산 " /></button>
-          </form>
+            ><LabText value=" 계산 " /></CairnButton>
+          </CairnForm>
 
           <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
             {scenarioId === "fixed_mix" && fixedMixEvidence

@@ -2,6 +2,8 @@ import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationWalkForwardMinimumVolatilityResult } from "@/lib/simulation-walk-forward-min-volatility";
 
 import { SimulationPathComparisonChart } from "./simulation-path-comparison-chart";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyResult = Extract<
   SimulationWalkForwardMinimumVolatilityResult,
@@ -26,11 +28,11 @@ export function WalkForwardMinimumVolatilitySection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"사후 검증 연구 · 계좌 및 목표비중과 무관"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-lg font-semibold"
             id="walk-forward-min-volatility-title"
           >
-            <SimulationText ko={"워크포워드 최소변동성 연구"} />{" "}</h2>
+            <SimulationText ko={"워크포워드 최소변동성 연구"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"KODEX 200과 VOO의 공동 원화 수익률만 사용합니다. 직전 60개 관측으로 비중을 계산하고 다음 10개 관측에만 적용하는 과정을 3번 반복합니다."} />{" "}</p>
         </div>

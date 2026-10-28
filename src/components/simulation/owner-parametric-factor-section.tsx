@@ -3,6 +3,8 @@ import type { SimulationOwnerParametricFactorResult } from "@/lib/simulation-own
 
 import { ResearchFanChart } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyResult = Extract<
   SimulationOwnerParametricFactorResult,
@@ -30,11 +32,11 @@ export function OwnerParametricFactorSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"별도 모형 · 부트스트랩과 합산하지 않음"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-lg font-semibold"
             id="owner-parametric-factor-title"
           >
-            <SimulationText ko={"환율·금리 요인 확률모형"} />{" "}</h2>
+            <SimulationText ko={"환율·금리 요인 확률모형"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={`같은 날짜의 종목 수익률과 USD/KRW·미국 10년물 금리·장단기 금리차 변화를 맞춰 통계 관계를 추정한 뒤 ${result.policy.pathCount.toLocaleString("ko-KR")}개 경로를 계산합니다. 기존 재표본 추출과 다른 가정의 결과이므로 두 모형의 차이 자체를 불확실성으로 봐야 합니다.`} en={`Align same-date holding returns with changes in USD/KRW, US 10-year yields and the yield spread, estimate statistical relationships, then calculate ${result.policy.pathCount.toLocaleString("en-US")} paths. Its assumptions differ from bootstrap, so disagreement between the models is itself a source of uncertainty.`} />{" "}</p>
         </div>
@@ -114,8 +116,8 @@ function ReadyFactorResult({ result }: { result: ReadyResult }) {
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"현재 비중 · 최초 배분 후 리밸런싱 없음"} />{" "}</p>
-          <h3 className="mt-1 text-lg font-semibold">
-            <SimulationText ko={"요인·잔차 모형 ·"} />{" "}{result.assumptions.horizon}<SimulationText ko={"단계"} />{" "}</h3>
+          <CairnSectionTitle level="h3" className="mt-1 text-lg font-semibold">
+            <SimulationText ko={"요인·잔차 모형 ·"} />{" "}{result.assumptions.horizon}<SimulationText ko={"단계"} />{" "}</CairnSectionTitle>
         </div>
         <span className="w-fit rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">
           <SimulationText ko={"계산 완료"} />{" "}</span>

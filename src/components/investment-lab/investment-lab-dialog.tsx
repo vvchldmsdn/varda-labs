@@ -7,6 +7,8 @@ import { LocalizedElement } from "@/components/i18n/localized-element";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CalendarDays, Info, Table2, X } from "lucide-react";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabDialog({
   title,
@@ -43,7 +45,7 @@ export function InvestmentLabDialog({
 
   return (
     <>
-      <button
+      <CairnButton variant="secondary"
         aria-label={displayedLabel}
         title={displayedLabel}
         className="inline-flex min-h-9 items-center gap-2 rounded px-2 text-xs text-[var(--muted)] transition-colors hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
@@ -55,7 +57,7 @@ export function InvestmentLabDialog({
       >
         <Icon aria-hidden="true" size={15} strokeWidth={1.6} />
         <span className={compactLabel ? "hidden sm:inline" : undefined}>{displayedLabel}</span>
-      </button>
+      </CairnButton>
       <dialog
         aria-labelledby={id}
         className={`varda-dialog fixed inset-0 m-auto max-h-[min(88dvh,850px)] w-[calc(100%_-_24px)] overflow-hidden p-0 ${size === "wide" ? "max-w-[1180px]" : "max-w-[760px]"}`}
@@ -74,9 +76,9 @@ export function InvestmentLabDialog({
       >
         <div className="flex max-h-[min(88dvh,850px)] flex-col">
           <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
-            <h2 className="text-base font-medium" id={id}>
+            <CairnSectionTitle className="text-base font-medium" id={id}>
               {displayedTitle}
-            </h2>
+            </CairnSectionTitle>
             <LocalizedElement as="button"
               aria-label="닫기"
               className="varda-icon-button"
