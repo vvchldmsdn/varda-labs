@@ -79,7 +79,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await shortage.getByText('상세 확인 사유', { exact: true }).click();
     await expect(shortage.locator('details[open]')).toContainText('invalid_input');
     await shortage.getByRole('button', { name: '분석 데이터 준비 확인', exact: true }).click();
-    await expect(page).toHaveURL(/\/portfolio\/holdings\?/);
+    await expect(page).toHaveURL(current => current.pathname === '/portfolio/holdings');
     assert.equal(new URL(page.url()).searchParams.get('scope'), scope);
     assertReturnFragment(page, '/portfolio/risk', riskDraft);
     await expect(page.locator('[data-recovery-return]').getByRole('button', { name: returnLabel, exact: true })).toBeVisible();
@@ -102,7 +102,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
       assertRecoveryFragment(destination.href, '/portfolio/risk', riskDraft);
     }
     await bodyAdd.click();
-    await expect(page).toHaveURL(/\/portfolio\/holdings\/new\?/);
+    await expect(page).toHaveURL(current => current.pathname === '/portfolio/holdings/new');
     assert.equal(new URL(page.url()).searchParams.get('scope'), scope);
     assertReturnFragment(page, '/portfolio/risk', riskDraft);
     await expect(page.getByRole('combobox', { name: '보유 계좌', exact: true })).toHaveValue(account);
@@ -122,7 +122,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await page.getByRole('combobox', { name: '표시 시간대', exact: true }).selectOption('UTC');
     const historyDraft = { ...historyQuery, _nativeView: JSON.stringify({ version: 1, scope, view: 'history', currency: 'KRW', zone: 'UTC', selected: '' }) };
     await page.locator('[data-recovery-kind="trades"]').getByRole('button', { name: '거래 기록 확인하기', exact: true }).click();
-    await expect(page).toHaveURL(/\/portfolio\/ledger\?/);
+    await expect(page).toHaveURL(current => current.pathname === '/portfolio/ledger');
     await expect(page.getByRole('heading', { name: '매매·현금 기록', exact: true })).toBeVisible();
     await expect(page.getByRole('combobox', { name: '계좌', exact: true })).toHaveValue(account);
     assertReturnFragment(page, '/history', historyDraft);
@@ -145,7 +145,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     const displayDraft = { mode: 'domain', scope, currency: 'KRW', _historyViewPeriod: '6M', _historyViewMetric: 'value', _historyViewScope: scope, _historyViewCurrency: 'KRW' };
     const openRecords = async expected => {
       await page.locator('[data-recovery-kind="history"]').getByRole('button', { name: '저장 기록 확인하기', exact: true }).click();
-      await expect(page).toHaveURL(/\/history\?/);
+      await expect(page).toHaveURL(current => current.pathname === '/history' && current.searchParams.get('detail') === 'raw');
       assert.equal(new URL(page.url()).pathname, '/history');
       assert.equal(new URL(page.url()).searchParams.get('detail'), 'raw');
       assertReturnFragment(page, '/beta/history', expected, '#history-evidence');
@@ -197,7 +197,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
   async function enterTargetResolution() {
     await openMissingNative();
     await targetNotice(nativeRegion(page)).getByRole('button', { name: '목표비중 설정하기', exact: true }).click();
-    await expect(page).toHaveURL(/\/portfolio\/targets\?/);
+    await expect(page).toHaveURL(current => current.pathname === '/portfolio/targets');
     await expect(page.locator('input[name="targetWeight:0"]')).toBeVisible();
     await expect(page.locator('[data-recovery-return]').getByRole('button', { name: returnLabel, exact: true })).toBeVisible();
     assertReturnFragment(page, '/additional-contribution', draft);
@@ -224,7 +224,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     const picker = await openExclusions(dialog);
     await picker.locator(`input[name="excludeSell"][value="${account}:${asset}"]`).check();
     await targetNotice(dialog).getByRole('button', { name: '목표비중 설정하기', exact: true }).click();
-    await expect(page).toHaveURL(/\/beta\/portfolio\/targets\?/);
+    await expect(page).toHaveURL(current => current.pathname === '/beta/portfolio/targets');
     await expect(page.locator('[data-target-editor-state="ready"]')).toBeVisible();
     await expect(page.getByRole('button', { name: returnLabel, exact: true })).toBeVisible();
     assertReturnFragment(page, '/beta', betaDraft, '#beta-contribution');
