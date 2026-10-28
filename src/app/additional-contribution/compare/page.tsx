@@ -39,7 +39,7 @@ export default async function ContributionComparisonPage({ searchParams }: { sea
     // Read once on the server. Scenario controls only recompute the supplied snapshot.
     if (accounts.some(item => item.key === scope)) {
       const accountId = scope.slice(8);
-      const [context, auth, saved] = await Promise.all([readNativeContributionContext(tenant.tenantContext, scope, 'KRW'), effectSession(), readContributionEffects(tenant.tenantContext, accountId).then(items => ({ items, unavailable: false })).catch(() => ({ items: [], unavailable: true }))]);
+      const [context, auth, saved] = await Promise.all([readNativeContributionContext(tenant.tenantContext, scope, 'KRW', true), effectSession(), readContributionEffects(tenant.tenantContext, accountId).then(items => ({ items, unavailable: false })).catch(() => ({ items: [], unavailable: true }))]);
       basis = prepareContributionComparison(context);
       if (auth) tracking = { accountId, sessionKey: auth.key, ...saved };
     } else basis = { status: 'blocked', reason: 'choose_one_account' };

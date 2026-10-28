@@ -5,7 +5,6 @@ import { readNativeContributionContext } from '@/db/queries/native-contribution-
 import { readNativeLedger } from '@/db/queries/native-portfolio-ledger';
 import { getTrackedCurrencyEvidence } from '@/db/queries/currency-tracked-portfolio';
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from '@/db/queries/portfolio-analysis-scopes';
-import { buildTrackedCurrencyPortfolio } from '@/lib/currency-tracked-portfolio';
 import { compareContribution, prepareContributionComparison } from '@/lib/contribution-comparison';
 import { eligibleEffectTrade, evaluateContributionEffect, type EffectQuote, type EffectTrade, type SavedContributionEffect, type ContributionEffectDocument } from '@/lib/contribution-effect';
 import type { TenantContext } from '@/lib/session-resolver-contract';
@@ -26,7 +25,7 @@ export async function saveContributionEffect(tenant: TenantContext, request: { i
     const budget = Decimal.from(request.amount).mul(request.currency === 'USD' ? previous.basis.usdKrw ?? 0 : 1).toNumber();
     return previous.funding === request.currency && previous.budget === budget && previous.basis.evidenceVersion === request.evidenceVersion ? { status: 'existing' as const, id: old.id } : { status: 'blocked' as const, reason: 'save_conflict_or_limit' };
   }
-  const context = await readNativeContributionContext(tenant, `account:${request.accountId}`, 'KRW');
+  const context = await readNativeContributionContext(tenant, `account:${request.accountId}`, 'KRW', true);
   if (context.status !== 'ready') return context;
   if (context.evidenceVersion !== request.evidenceVersion) return { status: 'blocked' as const, reason: 'basis_changed' };
   const basis = prepareContributionComparison(context);
@@ -42,7 +41,7 @@ export async function saveContributionEffect(tenant: TenantContext, request: { i
   const [, , rows] = await getTenantSqlClient().transaction(tx => [
     tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`varda.portfolio_mutation.v1:${tenant.ownerUserId}`]),
-    tx.query(SAVE_EFFECT_SQL, [tenant.ownerUserId, request.id, request.accountId, JSON.stringify(document), JSON.stringify(context.nativeSequences), JSON.stringify(context.policy)]),
+    tx.query(SAVE_EFFECT_SQL, [tenant.ownerUserId, request.id, request.accountId, JSON.stringify(document), JSON.stringify(context.nativeSequences), JSON.stringify(context.policy), JSON.stringify(context.holdingGuard)]),
   ]);
   return rows.length ? { status: 'created' as const, id: request.id } : { status: 'blocked' as const, reason: 'save_conflict_or_limit' };
 }
@@ -60,13 +59,15 @@ export async function readContributionEffects(tenant: TenantContext, accountId: 
   const scoped = await getReadOnlyTenantPortfolioAnalysisScopeContext({ tenantContext: tenant, scope: `account:${accountId}` });
   if (scoped.state !== 'ready' || scoped.resolution.state !== 'resolved' || scoped.resolution.scope.kind !== 'account' || scoped.resolution.scope.accountId !== accountId) return [];
   const [saved, ledger, evidence] = await Promise.all([listContributionEffects(tenant, accountId), readNativeLedger(tenant, accountId), getTrackedCurrencyEvidence(tenant, scoped.resolution.scope, 'KRW')]);
-  const trades = ledgerTrades(ledger), current = buildTrackedCurrencyPortfolio(evidence).current;
+  const trades = ledgerTrades(ledger);
   return saved.map(row => {
     const quotes = row.document.quotes.flatMap(entry => {
-      const observation = evidence.current.positions.find(p => p.id === entry.assetId && p.accountId === accountId)?.observation;
+      const owned = ledger.accounts.some(account => account.id === accountId && account.assets.some(asset => asset.id === entry.assetId));
+      const position = owned ? evidence.current.positions.find(p => p.id === entry.assetId && p.kind !== 'cash') : null;
+      const observation = position && !position.evidenceReason && !position.unsupportedReason ? position.observation : null;
       return observation?.basis === 'raw' ? [{ key: entry.key, assetId: entry.assetId, price: observation.price, currency: observation.currency, at: observation.priceObservedAt ?? observation.at, source: observation.source, basis: 'raw' as const }] : [];
     });
-    return { ...row, result: evaluateContributionEffect(row, { asOf: evidence.asOf, quotes, fx: evidence.fx, complete: !!current?.complete && ledger.entriesComplete, maxFxAgeMs: evidence.maxFxAgeMs ?? 3 * 86400000 }, trades),
+    return { ...row, result: evaluateContributionEffect(row, { asOf: evidence.asOf, quotes, fx: evidence.fx, complete: ledger.accountsComplete && ledger.entriesComplete, maxFxAgeMs: evidence.maxFxAgeMs ?? 3 * 86400000 }, trades),
       candidates: ledger.entriesComplete ? trades.filter(t => eligibleEffectTrade(row.document, t) && Date.parse(t.at) <= Date.parse(evidence.asOf)).map(t => ({ ...t, name: row.document.comparison.basis.rows.find(r => row.document.quotes.find(q => q.assetId === t.assetId)?.key === r.allocationKey)?.metadata.name ?? t.assetId })) : [] };
   });
 }

@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Checkbox, EmptyState, Field, Metric, MetricGroup, SectionHeading, Status } from '@/components/cairn-ui';
 import type { ContributionEffectView } from '@/db/queries/contribution-effects';
-import type { Currency } from '@/lib/money';
+import { parseMoneyInput, type Currency } from '@/lib/money';
 import styles from './contribution-comparison.module.css';
 
 export type EffectTrackingProps = { accountId: string; sessionKey: string; items: ContributionEffectView[]; preview?: boolean; unavailable?: boolean };
@@ -18,11 +18,13 @@ export function ContributionEffectTracking({ tracking, amount, currency, evidenc
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   async function save() {
     if (tracking.preview) { setMessage('예시 모드에서는 저장하지 않습니다. 실제 화면에서는 현재 배분안과 진입 가격을 저장합니다.'); return; }
-    const key = `${amount}:${currency}:${evidenceVersion}`;
+    const normalizedAmount = parseMoneyInput(amount, currency);
+    if (normalizedAmount === null || normalizedAmount <= 0) return;
+    const key = `${normalizedAmount}:${currency}:${evidenceVersion}`;
     if (pendingId.current?.key !== key) pendingId.current = { key, id: crypto.randomUUID() };
     setBusy(true); setMessage('');
     try {
-      const response = await fetch('/api/contribution-effects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionKey: tracking.sessionKey, id: pendingId.current.id, accountId: tracking.accountId, amount, currency, evidenceVersion }) });
+      const response = await fetch('/api/contribution-effects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionKey: tracking.sessionKey, id: pendingId.current.id, accountId: tracking.accountId, amount: String(normalizedAmount), currency, evidenceVersion }) });
       const result = await response.json();
       if (!response.ok) setMessage(effectReason(result.reason));
       else { setMessage('배분안을 저장했습니다. 이후 기록한 매수를 연결해 주세요.'); pendingId.current = null; router.refresh(); }

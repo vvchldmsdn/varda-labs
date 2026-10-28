@@ -1,6 +1,8 @@
 export const SAVE_EFFECT_SQL = `insert into contribution_effects(owner_user_id,id,account_id,document)
       select $1::uuid,$2::uuid,$3::uuid,$4::jsonb where exists(select 1 from accounts where id=$3::uuid and canonical_owner_user_id=$1::uuid and is_active)
-      and not exists(select 1 from jsonb_each_text($5::jsonb) e where not exists(select 1 from accounts a where a.id=e.key::uuid and a.canonical_owner_user_id=$1::uuid and a.native_state->>'sequence'=e.value))
+      and not exists(select 1 from jsonb_each_text($5::jsonb) e where not exists(select 1 from accounts a where a.id=e.key::uuid and a.canonical_owner_user_id=$1::uuid and coalesce(a.native_state->>'sequence','-1')=e.value))
+      and ($7::jsonb->>'revision')::integer=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=$3::uuid and r.canonical_owner_user_id=$1::uuid),0)
+      and $7::jsonb->'assets'=coalesce((select jsonb_agg(jsonb_build_object('id',h.id,'quantity',h.quantity::text,'currency',h.currency,'archived',h.archived_at is not null,'name',h.name,'ticker',h.ticker,'market',h.market,'assetType',h.asset_type) order by h.id) from assets h where h.account_id=$3::uuid and h.canonical_owner_user_id=$1::uuid),'[]'::jsonb)
       and (select count(*)=1 from portfolio_target_policy_revisions p where p.lifecycle_status='approved' and p.scope_kind='account' and p.scope_account_id=$3::uuid
         and p.approval_revision=($6::jsonb->>'revision')::integer and p.universe_hash=$6::jsonb->>'universeHash' and p.vector_hash=$6::jsonb->>'vectorHash' and p.policy_version=$6::jsonb->>'version')
       and (select count(*) from contribution_effects where owner_user_id=$1::uuid)<100 on conflict do nothing returning id`;

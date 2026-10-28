@@ -11,7 +11,7 @@ export type ContributionComparisonBasis = {
   usdKrw: number | null;
   evidenceVersion?: string;
 };
-export type ComparisonBasisResult = ContributionComparisonBasis | { status: 'blocked'; reason: string };
+export type ComparisonBasisResult = ContributionComparisonBasis | { status: 'blocked'; reason: string; unavailableHoldings?: string[] };
 export type ComparisonPlan = { amounts: Record<string, number>; cash: number };
 export type ContributionComparison = {
   status: 'ready'; budget: number; funding: Currency; basis: ContributionComparisonBasis;
