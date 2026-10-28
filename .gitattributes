@@ -2,3 +2,10 @@ drizzle/*.sql text eol=lf
 
 src/lib/shared-domain/** text eol=lf
 packages/cairn-research-domain/** text eol=lf
+
+packages/cairn-financial-domain/** text eol=lf
+packages/cairn-ui/** text eol=lf
+src/components/cairn-ui/** text eol=lf
+src/lib/portfolio-math.ts text eol=lf
+src/lib/portfolio-movement.ts text eol=lf
+src/lib/current-holding-movement.ts text eol=lf
