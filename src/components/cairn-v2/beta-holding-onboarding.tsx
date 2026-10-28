@@ -1,5 +1,5 @@
 'use client';
-import { Button as CairnButton, Status as CairnStatus, SectionHeading } from "@/components/cairn-ui";
+import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { DetailHeader } from './ui/molecules';
 
@@ -56,15 +56,14 @@ export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:Holdi
   <section className={styles.workspace} id="holding-onboarding" data-holding-onboarding-read-state={state} aria-busy={blocked}>
    <DetailHeader title="보유종목 추가" headingProps={{ref:heading,tabIndex:-1}} />
    <CairnStatus as="p" role="status">{message}</CairnStatus>
-   {enabled&&<section className={styles.evidence} aria-label="사진으로 보유종목 등록"><SectionHeading title="잔고 사진으로 한 번에 시작하기" description="사진에서 종목과 보유 수량을 읽고 확인한 뒤 등록합니다. 매입가 없이도 현재 구성과 첫날 시장 비교를 볼 수 있어요." /><a href={`/portfolio/holdings/new?${new URLSearchParams({from:'photo',...(initialAccountId?{accountId:initialAccountId,scope:`account:${initialAccountId}`}:{})})}`}>공통 사진 등록 화면 열기 ↗</a></section>}
-   <p className={styles.muted}>잔고 사진을 올리거나 종목을 검색해 목록에 담으세요. 저장 전에 수량과 매입가를 확인할 수 있습니다.</p>
+   <p className={styles.muted}>계좌를 선택하면 해당 계좌에서 가능한 등록 방법을 안내합니다.</p>
    <p className={styles.muted}>{collectionEnabled?'등록 요청에 필요한 가격·환율 수집이 활성화되어 있습니다. 수집 결과를 기다려야 할 수 있습니다.':'자동 수집이 꺼져 있습니다. 저장 가격을 확인할 수 없으면 등록이 보류됩니다.'}</p>
    {!available&&<p>이 실행 환경에서는 등록 요청을 보낼 수 없습니다.</p>}
    {!blocked&&state==='unavailable'&&<CairnButton variant="secondary" className={styles.retry} type="button" onClick={retry}>등록 자료 다시 조회</CairnButton>}
    {!blocked&&state==='unauthorized'&&<Link prefetch={false} href={onboardingHref({...context,scope:'all'},store?.pendingEpoch())}>전체 범위에서 접근 다시 확인 ↗</Link>}
    <Link prefetch={false} href={cancelHref}>보유 목록으로 돌아가기 ↗</Link>
    <div className={styles.reused} hidden={!readable} aria-hidden={!readable} inert={!enabled} onSubmitCapture={preventBlocked} key={generation}>
-    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={action} initialAccountId={initialAccountId}/>:<p>먼저 보유 계좌가 필요합니다. <Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}>계좌 관리 열기 ↗</Link></p>)}
+    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={action} initialAccountId={initialAccountId} nativeAccountIds={read.nativeAccountIds}/>:<p>먼저 보유 계좌가 필요합니다. <Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}>계좌 관리 열기 ↗</Link></p>)}
    </div>
    <details className={styles.evidence}><summary>등록 기준과 지원 범위</summary>
     <p>상단 범위는 접근·이동 문맥이며, 저장할 계좌는 폼에서 선택합니다. 본인의 활성 계좌·분석 범위를 저장 요청마다 다시 확인합니다. URL과 읽기 세대는 권한 증거가 아닙니다.</p>

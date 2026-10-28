@@ -416,6 +416,14 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       }finally{await stale.close();}
     });
     await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
+    await check('fullapp-beta-onboarding-shares-native-account-admission', async () => {
+      await setIdentity(sessionTokens[1]);
+      await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
+      await page.goto(url + `/beta/portfolio/holdings/new?mode=domain&scope=account:${otherAccount}&currency=KRW`);
+      await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toHaveAttribute('href', `/portfolio/ledger?accountId=${otherAccount}&action=buy`);
+    });
     // Execution-only evidence intentionally leaves cash unconfirmed; run after cash-dependent journeys.
     await check('fullapp-default-fractional-execution-preserves-cash-and-roundtrips-holdings', async () => {
       await setIdentity(sessionTokens[1]);
