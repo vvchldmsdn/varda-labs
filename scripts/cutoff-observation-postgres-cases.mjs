@@ -49,7 +49,7 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     const [runner]=await importWithPorts(['src/lib/cron-market-cycle-runner.ts'],{
       'next/server':{after:nextServer.after,NextResponse:nextServer.NextResponse},
       '@/db/client':{db:drizzle(worker),sqlClient},
-      '@/lib/market-data/collection-worker':{scheduleMarketCollection:()=>assert.fail('preparation must never schedule auxiliary provider work')},
+      '@/lib/market-data/collection-worker':{scheduleMarketCollection:()=>assert.fail('preparation must never schedule auxiliary provider work'),drainMarketCollection:()=>assert.fail('preparation must never drain auxiliary provider work')},
       // Financial clock is a historical synthetic cutoff; SQL lease expiration
       // uses the real database clock. Keep both actual repository functions.
       '@/lib/cron-market-cycle-run-repository':{
