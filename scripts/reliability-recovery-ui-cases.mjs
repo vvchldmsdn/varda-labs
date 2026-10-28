@@ -26,8 +26,8 @@ function assertReturnFragment(page, pathname, draft, hash = '') {
 }
 
 async function captureWidths(page, output, name, focus) {
-  for (const width of [1440, 390, 320]) {
-    await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+  for (const width of [1440, 1366, 390, 320]) {
+    await page.setViewportSize({ width, height: width === 1440 ? 900 : width === 1366 ? 768 : 844 });
     await focus.scrollIntoViewIfNeeded();
     await expect(focus).toBeInViewport();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${name}: overflow at ${width}px`);

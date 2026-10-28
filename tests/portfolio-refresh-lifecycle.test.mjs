@@ -12,7 +12,7 @@ describe("Today navigation refresh wiring", () => {
     const icons = Object.fromEntries(["ArrowUpRight", "ChartNoAxesCombined", "ChartPie", "ChevronLeft", "ChevronRight", "FlaskConical", "History", "House", "Menu", "Plus", "Settings2", "TrendingUp", "UserRound", "X"].map(name => [name, () => null]));
     let locale = "en";
     const [component] = await importUiWithPorts(["src/components/app-navigation.tsx"], {
-      react: { useRef: () => ({ current: null }) },
+      react: { useRef: () => ({ current: null }), useSyncExternalStore: (_subscribe, _snapshot, serverSnapshot) => serverSnapshot() },
       "next/image": { default: () => null },
       "next/link": { default: () => null, useLinkStatus: () => ({ pending: false }) },
       "next/navigation": { usePathname: () => "/today", useSearchParams: () => new URLSearchParams("scope=all") },
