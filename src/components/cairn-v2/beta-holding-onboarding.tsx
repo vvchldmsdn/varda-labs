@@ -63,7 +63,7 @@ export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:Holdi
    {!blocked&&state==='unauthorized'&&<Link prefetch={false} href={onboardingHref({...context,scope:'all'},store?.pendingEpoch())}>전체 범위에서 접근 다시 확인 ↗</Link>}
    <Link prefetch={false} href={cancelHref}>보유 목록으로 돌아가기 ↗</Link>
    <div className={styles.reused} hidden={!readable} aria-hidden={!readable} inert={!enabled} onSubmitCapture={preventBlocked} key={generation}>
-    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={action} initialAccountId={initialAccountId} nativeAccountIds={read.nativeAccountIds}/>:<p>먼저 보유 계좌가 필요합니다. <Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}>계좌 관리 열기 ↗</Link></p>)}
+    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={action} initialAccountId={initialAccountId} nativeAccountIds={read.nativeAccountIds} persistAccountContext={false}/>:<p>먼저 보유 계좌가 필요합니다. <Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}>계좌 관리 열기 ↗</Link></p>)}
    </div>
    <details className={styles.evidence}><summary>등록 기준과 지원 범위</summary>
     <p>상단 범위는 접근·이동 문맥이며, 저장할 계좌는 폼에서 선택합니다. 본인의 활성 계좌·분석 범위를 저장 요청마다 다시 확인합니다. URL과 읽기 세대는 권한 증거가 아닙니다.</p>
