@@ -69,9 +69,6 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
   const now = new Date(), quoteAt = new Date(now.getTime() - 3600000).toISOString();
   await admin.query("insert into app_users(id,status,role) values($1,'active','user'),($2,'active','user')", [owner, other]);
   await admin.query("insert into auth_identities(app_user_id,provider,provider_subject) values($1::uuid,'neon_auth',$1::text),($2::uuid,'neon_auth',$2::text)", [owner, other]);
-  // Seed the second account with the other fixture rows, before the writer fence is activated.
-  const balanceAccount = randomUUID();
-  await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'isa','Synthetic balance account','isa','KRW')", [balanceAccount, other]);
   for (const row of [{ id: account, owner, asset, code: 'brokerage', name: 'Synthetic USD', currency: 'USD', ticker: 'TESTUSD', market: 'us', price: 100 },
     { id: otherAccount, owner: other, asset: otherAsset, code: 'brokerage', name: 'Synthetic KRW', currency: 'KRW', ticker: 'TESTKR', market: 'korea', price: 10000 }]) {
     await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,$3,$4,'brokerage',$5)", [row.id, row.owner, row.code, row.name, row.currency]);
@@ -420,6 +417,14 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     });
     await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
     await check('fullapp-beta-onboarding-shares-native-account-admission', async () => {
+      // Follow the existing UI fixture transaction contract without changing earlier portfolio journeys.
+      const balanceAccount = randomUUID(), client = await admin.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("select set_config('app.trade_reliability_version','0059',true)");
+        await client.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'isa','Synthetic balance account','isa','KRW')", [balanceAccount, other]);
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
       await setIdentity(sessionTokens[1]);
       await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
       await page.goto(url + `/beta/portfolio/holdings/new?mode=domain&scope=account:${otherAccount}&currency=KRW`);
