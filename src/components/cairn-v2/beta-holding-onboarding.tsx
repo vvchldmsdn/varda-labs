@@ -56,7 +56,7 @@ export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:Holdi
   <section className={styles.workspace} id="holding-onboarding" data-holding-onboarding-read-state={state} aria-busy={blocked}>
    <DetailHeader title="보유종목 추가" headingProps={{ref:heading,tabIndex:-1}} />
    <CairnStatus as="p" role="status">{message}</CairnStatus>
-   <p className={styles.muted}>잔고 사진을 올리거나 종목을 검색해 목록에 담으세요. 저장 전에 수량과 매입가를 확인할 수 있습니다.</p>
+   <p className={styles.muted}>계좌를 선택하면 해당 계좌에서 가능한 등록 방법을 안내합니다.</p>
    <p className={styles.muted}>{collectionEnabled?'등록 요청에 필요한 가격·환율 수집이 활성화되어 있습니다. 수집 결과를 기다려야 할 수 있습니다.':'자동 수집이 꺼져 있습니다. 저장 가격을 확인할 수 없으면 등록이 보류됩니다.'}</p>
    {!available&&<p>이 실행 환경에서는 등록 요청을 보낼 수 없습니다.</p>}
    {!blocked&&state==='unavailable'&&<CairnButton variant="secondary" className={styles.retry} type="button" onClick={retry}>등록 자료 다시 조회</CairnButton>}
