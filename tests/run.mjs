@@ -250,3 +250,4 @@ import "./base44-market-context-canonical-plan.test.mjs";
 import './contribution-effect.test.mjs';
 import './contribution-effects-migration.test.mjs';
 import './contribution-effect-storage.test.mjs';
+import './contribution-investment-evidence.test.mjs';
