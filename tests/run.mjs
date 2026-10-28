@@ -410,5 +410,6 @@ import './contribution-effect-storage.test.mjs';
 import './contribution-investment-evidence.test.mjs';
 
 import "./master-frontend-integration.test.mjs";
+import "./beta-onboarding-admission.test.mjs";
 import "./beta-saved-plans/backend.test.mjs";
 import "./beta-saved-plans/ui.test.mjs";
