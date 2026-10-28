@@ -219,6 +219,11 @@ async function executeLocal(options, manifest) {
     await verifyLegacy(admin, before);
     report.cases.push({ name: 'legacy-rows-preserved', status: 'PASS' });
     assert.equal((await admin.query('SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations')).rows[0].n, manifest.length);
+    // Public reference metadata is bootstrapped by the catalog refresh, outside the Drizzle journal.
+    // Use the exact deployed DDL in this verified loopback-only disposable cluster too.
+    const catalogDdl = await readFile(path.join(ROOT, 'scripts/sql/instrument-catalog.sql'), 'utf8');
+    await admin.query(catalogDdl); await admin.query(catalogDdl);
+    report.cases.push({ name: 'shared-instrument-catalog-ddl-idempotent', status: 'PASS' });
     await admin.query(`GRANT USAGE ON SCHEMA public TO varda_tenant_app,rc_writer,rc_table_owner;
       GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO rc_writer;
       GRANT EXECUTE ON FUNCTION apply_native_portfolio_mutation(uuid,uuid,jsonb,jsonb) TO rc_writer;`);
@@ -227,6 +232,9 @@ async function executeLocal(options, manifest) {
     await admin.query('GRANT EXECUTE ON FUNCTION snapshot_cutoff_receipt_date(timestamptz),record_snapshot_cutoff_fx(text,date,numeric,timestamptz,text,timestamptz) TO rc_writer');
     worker = new Pool({ ...connection, user: 'rc_writer' });
     tenant = new Pool({ ...connection, user: 'varda_tenant_app' });
+    assert.equal((await tenant.query('select count(*)::int n from instrument_catalog')).rows[0].n, 0);
+    await assert.rejects(tenant.query('delete from instrument_catalog'), error => error.code === '42501');
+    report.cases.push({ name: 'shared-instrument-catalog-tenant-read-only', status: 'PASS' });
     if (options.sharedExecution) {
       const { runSharedProcessCases } = await import('./simulation-execution-process-cases.mjs');
       await runSharedProcessCases({ admin, connection, environment, report });
