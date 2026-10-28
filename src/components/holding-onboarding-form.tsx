@@ -24,7 +24,7 @@ const INITIAL_STATE: HoldingBatchState = { status: "idle", results: [] };
 const identity = (row: Pick<HoldingDraft, "market" | "ticker">) => `${row.market}:${row.ticker.trim().toUpperCase()}`;
 const positive = (value: string, precision: number) => /^\d+(?:\.\d+)?$/.test(value) && Number(value) > 0 && Number.isFinite(Number(value)) && (value.split(".")[1]?.length ?? 0) <= precision;
 
-export function HoldingOnboardingForm({ options, initialAccountId, nativeAccountIds = [], preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch }: { options: HoldingOnboardingOptions; initialAccountId?: string; nativeAccountIds?: readonly string[]; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean; action?: typeof createHoldingBatch }) {
+export function HoldingOnboardingForm({ options, initialAccountId, nativeAccountIds = [], persistAccountContext = true, preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch }: { options: HoldingOnboardingOptions; initialAccountId?: string; nativeAccountIds?: readonly string[]; persistAccountContext?: boolean; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean; action?: typeof createHoldingBatch }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<HoldingDraft[]>([]);
   const [saved, setSaved] = useState<Record<string, string>>({});
@@ -70,8 +70,9 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
 
   function selectAccount(next: string) {
     setAccountId(next);
-    // Persist only the explicit account context, without remounting queued inputs.
-    if (typeof window === "undefined") return;
+    // Embedded readers own their route scope; keep their form selection local.
+    // Standalone pages persist account context without remounting queued inputs.
+    if (!persistAccountContext || typeof window === "undefined") return;
     const url = new URL(window.location.href);
     url.searchParams.set("accountId", next);
     url.searchParams.set("scope", `account:${next}`);

@@ -107,7 +107,7 @@ function elements(tree) {
   return [tree, ...elements(tree.props?.children)];
 }
 
-async function batchFormFixture(locale, outcomes, { collectionState = null, initialAccountId, accounts = [{ id: accountId, name: "QA", accountType: "securities", code: "qa" }] } = {}) {
+async function batchFormFixture(locale, outcomes, { collectionState = null, initialAccountId, persistAccountContext, accounts = [{ id: accountId, name: "QA", accountType: "securities", code: "qa" }] } = {}) {
   const state = [];
   const submissions = [];
   const submittedAccountIds = [];
@@ -147,7 +147,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
   });
   function render() {
     stateIndex = 0;
-    return elements(component.HoldingOnboardingForm({ initialAccountId, options: {
+    return elements(component.HoldingOnboardingForm({ initialAccountId, persistAccountContext, options: {
       state: "ready", accounts, portfolioGroups: [],
     } }));
   }
@@ -171,6 +171,33 @@ const waitingPrice = { status: "price_unavailable", message: "Price lookup queue
 const partialNotice = nodes => nodes.find(node => node.props?.role === "status" && node.props.className?.split(" ").includes("varda-onboarding-hint"))?.props.children;
 
 describe("holding batch completion notices", () => {
+  it("keeps embedded account choices local while standalone forms persist their route context", async () => {
+    const secondId = "33333333-3333-4333-8333-333333333333";
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const fixtures = [];
+    for (const persistAccountContext of [false, true]) fixtures.push(await batchFormFixture("en", [], { persistAccountContext, accounts: [{ id: accountId, name: "First" }, { id: secondId, name: "Second" }] }));
+    try {
+      for (const persistAccountContext of [false, true]) {
+        const urls = [];
+        Object.defineProperty(globalThis, "window", { configurable: true, value: {
+          location: { href: `https://example.test/holdings/new?scope=account:${accountId}` },
+          history: { replaceState: (_state, _unused, url) => urls.push(String(url)) },
+        } });
+        const h = fixtures[Number(persistAccountContext)];
+        h.add("VOO");
+        h.render().find(node => node.props?.["aria-label"] === "Holding account").props.onChange({ target: { value: secondId } });
+        const nodes = h.render();
+        assert.equal(nodes.find(node => node.props?.name === "accountId").props.value, secondId);
+        assert.equal(JSON.parse(nodes.find(node => node.props?.name === "holdings").props.value)[0].ticker, "VOO");
+        assert.equal(urls.length, persistAccountContext ? 1 : 0);
+        if (persistAccountContext) assert.equal(new URL(urls[0]).searchParams.get("scope"), `account:${secondId}`);
+      }
+    } finally {
+      if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+      else delete globalThis.window;
+    }
+  });
+
   it("keeps the submitted second account through action resets, partial retries and completion", async () => {
     const secondId = "33333333-3333-4333-8333-333333333333";
     const h = await batchFormFixture("en", [

@@ -417,12 +417,29 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     });
     await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
     await check('fullapp-beta-onboarding-shares-native-account-admission', async () => {
+      // Follow the existing UI fixture transaction contract without changing earlier portfolio journeys.
+      const balanceAccount = randomUUID(), client = await admin.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("select set_config('app.trade_reliability_version','0059',true)");
+        await client.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'isa','Synthetic balance account','isa','KRW')", [balanceAccount, other]);
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
       await setIdentity(sessionTokens[1]);
       await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
       await page.goto(url + `/beta/portfolio/holdings/new?mode=domain&scope=account:${otherAccount}&currency=KRW`);
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toHaveCount(0);
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toHaveAttribute('href', `/portfolio/ledger?accountId=${otherAccount}&action=buy`);
+      const admittedUrl = page.url();
+      await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(balanceAccount);
+      await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toBeVisible();
+      await expect(page.locator('[data-holding-onboarding-read-state]')).toHaveAttribute('data-holding-onboarding-read-state', 'ready');
+      assert.equal(page.url(), admittedUrl, 'Form account changes must not invalidate the beta server read');
+      await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(otherAccount);
+      await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toBeVisible();
+      await page.reload();
+      await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toBeVisible();
     });
     // Execution-only evidence intentionally leaves cash unconfirmed; run after cash-dependent journeys.
     await check('fullapp-default-fractional-execution-preserves-cash-and-roundtrips-holdings', async () => {
