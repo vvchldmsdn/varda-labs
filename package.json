@@ -94,6 +94,7 @@
     "cleanup:base44:nonportfolio-assets": "node --no-warnings scripts/remove-base44-nonportfolio-assets.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:release:contribution-effects": "node --no-warnings scripts/migrate-contribution-effects.mjs",
     "db:studio": "drizzle-kit studio",
     "import:base44:cashflow-goals": "node scripts/import-base44-cashflow-goals.mjs",
     "import:base44:core": "node --no-warnings scripts/import-base44-core.mjs",
@@ -103,12 +104,15 @@
     "import:base44:market-data": "node scripts/import-base44-market-data.mjs",
     "import:base44:market-context": "node --no-warnings scripts/import-base44-market-context.mjs",
     "import:base44:settings": "node --no-warnings scripts/import-base44-settings.mjs",
-    "prebuild": "node scripts/verify-shared-domains.mjs"
+    "prebuild": "node scripts/prepare-balance-ocr.mjs && node scripts/verify-shared-domains.mjs",
+    "predev": "node scripts/prepare-balance-ocr.mjs"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
     "@neondatabase/auth": "0.5.0-beta",
     "@neondatabase/serverless": "^1.1.0",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/kor": "1.0.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "drizzle-orm": "^0.45.2",
@@ -117,6 +121,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
+    "tesseract.js": "7.0.0",
     "zod": "^4.4.3"
   },
   "overrides": {

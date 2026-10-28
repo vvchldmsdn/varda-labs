@@ -89,6 +89,25 @@ export const nativeContributionPlans = pgTable("native_contribution_plans", {
   deletePolicy: pgPolicy("native_contribution_plans_tenant_delete_v1", { for: "delete", to: tenantDatabaseRole, using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()` }),
 })).enableRLS();
 
+export const contributionEffects = pgTable('contribution_effects', {
+  ownerUserId: uuid('owner_user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+  id: uuid('id').notNull(),
+  accountId: uuid('account_id').notNull().references(() => accounts.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  revision: integer('revision').default(0).notNull(),
+  document: jsonb('document').notNull(),
+  tradeIds: jsonb('trade_ids').default([]).notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.ownerUserId, table.id] }),
+  ownerAccountIdx: index('contribution_effects_owner_account_idx').on(table.ownerUserId, table.accountId, table.createdAt),
+  revisionCheck: check('contribution_effects_revision_check', sql`${table.revision}>=0`),
+  documentCheck: check('contribution_effects_document_check', sql`jsonb_typeof(${table.document})='object' and octet_length(${table.document}::text)<=524288 and ${table.document}->>'version'='contribution_effect_v1' and ${table.document}->>'accountId'=${table.accountId}::text`),
+  linksCheck: check('contribution_effects_trade_ids_check', sql`jsonb_typeof(${table.tradeIds})='array' and jsonb_array_length(${table.tradeIds})<=100`),
+  tenantPolicy: pgPolicy('contribution_effects_tenant_v1', { for: 'all', to: tenantDatabaseRole,
+    using: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active()`,
+    withCheck: sql`${currentTenantOwns(table.ownerUserId)} and investment_plan_tenant_active() and exists(select 1 from accounts a where a.id=${table.accountId} and a.canonical_owner_user_id=${table.ownerUserId} and a.is_active)` }),
+})).enableRLS();
+
 export const portfolioDrafts = pgTable("portfolio_drafts", {
   ownerUserId: uuid("owner_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
   id: uuid("id").notNull(),

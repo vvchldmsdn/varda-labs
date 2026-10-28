@@ -21,10 +21,12 @@ export default async function NewHoldingPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const preview = process.env.NODE_ENV === "development" && params.preview === "design";
   const resolution = preview ? null : await resolveCurrentTenantContext();
-  const nativeAccounts = resolution?.ok ? await readNativeManagementAccounts(resolution.tenantContext) : [];
+  const [nativeAccounts, ownedOptions] = resolution?.ok ? await Promise.all([
+    readNativeManagementAccounts(resolution.tenantContext), getHoldingOnboardingOptions(resolution.tenantContext),
+  ]) : [[], null];
   const options: HoldingOnboardingOptions | { state: "unavailable" } | null = preview ? {
     state: "ready", accounts: [{ id: "11111111-1111-4111-8111-111111111111", code: "preview", name: "나의 증권 계좌", accountType: "securities" }], portfolioGroups: [],
-  } : resolution?.ok ? await getHoldingOnboardingOptions(resolution.tenantContext) : null;
+  } : ownedOptions;
   const initialAccountId = options?.state === "ready"
     ? resolveHoldingOnboardingAccountId(options.accounts, params.accountId ?? (typeof params.scope === "string" && params.scope.startsWith("account:") ? params.scope.slice(8) : params.scope !== undefined && params.scope !== "all" ? "" : undefined))
     : "";

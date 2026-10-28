@@ -54,7 +54,8 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
           maAssetClass: additionalContributionMaAssetClass({ ...target, maAssetClass: target.maAssetClass ?? null }), maRuleEnabled: evidence.contributionPolicy.useTrendFilter && (target.maRuleEnabled ?? true),
           ma120Evidence: rawCompatible && trend ? { status: trend.status, distanceFromMaPct: trend.evidence?.distanceFromMaPct ?? null } : { status: "unavailable", distanceFromMaPct: null },
           ...(rawCompatible ? { maBasis: { priceCurrency: target.currency, averageCurrency: target.currency, priceBasis: "raw", averageBasis: "raw" } } : {}),
-          metadata: { accountId: target.accountId, accountName:target.accountName, name: target.assetName, ticker: target.ticker, market: target.market, maEvidence: trend?.evidence ?? null },
+          metadata: { accountId: target.accountId, accountName:target.accountName, name: target.assetName, ticker: target.ticker, market: target.market, maEvidence: trend?.evidence ?? null,
+            entryQuote: observed ? { assetId: row!.id, price: observed.price, currency: observed.currency, at: observed.priceObservedAt ?? observed.at, source: observed.source, basis: observed.basis } : null },
           value: { amount: observed ? Decimal.from(observed.quantity).mul(observed.price).toExactString() : "0", currency: isCurrency(target.currency)?target.currency:reporting, at: evidence.current.at, source: observed?.source ?? "unheld_target_zero" },
           cost: null, costLots: row?.costLots ?? null,
         };

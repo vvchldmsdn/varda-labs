@@ -449,6 +449,13 @@
       "when": 1790899200000,
       "tag": "0063_holdings_snapshot_revision_repair",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1793145600000,
+      "tag": "0064_contribution_effects",
+      "breakpoints": true
     }
   ]
 }

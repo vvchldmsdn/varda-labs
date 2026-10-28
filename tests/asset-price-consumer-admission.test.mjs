@@ -4,8 +4,8 @@ import { describe, it } from "node:test";
 
 import {
   admitAdjustedHistoricalPriceRows,
-  admitPrivateSingleTenantRawHistoricalPriceRows,
-  admitPrivateSingleTenantRawTrendEvidenceRows,
+  admitSharedKisRawHistoricalPriceRows,
+  admitSharedKisRawTrendEvidenceRows,
   admitRawHistoricalPriceRows,
   ASSET_PRICE_CONSUMER_ADMISSION_POLICY,
   resolveOperationalClosePrice,
@@ -101,12 +101,8 @@ describe("asset price consumer admission", () => {
     ]);
   });
 
-  it("admits complete KIS raw rows only for the matching sole active owner", () => {
-    const ownerUserId = "11111111-1111-4111-8111-111111111111";
-    const result = admitPrivateSingleTenantRawHistoricalPriceRows({
-      requestedOwnerUserId: ownerUserId,
-      activeOwnerUserIds: [ownerUserId],
-      rows: [
+  it("admits complete KIS raw rows through the shared market cache", () => {
+    const result = admitSharedKisRawHistoricalPriceRows([
         providerRow({
           adjustedClosePrice: null,
           adjustedCloseBasis: null,
@@ -116,8 +112,7 @@ describe("asset price consumer admission", () => {
           source: "kis_domestic_dailyitemchartprice",
           fetchedAt: "2026-07-10T00:00:00.000Z",
         }),
-      ],
-    });
+      ]);
 
     assert.equal(result.status, "ready");
     assert.equal(result.policy.priceBasis, "raw_price_return");
@@ -126,29 +121,13 @@ describe("asset price consumer admission", () => {
     assert.deepEqual(result.issues, []);
   });
 
-  it("fails private raw history closed when another active owner exists", () => {
-    const result = admitPrivateSingleTenantRawHistoricalPriceRows({
-      requestedOwnerUserId: "11111111-1111-4111-8111-111111111111",
-      activeOwnerUserIds: [
-        "11111111-1111-4111-8111-111111111111",
-        "22222222-2222-4222-8222-222222222222",
-      ],
-      rows: [providerRow()],
-    });
-
-    assert.equal(result.status, "blocked");
-    assert.deepEqual(result.rows, []);
-    assert.deepEqual(result.issues, [
-      "private_single_tenant_scope_not_established",
-    ]);
+  it("rejects mixed provider bindings for a shared market instrument", () => {
+    const result = admitSharedKisRawHistoricalPriceRows([providerRow({source:'kis_a'}),providerRow({source:'kis_b',providerExchange:'OTHER'})]);
+    assert.equal(result.status,'blocked');assert.ok(result.issues.includes('conflicting_provider_binding'));
   });
 
   it("admits KIS raw levels as descriptive trend evidence without allocation authority", () => {
-    const ownerUserId = "11111111-1111-4111-8111-111111111111";
-    const result = admitPrivateSingleTenantRawTrendEvidenceRows({
-      requestedOwnerUserId: ownerUserId,
-      activeOwnerUserIds: [ownerUserId],
-      rows: [
+    const result = admitSharedKisRawTrendEvidenceRows([
         providerRow({
           adjustedClosePrice: null,
           adjustedCloseBasis: null,
@@ -157,42 +136,25 @@ describe("asset price consumer admission", () => {
           adjustedCloseFetchedAt: null,
           source: "kis_domestic_dailyitemchartprice",
         }),
-      ],
-    });
+      ]);
 
     assert.equal(result.status, "ready");
     assert.equal(result.summary.admittedRowCount, 1);
     assert.equal(
       result.policy.consumerPurpose,
-      "owner_only_descriptive_trend_evidence",
+      "tenant_scoped_descriptive_trend_evidence",
     );
     assert.equal(result.policy.allocationEffect, "none");
     assert.equal(result.policy.recommendation, "forbidden");
   });
 
-  it("fails descriptive raw trend evidence closed for multiple owners", () => {
-    const result = admitPrivateSingleTenantRawTrendEvidenceRows({
-      requestedOwnerUserId: "11111111-1111-4111-8111-111111111111",
-      activeOwnerUserIds: [
-        "11111111-1111-4111-8111-111111111111",
-        "22222222-2222-4222-8222-222222222222",
-      ],
-      rows: [providerRow()],
-    });
-
-    assert.equal(result.status, "blocked");
-    assert.deepEqual(result.rows, []);
-    assert.deepEqual(result.issues, [
-      "private_single_tenant_scope_not_established",
-    ]);
+  it("shared trends require KIS provenance independently of tenant count", () => {
+    const result = admitSharedKisRawTrendEvidenceRows([providerRow({source:'unverified'})]);
+    assert.equal(result.status,'blocked');assert.equal(result.rows.length,0);
   });
 
   it("rejects incomplete or non-KIS private raw provenance", () => {
-    const ownerUserId = "11111111-1111-4111-8111-111111111111";
-    const result = admitPrivateSingleTenantRawHistoricalPriceRows({
-      requestedOwnerUserId: ownerUserId,
-      activeOwnerUserIds: [ownerUserId],
-      rows: [
+    const result = admitSharedKisRawHistoricalPriceRows([
         providerRow({
           closePrice: null,
           source: "legacy_import",
@@ -200,8 +162,7 @@ describe("asset price consumer admission", () => {
           providerExchange: null,
           fetchedAt: null,
         }),
-      ],
-    });
+      ]);
 
     assert.equal(result.status, "blocked");
     assert.deepEqual(result.issues, [
@@ -378,22 +339,19 @@ describe("asset price consumer admission", () => {
     );
     assert.equal(
       investmentLabAdapter.match(
-        /admitPrivateSingleTenantRawHistoricalPriceRows\(\{/g,
+        /admitSharedKisRawHistoricalPriceRows\(/g,
       )?.length,
       3,
       "investment lab KODEX fallback, VOO, and anchor history must use owner-scoped raw admission",
     );
-    assert.match(
-      investmentLabAvailabilityAdapter,
-      /getActivePortfolioOwnerUserIds/,
-    );
+    assert.doesNotMatch(investmentLabAvailabilityAdapter, /getActivePortfolioOwnerUserIds/);
     assert.match(
       investmentLabAvailabilityAdapter,
       /admitAdjustedHistoricalPriceRows/,
     );
     assert.match(
       investmentLabAvailabilityAdapter,
-      /admitPrivateSingleTenantRawHistoricalPriceRows/,
+      /admitSharedKisRawHistoricalPriceRows/,
     );
     assert.match(
       investmentLabAvailabilityAdapter,

@@ -1,4 +1,4 @@
-.varda-holding-add-page { min-height:100dvh; background:var(--paper); color:var(--ink); }
+.varda-holding-add-page { min-height:100dvh; padding-left:var(--sidebar-width, 0px); background:var(--paper); color:var(--ink); }
 .varda-holding-add-content { width:min(1120px,calc(100% - 64px)); margin:32px auto 88px; }
 .varda-holding-add-back { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:var(--muted); font-size:12px; }
 .varda-holding-add-heading { padding:28px 0 32px; max-width:690px; }
@@ -11,7 +11,7 @@
 .varda-onboarding-account-line > span { font-size:11px; color:var(--muted); }
 .varda-onboarding-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.85fr); gap:64px; padding-top:36px; }
 .varda-onboarding-compose, .varda-onboarding-review { min-width:0; }
-.varda-holding-onboarding input:not([type=hidden]), .varda-holding-onboarding select, .varda-holding-onboarding textarea { width:100%; min-width:0; min-height:46px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:7px; padding:9px 12px; margin-top:7px; font-size:14px; outline:none; }
+.varda-holding-onboarding input:not([type=hidden]):not([type=checkbox]):not([type=radio]), .varda-holding-onboarding select, .varda-holding-onboarding textarea { width:100%; min-width:0; min-height:46px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:7px; padding:9px 12px; margin-top:7px; font-size:14px; outline:none; }
 .varda-holding-onboarding input:focus, .varda-holding-onboarding select:focus, .varda-holding-onboarding textarea:focus { border-color:var(--ink); box-shadow:0 0 0 1px var(--ink); }
 .varda-holding-onboarding button { cursor:pointer; }
 .varda-holding-onboarding button:disabled, .varda-holding-onboarding input:disabled, .varda-holding-onboarding select:disabled { opacity:.55; cursor:default; }

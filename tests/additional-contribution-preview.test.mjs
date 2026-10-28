@@ -98,7 +98,7 @@ describe("additional contribution tenant preview", () => {
     });
 
     assert.equal(attached.status, "ready");
-    assert.equal(attached.ma120Evidence.allocationEffect, "none");
+    assert.equal(attached.ma120Evidence.allocationEffect, "disabled");
     assert.deepEqual(
       attached.rows.map((row) => [row.ticker, row.allocationKrw]),
       before,
@@ -149,6 +149,8 @@ describe("additional contribution tenant preview", () => {
       "utf8",
     );
     const proxy = readFileSync("src/proxy.ts", "utf8");
+    const view = readFileSync("src/components/additional-contribution/additional-contribution-page-view.tsx", "utf8");
+    const calculator = readFileSync("src/components/additional-contribution/contribution-calculator.tsx", "utf8");
 
     for (const source of [
       universeQuery,
@@ -168,28 +170,28 @@ describe("additional contribution tenant preview", () => {
     assert.match(policyQuery, /loadCurrentTenantLegacyTargetPolicy/);
     assert.doesNotMatch(policyQuery, /from "@\/db\/client"/);
     assert.match(previewQuery, /Promise\.all/);
-    assert.match(ma120Query, /Promise\.all/);
-    assert.match(ma120Query, /getActivePortfolioOwnerUserIds/);
+    assert.match(ma120Query, /loadPortfolioRiskPriceCandidates/);
+    assert.doesNotMatch(ma120Query, /getActivePortfolioOwnerUserIds/);
     assert.match(
       ma120Query,
-      /admitPrivateSingleTenantRawTrendEvidenceRows/,
+      /admitSharedKisRawTrendEvidenceRows/,
     );
-    assert.match(ma120Query, /allocationEffect: "none"/);
+    assert.match(ma120Query, /allocationEffect: "bounded_overlay"/);
     assert.doesNotMatch(ma120Query, /assets\.ma_?120|daysAboveMa/i);
     assert.doesNotMatch(route, /^"use client";/);
     assert.doesNotMatch(route, /fetch\s*\(|\/api\//);
     assert.match(route, /searchParams: Promise/);
-    assert.match(route, /method="get"/);
+    assert.match(calculator, /method="get"/);
     assert.match(route, /resolveCurrentTenantContext/);
     assert.match(route, /if \(!resolution\.ok\)/);
     assert.match(route, /getReadOnlyTenantPortfolioAnalysisScopeContext/);
-    assert.match(route, /PortfolioAnalysisScopeTabs/);
+    assert.match(view, /PortfolioAnalysisScopeTabs/);
     assert.match(
       route,
       /getReadOnlyTenantAdditionalContributionPreviewForScope/,
     );
     assert.doesNotMatch(route, /resolveAdditionalContributionScope/);
-    assert.match(route, /name="scope"/);
+    assert.match(calculator, /name="scope"/);
     assert.doesNotMatch(
       proxy,
       /"\/additional-contribution(?:\/:path\*)?"/,

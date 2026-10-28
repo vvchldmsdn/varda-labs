@@ -83,10 +83,12 @@ export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: st
     } catch { setError(t("삭제하지 못했어요. 계획을 그대로 두었습니다. 다시 시도해 주세요.", "Unable to delete. The plan is still listed; please retry.")); }
     finally { setDeleting(false); }
   }
+  const comparisonHref = `/additional-contribution/compare?${new URLSearchParams({ scope: scopeKey, amount: cash.trim() || (cashCurrency === 'USD' ? '1000' : '1000000'), currency: cashCurrency })}`;
   const document = shown?.document;
   const result = document?.result;
   return <section className={styles.contribution} aria-label={t("추가 투자 계획", "Contribution plan")}>
     <CairnSectionTitle>{t("다음 투자금 나눠보기", "Plan a contribution")}</CairnSectionTitle>
+    <Link href={comparisonHref}>{t('비율 매수와 환율·MA120 조정 효과 비교 →', 'Compare proportional buying with FX / MA120 adjustments →')}</Link>
     <p className={styles.note}>{t("승인한 목표 비중을 사용합니다. 저장은 계획만 남기며 실제 주문이나 보유 수량을 바꾸지 않아요.", "Uses your approved targets. Saving records a plan without placing orders or changing holdings.")}</p>
     {!loaded ? <CairnStatus as="p" tone="neutral" role="status">{t("목표와 보유 정보를 확인하고 있어요.", "Checking targets and holdings.")}</CairnStatus> : !context ? <p className={styles.notice}>{t("계산에 필요한 전체 평가 또는 승인된 목표를 확인할 수 없어요.", "A complete valuation or approved targets are unavailable.")} <Link href={`/portfolio/targets?scope=${encodeURIComponent(scopeKey)}`}>{t("목표 비중 확인 →", "Review targets →")}</Link></p> : <CairnForm onSubmit={calculate} noValidate className={styles.form}>
       <div className={styles.funds}><CairnField>{t("새 투자금", "New money")}<MoneyInput value={cash} onValueChange={value => { setCash(value); changed(); }} allowDecimals={cashCurrency === "USD"} aria-label={t("새 투자금", "New money")} placeholder="0" /></CairnField><CairnField>{t("투자금 통화", "Money currency")}<CairnSelect value={cashCurrency} onChange={event => { setCashCurrency(event.target.value as Currency); changed(); }}><option>KRW</option><option>USD</option></CairnSelect></CairnField></div>

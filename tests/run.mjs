@@ -1,3 +1,8 @@
+import "./balance-photo.test.mjs";
+import "./contribution-comparison.test.mjs";
+import "./trade-photo.test.mjs";
+import "./trade-photo-replay.test.mjs";
+import "./first-day-replay.test.mjs";
 import "./market-calendar.test.mjs";
 import "./tenant-ownership-audit.test.mjs";
 import "./tenant-database-role-boundary.test.mjs";
@@ -241,3 +246,7 @@ import "./base44-settings-canonical-plan.test.mjs";
 import "./base44-event-canonical-plan.test.mjs";
 import "./base44-history-canonical-plan.test.mjs";
 import "./base44-market-context-canonical-plan.test.mjs";
+
+import './contribution-effect.test.mjs';
+import './contribution-effects-migration.test.mjs';
+import './contribution-effect-storage.test.mjs';

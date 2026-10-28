@@ -7,6 +7,7 @@ import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import styles from "./first-portfolio-analysis.module.css";
 import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { FirstDayReplay } from "./first-day-replay";
 
 
 export async function FirstPortfolioAnalysis({ scope, serviceDate, tenantContext }: {
@@ -56,6 +57,7 @@ export function FirstPortfolioAnalysisView({ result, scopeKey, designPreview = f
         <div className={styles.holdingRows}>{summary.rows.slice(0, 5).map((row) => <div key={row.key}><span><b>{row.name}</b><small>{row.ticker}</small></span><strong>{row.weightPct === null ? money(row.valueKrw) : `${row.weightPct.toFixed(1)}%`}</strong></div>)}</div>
         {summary.rows.length > 5 ? <Link className={styles.more} href={href("/portfolio/holdings")}><T ko={`전체 ${summary.rows.length}종목 보기`} en={`View all ${summary.rows.length} holdings`} /><ArrowUpRight size={14} aria-hidden="true" /></Link> : null}
       </section> : null}
+      <FirstDayReplay result={result.replay} />
       <section className={styles.next}>
         <div className={styles.sectionTitle}><CairnSectionTitle><T ko="이제 무엇을 볼까요?" en="What would you like to explore?" /></CairnSectionTitle></div>
         <div className={styles.nextRows}>

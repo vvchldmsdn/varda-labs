@@ -11,6 +11,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import { ManagementText } from "@/components/i18n/management-text";
 import { InstrumentSearch, type InstrumentChoice } from "@/components/onboarding/instrument-search";
 import { HoldingImportPanel } from "@/components/onboarding/holding-import-panel";
+import { BalancePhotoPanel } from "@/components/onboarding/balance-photo-panel";
 import { QuickHoldingReference } from "@/components/first-visit/quick-holding-reference";
 import { PlanHoldingReference } from "@/components/onboarding/plan-holding-reference";
 import { trackFirstVisit } from "@/lib/first-visit-events";
@@ -113,6 +114,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
         if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault();
       }}>
         <p className="varda-onboarding-eyebrow" id="holding-add-heading">01 · {t("종목과 수량", "HOLDING & QUANTITY")}</p>
+        <BalancePhotoPanel key={accountId} onAdd={addDrafts} remaining={MAX_HOLDING_BATCH - unsaved.length} disabled={pending} preview={preview} />
         {fromPlan ? <PlanHoldingReference disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSearch={name => { setSelected(null); setQuantity(""); setCost(""); setError(null); setPlanSearch(previous => ({ name, revision: previous.revision + 1 })); }} /> : null}
         {fromQuick ? <QuickHoldingReference disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSearch={name => { setSelected(null); setQuantity(""); setCost(""); setError(null); setPlanSearch(previous => ({ name, revision: previous.revision + 1 })); }} /> : null}
         <InstrumentSearch key={planSearch.revision} initialQuery={planSearch.name} privateQuery={fromPlan || fromQuick} preview={preview} disabled={pending || unsaved.length >= MAX_HOLDING_BATCH} onSelect={instrument => { setSelected(instrument); setQuantity(""); setCost(""); setError(null); }} />
@@ -158,7 +160,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
           {awaitingPrice && collectionState === "waiting" ? <CairnStatus as="p" tone="neutral" role="status" className="varda-onboarding-hint">{t("가격 확인이 대기 중입니다. 다시 저장을 눌러 확인하거나 현재 가격을 직접 입력해 주세요.", "Price lookup is still pending. Try saving again or enter a current price.")}</CairnStatus> : null}
           <CairnButton variant="primary" type="submit" className="varda-onboarding-primary" disabled={preview || pending || unsaved.length === 0 || !accountId}>{pending ? t("종목을 확인하며 저장 중…", "Checking and saving holdings…") : t(`${unsaved.length}종목 저장`, `Save ${unsaved.length} holding${unsaved.length === 1 ? "" : "s"}`)}<ArrowRight size={18} /></CairnButton>
           <p className="varda-onboarding-hint">{preview ? t("예시 화면입니다. 편집은 가능하지만 저장하지 않습니다.", "Demo view. You can edit the list, but saving is disabled.") : t("주문을 실행하지 않습니다. 내 포트폴리오에 기록만 추가합니다.", "No orders are placed. These are records for your portfolio.")}</p>
-          {hasSaved ? <CairnStatus as="div" tone="success" className="varda-onboarding-success" role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href="/portfolio/first-look">{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{rows.some(row => saved[row.key]) ? <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" onClick={() => setRows(previous => previous.filter(row => !saved[row.key]))} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></CairnButton> : null}</CairnStatus> : null}
+          {hasSaved ? <CairnStatus as="div" tone="success" className="varda-onboarding-success" role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href={`/portfolio/first-look?${new URLSearchParams({scope: `account:${accountId}`})}`}>{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{rows.some(row => saved[row.key]) ? <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" onClick={() => setRows(previous => previous.filter(row => !saved[row.key]))} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></CairnButton> : null}</CairnStatus> : null}
         </div>
       </section>
     </div>
