@@ -284,6 +284,12 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       // The graph shows the valuation date, one day before the daily save date.
       const firstDate = page.getByRole('button', { name: /^2026\.08\.04 이전 저장점 대비/ });
       const secondDate = page.getByRole('button', { name: /^2026\.08\.05 이전 저장점 대비/ });
+      const cells = await firstDate.evaluate(element => {
+        const cell = element.getBoundingClientRect();
+        return { width: cell.width, height: cell.height };
+      });
+      assert.equal(cells.width, 17, 'Calendar cells must retain their chart width');
+      assert.equal(cells.height, 17, 'Form button minimum height must not overlap adjacent dates');
       await firstDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
       await secondDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
       await page.screenshot({ path: path.join(output, 'desktop-legacy-history-heatmap.png'), fullPage: true });

@@ -512,7 +512,7 @@ function HistoryCalendar({
           }}
         >
           {layout.cells.map((cell) => (
-            <CairnButton variant="selection"
+            <CairnButton variant="bare"
               key={cell.point.date}
               type="button"
               title={t(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`, translateHomeHistory(`${formatDate(cell.point.date)} · ${formatSignedKrw(cell.point.movementKrw)}`))}
