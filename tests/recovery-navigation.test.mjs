@@ -30,6 +30,7 @@ it('history and research restore display conditions without inventing a result',
     '/beta/history?mode=domain&scope=all&currency=KRW&_historyDate=2026-09-14&_historyMetric=return&_historyPeriod=3M',
     '/simulation?scope=account%3Aabc&end=2026-10-26&horizon=63',
     '/investment-lab?scope=all&start=2026-08-01&end=2026-10-26',
+    '/investment-lab?scope=all&start=2026-09-01&end=2026-10-26&basketAnchor=2026-09-18&kodexWeight=60',
   ]) assert.equal(recoveryReturnHref(new URL(recoveryHref('/portfolio/holdings', source), 'https://local.test').hash), source);
 });
 it('recovery rejects external, malformed, oversized and unsupported return routes', () => {

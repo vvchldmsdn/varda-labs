@@ -11,7 +11,7 @@ const paths = new Set([
 ]);
 const fields = new Set(['scope', 'account', 'accountId', 'currency', 'amount', 'cashAmountKrw',
   'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window',
-  'horizon', 'end', 'start', 'period', 'metric', 'date', 'analysis', 'run', 'kodexWeight', 'q', 'asOfDate',
+  'horizon', 'end', 'start', 'period', 'metric', 'date', 'analysis', 'run', 'kodexWeight', 'basketAnchor', 'q', 'asOfDate',
   'view', 'detail', 'model', 'range', 'selectedDate', 'historyDate', 'historyPeriod', 'historyMetric', 'historySource',
   '_historyDate', '_historyPeriod', '_historyMetric', '_historyScope', '_historyCurrency', '_historyReturn', '_historyDateBasis',
   '_historyViewPeriod', '_historyViewMetric', '_historyViewScope', '_historyViewCurrency', '_nativeView']);

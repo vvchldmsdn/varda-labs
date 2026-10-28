@@ -15,10 +15,14 @@ function assertDraft(location, pathname, draft, hash = '') {
   }
 }
 
-function assertReturnFragment(page, pathname, draft, hash = '') {
-  const fragment = new URL(page.url()).hash;
+function assertRecoveryFragment(location, pathname, draft, hash = '') {
+  const fragment = new URL(location).hash;
   assert.ok(fragment.startsWith('#cairn-return='), 'Resolution must carry the explicit return fragment');
   assertDraft(decodeURIComponent(fragment.slice('#cairn-return='.length)), pathname, draft, hash);
+}
+
+function assertReturnFragment(page, pathname, draft, hash = '') {
+  assertRecoveryFragment(page.url(), pathname, draft, hash);
 }
 
 async function captureWidths(page, output, name, focus) {
@@ -78,11 +82,26 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await expect(page).toHaveURL(/\/portfolio\/holdings\?/);
     assert.equal(new URL(page.url()).searchParams.get('scope'), scope);
     assertReturnFragment(page, '/portfolio/risk', riskDraft);
+    await expect(page.locator('[data-recovery-return]').getByRole('button', { name: returnLabel, exact: true })).toBeVisible();
     const holding = page.locator(`[data-holding-management="${asset}"]`);
     await expect(holding).toBeVisible();
     await holding.getByText('분석 데이터 준비 상태', { exact: true }).click();
     await expect(holding.locator('details[open]')).toBeVisible();
-    await page.getByRole('link', { name: '종목 추가', exact: true }).click();
+    const bodyAdd = page.locator('main.varda-secondary-page > section [data-cairn-page-header]').getByRole('link', { name: '종목 추가', exact: true });
+    const addLinks = [
+      ['page action', bodyAdd],
+      ['top bar', page.locator('.varda-topbar-add')],
+      ['mobile menu', page.locator('.varda-mobile-menu a[href^="/portfolio/holdings/new"]')],
+    ];
+    for (const [location, link] of addLinks) {
+      await expect(link, `${location}: one explicit add-holding link`).toHaveCount(1);
+      await expect(link, `${location}: return fragment survives hydration`).toHaveAttribute('href', /#cairn-return=/);
+      const destination = new URL(await link.getAttribute('href'), url);
+      assert.equal(destination.pathname, '/portfolio/holdings/new', `${location}: correct destination`);
+      assert.equal(destination.searchParams.get('scope'), scope, `${location}: account scope preserved`);
+      assertRecoveryFragment(destination.href, '/portfolio/risk', riskDraft);
+    }
+    await bodyAdd.click();
     await expect(page).toHaveURL(/\/portfolio\/holdings\/new\?/);
     assert.equal(new URL(page.url()).searchParams.get('scope'), scope);
     assertReturnFragment(page, '/portfolio/risk', riskDraft);
@@ -160,7 +179,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await openRecords(emptyDraft);
     await page.getByRole('button', { name: returnLabel, exact: true }).click();
     await expect(page.getByText('저장된 평가가 없습니다.', { exact: true })).toBeVisible();
-    await page.getByRole('link', { name: '홈', exact: true }).click();
+    await page.locator('[data-beta-root] > aside[aria-label="목적별 내비게이션"]').getByRole('link', { name: '홈', exact: true }).click();
     await expect(page.locator('[data-beta-card="history"]').getByRole('button', { name: '수익률', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
 

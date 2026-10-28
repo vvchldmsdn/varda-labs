@@ -20,6 +20,12 @@ function freshReturnHref(href: string) {
   return url.pathname + url.search + url.hash;
 }
 export function RecoveryReturn() {
+  const pathname = usePathname(), search = useSearchParams();
+  // Layouts survive App Router navigation. Remount the fragment subscriber after
+  // a route commit: pushState itself does not emit hashchange for that navigation.
+  return <RecoveryReturnContent key={`${pathname}?${search}`} />;
+}
+function RecoveryReturnContent() {
   const href = useReturnHref(), router = useRouter(), { t } = useI18n();
   if (!href) return null;
   function back() {
