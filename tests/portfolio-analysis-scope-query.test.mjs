@@ -68,7 +68,7 @@ describe("tenant portfolio analysis scope query", () => {
         links.push({ href, label: text(children), current: props["aria-current"], accessibleName: props["aria-label"] });
         return React.createElement("a", { href, ...props }, children);
       } },
-      "next/navigation": { usePathname: () => "/simulation" },
+      "next/navigation": { usePathname: () => "/simulation", useSearchParams: () => new URLSearchParams(), useRouter: () => ({}) },
     });
     const localizedLinks = [];
     for (const locale of ["ko", "en"]) {

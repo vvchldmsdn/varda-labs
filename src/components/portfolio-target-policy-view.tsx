@@ -1,9 +1,10 @@
-import Link from "next/link";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { RecoveryBackLink } from '@/components/recovery/recovery-return';
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
+import { ArrowLeft } from "lucide-react";
 import { T } from "@/components/i18n/localized-text";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
-import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
+import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
 import { PortfolioTargetPolicyEditor } from "./portfolio-target-policy-form";
 import type { PortfolioTargetEditorRow } from "./portfolio-target-policy-editor";
@@ -31,7 +32,7 @@ export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, 
   return <main className="varda-page" data-page="portfolio-targets" data-design-preview={isDesignPreview || undefined}>
     <SecondaryPageHeader />
     <div className={styles.content} id="varda-main-content" tabIndex={-1}>
-      <Link className={styles.back} href={navigation.returnHref}><ArrowLeft size={15} aria-hidden="true" /><T {...navigation.returnLabel} /></Link>
+      <RecoveryBackLink className={styles.back} href={navigation.returnHref}><ArrowLeft size={15} aria-hidden="true" /><T {...navigation.returnLabel} /></RecoveryBackLink>
       <header className={styles.heading}>
         <div><CairnPageTitle><T ko="목표 비중" en="Target weights" /></CairnPageTitle><details className="cairn-details"><summary><T ko="목표비중 안내" en="About target weights" /></summary><p><T ko="선택한 범위에서 종목별 비중을 정합니다. 합계를 100%로 맞추세요." en="Set each holding’s share within this scope. The total must be 100%." /></p></details></div>
         {isDesignPreview ? <span className={styles.headingBadge}><T ko="예시 · 저장 불가" en="Demo · No saving" /></span> : null}
@@ -46,7 +47,7 @@ export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, 
       {isReady && universeHash ? <PortfolioTargetPolicyEditor key={selectedScope.key} rows={rows} accounts={accounts} scopeKey={selectedScope.key} approvalRevision={approvalRevision} universeHash={universeHash} isDesignPreview={isDesignPreview} returnHref={navigation.returnHref} returnLabel={navigation.returnLabel} /> : <div className={styles.blocked}>
         <CairnSectionTitle><T ko={rows.length === 0 ? "보유종목부터 연결해 주세요." : "보유종목 구성을 확인해 주세요."} en={rows.length === 0 ? "Start with your holdings." : "Check your holdings first."} /></CairnSectionTitle>
         <p><T ko="선택한 범위의 계좌와 보유종목 연결을 확인하면 목표비중을 설정할 수 있습니다. 현재 저장된 목표는 변경하지 않습니다." en="Check the accounts and holdings linked to this scope before setting targets. Existing targets remain unchanged." /></p>
-        <Link href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key, isDesignPreview ? { preview: "design" } : {})}><T ko="보유종목 확인" en="Review holdings" /><ArrowRight size={15} aria-hidden="true" /></Link>
+        <RecoveryNotice kind="holdings" scope={selectedScope.key} allowResolve={!isDesignPreview} />
       </div>}
     </div>
   </main>;

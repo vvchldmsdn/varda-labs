@@ -1,4 +1,6 @@
 "use client";
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
+import { betaHref } from '@/lib/cairn-v2/navigation';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, FormActions as CairnFormActions, Status as CairnStatus } from "@/components/cairn-ui";
 
 import {SaleExclusionPicker} from "../sale-exclusion-picker";
@@ -7,6 +9,7 @@ import { useId, useState } from "react";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { requestKey, type BetaView } from "@/lib/cairn-v2/read-contract";
 import { useBetaContext } from "./use-beta-context";
+import { useBetaExistingCrudAvailable } from './beta-provider';
 import styles from "./beta.module.css";
 
 import {AdditionalContributionAllocationTable} from "./reused/allocation-list";
@@ -21,8 +24,10 @@ export { ContributionHome } from "./home-contribution";
 
 export function TargetDetail({view}: {view: BetaView}) {
   const target = view.domain?.planning?.targets;
+  const available = useBetaExistingCrudAvailable();
   return <div className={styles.planningDetail} data-target-state={target?.state ?? view.domain?.state}>
     <CairnStatus as="p" role="status" className={styles.muted}>{targetMessage(view)}</CairnStatus>
+    {target && target.state !== 'ready' && <RecoveryNotice beta allowResolve={available && Boolean(view.domain)} scope={target.provenance?.scopeKey} kind={target.state === 'missing' ? 'targets' : target.state === 'partial' ? 'market' : 'retry'} />}
     {target?.provenance && <p className={styles.muted}>{target.state === "ready" ? "승인 목표" : "목표 정책 조회 근거"} · revision {target.provenance.approvalRevision ?? "없음"} · 적용일 {target.provenance.effectiveServiceDate ?? "없음"} · 평가 기준일 {target.provenance.serviceDate}</p>}
     {target?.maxDrift && <p className={styles.detailNumber}>{driftNumber(target.maxDrift.driftPct)}<small>%p</small></p>}
     <p className={styles.muted}>현재 비중 − 승인 목표 · 수익률이나 매도 주문이 아닙니다.</p>
@@ -31,6 +36,7 @@ export function TargetDetail({view}: {view: BetaView}) {
 }
 export function ContributionDetail({view, context, onEdit, onCalculate}: {view: BetaView; context: BetaContext; onEdit?: (dirty: boolean) => void; onCalculate?: (amount: string,keys?:string[]) => void}) {
   const inputId=useId();
+  const available = useBetaExistingCrudAvailable();
   const [evidenceOpen,setEvidenceOpen] = useState(false);
   const [,setContext] = useBetaContext(context);
   const queryKey = requestKey(context);
@@ -53,8 +59,7 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
       <CairnFormActions className={presentation.submitRow}><CairnButton variant="primary" className={presentation.calculate} type="submit" disabled={context.currency!=="KRW"}>계산 <span aria-hidden="true">↗</span></CairnButton></CairnFormActions>
     </CairnForm><div className={presentation.fundingPanel}>{result&&<ContributionFundingVisual cash={result.cashAmountKrw} trims={result.totalTrimProceedsKrw} total={result.totalAvailableFundsKrw} residual={result.residualCashKrw} rows={result.rows.map((row,i)=>({key:row.accountCode+":"+row.ticker+":"+i,name:row.name,amount:row.allocationKrw}))}/>}</div></div>
     <p className={styles.muted}>KRW 양의 정수 · 최대 100,000,000,000원 · 입력한 조건으로만 계산</p>
-    <CairnStatus as="p" role="status" className={styles.muted}>{dirty ? "입력 변경 · 계산 대기 · 이전 결과는 숨겼습니다." : read?.message ?? "계산 대기"}</CairnStatus>
-    {read?.blockers.length ? <p className={styles.muted}>보류 사유: {read.blockers.join(" · ")}</p> : null}
+    {(read?.state === 'blocked' || read?.state === 'unavailable') ? <RecoveryNotice beta allowResolve={available && context.mode === 'domain'} scope={context.scope} reasons={read.blockers} kind={read.state === 'unavailable' ? 'retry' : undefined} returnHref={betaHref('/beta', {...context,cashAmountKrw:amount,excludeSell:excludedSales})+'#beta-contribution'} /> : <CairnStatus as="p" role="status" className={styles.muted}>{dirty ? "입력 변경 · 계산 대기 · 이전 결과는 숨겼습니다." : read?.message ?? "계산 대기"}</CairnStatus>}
     {result && <>
 
       <dl className={presentation.footerNumbers}>

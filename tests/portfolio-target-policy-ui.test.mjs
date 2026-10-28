@@ -8,6 +8,7 @@ import { parseTargetWeightPercent } from "../src/lib/portfolio-target-policy.ts"
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 const scope = "account:11111111-1111-4111-8111-111111111111";
+const targetNavigationPort = { usePathname: () => "/portfolio/targets", useSearchParams: () => new URLSearchParams({ scope }), useRouter: () => ({}) };
 const fixtureRow = (overrides = {}) => ({ accountName: "Test account", assetName: "Example fund", market: "korea", currency: "KRW", ticker: "123456", buyability: "buyable", currentValueKrw: 300, targetWeightBps: 10_000, ...overrides });
 
 describe("target-weight editing and navigation", () => {
@@ -19,6 +20,7 @@ describe("target-weight editing and navigation", () => {
       { status: "success", message: "saved", approvalRevision: 3 },
     ];
     const [{ PortfolioTargetPolicyForm }] = await importUiWithPorts(["src/components/portfolio-target-policy-form.tsx"], {
+      "next/navigation": targetNavigationPort,
       "next/link": { default: () => null },
       "@/app/portfolio/targets/actions": { savePortfolioTargetPolicy: async () => responses.shift() },
       "@/components/i18n/locale-provider": { useI18n: () => ({ locale: "en", t: (ko, en) => en ?? ko }) },
@@ -50,7 +52,7 @@ describe("target-weight editing and navigation", () => {
   it("offers target setup only for missing or changed target policies, never data failures", async () => {
     const [view] = await importUiWithPorts(["src/components/additional-contribution/additional-contribution-page-view.tsx"], {
       "next/link": { default: () => null },
-      "next/navigation": { useRouter: () => ({}) },
+      "next/navigation": targetNavigationPort,
       "./additional-contribution-result": { AdditionalContributionAllocationTable: () => null, AdditionalContributionFlowScene: () => null, AdditionalContributionWeightScene: () => null },
       "./additional-contribution-logic-dialog": { AdditionalContributionLogicDialog: () => null },
       "./contribution-adjustment-dialog": { ContributionAdjustmentDialog: () => null },
@@ -159,6 +161,7 @@ describe("target-weight editing and navigation", () => {
       "src/components/portfolio-target-policy-form.tsx", "src/components/i18n/locale-provider.tsx",
     ], {
       "@/app/portfolio/targets/actions": { savePortfolioTargetPolicy: async () => { throw new Error("A render must not write a policy"); } },
+      "next/navigation": targetNavigationPort,
       "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
     });
     for (const locale of ["ko", "en"]) {

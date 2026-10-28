@@ -42,6 +42,8 @@ it("renders the existing risk evidence as one section without a second portfolio
   const states = ["USD", result, false, false, undefined, null, "0", 126, 126, input.histories[0].instrumentId];
   let index = 0;
   const [view] = await importUiWithPorts(["src/components/currency-research-view.tsx"], {
+    "@/components/recovery/recovery-notice": { RecoveryNotice: () => null },
+    "next/navigation": { useRouter: () => ({ replace() {}, refresh() {} }) },
     react: { ...React, useState: () => [states[index++], () => {}], useMemo: fn => fn(), useEffect: () => {}, useRef: () => ({ current: null }) },
     "@/components/i18n/locale-provider": { useI18n: () => ({ locale: "en", t: (ko, en) => en ?? ko }) },
     "@/components/portfolio/portfolio-allocation-ring": { PortfolioAllocationRing: () => React.createElement("p", null, "DUPLICATE RING") },

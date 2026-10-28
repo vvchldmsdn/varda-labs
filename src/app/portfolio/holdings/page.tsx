@@ -3,7 +3,7 @@ import { ManagementText } from "@/components/i18n/management-text";
 import { T } from "@/components/i18n/localized-text";
 import { HoldingsManagementList } from "@/components/holdings-management-list";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
-import Link from "next/link";
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import {
@@ -103,7 +103,7 @@ export default async function TenantHoldingsPage({
           <PageHeader className="mt-5" title={<T ko="보유 종목" en="Your holdings" />}
             description={<T ko="수량과 매입가를 확인하고 수정하세요. 매입가는 나중에 입력해도 됩니다." en="Review quantities and average costs. You can add missing purchase costs later." />}
             actions={
-            <Link href="/portfolio/holdings/new" className="inline-flex min-h-11 items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)]"><T ko="종목 추가" en="Add holding" /></Link>
+            <Link href={`/portfolio/holdings/new?${new URLSearchParams({scope:selectedScope?.key ?? 'all'})}`} className="inline-flex min-h-11 items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)]"><T ko="종목 추가" en="Add holding" /></Link>
           } />
           <details className="mt-4 text-sm"><summary className="w-fit cursor-pointer py-2 text-[var(--muted)]"><T ko="계좌·관련 기록" en="Accounts & related records" /></summary><nav className="mt-2 flex flex-wrap gap-x-5 gap-y-3 text-sm">
             <Link href="/portfolio/accounts"><T ko="계좌 관리" en="Accounts" /></Link>

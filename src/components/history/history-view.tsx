@@ -82,7 +82,7 @@ export function HistoryView({
           </header>
 
 
-          <RecoveredHistoryExplorer accountId={detailParams.preview !== 'design' && history.selectedScope.kind === 'account' ? history.selectedScope.accountId : undefined} model={overview} scopeLabel={history.selectedScope.label} status={<>
+          <RecoveredHistoryExplorer key={JSON.stringify([history.selectedScope.key,detailParams.period,detailParams.metric,detailParams.date])} initialSelection={detailParams} recovery={detailParams.preview === 'design' ? undefined : {scope:history.selectedScope.key,readFailed:history.unavailableSources.length>0,valuationIncomplete:liveValuation?.state==='partial'||liveValuation?.state==='unavailable'}} accountId={detailParams.preview !== 'design' && history.selectedScope.kind === 'account' ? history.selectedScope.accountId : undefined} model={overview} scopeLabel={history.selectedScope.label} status={<>
             {history.unavailableSources.length ? <T ko={`일부 기록 확인 필요 · ${history.unavailableSources.map(historyReadSourceLabel).join(", ")}`} en={`Some records need review · ${history.unavailableSources.map(source => translateHomeHistory(historyReadSourceLabel(source))).join(", ")}`}/> : null}
             {liveValuation && (liveValuation.state === "partial" || liveValuation.state === "unavailable") ? <p><T ko="현재 평가 근거가 부족해 오늘 값을 추가하지 않았습니다. 저장 기록은 그대로 표시합니다." en="Today's value is unavailable because current valuation evidence is incomplete. Recorded history remains visible."/></p> : null}
           </>} details={

@@ -115,6 +115,7 @@ export function SimulationDateControl() {
   const [pending, startTransition] = useContext(SimulationTransitionContext) ?? localTransition;
   return (
     <CairnForm
+      id="simulation-date-filter"
       className="flex flex-wrap items-end gap-3"
       data-simulation-link-pending={pending || undefined}
       onSubmit={(event) => {

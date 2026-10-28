@@ -3,7 +3,8 @@ import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn
 
 import { DetailHeader } from './ui/molecules';
 
-import Link from 'next/link';
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
+import { carryRecoveryFragment } from '@/lib/recovery-navigation';
 import {useCallback,useLayoutEffect,useMemo,useRef,useTransition,type FormEvent,type MutableRefObject} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {createBetaHoldingBatch} from '@/app/beta/portfolio/holdings/new/actions';
@@ -43,11 +44,11 @@ export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:Holdi
  const initialAccountId=context.scope.startsWith('account:')&&accountIds.includes(context.scope.slice(8))?context.scope.slice(8):'';
  const afterSuccess=useCallback((accountId:string)=>{
   const nextEpoch=crypto.randomUUID();store?.begin(nextEpoch);
-  startTransition(()=>router.push(ownedManagementHref('holdings',{...context,scope:`account:${accountId}`},nextEpoch),{scroll:false}));
+  startTransition(()=>router.push(carryRecoveryFragment(ownedManagementHref('holdings',{...context,scope:`account:${accountId}`},nextEpoch),location.hash),{scroll:false}));
  },[context,router,store]);
  const action=useOnboardingContinuation(createBetaHoldingBatch,generation,current,accountIds,afterSuccess);
- const retry=()=>{const nextEpoch=crypto.randomUUID();store?.begin(nextEpoch);startTransition(()=>router.replace(onboardingHref(context,nextEpoch),{scroll:false}));};
- const navigate=(next:typeof context)=>startTransition(()=>router.push(onboardingHref(next,store?.pendingEpoch()),{scroll:false}));
+ const retry=()=>{const nextEpoch=crypto.randomUUID();store?.begin(nextEpoch);startTransition(()=>router.replace(carryRecoveryFragment(onboardingHref(context,nextEpoch),location.hash),{scroll:false}));};
+ const navigate=(next:typeof context)=>startTransition(()=>router.push(carryRecoveryFragment(onboardingHref(next,store?.pendingEpoch()),location.hash),{scroll:false}));
  const preventBlocked=(event:FormEvent)=>{if(!enabled)event.preventDefault()};
  const state=blocked?'loading':read.state,message=blocked?'사용자·조회 범위를 다시 확인하는 중':read.message;
  const shell=blankDomainView(state,message);shell.domain!.scopes=blocked?[]:read.scopes;

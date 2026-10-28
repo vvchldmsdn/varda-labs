@@ -72,6 +72,7 @@ test("Lab replaces only short valid personal histories with first steps, preserv
   const Empty = () => null;
   const ports = {
     "./investment-lab-workspace": { InvestmentLabWorkspace: ({ showFirstSteps, comparison }) => createElement("section", { "data-first-steps": String(showFirstSteps) }, comparison) },
+    "next/navigation": { useRouter: () => ({}) },
   };
   for (const [path, name] of [
     ["@/components/portfolio-primary-navigation", "PortfolioPrimaryNavigation"],

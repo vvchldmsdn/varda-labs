@@ -11,6 +11,7 @@ const textOf = node => typeof node === "string" || typeof node === "number" ? St
 const ring = () => null;
 const i18n = { useI18n: () => ({ locale: "en", t: (_ko, en) => en ?? _ko }) };
 const basePorts = {
+  "@/components/recovery/recovery-notice": { RecoveryNotice: () => null },
   "@/components/quick-trade-actions": { QuickTradeActions: () => null },
   react: { useState: value => [value, () => {}], useMemo: fn => fn() },
   "@/components/i18n/locale-provider": i18n,

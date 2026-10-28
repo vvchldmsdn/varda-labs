@@ -6,6 +6,28 @@ import type {BetaView} from './read-contract';
 export type HistorySelection={date:string;period:'1M'|'3M'|'6M'|'ALL';metric:'value'|'return'};
 export type HistoryReturn=HistorySelection & {scope:string;currency:string;kind:'origin'|'direct';dateBasis?:'storage'};
 const fields=['_historyDate','_historyPeriod','_historyMetric','_historyScope','_historyCurrency','_historyReturn'] as const;
+export type HistoryDisplayReturn=Pick<HistorySelection,'period'|'metric'> & {scope:string;currency:string};
+const displayFields=['_historyViewPeriod','_historyViewMetric','_historyViewScope','_historyViewCurrency'] as const;
+/** Display preferences only. Empty or live views carry no historical date evidence. */
+export function parseHistoryDisplayReturn(search:URLSearchParams,context:BetaContext):HistoryDisplayReturn|'invalid'|null{
+ if(!displayFields.some(k=>search.has(k)))return null;
+ if(fields.some(k=>search.has(k))||search.has('_historyDateBasis'))return 'invalid';
+ const values=displayFields.map(k=>search.getAll(k));if(values.some(v=>v.length!==1))return 'invalid';
+ const [period,metric,scope,currency]=values.map(v=>v[0]);
+ if(!['1M','3M','6M','ALL'].includes(period)||!['value','return'].includes(metric)||scope!==context.scope||currency!==context.currency||context.mode!=='domain')return 'invalid';
+ return {period:period as HistorySelection['period'],metric:metric as HistorySelection['metric'],scope,currency};
+}
+export function historyDisplayReturnHref(context:BetaContext,selection:Pick<HistorySelection,'period'|'metric'>,epoch?:string|null){
+ const url=new URL(betaReadHref(betaHref('/beta/history',context)+'#history-evidence',epoch),'https://beta.invalid');
+ const values=[selection.period,selection.metric,context.scope,context.currency];displayFields.forEach((field,index)=>url.searchParams.set(field,values[index]));
+ return url.pathname+url.search+url.hash;
+}
+export function validateHistoryDisplayReturn(hint:HistoryDisplayReturn|'invalid'|null,view:BetaView){
+ if(!hint)return 'none';if(hint==='invalid')return 'invalid';
+ if(view.domain?.state==='loading'||view.domain?.historyState==='loading')return 'loading';
+ if(!view.domain||view.domain.state==='unauthorized'||!['ready','partial','empty'].includes(view.domain.historyState))return 'unavailable';
+ return 'valid';
+}
 export function parseHistoryReturn(search:URLSearchParams,context:BetaContext):HistoryReturn|'invalid'|null{
  if(!fields.some(k=>search.has(k)))return null;
  const values=fields.map(k=>search.getAll(k));if(values.some(v=>v.length!==1))return 'invalid';

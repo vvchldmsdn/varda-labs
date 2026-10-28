@@ -9,7 +9,9 @@ const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const accountId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const scope = { kind: "account", key: `account:${accountId}`, label: "Fixture", accountId, accountCode: "brokerage" };
 let currentQuery = new URLSearchParams();
-const [{ HistoryTimeExplorer }] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx"], {});
+const [{ HistoryTimeExplorer }] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx"], {
+  "next/navigation": { useRouter: () => ({ refresh() {}, push() {} }) },
+});
 const routingPorts = {
   "@/components/recovered-return-section": { RecoveredHistoryExplorer: HistoryTimeExplorer },
   "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => { throw new Error("Unexpected history UI tenant read"); } },

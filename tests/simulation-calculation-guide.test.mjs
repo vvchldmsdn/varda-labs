@@ -8,6 +8,7 @@ import { SIMULATION_RESEARCH_HORIZON_POLICY } from "../src/lib/simulation-resear
 import { calculateSimulationPathMaxDrawdowns } from "../src/lib/simulation-path-max-drawdown.ts";
 import { syntheticPathMaxDrawdownInput } from "./fixtures/simulation-path-max-drawdown.mjs";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
+import { recoveryReturnHref } from "../src/lib/recovery-navigation.ts";
 
 const linkPort = { default: ({ href, children, prefetch, ...props }) => {
   assert.equal(prefetch, false);
@@ -79,7 +80,7 @@ describe("beginner simulation calculation guide", () => {
     const [provider, owner] = await importUiWithPorts([
       "src/components/i18n/locale-provider.tsx",
       "src/components/simulation/owner-research-execution-section.tsx",
-    ], { "next/link": linkPort, "next/dynamic": { default: () => function DeferredGuide() { throw new Error("The closed guide must not render its lazy contents"); } } });
+    ], { "next/link": linkPort, "next/navigation": { useRouter: () => ({}) }, "next/dynamic": { default: () => function DeferredGuide() { throw new Error("The closed guide must not render its lazy contents"); } } });
     const base = {
       id: "owner-all", name: "내 포트폴리오", account: "all", instruments: [],
       policy: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY,
@@ -109,21 +110,71 @@ describe("beginner simulation calculation guide", () => {
   it("gives unavailable calculations an honest next action in the selected account or group", async () => {
     const [provider, owner] = await importUiWithPorts([
       "src/components/i18n/locale-provider.tsx", "src/components/simulation/owner-research-execution-section.tsx",
-    ], { "next/link": linkPort, "next/dynamic": { default: () => () => null } });
-    for (const selectedScopeKey of ["account:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "portfolio:cccccccc-cccc-4ccc-8ccc-cccccccccccc"]) {
-      for (const initialLocale of ["ko", "en"]) {
-        for (const reason of ["owner_input_unavailable", "historical_evidence_not_admitted", "input_matrix_unavailable", "invalid_end_service_date", "invalid_horizon_selection"]) {
-          const execution = { status: "unavailable", reason, policy: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY, assumptions: null, account: selectedScopeKey, instruments: [], endSelection: { status: "unavailable", endServiceDate: null, source: "latest_common_stored" }, coverage: { modeledInstrumentCount: 0, candidateInstrumentCount: 2, modeledCurrentValuePct: 0, omittedWeightBps: 0 } };
-          const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale }, React.createElement(owner.OwnerResearchExecutionSection, { execution, selectedScopeKey })));
-          assert.match(markup, initialLocale === "ko" ? /아직 이 구성으로 계산할 수 없습니다/ : /This portfolio cannot be simulated yet/);
-          assert.doesNotMatch(markup, /계산에 필요한 근거를 확인하고 있습니다|We are checking the evidence/);
-          const href = markup.match(/href="([^"]+)"/)?.[1];
-          assert.ok(href);
-          const url = new URL(href.replaceAll("&amp;", "&"), "https://example.test");
-          assert.equal(url.searchParams.get("scope"), selectedScopeKey);
-          assert.equal(url.pathname, reason.startsWith("invalid_") ? "/simulation" : "/portfolio/holdings");
-          if (reason === "historical_evidence_not_admitted") assert.match(markup, initialLocale === "ko" ? /과거 가격·환율/ : /Historical prices, exchange rates/);
+    ], { "next/link": linkPort, "next/navigation": { useRouter: () => ({}) }, "next/dynamic": { default: () => () => null } });
+    const pushes = [];
+    let refreshes = 0;
+    const [{ RecoveryNotice }] = await importUiWithPorts(["src/components/recovery/recovery-notice.tsx"], {
+      "next/navigation": { useRouter: () => ({ push: href => pushes.push(href), refresh: () => { refreshes += 1; } }) },
+      "@/components/i18n/locale-provider": { useI18n: () => ({ t: (ko, en) => en ?? ko }) },
+      react: { useTransition: () => [false, callback => callback()] },
+    });
+    const elements = node => Array.isArray(node) ? node.flatMap(elements) : node && typeof node === "object" ? [node, ...elements(node.props?.children)] : [];
+    const globals = new Map(["location", "document", "HTMLFormElement", "FormData"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+    class RecoveryForm {}
+    Object.defineProperties(globalThis, {
+      HTMLFormElement: { configurable: true, value: RecoveryForm },
+      document: { configurable: true, value: { getElementById: id => { assert.equal(id, "simulation-date-filter"); return new RecoveryForm(); } } },
+      FormData: { configurable: true, value: class { constructor(form) { assert.ok(form instanceof RecoveryForm); } get(name) { assert.equal(name, "end"); return "2026-10-25"; } } },
+    });
+    try {
+      for (const selectedScopeKey of ["account:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "portfolio:cccccccc-cccc-4ccc-8ccc-cccccccccccc"]) {
+        Object.defineProperty(globalThis, "location", { configurable: true, value: new URL(`/simulation?${new URLSearchParams({ scope: selectedScopeKey, end: "2026-09-01", horizon: "126" })}`, "https://example.test") });
+        for (const initialLocale of ["ko", "en"]) {
+          for (const reason of ["owner_input_unavailable", "historical_evidence_not_admitted", "input_matrix_unavailable", "input_matrix_shape_mismatch", "invalid_end_service_date", "invalid_horizon_selection"]) {
+            const execution = { status: "unavailable", reason, policy: SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY, assumptions: null, account: selectedScopeKey, instruments: [], endSelection: { status: "unavailable", endServiceDate: null, source: "latest_common_stored" }, coverage: { modeledInstrumentCount: 0, candidateInstrumentCount: 2, modeledCurrentValuePct: 0, omittedWeightBps: 0 } };
+            const markup = renderToStaticMarkup(React.createElement(provider.LocaleProvider, { initialLocale }, React.createElement(owner.OwnerResearchExecutionSection, { execution, selectedScopeKey })));
+            assert.match(markup, initialLocale === "ko" ? /아직 이 구성으로 계산할 수 없습니다/ : /This portfolio cannot be simulated yet/);
+            assert.doesNotMatch(markup, /계산에 필요한 근거를 확인하고 있습니다|We are checking the evidence/);
+            if (reason.startsWith("invalid_")) {
+              const href = markup.match(/href="([^"]+)"/)?.[1];
+              assert.ok(href);
+              const url = new URL(href.replaceAll("&amp;", "&"), "https://example.test");
+              assert.equal(url.searchParams.get("scope"), selectedScopeKey);
+              assert.equal(url.pathname, "/simulation");
+            } else {
+              const expectedKind = reason === "owner_input_unavailable" ? "holdings" : reason === "input_matrix_shape_mismatch" ? "retry" : "market";
+              assert.match(markup, new RegExp(`data-recovery-kind="${expectedKind}"`));
+              const notice = elements(owner.OwnerResearchExecutionSection({ execution, selectedScopeKey })).find(node => node.type?.name === "RecoveryNotice");
+              assert.ok(notice);
+              assert.equal(notice.props.scope, selectedScopeKey);
+              const buttons = elements(RecoveryNotice(notice.props)).filter(node => node.type === "button");
+              const beforePushes = pushes.length, beforeRefreshes = refreshes;
+              buttons[0].props.onClick();
+              if (expectedKind === "retry") {
+                assert.equal(refreshes, beforeRefreshes + 1);
+                assert.equal(pushes.length, beforePushes, "invalid evidence must not navigate to an editing screen");
+              } else {
+                assert.equal(pushes.length, beforePushes + 1);
+                const url = new URL(pushes.at(-1), "https://example.test");
+                assert.equal(url.pathname, "/portfolio/holdings");
+                assert.equal(url.searchParams.get("scope"), selectedScopeKey);
+                const back = new URL(recoveryReturnHref(url.hash), "https://example.test");
+                assert.equal(back.pathname, "/simulation");
+                assert.equal(back.searchParams.get("scope"), selectedScopeKey);
+                assert.equal(back.searchParams.get("horizon"), "126");
+                assert.equal(back.searchParams.get("end"), "2026-10-25", "recovery must preserve the currently edited form date");
+                buttons[1].props.onClick();
+                assert.equal(refreshes, beforeRefreshes + 1);
+              }
+            }
+            if (reason === "historical_evidence_not_admitted") assert.match(markup, initialLocale === "ko" ? /과거 가격·환율/ : /Historical prices, exchange rates/);
+          }
         }
+      }
+    } finally {
+      for (const [key, descriptor] of globals) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete globalThis[key];
       }
     }
   });

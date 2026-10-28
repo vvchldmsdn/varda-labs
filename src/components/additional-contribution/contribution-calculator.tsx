@@ -7,6 +7,8 @@ import { useState, useTransition, type FormEvent, type ReactNode, type CSSProper
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowUpRight, Check, LoaderCircle } from "lucide-react";
 import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
+import { recoveryHref } from '@/lib/recovery-navigation';
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import {SaleExclusionPicker,type SaleExclusionOption} from "../sale-exclusion-picker";
 import {SaleSelectionResultGate,useSaleSelection} from "../sale-exclusion-state";
@@ -23,7 +25,8 @@ export function ContributionTargetAction({ action }: { action: ContributionTarge
   return <CairnButton variant="primary" type="submit" form={CONTRIBUTION_FORM_ID} formNoValidate className={styles.textLink}><PortfolioText ko={action === "set" ? "목표비중 설정" : "목표비중 다시 확인"} en={action === "set" ? "Set target weights" : "Review target weights"} /><ArrowUpRight size={16} aria-hidden="true" /></CairnButton>;
 }
 
-export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, status, targetAction, children, allocations, exclusionOptions=[] }: {
+export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, status, targetAction, children, allocations, exclusionOptions=[], blockers=[] }: {
+  blockers?: readonly string[];
   exclusionOptions?: readonly SaleExclusionOption[];
   amountKrw: number;
   scopeKey: PortfolioAnalysisScopeKey;
@@ -38,6 +41,10 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
+  const [draft, setDraft] = useState({basis:amountKrw,value:amountKrw ? amountKrw.toLocaleString('ko-KR') : ''});
+  const amount = draft.basis === amountKrw ? draft.value : amountKrw.toLocaleString('ko-KR');
+  const returnQuery = new URLSearchParams({scope:scopeKey,amount:amount.replaceAll(',',''),...(isDesignPreview ? {preview:'design'} : {})});
+  for (const key of saleSelection?.keys ?? []) returnQuery.append('excludeSell',key);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,7 +53,7 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
     if (targetAction) {
       const navigation = buildPortfolioTargetNavigation({ scopeKey, from: "contribution", isDesignPreview,
         amount: String(data.get("amount") ?? "").replaceAll(",", "").trim() });
-      startTransition(() => router.push(navigation.settingsHref));
+      startTransition(() => router.push(recoveryHref(navigation.settingsHref, '/additional-contribution?'+returnQuery) ?? navigation.settingsHref));
       return;
     }
     const query = new URLSearchParams();
@@ -66,14 +73,14 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
         {isDesignPreview ? <input type="hidden" name="preview" value="design" /> : null}
         <CairnField htmlFor="additional-contribution-amount"><PortfolioText ko={"얼마를 더 투자할까요?"} /></CairnField>
         <div className={styles.amountInput}>
-          <CairnInput key={amountKrw} id="additional-contribution-amount" aria-describedby="additional-contribution-amount-hint" defaultValue={amountKrw ? amountKrw.toLocaleString("ko-KR") : ""} inputMode="numeric" name="amount" pattern="[0-9,]*" placeholder="0" required type="text" disabled={isPending} />
+          <CairnInput id="additional-contribution-amount" aria-describedby="additional-contribution-amount-hint" value={amount} onChange={event=>setDraft({basis:amountKrw,value:event.target.value})} inputMode="numeric" name="amount" pattern="[0-9,]*" placeholder="0" required type="text" disabled={isPending} />
           <span><PortfolioText ko={"원"} /></span>
         </div>
         <div aria-label={pt("투입 금액 빠른 선택")} className={styles.presets}>
           {PRESETS.map((preset) => <CairnButton variant="secondary" type="button" key={preset} disabled={isPending} onClick={(event) => {
             const form = event.currentTarget.form;
             const input = form?.elements.namedItem("amount");
-            if (input instanceof HTMLInputElement) { input.value = preset.toLocaleString("ko-KR"); input.focus(); }
+            if (input instanceof HTMLInputElement) { setDraft({basis:amountKrw,value:preset.toLocaleString('ko-KR')}); input.focus(); }
           }}><PortfolioText ko={`${preset / 10_000}만`} en={new Intl.NumberFormat("en-US", { style: "currency", currency: "KRW", notation: "compact", maximumFractionDigits: 1 }).format(preset)} /></CairnButton>)}
         </div>
         {!isDesignPreview&&<SaleExclusionPicker options={exclusionOptions} value={saleSelection?.keys??[]} onChange={keys=>saleSelection?.choose(keys)} disabled={isPending}/>}
@@ -82,6 +89,7 @@ export function ContributionCalculator({ amountKrw, scopeKey, isDesignPreview, s
           <CairnStatus as="span" tone="neutral" className={styles.calculationStatus} role="status">{isPending ? targetAction ? pt("입력한 금액을 유지하고 이동합니다", "Keeping your entered amount") : pt("현재 가격과 목표를 계산하고 있어요") : submitted ? <>{status === "ready" ? <Check size={13} aria-hidden="true" /> : null}<PortfolioText ko={status === "ready" ? "계산 완료" : "계산 근거 확인 필요"} /></> : ""}</CairnStatus>
         </div>
         <p id="additional-contribution-amount-hint" className={styles.hint}><PortfolioText ko={"계산 결과만 제공하며 실제 주문은 실행하지 않습니다."} /></p>
+        {status === 'blocked' && !targetAction && <RecoveryNotice reasons={blockers} scope={scopeKey} allowResolve={!isDesignPreview} returnHref={'/additional-contribution?'+returnQuery} />}
       </CairnForm>
       <div className={styles.fundingPanel} aria-busy={isPending}><SaleSelectionResultGate>{children}</SaleSelectionResultGate></div>
       {allocations ? <aside className={styles.featuredPanel} aria-label={pt("대표 배분 결과")}><SaleSelectionResultGate>{allocations}</SaleSelectionResultGate></aside> : null}

@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { buildCurrencyResearch, type CurrencyResearchInput, type CurrencyResearchResult } from "@/lib/currency-research";
 import { formatMoney, type Currency } from "@/lib/money";
 import { PortfolioAllocationRing } from "@/components/portfolio/portfolio-allocation-ring";
 import { buildCurrencyInvestmentLabCounterfactual } from "@/lib/investment-lab-counterfactual-path";
+import { RecoveryNotice } from "@/components/recovery/recovery-notice";
+import { currencyRecoveryKind, type NativeViewDraft } from "@/lib/recovery-currency";
 import styles from "./currency-research-view.module.css";
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
@@ -52,27 +55,31 @@ function inputTimestamp(at: string, timeZone: string) {
 }
 
 type ResearchSurface = "lab" | "simulation" | "structure";
-export function CurrencyResearchView({ evidence, surface, hideCurrencyControl = false }: { evidence: CurrencyResearchInput; surface?: ResearchSurface; hideCurrencyControl?: boolean }) {
+type ResearchViewProps = { evidence: CurrencyResearchInput; surface?: ResearchSurface; hideCurrencyControl?: boolean; recoveryScope?: string; initialView?: NativeViewDraft | null };
+export function CurrencyResearchView({ evidence, surface, hideCurrencyControl = false, recoveryScope, initialView }: ResearchViewProps) {
   // A different saved input must not inherit another draft's experimental weights.
-  return <CurrencyResearchWorkspace key={`${JSON.stringify(evidence.input)}:${evidence.reportingCurrency}:${surface}`} evidence={evidence} surface={surface} hideCurrencyControl={hideCurrencyControl} />;
+  return <CurrencyResearchWorkspace key={`${JSON.stringify(evidence.input)}:${evidence.reportingCurrency}:${surface}`} evidence={evidence} surface={surface} hideCurrencyControl={hideCurrencyControl} recoveryScope={recoveryScope} initialView={initialView} />;
 }
 
-function CurrencyResearchWorkspace({ evidence, surface, hideCurrencyControl }: { evidence: CurrencyResearchInput; surface?: ResearchSurface; hideCurrencyControl: boolean }) {
+function CurrencyResearchWorkspace({ evidence, surface, hideCurrencyControl, recoveryScope, initialView }: ResearchViewProps) {
   const { t, locale: language } = useI18n();
+  const router = useRouter();
+  const sameRows = initialView?.instruments?.length === evidence.input.rows.length && initialView.instruments.every((id, index) => id === evidence.input.rows[index].instrumentId);
   const [currency, setCurrency] = useState<Currency>(evidence.reportingCurrency);
   const [result, setResult] = useState<CurrencyResearchResult | null>(null);
   const [busy, setBusy] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [comparison, setComparison] = useState<readonly number[] | undefined>(evidence.comparisonWeights);
-  const [fields, setFields] = useState<string[] | null>(null);
-  const [selected, setSelected] = useState("0");
-  const [horizon, setHorizon] = useState(evidence.horizon ?? 126);
-  const [step, setStep] = useState(evidence.horizon ?? 126);
+  const [comparison, setComparison] = useState<readonly number[] | undefined>(sameRows && initialView?.comparison?.length === evidence.input.rows.length ? initialView.comparison : evidence.comparisonWeights);
+  const [fields, setFields] = useState<string[] | null>(sameRows && initialView?.fields?.length === evidence.input.rows.length ? initialView.fields : null);
+  const [selected, setSelected] = useState(initialView?.selected && /^\d+$/.test(initialView.selected) && Number(initialView.selected) < evidence.input.rows.length ? initialView.selected : "0");
+  const initialHorizon = initialView?.horizon && (evidence.input.version === 3 && surface === "simulation" ? [63, 126] : [30, 126, 252]).includes(initialView.horizon) ? initialView.horizon : evidence.horizon ?? 126;
+  const [horizon, setHorizon] = useState(initialHorizon);
+  const [step, setStep] = useState(initialView?.step !== undefined && initialView.step <= initialHorizon ? initialView.step : initialHorizon);
   const owned = evidence.provenance === "owned_native_history" && evidence.input.version === 3;
   const actual = owned && evidence.actualPortfolio?.reportingCurrency === currency ? evidence.actualPortfolio : null;
   const selectedGroup = actual?.boundary === "selected_group";
   const scenarios = evidence.histories.filter(history => history.admission !== "native_cash");
-  const [scenarioId, setScenarioId] = useState(scenarios[0]?.instrumentId ?? "");
+  const [scenarioId, setScenarioId] = useState(scenarios.some(item => item.instrumentId === initialView?.scenarioId) ? initialView!.scenarioId! : scenarios[0]?.instrumentId ?? "");
   const sameFlow = useMemo(() => {
     const scenario = evidence.histories.find(history => history.instrumentId === scenarioId);
     return owned && surface !== "structure" && surface !== "simulation" && evidence.counterfactual?.reportingCurrency === currency && scenario
@@ -97,6 +104,18 @@ function CurrencyResearchWorkspace({ evidence, surface, hideCurrencyControl }: {
   const locale = language === "en" ? "en-US" : "ko-KR";
   const entries = rows.map((row, index) => ({ key: String(index), name: row.name, weightPct: (row.weight ?? 0) * 100 }));
   const issues = result?.issues ?? [];
+  const recoveryReasons = [...issues.map(issue => issue.code), ...(surface === "lab" && sameFlow?.reason ? [sameFlow.reason] : [])];
+  const recoveryKind = failed ? "retry" : currencyRecoveryKind(recoveryReasons) ?? (surface === "lab" && owned && actual?.totalReturnPct == null ? "trades" : null);
+  const recoveryDraft = { currency, ...(surface === "simulation" ? { horizon: String(horizon) } : {}), _nativeView: JSON.stringify({ version: 1, scope: recoveryScope ?? "", view: surface ?? "research", currency, selected, horizon, step, ...(fields ? { fields } : {}), ...(comparison ? { comparison: [...comparison] } : {}), instruments: evidence.input.rows.map(row => row.instrumentId ?? ""), scenarioId } satisfies NativeViewDraft) };
+  const recoveryNotice = recoveryScope && owned && !busy && recoveryKind ? <RecoveryNotice kind={recoveryKind} scope={recoveryScope} reasons={recoveryReasons} draft={recoveryDraft} onRetry={() => {
+    // A refreshed owned input gets a new workspace key. Carry editable UI state
+    // through the same bounded return parser before requesting that fresh read.
+    const url = new URL(location.href);
+    for (const [key, value] of Object.entries(recoveryDraft)) url.searchParams.set(key, value);
+    const href = url.pathname + url.search;
+    if (href === location.pathname + location.search) router.refresh();
+    else router.replace(href, { scroll: false });
+  }} /> : null;
   const unavailable = <div className={styles.unavailable}><strong>{t("분석에 필요한 근거가 아직 부족해요.", "More evidence is needed for this analysis.")}</strong>{issues.length ? <ul>{issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.rowIndex !== undefined ? `${evidence.input.rows[issue.rowIndex]?.name} · ` : ""}{t(REASONS[issue.code] ?? "계산 근거를 확인해 주세요.", REASONS_EN[issue.code] ?? "Please review the calculation evidence.")}</li>)}</ul> : <p>{t("종목을 선택하고 확인된 시장 이력이 연결되면 계산할 수 있어요.", "Choose instruments and connect verified market history to calculate.")}</p>}<p>{t("확인된 일부만 다시 100%로 맞추거나 빈 이력을 채우지 않습니다.", "Missing assets and dates are never filled or reweighted away.")}</p></div>;
   const riskDetails = result?.risk ? <>
     <div className={styles.metrics}><div><span>{t("연율화 변동성", "Annualized volatility")}</span><strong>{result.risk.volatilityPct.toFixed(2)}%</strong></div><div><span>{t("함께 비교한 수익률", "Aligned return observations")}</span><strong>{result.risk.observations}{t("개", " observations")}</strong></div></div>
@@ -107,7 +126,7 @@ function CurrencyResearchWorkspace({ evidence, surface, hideCurrencyControl }: {
     <p className={styles.note}>{t("현재 비중을 유지했다고 가정한 위험입니다. Sharpe와 Beta는 같은 통화·수익률 기준·관측 기간의 근거가 확인된 지표만 표시합니다.", "Risk assumes constant current weights. Sharpe and Beta appear only with verified evidence matching the currency, return basis and observation intervals.")}</p>
     {result.risk.sharpe === null || result.risk.beta === null ? <p className={styles.note}>{t("일치하는 금리·벤치마크 근거가 없는 지표는 제공하지 않습니다.", "Metrics without matching rate or benchmark evidence remain unavailable.")}</p> : null}
   </> : unavailable;
-  if (surface === "structure") return <section className={styles.section} aria-labelledby="native-structure-risk"><div className={styles.sectionHeading}><span>{t("과거 시장에서 본 위험", "Risk from historical markets")} · {currency}</span><CairnSectionTitle id="native-structure-risk">{t("현재 구성의 변동성", "Volatility of your current allocation")}</CairnSectionTitle><p>{t("현재 보유 종목과 현금의 비중을 같은 날짜의 과거 수익률에 적용합니다. 실제 개인 수익률과는 별도의 위험 추정치입니다.", "Apply your current holdings and cash weights to historical returns from matching dates. This is a risk estimate, separate from your actual personal return.")}</p></div><div aria-live="polite">{busy ? <p className={styles.loading}>{t("통화별 위험을 계산하고 있어요…", "Calculating currency-specific risk…")}</p> : failed ? <p className={styles.unavailable}>{t("위험 계산에 필요한 이력을 확인할 수 없어요.", "The history needed for risk calculation is unavailable.")}</p> : riskDetails}</div></section>;
+  if (surface === "structure") return <section className={styles.section} aria-labelledby="native-structure-risk"><div className={styles.sectionHeading}><span>{t("과거 시장에서 본 위험", "Risk from historical markets")} · {currency}</span><CairnSectionTitle id="native-structure-risk">{t("현재 구성의 변동성", "Volatility of your current allocation")}</CairnSectionTitle><p>{t("현재 보유 종목과 현금의 비중을 같은 날짜의 과거 수익률에 적용합니다. 실제 개인 수익률과는 별도의 위험 추정치입니다.", "Apply your current holdings and cash weights to historical returns from matching dates. This is a risk estimate, separate from your actual personal return.")}</p></div>{recoveryNotice}<div aria-live="polite">{busy ? <p className={styles.loading}>{t("통화별 위험을 계산하고 있어요…", "Calculating currency-specific risk…")}</p> : failed ? <p className={styles.unavailable}>{t("위험 계산에 필요한 이력을 확인할 수 없어요.", "The history needed for risk calculation is unavailable.")}</p> : riskDetails}</div></section>;
   return <main id="varda-main-content" className={styles.workspace}>
     <header className={styles.header}><div><p className={styles.eyebrow}>{t("내 구성으로 보는 가상 실험", "A hypothetical experiment with your allocation")}</p><CairnPageTitle>{surface === "lab" ? (owned ? t("같은 입출금, 다른 선택", "The same cash flows, a different choice") : t("다른 비중이었다면?", "What if the weights were different?")) : surface === "simulation" ? t("1,000개의 가능한 경로", "1,000 possible paths") : t("통화를 바꾸면, 관점도 달라집니다.", "A different currency. A different perspective.")}</CairnPageTitle><p>{owned ? t("현재 보유 종목과 현금의 비중을 과거 시장에 적용하는 가상 비교입니다. 실제 매매 이력과는 구분됩니다.", "This hypothetical comparison applies your current holdings and cash weights to past markets. It is separate from your actual trading record.") : t("입력한 금액의 비중을 과거 시장에 적용해 비교합니다. 실제 투자 이력이나 미래 예측은 아닙니다.", "Compare your entered allocation using historical markets. This is hypothetical, not your investment record or a forecast.")}</p></div>{!hideCurrencyControl ? <CairnField className={styles.currency}>{t("분석 기준 통화", "Analysis currency")}<CairnSelect value={currency} onChange={event => { setBusy(true); setCurrency(event.target.value as Currency); }}><option value="KRW">{t("KRW · 원", "KRW · Korean won")}</option><option value="USD">{t("USD · 달러", "USD · US dollar")}</option></CairnSelect><span>{t("각 날짜의 환율로 다시 계산", "Recalculated with dated exchange rates")}</span></CairnField> : <span>{currency}</span>}</header>
     {evidence.provenance === "synthetic_fixture" ? <p className={styles.sample}>{t("개발용 가상 데이터 · 실제 시세와 투자 성과가 아닙니다.", "Synthetic development data · Not actual prices or investment results.")}</p> : null}
@@ -123,7 +142,7 @@ function CurrencyResearchWorkspace({ evidence, surface, hideCurrencyControl }: {
         <p className={styles.note}>{t("차트는 시작 평가액을 100으로 둔 자산 경로이며 입출금도 반영합니다. 수익률은 같은 관측 기간과 실제 입출금 시각으로 계산한 Modified Dietz 추정치입니다. 종가 확인 전 대기 금액은 기준 통화 현금 또는 출금 의무로 반영합니다.", "The chart indexes starting wealth to 100 and includes cash flows. Returns are Modified Dietz estimates using the same observed periods and actual flow timestamps. Amounts awaiting an eligible close remain reporting-currency cash or withdrawal obligations.")}</p>
       </> : <p className={styles.unavailable}>{sameFlow?.reason === "corporate_action_evidence_missing" ? t(REASONS.corporate_action_evidence_missing, REASONS_EN.corporate_action_evidence_missing) : t("실제 평가·입출금과 선택 종목의 해당 날짜 가격·환율이 모두 확인되어야 비교할 수 있어요.", "Comparison requires complete actual valuations, external flows and the selected instrument’s dated prices and FX.")}</p>}
     </section> : null}
-    <CairnStatus as="div" tone="neutral" aria-live="polite" role="status">{busy ? <p className={styles.loading}>{t("통화별 수익률과 1,000개 경로를 계산하고 있어요…", "Recalculating currency returns and 1,000 paths…")}</p> : failed ? <p className={styles.unavailable}>{t("계산을 완료하지 못했어요. 분석 통화를 다시 선택해 주세요.", "Calculation could not finish. Select the analysis currency again.")}</p> : null}</CairnStatus>
+    {recoveryNotice}<CairnStatus as="div" tone="neutral" aria-live="polite" role="status">{busy ? <p className={styles.loading}>{t("통화별 수익률과 1,000개 경로를 계산하고 있어요…", "Recalculating currency returns and 1,000 paths…")}</p> : failed ? <p className={styles.unavailable}>{t("계산을 완료하지 못했어요. 분석 통화를 다시 선택해 주세요.", "Calculation could not finish. Select the analysis currency again.")}</p> : null}</CairnStatus>
     {!busy && !failed && result ? <>
       {!surface ? <section className={styles.section} aria-labelledby="research-structure"><div className={styles.sectionHeading}><span>{t("01 / 구성과 위험", "01 / Composition & risk")}</span><CairnSectionTitle id="research-structure">{t("현재 입력, 하나의 포트폴리오로", "Your inputs, one portfolio")}</CairnSectionTitle></div>
         <div className={styles.twoColumns}><div>{result.composition.complete ? <PortfolioAllocationRing entries={entries} selectedKey={selected} onSelect={setSelected} compositionOnly /> : <p className={styles.unavailable}>{t("통화 환산이 완료되면 전체 비중을 표시합니다.", "Full weights are shown once all currency conversions are available.")}</p>}</div><div><p className={styles.total}>{result.composition.total !== null ? formatMoney(result.composition.total, currency, locale) : t("전체 금액 확인 필요", "Total needs verification")}</p><div className={styles.assetList}>{rows.map((row, index) => <CairnButton variant="selection" type="button" key={index} aria-pressed={selected === String(index)} onClick={() => setSelected(String(index))}><span>{row.name}</span><strong>{row.weight === null ? "—" : `${(row.weight * 100).toFixed(1)}%`}</strong></CairnButton>)}</div>

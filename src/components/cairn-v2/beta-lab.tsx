@@ -1,11 +1,12 @@
 'use client';
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { DetailHeader } from './ui/molecules';
 import {useLayoutEffect,useState,useTransition} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {BetaShell} from './beta-shell';
-import {useBetaReadFreshness} from './beta-provider';
+import {useBetaReadFreshness,useBetaExistingCrudAvailable} from './beta-provider';
 import {InvestmentLabComparisonChart} from '@/components/investment-lab/investment-lab-comparison-chart';
 import {ObservedHistoryChart} from './reused/lab-observed-chart';
 import {blankDomainView} from '@/lib/cairn-v2/read-contract';
@@ -13,6 +14,7 @@ import {blankLab,labContext,labHref,labKey,labNumber,labParams,labVisible,type L
 import {labPeriodReason,labBlockerLabel,labFundingLabel,labChartPalette} from './lab-presentation';
 import styles from './lab.module.css';
 export function BetaLab({read}:{read:LabRead}){
+ const crudAvailable=useBetaExistingCrudAvailable();
  const router=useRouter(),search=useSearchParams(),freshness=useBetaReadFreshness(),p=labParams(new URLSearchParams(search.toString())),context=labContext(p),key=labKey(p);
  const [pending,startTransition]=useTransition(),[draft,setDraft]=useState<{key:string;start:string;end:string}|null>(null);
  const observed=freshness?.observed,epoch=freshness?.epoch;
@@ -35,6 +37,7 @@ export function BetaLab({read}:{read:LabRead}){
   </CairnForm>
   <CairnStatus as="p" role="status" className={styles.status}>{dirty?'기간 변경 · 다시 실행하기 전에는 이전 결과를 표시하지 않습니다':visible.message}</CairnStatus>
   <p className={styles.note}>분석 기준 KRW · 표시 통화가 USD여도 환산하지 않습니다. 날짜를 비우면 원본의 기본 허용 기간을 실행 시 확인합니다.</p>
+  {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&<RecoveryNotice beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
   {model&&<>
    <dl className={styles.context}>
     <div><dt>요청 기간</dt><dd className={styles.dateRange}><span>{model.period.requestedStartServiceDate??'기본'}</span> ~ <span>{model.period.requestedEndServiceDate??'기본'}</span></dd></div>

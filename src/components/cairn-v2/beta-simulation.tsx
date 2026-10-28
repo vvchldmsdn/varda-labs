@@ -1,4 +1,5 @@
 "use client";
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Select as CairnSelect } from "@/components/cairn-ui";
 
 
@@ -7,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { betaHref } from '@/lib/cairn-v2/navigation';
 import { BetaShell } from "./beta-shell";
 import { useBetaContext } from "./use-beta-context";
-import { useBetaReadFreshness } from "./beta-provider";
+import { useBetaReadFreshness, useBetaExistingCrudAvailable } from "./beta-provider";
 import { blankDomainView } from "@/lib/cairn-v2/read-contract";
 import { blankSimulation, simulationKey, SIMULATION_RESEARCH_HORIZON_POLICY, type SimulationRead } from "@/lib/cairn-v2/simulation-contract";
 import { DetailHeader, EmptyState } from "./ui/molecules";
@@ -19,6 +20,7 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
   const [context, setContext] = useBetaContext(read.context);
   const freshness = useBetaReadFreshness();
   const router = useRouter();
+  const crudAvailable = useBetaExistingCrudAvailable();
   const [edited, setEdited] = useState<string | null>(null);
   const [running, startRun] = useTransition();
   const key = simulationKey(context);
@@ -64,6 +66,7 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
         <EmptyState title={visible.state === "loading" ? "연구 결과를 준비하고 있습니다" : visible.state === "idle" ? "조건을 확인하고 연구를 시작하세요" : "연구를 완료할 수 없습니다"}
           description={visible.model?.historyRecovery?'최근 조정 종가에 확인이 필요한 날짜가 있습니다. 요청한 기준일은 바꾸지 않았습니다.':visible.message}
           action={visible.model?.historyRecovery?<a href={betaHref('/beta/simulation',{...context,end:visible.model.historyRecovery.verifiedEndServiceDate,run:'1'})}>검증된 {visible.model.historyRecovery.verifiedEndServiceDate} 기준으로 보기 ↗</a>:undefined} />}
+      {!ready && crudAvailable && ['unavailable','partial','blocked'].includes(visible.state) && <RecoveryNotice beta scope={context.scope} reasons={visible.model?.execution.reason ? [visible.model.execution.reason] : []} kind={!visible.model ? 'retry' : undefined} />}
     </section>
   </BetaShell>;
 }

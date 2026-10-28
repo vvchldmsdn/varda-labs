@@ -8,7 +8,7 @@ import type { SimulationRead } from "@/lib/cairn-v2/simulation-contract";
 import heatmapStyles from "./holding-heatmap.module.css";
 import { ContributionHome } from "./home-contribution";
 import { TargetDriftHome } from "./target-drift-home";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { HomeCard as Card } from "./home-card";
 import { cardTitles, type CardKind } from "./card-definition";
@@ -58,6 +58,15 @@ export function BetaHome({
     setExpanded({ kind, origin: { rect: card.getBoundingClientRect(), trigger } });
   }
   const [contributionDirty, setContributionDirty] = useState(false);
+  useEffect(() => {
+    const resume = () => {
+      if (location.hash !== '#beta-contribution') return;
+      const trigger = document.getElementById('beta-contribution');
+      if (trigger) trigger.click();
+    };
+    resume(); window.addEventListener('hashchange', resume);
+    return () => window.removeEventListener('hashchange', resume);
+  }, []);
   const active = view.rows.find((r) => r.key === selected) ?? view.rows[0];
   const contributionTotal = view.contribution.length
     ? view.contribution.reduce((sum, r) => sum + r.amountKrw, 0)

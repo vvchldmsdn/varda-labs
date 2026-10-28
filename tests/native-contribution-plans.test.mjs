@@ -198,6 +198,7 @@ it('renders a saved USD decision on a KRW page without changing its frozen resul
   const [ui]=await importUiWithPorts(['src/components/native-contribution-planner.tsx'],{
     react:{useState:()=>[values[position++],()=>{}],useRef:()=>({current:null}),useEffect:()=>{}},
     'next/link':{default:({href,children})=>createElement('a',{href},children)},
+    'next/navigation':{usePathname:()=>'/additional-contribution',useSearchParams:()=>new URLSearchParams(),useRouter:()=>({refresh(){},push(){}})},
     '@/components/i18n/locale-provider':{useI18n:()=>({locale:'en',t:(_ko,en)=>en})},
     '@/components/first-visit/money-input':{MoneyInput:()=>null},
   });

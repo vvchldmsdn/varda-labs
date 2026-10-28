@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowDownRight, ArrowUpRight, Equal } from 'lucide-react';
-import { Button, Field, Input, Select, PageTitle, SectionHeading, Metric, MetricGroup, Status, EmptyState } from '@/components/cairn-ui';
+import { Button, Field, Input, Select, PageTitle, SectionHeading, Metric, MetricGroup, Status } from '@/components/cairn-ui';
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { compareContribution, evaluateContributionScenario, type ComparisonBasisResult, type ContributionComparison } from '@/lib/contribution-comparison';
 import type { Currency } from '@/lib/money';
 import styles from './contribution-comparison.module.css';
@@ -22,12 +24,19 @@ const cases = [
 export function ContributionComparisonView({ basis, initialAmount = '1000000', initialCurrency = 'KRW', preview = false, backHref, tracking }: {
   basis: ComparisonBasisResult; initialAmount?: string; initialCurrency?: Currency; preview?: boolean; backHref: string; tracking?: EffectTrackingProps;
 }) {
+  const router = useRouter();
   const [amount, setAmount] = useState(initialAmount);
   const [currency, setCurrency] = useState<Currency>(initialCurrency);
   const [price, setPrice] = useState('0');
   const [fx, setFx] = useState('0');
   const [horizon, setHorizon] = useState('30');
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const backQuery = new URLSearchParams(backHref.split('?')[1] ?? '');
+  const scope = backQuery.get('scope') ?? 'all';
+  const beta = backHref.startsWith('/beta?') || backHref === '/beta';
+  const recoveryQuery = new URLSearchParams({ scope, amount, currency, ...(beta ? { from: 'beta' } : {}), ...(preview ? { preview: 'design' } : {}) });
+  const returnHref = `/additional-contribution/compare?${recoveryQuery}`;
+  const recoveryDraft = { amount, currency };
   const comparison = useMemo(() => basis.status === 'ready' ? compareContribution(basis, amount, currency) : basis, [basis, amount, currency]);
   const rowPricePct = Object.fromEntries(Object.entries(overrides).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, Number(value)]));
   const valid = price.trim() !== '' && fx.trim() !== '';
@@ -37,7 +46,7 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
     <a href={backHref} className={styles.back}>← 추가투입으로 돌아가기</a>
     <header className={styles.header}><div><p className={styles.eyebrow}>CONTRIBUTION / COMPARE</p><PageTitle>같은 투자금, 다른 배분</PageTitle><p className={styles.lead}>비율대로 샀을 때와 환율·이동평균선을 반영했을 때를 비교해 보세요.</p></div><span className={styles.badge}>가정 비교 · 실제 성과 아님</span></header>
     {preview && <Status>화면 검증용 예시 데이터입니다. 실제 계좌와 연결되지 않습니다.</Status>}
-    {basis.status !== 'ready' ? <EmptyState title="비교에 필요한 근거를 확인해 주세요" description={`${reasonLabel(basis.reason)}${basis.unavailableHoldings?.length ? ` 확인 필요: ${basis.unavailableHoldings.join(', ')}.` : ''}`} action={basis.reason === 'choose_one_account' ? undefined : <a href={`/portfolio/${['valuation_incomplete', 'holding_evidence_incomplete'].includes(basis.reason) ? 'reporting' : 'targets'}?${new URLSearchParams(backHref.split('?')[1] ?? '')}`}>{['valuation_incomplete', 'holding_evidence_incomplete'].includes(basis.reason) ? '보유 평가 근거 확인' : '계좌와 목표비중 확인'} →</a>} /> : <>
+    {basis.status !== 'ready' ? basis.reason === 'choose_one_account' ? <Status tone="warning">비교할 계좌를 위에서 선택해 주세요. 계좌 사이의 자금 이동은 계산하지 않습니다.</Status> : <RecoveryNotice reasons={[basis.reason]} scope={scope} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={() => router.refresh()} details={`${reasonLabel(basis.reason)}${basis.unavailableHoldings?.length ? ` 확인 필요: ${basis.unavailableHoldings.join(', ')}.` : ''}`} /> : <>
       <div className={styles.context}>{basis.scopeLabel}<span>기준 {new Date(basis.asOf).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false })} KST</span><span>목표비중 승인 {basis.policyRevision}차</span></div>
       <section className={styles.controls} aria-label="공통 비교 조건">
         <Field label="새 투자금"><Input aria-label="새 투자금" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} /></Field>
@@ -45,7 +54,7 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
         <Field label="비교 시점"><Select value={horizon} onChange={event => setHorizon(event.target.value)}><option value="10">10일 뒤</option><option value="30">30일 뒤</option><option value="90">90일 뒤</option></Select></Field>
         <p>동일 종목 · 동일 진입 가격<br />신규 투자금만 · 매도 없이 비교</p>
       </section>
-      {comparison.status !== 'ready' ? <Status tone="warning">{reasonLabel(comparison.reason)}</Status> : <>
+      {comparison.status !== 'ready' ? comparison.reason === 'invalid_amount' ? <Status tone="warning">{reasonLabel(comparison.reason)}</Status> : <RecoveryNotice reasons={[comparison.reason]} scope={scope} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={() => router.refresh()} details={reasonLabel(comparison.reason)} /> : <>
         <div className={styles.sectionHeading}><SectionHeading title="01. 투자금을 어떻게 나누나요?" description="설정한 비율대로 매수하거나, 기존 보유의 부족 비중과 확인된 조정 근거를 반영합니다." /></div>
         <div className={styles.plans}>
           <Plan title="비율대로 매수" subtitle="새 투자금 × 목표비중" plan={comparison.ratio} comparison={comparison} />

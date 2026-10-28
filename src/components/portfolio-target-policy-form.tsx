@@ -3,7 +3,7 @@
 import { useActionFormReset } from "@/components/cairn-ui/client";
 
 import { InstrumentSearch, type InstrumentChoice } from "@/components/onboarding/instrument-search";
-import Link from "next/link";
+import { RecoveryBackLink as Link } from '@/components/recovery/recovery-return';
 import { ArrowRight, Check, RotateCcw } from "lucide-react";
 import { useActionState, useState, type ComponentProps } from "react";
 import { savePortfolioTargetPolicy } from "@/app/portfolio/targets/actions";

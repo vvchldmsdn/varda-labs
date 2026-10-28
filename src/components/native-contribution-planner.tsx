@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { MoneyInput } from "@/components/first-visit/money-input";
@@ -7,6 +8,9 @@ import { formatMoney, parseMoneyInput, type Currency } from "@/lib/money";
 import { intlLocale } from "@/lib/i18n/locale";
 import { buildNativeContributionPlan, type NativeContributionContextResult, type NativeContributionDocument, type NativeContributionRequest, type SavedNativeContributionPlan } from "@/lib/native-contribution-plan";
 import {SaleExclusionPicker} from "./sale-exclusion-picker";
+import { RecoveryNotice } from "@/components/recovery/recovery-notice";
+import { parseSaleExclusionKeys } from "@/lib/additional-contribution-sale-exclusions";
+import { recoveryHref } from "@/lib/recovery-navigation";
 import styles from "./currency-tracked-view.module.css";
 import plannerStyles from "./native-contribution-planner.module.css";
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
@@ -14,32 +18,56 @@ import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as
 
 export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: string; currency: Currency }) {
   const { locale, t } = useI18n();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [loaded, setLoaded] = useState<{ context: NativeContributionContextResult; sessionKey: string; plans: SavedNativeContributionPlan[]; canSave: boolean } | null>(null);
-  const [cash, setCash] = useState("");
-  const [cashCurrency, setCashCurrency] = useState<Currency>(currency);
-  const [useCash, setUseCash] = useState(false);
+  const [cash, setCash] = useState(() => searchParams.get("amount") ?? "");
+  const [cashCurrency, setCashCurrency] = useState<Currency>(() => searchParams.get("fundingCurrency") === "USD" ? "USD" : searchParams.get("fundingCurrency") === "KRW" ? "KRW" : currency);
+  const [useCash, setUseCash] = useState(() => searchParams.get("useCash") === "1");
   const [shown, setShown] = useState<{ document: NativeContributionDocument; saved: boolean } | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const pending = useRef<NativeContributionRequest | null>(null);
-  const [saleDraft,setSaleDraft]=useState<{key:string;keys:string[]}>({key:"",keys:[]});
+  const [saleDraft,setSaleDraft]=useState<{key:string;keys:string[]}>(() => {
+    const restored = parseSaleExclusionKeys(searchParams.getAll("excludeSell"));
+    return { key: "", keys: restored.ok ? restored.keys : [] };
+  });
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [readAttempt, setReadAttempt] = useState(0);
+  const [calculationBlock, setCalculationBlock] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/native-contribution-plans?${new URLSearchParams({ scope: scopeKey, currency })}`, { cache: "no-store", signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error();
       const payload = await response.json();
       if (!controller.signal.aborted) setLoaded(payload);
-    }).catch(() => { if (!controller.signal.aborted) setError(t("투자 계획을 불러오지 못했어요. 다시 로그인한 뒤 새로고침해 주세요.", "Unable to load plans. Sign in again and refresh.")); });
+    }).catch(() => { if (!controller.signal.aborted) setLoadFailed(true); });
     return () => controller.abort();
-  }, [scopeKey, currency, t]);
+  }, [scopeKey, currency, readAttempt]);
   const context = loaded?.context.status === "ready" && loaded.context.scopeKey===scopeKey && loaded.context.input.reportingCurrency===currency ? loaded.context : null;
-  const saleKey=JSON.stringify([scopeKey,currency,loaded?.sessionKey,context?.evidenceVersion??context?.policy.revision]);
-  const excludedSales=saleDraft?.key===saleKey?saleDraft.keys:[];
+  // Sale exclusions are a draft, not evidence. A reread keeps them within the
+  // same account/session; the existing engine still validates the current keys.
+  const saleKey=JSON.stringify([scopeKey,currency,loaded?.sessionKey]);
+  const excludedSales=saleDraft && (!saleDraft.key || !loaded || saleDraft.key===saleKey)?saleDraft.keys:[];
+  const returnHref = `${pathname}?${searchParams}`;
+  const recoveryDraft = { scope: scopeKey, currency, amount: cash, fundingCurrency: cashCurrency, useCash: useCash ? "1" : "0", excludeSell: excludedSales };
+  const beta = pathname === "/beta" || pathname.startsWith("/beta/");
+  const draftQuery = new URLSearchParams(searchParams.toString());
+  for (const [key, value] of Object.entries(recoveryDraft)) {
+    draftQuery.delete(key);
+    for (const entry of Array.isArray(value) ? value : [value]) draftQuery.append(key, entry);
+  }
+  const targetsHref = recoveryHref(`${beta ? '/beta' : ''}/portfolio/targets?${new URLSearchParams({ scope: scopeKey })}`, `${pathname}?${draftQuery}`)!;
   const money = (value: string | number, code: Currency) => formatMoney(Number(value), code, intlLocale(locale));
   const time = (at: string) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }).format(new Date(at));
-  function changed() { pending.current = null; setShown(null); setError(""); }
+  function changed() { pending.current = null; setShown(null); setError(""); setCalculationBlock(""); }
+  function retryRead() {
+    if (saving || deleting) return;
+    setLoadFailed(false); setLoaded(null); setError(""); setCalculationBlock("");
+    setReadAttempt(previous => previous + 1);
+  }
   function makeRequest(): NativeContributionRequest | null {
     const amount = cash.trim() === "" ? 0 : parseMoneyInput(cash, cashCurrency);
     if (amount === null || amount < 0) { setError(t("투자금과 통화의 소수 자릿수를 확인해 주세요.", "Check the amount and the currency’s precision.")); return null; }
@@ -49,11 +77,12 @@ export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: st
     return pending.current;
   }
   function calculate(event: FormEvent) {
-    event.preventDefault(); setError("");
+    event.preventDefault(); setError(""); setCalculationBlock("");
     const input = makeRequest(); if (!input || !context) return;
     const result = buildNativeContributionPlan(context, input);
     if (result.status === "ready") setShown({ document: result.document, saved: false });
-    else setError(result.reason==='choose_account_for_funding'?t('투자할 계좌 하나를 선택해 주세요. 계좌 사이의 자금 이동은 계산하지 않아요.','Choose one account. Transfers between accounts are not assumed.'):t("원가와 해당 시점의 환율 등 계산 근거를 확인해 주세요.", "Check cost evidence and exchange rates for the relevant dates."));
+    else if (result.reason === 'choose_account_for_funding' || result.reason === 'invalid_request' || result.reason === 'invalid_sale_exclusions') setError(result.reason==='choose_account_for_funding'?t('투자할 계좌 하나를 선택해 주세요. 계좌 사이의 자금 이동은 계산하지 않아요.','Choose one account. Transfers between accounts are not assumed.'):t("투자금과 매도 제외 종목을 확인해 주세요.", "Check your new money and sale exclusions."));
+    else setCalculationBlock(result.reason);
   }
   async function save() {
     const input = makeRequest(); if (!input || !loaded?.canSave || saving || deleting) return;
@@ -90,16 +119,17 @@ export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: st
     <CairnSectionTitle>{t("다음 투자금 나눠보기", "Plan a contribution")}</CairnSectionTitle>
     <Link href={comparisonHref}>{t('비율 매수와 환율·MA120 조정 효과 비교 →', 'Compare proportional buying with FX / MA120 adjustments →')}</Link>
     <p className={styles.note}>{t("승인한 목표 비중을 사용합니다. 저장은 계획만 남기며 실제 주문이나 보유 수량을 바꾸지 않아요.", "Uses your approved targets. Saving records a plan without placing orders or changing holdings.")}</p>
-    {!loaded ? <CairnStatus as="p" tone="neutral" role="status">{t("목표와 보유 정보를 확인하고 있어요.", "Checking targets and holdings.")}</CairnStatus> : !context ? <p className={styles.notice}>{t("계산에 필요한 전체 평가 또는 승인된 목표를 확인할 수 없어요.", "A complete valuation or approved targets are unavailable.")} <Link href={`/portfolio/targets?scope=${encodeURIComponent(scopeKey)}`}>{t("목표 비중 확인 →", "Review targets →")}</Link></p> : <CairnForm onSubmit={calculate} noValidate className={styles.form}>
+    {!loaded ? loadFailed ? <RecoveryNotice kind="retry" scope={scopeKey} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={retryRead} details={t("투자 계획을 불러오지 못했어요. 입력한 투자금과 조건은 유지됩니다.", "Unable to load plans. Your investment amount and conditions are preserved.")} /> : <CairnStatus as="p" tone="neutral" role="status">{t("목표와 보유 정보를 확인하고 있어요.", "Checking targets and holdings.")}</CairnStatus> : !context ? <RecoveryNotice reasons={[loaded.context.status === "blocked" ? loaded.context.reason : "context_mismatch"]} scope={scopeKey} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={retryRead} /> : <CairnForm onSubmit={calculate} noValidate className={styles.form}>
       <div className={styles.funds}><CairnField>{t("새 투자금", "New money")}<MoneyInput value={cash} onValueChange={value => { setCash(value); changed(); }} allowDecimals={cashCurrency === "USD"} aria-label={t("새 투자금", "New money")} placeholder="0" /></CairnField><CairnField>{t("투자금 통화", "Money currency")}<CairnSelect value={cashCurrency} onChange={event => { setCashCurrency(event.target.value as Currency); changed(); }}><option>KRW</option><option>USD</option></CairnSelect></CairnField></div>
       {context.availableCash.length ? <CairnField className={styles.cashChoice}><CairnInput type="checkbox" checked={useCash} onChange={event => { setUseCash(event.target.checked); changed(); }} />{t("보유 현금도 사용", "Use available cash")} · {context.availableCash.map((fund, index) => <span key={`${fund.accountId}:${fund.currency}:${index}`}>{money(fund.amount, fund.currency)} </span>)}</CairnField> : null}
       <SaleExclusionPicker english={locale==="en"} value={excludedSales} disabled={saving||deleting} onChange={keys=>{setSaleDraft({key:saleKey,keys});changed();}} options={context.input.rows.filter(row=>Number(row.value.amount)>0).map(row=>({key:row.allocationKey,label:context.names[row.allocationKey]??row.allocationKey,detail:[(row.metadata as {accountName?:string; ticker?:string; market?:string})?.accountName??context.scopeLabel,(row.metadata as {ticker?:string})?.ticker,row.value.currency].filter(Boolean).join(" · ")}))}/>
       <div className={styles.targets}>{context.input.rows.map(row => <div key={row.allocationKey}><span>{context.names[row.allocationKey]}</span> <strong>{row.targetWeightBps / 100}%</strong></div>)}</div>
-      <Link href={`/portfolio/targets?scope=${encodeURIComponent(scopeKey)}`}>{t("승인된 목표 비중 변경 →", "Edit approved targets →")}</Link>
+      <Link href={targetsHref}>{t("승인된 목표 비중 변경 →", "Edit approved targets →")}</Link>
       <p className={styles.note}>{t("원가가 없거나 손실인 자산은 매도하지 않습니다. MA120은 원본 통화와 가격 기준이 일치하는 근거만 적용해요.", "Assets with unknown costs or losses are not sold. MA120 applies only when currency and price basis agree.")}</p>
       <div className={plannerStyles.actions}><CairnButton variant="primary" type="submit" className={styles.primary} disabled={saving || deleting}>{t("배분 미리보기", "Preview allocation")}</CairnButton>
       {loaded.canSave ? <CairnButton variant="primary" type="button" className={styles.primary} disabled={saving || deleting} onClick={save}>{saving ? t("저장 중…", "Saving…") : t("최신 기준으로 계산·저장", "Recalculate and save")}</CairnButton> : <span>{t("지금은 미리보기만 이용할 수 있어요.", "Preview is available; saving is currently unavailable.")}</span>}</div>
     </CairnForm>}
+    {calculationBlock ? <RecoveryNotice reasons={[calculationBlock]} scope={scopeKey} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={retryRead} /> : null}
     {error ? <CairnStatus as="p" tone="danger" role="alert" className={styles.notice}>{error}</CairnStatus> : null}
     {document && result ? <section className={styles.calculation} id={`native-plan-${document.request.id}`} aria-live="polite"><CairnSectionTitle level="h3">{shown.saved ? t("저장된 계획", "Saved plan") : t("배분 미리보기", "Allocation preview")} · {result.context.profitCurrency}</CairnSectionTitle><p>{time(result.context.asOf)} · {document.basis.scopeLabel}</p>
       <p>{t('새 투자금','New money')} {money(document.request.newMoney.amount,document.request.newMoney.currency)} · {t('보유 현금','Available cash')} {result.context.originalFunds.filter(fund=>fund.kind==='native_cash').map(fund=>money(fund.amount,fund.currency)).join(' + ')||money(0,result.context.reportingCurrency)}</p>

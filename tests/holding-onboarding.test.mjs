@@ -29,6 +29,7 @@ describe("holding onboarding contract", () => {
       "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
       "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       "next/link": { default: () => null },
+      "next/navigation": { usePathname: () => "/portfolio/holdings/new", useSearchParams: () => new URLSearchParams(), useRouter: () => ({}) },
       "@/lib/i18n/server": { localizedMetadata: () => ({}) },
       "@/components/i18n/localized-text": { T: () => null },
       "@/components/secondary-page-header": { SecondaryPageHeader: () => null },

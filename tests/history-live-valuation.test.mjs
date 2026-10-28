@@ -101,6 +101,7 @@ describe("ephemeral current valuation in History", () => {
 
   it("keeps current date in the hero and live/recorded provenance in details in both locales", async () => {
     const [explorer, locale] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx", "src/components/i18n/locale-provider.tsx"], {
+      "next/navigation": { useRouter: () => ({ refresh() {}, push() {} }) },
       "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children }) => React.createElement("section", { "data-open-detail": true }, children) },
     });
     for (const language of ["ko", "en"]) {
@@ -124,6 +125,7 @@ describe("ephemeral current valuation in History", () => {
 
   it("distinguishes insufficient one-point comparisons from true zero changes in both locales", async () => {
     const [explorer, locale] = await importUiWithPorts(["src/components/history/history-time-explorer.tsx", "src/components/i18n/locale-provider.tsx"], {
+      "next/navigation": { useRouter: () => ({ refresh() {}, push() {} }) },
       "@/components/presentation/presentation-dialog": { PresentationDialog: ({ children }) => React.createElement("section", null, children) },
     });
     for (const initialLocale of ["ko", "en"]) {
