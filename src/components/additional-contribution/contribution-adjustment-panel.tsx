@@ -7,6 +7,8 @@ import type { AdditionalContributionResultPreview } from "@/lib/additional-contr
 import { compareContributionFxAssumption, type ContributionMarketContext } from "@/lib/contribution-market-context";
 import { compareAdditionalContributionCashReserve } from "@/lib/additional-contribution-cash-reserve";
 import styles from "./contribution-adjustment.module.css";
+import { Button as CairnButton, Field as CairnField, Input as CairnInput, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function ContributionAdjustmentPanel({ preview, context }: {
   preview: AdditionalContributionResultPreview;
@@ -39,12 +41,12 @@ export function ContributionAdjustmentPanel({ preview, context }: {
   return <div className={styles.panel}>
     <section className={styles.reserve} aria-labelledby={reserveId}>
       <div className={styles.sectionHeading}>
-        <div><span className={styles.eyebrow}>YOUR CHOICE</span><h3 id={reserveId}>{t("이번 투입, 얼마나 남겨둘까요?", "How much will you keep in cash?")}</h3></div>
-        <button type="button" role="switch" aria-checked={enabled} aria-label={t("신규 투입금 보류 비교", "Compare cash reserve")} className={styles.switch} onClick={() => setEnabled(!enabled)}><span />{t(enabled ? "비교 켜짐" : "비교 꺼짐", enabled ? "On" : "Off")}</button>
+        <div><span className={styles.eyebrow}>YOUR CHOICE</span><CairnSectionTitle level="h3" id={reserveId}>{t("이번 투입, 얼마나 남겨둘까요?", "How much will you keep in cash?")}</CairnSectionTitle></div>
+        <CairnButton variant="secondary" type="button" role="switch" aria-checked={enabled} aria-label={t("신규 투입금 보류 비교", "Compare cash reserve")} className={styles.switch} onClick={() => setEnabled(!enabled)}><span />{t(enabled ? "비교 켜짐" : "비교 꺼짐", enabled ? "On" : "Off")}</CairnButton>
       </div>
       <p className={styles.note}>{t("신규 투입금 중 선택한 비율 이상을 현금으로 남기는 가정입니다. 계산된 매도대금의 매수 배분은 유지합니다.", "Compare keeping at least your chosen share of new money in cash. Purchases funded by calculated sales are preserved.")}</p>
-      <label className={styles.sliderLabel} htmlFor={`${reserveId}-ratio`}><span>{t("신규 투입금의 최소 보류 비율", "Minimum share of new money to retain")}</span><strong>{enabled ? reserveRatioPct : 0}%</strong></label>
-      <input id={`${reserveId}-ratio`} className={styles.slider} type="range" min="0" max="100" step="5" value={reserveRatioPct} disabled={!enabled} onChange={(event) => setReserveRatioPct(Number(event.target.value))} />
+      <CairnField className={styles.sliderLabel} htmlFor={`${reserveId}-ratio`}><span>{t("신규 투입금의 최소 보류 비율", "Minimum share of new money to retain")}</span><strong>{enabled ? reserveRatioPct : 0}%</strong></CairnField>
+      <CairnInput id={`${reserveId}-ratio`} className={styles.slider} type="range" min="0" max="100" step="5" value={reserveRatioPct} disabled={!enabled} onChange={(event) => setReserveRatioPct(Number(event.target.value))} />
       <div className={styles.endpoints}><span>{t("전액 계산", "Full base calculation")}</span><span>{t("신규금 전액 보류", "Keep all new money")}</span></div>
       {reserve.status === "ready" ? <>
         <div className={styles.comparison} aria-live="polite" aria-atomic="true">
@@ -62,11 +64,11 @@ export function ContributionAdjustmentPanel({ preview, context }: {
           <p className={styles.note}>{t("기본 매수금과 남은 현금을 신규금·매도금 비율로 나눠 자금 출처를 계산합니다. 실제 자금 이동을 추적한 값은 아닙니다. 보류 목표액은 1원 미만을 버리고, 이미 남는 신규 현금부터 인정합니다. 부족한 보류액만 신규금으로 살 부분에서 원 단위로 줄이며 다른 종목으로 옮기지 않습니다.", "Funding is attributed proportionately to new money and calculated sale proceeds; this does not trace actual cash transfers. The reserve target is rounded down to whole won. Existing unspent new money counts first; only the remaining reserve reduces new-money-funded purchases. Reductions are not reassigned to other holdings.")}</p>
           <ul className={styles.holdings}>{reserve.rows.map((row) => <li key={row.allocationKey}><div><strong>{holdingsByKey.get(row.allocationKey)?.name}</strong><small>{holdingsByKey.get(row.allocationKey)?.accountName}</small></div><div><span>{money(row.baselineAllocationKrw)} → {money(row.scenarioAllocationKrw)}</span><small>{t("보류", "Retained")} {money(row.reserveKrw)}</small></div></li>)}</ul>
         </details>
-      </> : <p role="status" className={styles.note}>{t("자금 합계를 검증하지 못해 비교를 표시하지 않습니다. 기본 배분안은 유지됩니다.", "The funding totals could not be verified. The base allocation remains available.")}</p>}
+      </> : <CairnStatus as="p" tone="neutral" role="status" className={styles.note}>{t("자금 합계를 검증하지 못해 비교를 표시하지 않습니다. 기본 배분안은 유지됩니다.", "The funding totals could not be verified. The base allocation remains available.")}</CairnStatus>}
     </section>
 
     <section className={styles.market} aria-labelledby={fxId}>
-      <span className={styles.eyebrow}>OBSERVED, NOT PREDICTED</span><h3 id={fxId}>{t("지금 확인할 수 있는 근거", "Evidence available now")}</h3>
+      <span className={styles.eyebrow}>OBSERVED, NOT PREDICTED</span><CairnSectionTitle level="h3" id={fxId}>{t("지금 확인할 수 있는 근거", "Evidence available now")}</CairnSectionTitle>
       <div className={styles.fxHeadline}><span>USD / KRW</span><strong>{hasFx ? new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(fx!.rate!) : "—"}</strong><small>{t(!hasFx ? "사용 가능한 관측 없음" : fx?.status === "stale" ? "지난 관측 · 최신성 부족" : "저장된 관측값", !hasFx ? "No usable observation" : fx?.status === "stale" ? "Earlier observation · stale" : "Stored observation")}</small></div>
       {hasFx ? <p className={styles.source}>{fx!.date} · {fx!.source}<br />{t("수집 시각", "Retrieved")} {fx!.fetchedAt ? new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(fx!.fetchedAt)) : "—"} KST</p> : null}
       {fx?.rangePositionPct !== null && fx?.rangePositionPct !== undefined ? <div className={styles.range}>
@@ -78,8 +80,8 @@ export function ContributionAdjustmentPanel({ preview, context }: {
       <details className={styles.details}>
         <summary>{t("환율이 변한다면?", "What if FX changes?")}<ArrowDown aria-hidden="true" size={15} /></summary>
         <p className={styles.note}>{t("현재 보유한 USD 표시자산의 달러 가격만 고정하고 원화 환산액을 비교합니다. 원화 상장 해외 ETF, 헤지·파생상품·매수 후 변화는 포함하지 않으므로 전체 환위험을 뜻하지 않습니다.", "Hold USD asset prices fixed and compare their KRW translation. KRW-listed global ETFs, hedges, derivatives and post-purchase changes are excluded, so this is not total currency exposure.")}</p>
-        <label className={styles.sliderLabel} htmlFor={`${fxId}-change`}><span>{t("USD/KRW 변화 가정", "Assumed USD/KRW change")}</span><strong>{fxChangeBps > 0 ? "+" : ""}{fxChangeBps / 100}%</strong></label>
-        <input id={`${fxId}-change`} className={styles.slider} type="range" min="-2000" max="2000" step="100" value={fxChangeBps} onChange={(event) => setFxChangeBps(Number(event.target.value))} />
+        <CairnField className={styles.sliderLabel} htmlFor={`${fxId}-change`}><span>{t("USD/KRW 변화 가정", "Assumed USD/KRW change")}</span><strong>{fxChangeBps > 0 ? "+" : ""}{fxChangeBps / 100}%</strong></CairnField>
+        <CairnInput id={`${fxId}-change`} className={styles.slider} type="range" min="-2000" max="2000" step="100" value={fxChangeBps} onChange={(event) => setFxChangeBps(Number(event.target.value))} />
         {fxScenario ? <dl className={styles.evidenceList}><div><dt>{t("USD 표시자산", "USD-priced holdings")}</dt><dd>{money(fxScenario.usdListedValueKrw)}</dd></div><div><dt>{t("원화 환산 차이", "KRW translation difference")}</dt><dd>{fxScenario.differenceKrw > 0 ? "+" : ""}{money(fxScenario.differenceKrw)}</dd></div></dl> : null}
         <p className={styles.note}>{t("앞으로의 환율 전망이 아니며 매수·매도 계산에 적용하지 않습니다.", "This is not an FX forecast and does not change buy or sell calculations.")}</p>
       </details>

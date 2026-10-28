@@ -9,6 +9,8 @@ import Link from "next/link";
 import { ArrowRight, CircleHelp, Database, FolderOpen, Landmark, Layers3, ListChecks, Plus, RefreshCw, SlidersHorizontal, Wallet } from "lucide-react";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export async function generateMetadata() {
   return localizedMetadata({ title: "관리 | CAIRN LABS" }, "Manage | CAIRN LABS");
@@ -56,7 +58,7 @@ export default async function PortfolioManagementPage({ searchParams }: {
       <div className="varda-management-stage">
         <header className="varda-management-cover">
           <p className="varda-kicker">YOUR WORKSPACE</p>
-          <h1><PortfolioText ko={"나의 자산,"} />{" "}<br /><PortfolioText ko={"나의 기준."} /></h1>
+          <CairnPageTitle><PortfolioText ko={"나의 자산,"} />{" "}<br /><PortfolioText ko={"나의 기준."} /></CairnPageTitle>
           <p className="varda-management-cover-note"><PortfolioText ko={"포트폴리오를 이루는 데이터와"} />{" "}<br /><PortfolioText ko={"분석의 기준을 관리하세요."} /></p>
           <TradeRecordLinks />
           <Link href="/portfolio/holdings/new" className="varda-action"><Plus size={16} aria-hidden="true" /><PortfolioText ko={"보유 종목 추가"} /></Link>

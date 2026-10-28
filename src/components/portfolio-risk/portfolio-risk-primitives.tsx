@@ -1,5 +1,7 @@
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { ReactNode } from "react";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function RiskSection({
   title,
@@ -18,7 +20,7 @@ export function RiskSection({
       className="border-t border-[var(--line)] py-5"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="text-lg font-semibold tracking-normal"><PortfolioText ko={title} /></h2>
+        <CairnSectionTitle className="text-lg font-semibold tracking-normal"><PortfolioText ko={title} /></CairnSectionTitle>
         {detail ? (
           <p className="text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={detail} /></p>
         ) : null}

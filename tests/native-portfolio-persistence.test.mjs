@@ -34,7 +34,13 @@ async function fixture(withApi=false) {
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
   await addNativeReliabilityFixtureTables(pg);
   await pg.exec(readFileSync(new URL('../drizzle/0050_native_portfolio_ledger.sql',import.meta.url),'utf8'));
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability','0060_snapshot_cutoff_observations']) await pg.exec(readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8'));
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability','0060_snapshot_cutoff_observations']) {
+    const sql = readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8');
+    // Freeze the database clock alongside this September fixture. Preserve the
+    // real 35-day retention guard instead of depending on the developer's date.
+    await pg.exec(migration === '0060_snapshot_cutoff_observations'
+      ? sql.replaceAll('statement_timestamp()', "TIMESTAMPTZ '2026-09-02T00:00:00Z'") : sql);
+  }
   await pg.exec('grant usage on schema public to varda_tenant_app; grant select on live_price_quotes,fx_rates to varda_tenant_app');
   for(const table of ['accounts','assets','event_ledger_entries','daily_portfolio_snapshots']) await pg.exec(`alter table ${table} enable row level security; alter table ${table} force row level security; create policy tenant_select on ${table} for select to varda_tenant_app using(canonical_owner_user_id = nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${table} to varda_tenant_app;`);
   await pg.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);

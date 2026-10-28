@@ -26,6 +26,8 @@ import {
   type InvestmentLabTimeMachineScenarioSummary,
   type UnavailableLabScenario,
 } from "./investment-lab-chart-presentation";
+import { Button as CairnButton, Field as CairnField, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export type { InvestmentLabTimeMachineScenarioSummary } from "./investment-lab-chart-presentation";
 
@@ -69,12 +71,12 @@ export function InvestmentLabTimeMachine({
           <div className={styles.headline}>
             {unavailableScenarios.length ? <p className={styles.readinessNote}>{unavailableScenarios.length}<LabText value="개 시나리오 · 추가 근거 필요" /></p> : null}
             <div>
-              <h2><LabText value=" 비교 시나리오 " /></h2>
+              <CairnSectionTitle><LabText value=" 비교 시나리오 " /></CairnSectionTitle>
 
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <label className="sr-only" htmlFor="investment-lab-scenario-select"><LabText value=" 비교 시나리오 " /></label>
-              <select
+              <CairnField className="sr-only" htmlFor="investment-lab-scenario-select"><LabText value=" 비교 시나리오 " /></CairnField>
+              <CairnSelect
                 className="cairn-select"
                 id="investment-lab-scenario-select"
                 onChange={(event) => {
@@ -88,7 +90,7 @@ export function InvestmentLabTimeMachine({
                     <LabText value={labScenarioLabel(line.id)} />
                   </option>
                 ))}
-              </select>
+              </CairnSelect>
               <InvestmentLabDialog
                 icon="info"
                 label="비교 기준"
@@ -177,7 +179,7 @@ export function InvestmentLabTimeMachine({
           aria-label="비교 시나리오" en={{"aria-label": labEnglish("비교 시나리오")}}
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-xs font-medium text-[var(--muted)]"><LabText value=" 비교 시나리오 " /></h3>
+            <CairnSectionTitle level="h3" className="text-xs font-medium text-[var(--muted)]"><LabText value=" 비교 시나리오 " /></CairnSectionTitle>
             <span className="text-[10px] tabular-nums text-[var(--faint)]">
               {ready.length}<LabText value="개 경로 " /></span>
           </div>
@@ -197,7 +199,7 @@ export function InvestmentLabTimeMachine({
             {ready.map((line) => {
               const active = line.id === selected.id;
               return (
-                <button
+                <CairnButton variant="selection"
                   aria-pressed={active}
                   className={`${styles.scenario} ${active ? styles.scenarioActive : ""}`}
                   key={line.id}
@@ -227,13 +229,13 @@ export function InvestmentLabTimeMachine({
                     </span>
                   </span>
                   <MiniPath line={line} active={active} />
-                </button>
+                </CairnButton>
               );
             })}
           </div>
           {unavailableScenarios.length > 0 ? (
             <div className="mt-4 border-t border-[var(--wash)] pt-3">
-              <button
+              <CairnButton variant="secondary"
                 aria-expanded={showUnavailable}
                 className="flex min-h-9 w-full items-center justify-between text-xs text-[var(--muted)]"
                 onClick={() => setShowUnavailable(!showUnavailable)}
@@ -246,11 +248,11 @@ export function InvestmentLabTimeMachine({
                   className={showUnavailable ? "rotate-180" : ""}
                   size={14}
                 />
-              </button>
+              </CairnButton>
               {showUnavailable ? (
                 <div className="space-y-1">
                   {unavailableScenarios.map((item) => (
-                    <button
+                    <CairnButton variant="secondary"
                       aria-expanded={unavailable === item.id}
                       className="flex w-full items-start gap-2 rounded py-2 text-left text-xs text-[var(--warning)] hover:text-[var(--ink)]"
                       key={item.id}
@@ -265,12 +267,12 @@ export function InvestmentLabTimeMachine({
                         size={13}
                       />
                       <LabText value={labScenarioLabel(item.id)} />
-                    </button>
+                    </CairnButton>
                   ))}
                 </div>
               ) : null}
               {showUnavailable && unavailableDetail ? (
-                <div
+                <CairnStatus as="div" tone="warning"
                   className="mt-2 border-l-2 border-[var(--warning-soft)] pl-3 text-xs leading-6"
                   role="status"
                 >
@@ -278,7 +280,7 @@ export function InvestmentLabTimeMachine({
                   <p className="mt-2 text-[var(--muted)]">
                     <LabText value={unavailableDetail.resolution} />
                   </p>
-                </div>
+                </CairnStatus>
               ) : null}
             </div>
           ) : null}

@@ -5,6 +5,8 @@ import type {
   InvestmentLabSmallAdjustmentCalculation,
   InvestmentLabSmallAdjustmentCalculationBlocker,
 } from "@/lib/investment-lab-small-adjustment";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabSmallAdjustmentResult({
   accountLabel,
@@ -18,7 +20,7 @@ export function InvestmentLabSmallAdjustmentResult({
   if (result.status === "blocked") {
     return (
       <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
-        <h3 className="mb-3 font-semibold" ref={headingRef} tabIndex={-1}><T ko="입력 내용을 확인해 주세요" en="Check your inputs" /></h3>
+        <CairnSectionTitle level="h3" className="mb-3 font-semibold" ref={headingRef} tabIndex={-1}><T ko="입력 내용을 확인해 주세요" en="Check your inputs" /></CairnSectionTitle>
         {result.blockers.map((blocker) => (
           <p key={blocker}><LabText value={calculationBlockerLabel(blocker)} /></p>
         ))}
@@ -40,7 +42,7 @@ export function InvestmentLabSmallAdjustmentResult({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold" ref={headingRef} tabIndex={-1}><span className="sr-only"><T ko="계산 완료. " en="Calculation complete. " /></span><LabText value="조정 전후 비교" /></h3>
+          <CairnSectionTitle level="h3" className="text-lg font-semibold" ref={headingRef} tabIndex={-1}><span className="sr-only"><T ko="계산 완료. " en="Calculation complete. " /></span><LabText value="조정 전후 비교" /></CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]">
             {accountLabel} · <LabText value={formatKrw(result.transferAmountKrw)} />
           </p>

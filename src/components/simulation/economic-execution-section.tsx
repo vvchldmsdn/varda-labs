@@ -9,6 +9,8 @@ import { SimulationText } from "./simulation-text";
 import { simulationReturnLabel, simulationReturnTone } from "./simulation-presentation";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
 import styles from "./simulation-workspace.module.css";
+import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function EconomicExecutionSection({ result, baseline, pathDetail, pathDetailNotice }: {
   pathDetail?: SimulationPathHandle;
@@ -18,7 +20,7 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
 }) {
   return <section data-economic-execution={result.status} className={`${styles.execution} ${styles.economicExecution}`}>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-sm font-medium sm:text-base"><SimulationText ko="경제지표 시뮬레이션" en="Economic simulation" /></h2>
+      <CairnSectionTitle className="text-sm font-medium sm:text-base"><SimulationText ko="경제지표 시뮬레이션" en="Economic simulation" /></CairnSectionTitle>
       <div className="flex items-center gap-4">
         <span className="text-xs text-[var(--muted)]">{baseline.coverage.modeledCurrentValuePct.toFixed(1)}<SimulationText ko="% 포함" en="% covered" /></span>
         {result.status === "ready" ? (      <InvestmentLabDialog label="세부 사항" labelEn="Details" title="경제지표와 자산을 연결한 근거" titleEn="How economic data connects to holdings" icon="table" size="wide">
@@ -41,13 +43,13 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
       </InvestmentLabDialog>) : <CalculationGuideDialog guide={economicCalculationGuide} label={{ ko: "계산 과정", en: "How it works" }} title={{ ko: "경제지표에서 내 자산까지", en: "From economic indicators to your assets" }} />}
       </div>
     </div>
-    {result.status !== "ready" ? <div role="status" className="my-6 border-y border-[var(--line)] py-10" data-economic-unavailable={result.reason}>
+    {result.status !== "ready" ? <CairnStatus as="div" tone="neutral" role="status" className="my-6 border-y border-[var(--line)] py-10" data-economic-unavailable={result.reason}>
       <p className="text-xl"><SimulationText ko="경제지표 경로를 아직 계산할 수 없습니다." en="Economic paths cannot be calculated yet." /></p>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]"><SimulationText ko="현재 보유 종목의 가격 이력과 환율·금리의 겹치는 관측이 필요합니다. 최신 경제지표가 오래됐거나 이력이 부족하면 이 모형은 실행하지 않습니다. ‘과거 수익률 경로’를 선택해 준비된 다른 모형을 확인할 수 있습니다." en="This model needs overlapping holding returns, FX and yields, plus recent economic observations. Missing or stale evidence stops this model. Select Historical paths to inspect the other model if its data is ready." /></p>
       <p className="mt-3 text-xs text-[var(--muted)]"><SimulationText ko="확인 상태" en="Status" />: <EconomicReason reason={result.reason} /></p>
       <EconomicObservationReadiness result={result} />
       <p className="mt-4 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="‘모형·데이터’에서 종목별 준비 상태와 경제지표의 날짜를 확인하세요. 종목 가격 이력은 보유종목 관리에서 확인할 수 있습니다." en="Open Model & data for each holding's readiness and economic-data dates. Review holding price history in holdings management." /></p>
-    </div> : <>
+    </CairnStatus> : <>
       <div className={styles.resultLayout}>
         <dl className={styles.resultSummary}>
           <div><dt><SimulationText ko="마지막 수익률 중간값" en="Median final return" /></dt><dd data-value-tone={simulationReturnTone(result.terminal.p50ReturnPct)}>{simulationReturnLabel(100 + result.terminal.p50ReturnPct)}</dd><p>{result.assumptions.horizon}<SimulationText ko={`단계 · ${result.assumptions.pathCount.toLocaleString("ko-KR")}개 공동 경로`} en={` steps · ${result.assumptions.pathCount.toLocaleString("en-US")} joint paths`} /></p></div>
@@ -63,9 +65,9 @@ export function EconomicExecutionSection({ result, baseline, pathDetail, pathDet
 
 export function EconomicDataEvidence({ result }: { result: SimulationEconomicPresentation }) {
   return <section data-economic-evidence>
-    <h3 className="text-lg font-medium"><SimulationText ko="현재 지원하는 경제지표" en="Economic indicators in this model" /></h3>
+    <CairnSectionTitle level="h3" className="text-lg font-medium"><SimulationText ko="현재 지원하는 경제지표" en="Economic indicators in this model" /></CairnSectionTitle>
     <p className="mt-2 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="USD/KRW, 미국 10년 국채금리, 미국 10년−2년 금리차를 사용합니다. 각국 정책금리나 뉴스 전체를 반영하는 모형은 아닙니다. 주식 가격은 보유 종목의 과거 공동 수익률과 각 지표에 대한 민감도로 함께 생성됩니다." en="Inputs are USD/KRW, the US 10-year Treasury yield and the US 10Y−2Y spread. This model does not cover all countries' policy rates or news. Holding-price paths combine joint historical returns with estimated sensitivity to these indicators." /></p>
-    {result.status !== "ready" ? <p role="status" className="mt-4 text-sm leading-7 text-[var(--warning)]"><EconomicReason reason={result.reason} /></p> : null}
+    {result.status !== "ready" ? <CairnStatus as="p" tone="warning" role="status" className="mt-4 text-sm leading-7 text-[var(--warning)]"><EconomicReason reason={result.reason} /></CairnStatus> : null}
     <div className="mt-5 divide-y divide-[var(--line)] border-y border-[var(--line)]">{result.factorSources.map((row) => <div key={row.factorKey} className="flex flex-wrap justify-between gap-2 py-3 text-sm"><strong className="font-medium">{row.label}</strong><span className="text-[var(--muted)]"><SimulationText ko="공표일" en="Release" /> {row.currentReleaseDate ?? "—"}{row.currentCarryDays !== null ? <> · {row.currentCarryDays}<SimulationText ko="일 경과" en=" days old" /></> : null}{row.currentCarryDays === null ? <> · <SimulationText ko="관측 없음" en="No observation" /></> : row.currentCarryDays > result.policy.factorMaximumCarryDays ? <> · <SimulationText ko="최신성 기준 초과" en="Too old for this cutoff" /></> : null}</span></div>)}</div>
     <EconomicObservationReadiness result={result} />
     {result.status === "ready" ? <>

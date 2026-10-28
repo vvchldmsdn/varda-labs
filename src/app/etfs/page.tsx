@@ -15,6 +15,8 @@ import type {
   GroupedTextValue,
 } from "@/lib/etf-holdings";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -94,9 +96,9 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
                 <p className="text-xs font-semibold text-[var(--muted)]">
                   Cairn Labs
                 </p>
-                <h1 className="mt-1 text-xl font-semibold tracking-normal">
+                <CairnPageTitle className="mt-1 text-xl font-semibold tracking-normal">
                   ETF Reference
-                </h1>
+                </CairnPageTitle>
               </div>
               <Link
                 href={`/portfolio/structure${context.size ? `?${context}` : ""}`}
@@ -105,14 +107,14 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
                 Portfolio Structure
               </Link>
             </div>
-            <form action="/etfs" className="mt-4 space-y-2">
+            <CairnForm action="/etfs" className="mt-4 space-y-2">
               {scope ? <input type="hidden" name="scope" value={scope} /> : null}
               {account ? <input type="hidden" name="account" value={account} /> : null}
-              <label className="block text-xs font-semibold text-[var(--muted)]" htmlFor="q">
+              <CairnField className="block text-xs font-semibold text-[var(--muted)]" htmlFor="q">
                 Search ticker or name
-              </label>
+              </CairnField>
               <div className="flex gap-2">
-                <input
+                <CairnInput
                   id="q"
                   name="q"
                   type="search"
@@ -120,14 +122,14 @@ export default async function EtfsPage({ searchParams }: EtfsPageProps) {
                   className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)]"
                   placeholder="SPY, TIGER, KODEX"
                 />
-                <button
+                <CairnButton variant="primary"
                   type="submit"
                   className="rounded-md bg-[var(--ink)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)]"
                 >
                   Search
-                </button>
+                </CairnButton>
               </div>
-            </form>
+            </CairnForm>
           </section>
 
           <EtfMasterList
@@ -161,7 +163,7 @@ function EtfMasterList({
   return (
     <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold tracking-normal">ETF Masters</h2>
+        <CairnSectionTitle className="text-base font-semibold tracking-normal">ETF Masters</CairnSectionTitle>
         <p className="text-xs text-[var(--muted)]">{masters.length} shown</p>
       </div>
       <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1 sm:max-h-[560px]">
@@ -228,9 +230,9 @@ function EtfHoldingSummary({
     return (
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
         <p className="text-sm font-semibold text-[var(--muted)]">ETF Holdings</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-normal">
+        <CairnSectionTitle className="mt-2 text-2xl font-semibold tracking-normal">
           Select an ETF
-        </h2>
+        </CairnSectionTitle>
         <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
           {searchQuery
             ? "No holdings are available for the current search."
@@ -249,9 +251,9 @@ function EtfHoldingSummary({
           <p className="text-sm font-semibold text-[var(--muted)]">
             {holdings.asOfDate.replaceAll("-", ".")}
           </p>
-          <h2 className="mt-1 truncate text-2xl font-semibold tracking-normal">
+          <CairnSectionTitle className="mt-1 truncate text-2xl font-semibold tracking-normal">
             {master?.name ?? holdings.etfTicker}
-          </h2>
+          </CairnSectionTitle>
           <p className="mt-2 text-sm text-[var(--muted)]">
             {[holdings.etfTicker, master?.market, master?.currency]
               .filter(Boolean)
@@ -289,9 +291,9 @@ function GroupedHoldingsTable({
   return (
     <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]">
       <div className="flex flex-col gap-2 border-b border-[var(--wash)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-base font-semibold tracking-normal">
+        <CairnSectionTitle className="text-base font-semibold tracking-normal">
           Latest grouped holdings
-        </h2>
+        </CairnSectionTitle>
         <p className="text-sm text-[var(--muted)]">
           {visibleRows.length} of {holdings.groupedRowCount} groups
         </p>

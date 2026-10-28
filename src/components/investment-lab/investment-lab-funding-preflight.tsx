@@ -4,6 +4,8 @@ import type {
   InvestmentLabAccountFundingPreflight,
   InvestmentLabFundingResolution,
 } from "@/lib/investment-lab-account-funding-preflight";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const SCENARIOS = Object.freeze([
   ["actual", "실제"],
@@ -41,7 +43,7 @@ export function InvestmentLabFundingPreflightView({
       <div className="border-b border-[var(--wash)] py-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold"><LabText value="계정별 자금 경계" /></h2>
+            <CairnSectionTitle className="text-lg font-semibold"><LabText value="계정별 자금 경계" /></CairnSectionTitle>
             <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 각 계정의 시작 평가액과 매수·매도 흐름만 사용한 연구 경로인지 확인합니다. " /></p>
           </div>
           <p className="text-sm font-semibold text-[var(--ink)]">

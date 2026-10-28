@@ -56,9 +56,9 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
 .varda-screen-header { gap: 20px 28px; align-items: center; }
 .varda-screen-heading { padding-block: 0; }
 .varda-screen-title-row { align-items: center; }
-.varda-page-title { font-size: clamp(28px, 2.8vw, 40px); font-weight: 650; letter-spacing: -.065em; line-height: 1.3; }
+.varda-page-title:not([data-cairn-heading]) { font-size: clamp(28px, 2.8vw, 40px); font-weight: 650; letter-spacing: -.065em; line-height: 1.3; }
 .varda-kicker { color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .13em; }
-.varda-kicker + .varda-page-title { margin-top: 8px; }
+.varda-kicker + .varda-page-title:not([data-cairn-heading]) { margin-top: 8px; }
 .varda-primary-number { font-size: clamp(42px, 5vw, 76px); font-weight: 600; letter-spacing: -.065em; }
 .varda-hero-strip { min-height: 128px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 22px 0 30px; }
 .varda-hero-value { padding: 0 28px 0 0; }
@@ -77,8 +77,8 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
 .varda-icon-button { min-width: 36px; min-height: 36px; border-radius: 50%; display: inline-grid; place-items: center; }
 .varda-action { min-height: 42px; border-radius: 28px; font-size: 12px; background: var(--ink); color: var(--surface); padding-inline: 22px; }
 .varda-segmented { padding: 3px; border-radius: 30px; background: var(--wash); }
-.varda-segmented button { min-height: 32px; font-size: 11px; border-radius: 24px; }
-.varda-segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px #20211f08; }
+.varda-segmented button:not([data-cairn-button]) { min-height: 32px; font-size: 11px; border-radius: 24px; }
+.varda-segmented button:not([data-cairn-button])[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px #20211f08; }
 .varda-page nav[data-scope-rail] { border: 0; border-radius: 0; background: transparent !important; padding-bottom: 5px; }
 .varda-page nav[data-scope-rail] a { position: relative; border-color: transparent; border-radius: 0; background: transparent; color: var(--muted); padding-block: 9px 15px; padding-inline: 3px; min-width: 50px; font-size: 13px; font-weight: 550; }
 .varda-page nav[data-scope-rail] a[aria-current="page"] { color: var(--ink); background: transparent !important; }
@@ -90,16 +90,16 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
 .varda-secondary-page:has(.varda-app-navigation) > :not(.varda-app-navigation) { flex: auto; min-height: 0; overflow: visible; max-width: 1240px; margin: 32px auto 0; width: calc(100% - 104px); }
 .varda-secondary-page:has(.varda-app-navigation) section { border-radius: 0; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 28px 0; }
 .varda-secondary-page:has(.varda-app-navigation) section section { padding: 24px 0; border: 0; background: transparent; }
-.varda-secondary-page:has(.varda-app-navigation) h1 { font-size: 36px; font-weight: 650; letter-spacing: -.06em; }
+.varda-secondary-page:has(.varda-app-navigation) h1:not([data-cairn-heading]) { font-size: 36px; font-weight: 650; letter-spacing: -.06em; }
 .varda-secondary-page:has(.varda-app-navigation) dl > div { border-radius: 0; padding: 15px 0; background: transparent; border: 0; }
-.varda-secondary-page:has(.varda-app-navigation) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) { border-radius: 8px; min-height: 44px; background: var(--surface); }
+.varda-secondary-page:has(.varda-app-navigation) :where(input:not([data-cairn-control]):not([type="checkbox"]):not([type="radio"]):not([type="range"]), select:not([data-cairn-control]), textarea:not([data-cairn-control])) { border-radius: 8px; min-height: 44px; background: var(--surface); }
 .varda-secondary-page:has(.varda-app-navigation) :where(th) { background: transparent; color: var(--muted); font-size: 11px; padding-block: 14px; }
 .varda-secondary-page:has(.varda-app-navigation) :where(td) { padding-block: 18px; }
 .varda-management-intro { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 20px 0 34px; }
 .varda-management-intro p { color: var(--muted); font-size: 13px; margin-top: 12px; }
 .varda-management-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 60px; }
 .varda-management-section { border-top: 1px solid var(--line); padding: 24px 0 0; }
-.varda-management-section h2 { font-size: 19px; font-weight: 600; margin-bottom: 18px; letter-spacing: -.035em; }
+.varda-management-section h2:not([data-cairn-heading]) { font-size: 19px; font-weight: 600; margin-bottom: 18px; letter-spacing: -.035em; }
 .varda-management-link { display: flex; align-items: center; gap: 18px; padding: 21px 0; border-bottom: 1px solid var(--line); transition: padding 200ms var(--motion-ease); }
 .varda-management-link > svg:first-child { color: var(--ink); flex: none; }
 .varda-management-link > span { flex: 1; font-size: 14px; font-weight: 550; }
@@ -141,7 +141,7 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
   .varda-content, .varda-presentation-content { padding: 24px 22px 32px; }
   .varda-screen { height: auto; overflow: visible; gap: 25px; }
   .varda-screen-title-row { align-items: center; gap: 14px; }
-  .varda-page-title { font-size: 28px; }
+  .varda-page-title:not([data-cairn-heading]) { font-size: 28px; }
   .varda-hero-strip { padding: 20px 0; }
   .varda-hero-value { padding: 0; }
   .varda-hero-value strong { font-size: 48px; }
@@ -154,7 +154,7 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
   .varda-screen-footer { flex-direction: column; align-items: flex-start; }
   .varda-secondary-page:has(.varda-app-navigation) > :not(.varda-app-navigation) { width: calc(100% - 44px); margin-top: 24px; }
   .varda-secondary-page:has(.varda-app-navigation) section { padding: 22px 0; }
-  .varda-secondary-page:has(.varda-app-navigation) h1 { font-size: 28px; }
+  .varda-secondary-page:has(.varda-app-navigation) h1:not([data-cairn-heading]) { font-size: 28px; }
   .varda-management-intro { align-items: flex-start; flex-direction: column; gap: 20px; padding-bottom: 20px; }
   .varda-management-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
   .varda-skip-link { left: 16px; }
@@ -165,7 +165,7 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
 }
 /* Reporting currency is a distinct control, independent of language. */
 .varda-reporting-control { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
-.varda-reporting-control select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+.varda-reporting-control select:not([data-cairn-control]) { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
 @media (max-width: 640px) { .varda-reporting-control { gap: 8px; } }
 
 .varda-topbar-language { display:flex; }

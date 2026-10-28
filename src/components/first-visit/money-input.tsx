@@ -1,6 +1,8 @@
 "use client";
 
 import type { InputHTMLAttributes } from "react";
+import { Input as CairnInput } from "@/components/cairn-ui";
+
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> & {
   value: string;
@@ -15,7 +17,7 @@ export const formatMoneyInput = (value: string) => {
 };
 
 export function MoneyInput({ value, onValueChange, allowDecimals = false, ...props }: Props) {
-  return <input {...props} type="text" inputMode={allowDecimals ? "decimal" : "numeric"} value={formatMoneyInput(value)}
+  return <CairnInput {...props} type="text" inputMode={allowDecimals ? "decimal" : "numeric"} value={formatMoneyInput(value)}
     onKeyDown={event => {
       const input = event.currentTarget;
       const position = input.selectionStart;

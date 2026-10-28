@@ -5,6 +5,8 @@ import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import Form from "next/form";
 import { SimulationContextFields } from "./simulation-query-controls";
 import type { SimulationResearchUniversePreflightModel } from "@/lib/simulation-research-universe-preflight";
+import { Button as CairnButton, Field as CairnField, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function ResearchUniversePreflightSection({
   model,
@@ -29,11 +31,11 @@ export function ResearchUniversePreflightSection({
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2
+          <CairnSectionTitle
             className="text-lg font-semibold"
             id="research-universe-preflight-title"
           >
-            <SimulationText ko={"연구 종목 데이터 점검"} />{" "}</h2>
+            <SimulationText ko={"연구 종목 데이터 점검"} />{" "}</CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]">
             <SimulationText ko={"계정과 연결하지 않은 연구 입력입니다. 저장된 가격·환율·출처만 확인하며 시뮬레이션은 실행하지 않습니다."} />{" "}</p>
         </div>
@@ -69,7 +71,7 @@ export function ResearchUniversePreflightSection({
             value={preservedQuery.kodexWeight}
           />
         ) : null}
-        <label className="min-w-0">
+        <CairnField className="min-w-0">
           <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
             market:currency:ticker:weight_bps
           </span>
@@ -81,12 +83,12 @@ export function ResearchUniversePreflightSection({
             placeholder="korea:KRW:069500:5000,us:USD:QQQ:5000"
             type="text" as="input" en={{"aria-label": simulationEnglish("연구 종목과 비중")}}
           />
-        </label>
-        <button
+        </CairnField>
+        <CairnButton variant="primary"
           className="h-11 self-end rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white hover:bg-[var(--ink)]"
           type="submit"
         >
-          <SimulationText ko={"데이터 점검"} />{" "}</button>
+          <SimulationText ko={"데이터 점검"} />{" "}</CairnButton>
       </Form>
       <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
         <SimulationText ko={"Fount는 managed:KRW:FOUNT:0, 금현물은 krx-gold:KRW:GOLD_9999_1KG:0 형식으로 남길 수 있습니다. 0bps 행도 삭제하지 않습니다."} />{" "}</p>

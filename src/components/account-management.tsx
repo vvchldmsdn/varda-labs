@@ -1,8 +1,10 @@
 "use client";
 
+import { useActionFormReset } from "@/components/cairn-ui/client";
+
 import Link from "next/link";
 import { NATIVE_ACCOUNT_BALANCE_MESSAGE } from "@/lib/native-ledger-compatibility";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { accountActionMessageKo, accountTypeLabel } from "@/lib/i18n/account-management-copy";
 
@@ -14,6 +16,8 @@ import {
 } from "@/app/portfolio/accounts/actions";
 import type { AccountManagementModel } from "@/db/queries/account-management";
 import type { AccountManagementActionState } from "@/lib/account-management";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput , Status as CairnStatus } from "@/components/cairn-ui";
+
 
 type AccountModel = AccountManagementModel["accounts"][number];
 
@@ -25,17 +29,13 @@ const INITIAL_STATE: AccountManagementActionState = Object.freeze({
 export function AccountCreateForm() {
   const { t } = useI18n();
   const [state, action, pending] = useActionState(createAccount, INITIAL_STATE);
-  const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (state.status === "success") formRef.current?.reset();
-  }, [state.status]);
+  const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state, { resetOnSuccess: true });
 
   return (
-    <form action={action} className="space-y-3" ref={formRef}>
-      <label className="block text-sm font-semibold text-[var(--ink)]">
+    <CairnForm action={action} className="space-y-3" ref={actionFormRef} onReset={actionFormOnReset}>
+      <CairnField className="block text-sm font-semibold text-[var(--ink)]">
         {t("계좌 이름", "Account name")}
-        <input
+        <CairnInput
           className={fieldClassName}
           maxLength={100}
           name="name"
@@ -43,18 +43,18 @@ export function AccountCreateForm() {
           required
           type="text"
         />
-      </label>
+      </CairnField>
       <p className="text-xs leading-5 text-[var(--muted)]">
         {t("평가액은 원화로 표시합니다. 미국 주식 등 외화 종목도 등록할 수 있습니다.", "Valuations are shown in KRW. You can also add holdings in foreign currencies, including US stocks.")}
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <button
+        <CairnButton variant="primary"
           className={primaryButtonClassName}
           disabled={pending}
           type="submit"
         >
           {t(pending ? "만드는 중…" : "계좌 만들기", pending ? "Creating…" : "Create account")}
-        </button>
+        </CairnButton>
         <ActionMessage state={state} />
       </div>
       {state.status === "success" && state.createdAccountId && !pending ? (
@@ -65,7 +65,7 @@ export function AccountCreateForm() {
           {t("이 계좌에 종목 추가", "Add holdings to this account")}
         </Link>
       ) : null}
-    </form>
+    </CairnForm>
   );
 }
 
@@ -75,10 +75,12 @@ export function AccountEditor({ account }: { account: AccountModel }) {
     updateAccount,
     INITIAL_STATE,
   );
+  const {formRef: updateActionFormRef, onReset: updateActionFormOnReset} = useActionFormReset(updateState);
   const [archiveState, archiveAction, archivePending] = useActionState(
     archiveAccount,
     INITIAL_STATE,
   );
+  const {formRef: archiveActionFormRef, onReset: archiveActionFormOnReset} = useActionFormReset(archiveState);
   const archiveBlocked =
     account.activeHoldingCount > 0 || account.openGroupReferenceCount > 0;
 
@@ -114,11 +116,11 @@ export function AccountEditor({ account }: { account: AccountModel }) {
         {t("이 계좌에 종목 추가", "Add holdings to this account")}
       </Link>
 
-      <form action={updateAction} className="mt-4 flex flex-wrap items-end gap-3">
+      <CairnForm action={updateAction} className="mt-4 flex flex-wrap items-end gap-3" onReset={updateActionFormOnReset} ref={updateActionFormRef}>
         <IdentityFields account={account} />
-        <label className="min-w-0 w-full flex-1 text-sm font-semibold text-[var(--ink)] sm:min-w-56">
+        <CairnField className="min-w-0 w-full flex-1 text-sm font-semibold text-[var(--ink)] sm:min-w-56">
           {t("계좌 이름", "Account name")}
-          <input
+          <CairnInput
             className={fieldClassName}
             defaultValue={account.name}
             maxLength={100}
@@ -126,25 +128,25 @@ export function AccountEditor({ account }: { account: AccountModel }) {
             required
             type="text"
           />
-        </label>
-        <button
+        </CairnField>
+        <CairnButton variant="primary"
           className={secondaryButtonClassName}
           disabled={updatePending}
           type="submit"
         >
           {t(updatePending ? "저장 중…" : "이름 저장", updatePending ? "Saving…" : "Save name")}
-        </button>
+        </CairnButton>
         <ActionMessage state={updateState} />
-      </form>
+      </CairnForm>
 
-      <form
+      <CairnForm
         action={archiveAction}
-        className="mt-4 flex flex-col gap-3 border-t border-[var(--wash)] pt-4 sm:flex-row sm:items-center sm:justify-between"
+        className="mt-4 flex flex-col gap-3 border-t border-[var(--wash)] pt-4 sm:flex-row sm:items-center sm:justify-between" onReset={archiveActionFormOnReset} ref={archiveActionFormRef}
       >
         <IdentityFields account={account} />
         <div className="min-w-0 flex-1">
-          <label className="flex items-start gap-2 text-sm text-[var(--muted)]">
-            <input
+          <CairnField className="flex items-start gap-2 text-sm text-[var(--muted)]">
+            <CairnInput
               className="mt-0.5 h-4 w-4 accent-[var(--negative)]"
               disabled={archiveBlocked}
               name="archiveConfirmed"
@@ -155,22 +157,22 @@ export function AccountEditor({ account }: { account: AccountModel }) {
             <span>
               {t("과거 기록을 보존하고 이 계좌를 종료합니다.", "Close this account while keeping its historical records.")}
             </span>
-          </label>
+          </CairnField>
           {archiveBlocked ? (
             <p className="mt-2 text-xs text-[var(--warning)]">
               {t("먼저 보유종목을 이동·종료하고 분석 범위 연결을 해제해 주세요.", "Move or close holdings and remove analysis-scope links first.")}
             </p>
           ) : null}
         </div>
-        <button
+        <CairnButton variant="danger"
           className={dangerButtonClassName}
           disabled={archiveBlocked || archivePending}
           type="submit"
         >
           {t(archivePending ? "종료 중…" : "계좌 종료", archivePending ? "Closing…" : "Close account")}
-        </button>
+        </CairnButton>
         <ActionMessage state={archiveState} />
-      </form>
+      </CairnForm>
     </article>
   );
 }
@@ -178,6 +180,7 @@ export function AccountEditor({ account }: { account: AccountModel }) {
 export function ArchivedAccountRow({ account }: { account: AccountModel }) {
   const { t } = useI18n();
   const [state, action, pending] = useActionState(restoreAccount, INITIAL_STATE);
+  const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state);
 
   return (
     <article className="flex flex-col gap-3 rounded-md border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -187,17 +190,17 @@ export function ArchivedAccountRow({ account }: { account: AccountModel }) {
           {t("종료됨", "Closed")} / {t(...accountTypeLabel(account.accountType))} / {account.currency}
         </p>
       </div>
-      <form action={action} className="flex flex-wrap items-center gap-3">
+      <CairnForm action={action} className="flex flex-wrap items-center gap-3" onReset={actionFormOnReset} ref={actionFormRef}>
         <IdentityFields account={account} />
-        <button
+        <CairnButton variant="primary"
           className={secondaryButtonClassName}
           disabled={pending}
           type="submit"
         >
           {t(pending ? "복원 중…" : "복원", pending ? "Restoring…" : "Restore")}
-        </button>
+        </CairnButton>
         <ActionMessage state={state} />
-      </form>
+      </CairnForm>
     </article>
   );
 }
@@ -218,7 +221,7 @@ function IdentityFields({ account }: { account: AccountModel }) {
 function ActionMessage({ state }: { state: AccountManagementActionState }) {
   const { t } = useI18n();
   return (
-    <p
+    <CairnStatus as="p" tone={state.status === "success" ? "success" : state.message ? "warning" : "neutral"}
       aria-live="polite"
       className={
         state.status === "success"
@@ -228,7 +231,7 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
     >
       {state.message ? t(accountActionMessageKo(state.message), state.message) : null}
       {state.message === NATIVE_ACCOUNT_BALANCE_MESSAGE ? <Link className="block py-2 underline underline-offset-4" href="/portfolio/ledger">{t("거래·현금 원장에서 확인하기", "Review holdings & cash")}</Link> : null}
-    </p>
+    </CairnStatus>
   );
 }
 

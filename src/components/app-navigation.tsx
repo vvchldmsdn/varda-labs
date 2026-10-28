@@ -6,12 +6,16 @@ import { REPORTING_ROUTES, ReportingCurrencySwitch } from "@/components/reportin
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRef } from "react";
+import { buildBetaFrontendHref } from "@/lib/frontend-beta-link";
+import betaSwitchStyles from "./mobile-beta-switch.module.css";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { LanguageSwitch } from "@/components/i18n/language-switch";
 import { ArrowUpRight, ChartNoAxesCombined, ChartPie, ChevronLeft, ChevronRight, FlaskConical, History, House, Menu, Plus, Settings2, TrendingUp, UserRound, X } from "lucide-react";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { formatKstTime } from "@/components/home/portfolio-format";
 import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 const navigation = [
   { title: "포트폴리오", items: [
@@ -74,6 +78,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
 
   function isActive(href: string) {
     if (href === currentPath) return true;
+    if (href === "/additional-contribution" && currentPath === "/additional-contribution/compare") return true;
     if (href === "/portfolio/structure" && ["/portfolio/risk", "/etfs"].includes(currentPath)) return true;
     return href === "/portfolio/manage" && (
       currentPath.startsWith("/admin/") ||
@@ -141,9 +146,12 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
           </Link>
-          <button type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")} aria-haspopup="dialog">
+          {!preview && !researchHref ? <a className={betaSwitchStyles.link} href={buildBetaFrontendHref(params, selectedScopeKey)} aria-label={t("베타로 보기", "Try beta")}>
+            <span>{t("베타 보기", "Try beta")}</span><ArrowUpRight size={14} aria-hidden="true" />
+          </a> : null}
+          <CairnButton variant="secondary" type="button" className="varda-mobile-menu-button" onClick={() => menuRef.current?.showModal()} aria-label={t("메뉴 열기", "Open menu")} aria-haspopup="dialog">
             <Menu size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("메뉴", "Menu")}</span>
-          </button>
+          </CairnButton>
         </div>
       </div>
       <nav className="varda-mobile-bottom" aria-label={t("빠른 메뉴", "Quick navigation")}>
@@ -157,9 +165,12 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         onClick={(event) => { if (event.target === event.currentTarget) menuRef.current?.close(); }}>
         <div className="varda-mobile-menu-inner">
           <div className="varda-mobile-menu-heading"><span className="varda-wordmark"><BrandLogo /></span>
-            <button type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></button>
+            <CairnButton variant="ghost" type="button" className="varda-icon-button" onClick={() => menuRef.current?.close()} aria-label={t("메뉴 닫기", "Close menu")}><X size={22} /></CairnButton>
           </div>
           {links}
+          {!preview && !researchHref ? <a className="varda-menu-account" href={buildBetaFrontendHref(params, selectedScopeKey)} onClick={() => menuRef.current?.close()}>
+            {t("베타로 보기", "Try beta")}<ArrowUpRight size={15} aria-hidden="true" />
+          </a> : null}
           <div className="varda-menu-language"><LanguageSwitch /></div>
           <Link className="varda-menu-account" href={hrefFor("/portfolio/holdings/new")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
           {!preview ? <TradeRecordLinks variant="menu" accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}

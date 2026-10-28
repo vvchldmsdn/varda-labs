@@ -347,6 +347,7 @@ with lock_acquired as materialized (
     (select count(*) from existing_account a where a.native_state is not null and (
       exists(select 1 from jsonb_each_text(a.native_state->'cash') c where c.value::numeric<>0)
       or exists(select 1 from jsonb_array_elements(a.native_state->'positions') p where (p->>'quantity')::numeric<>0)
+      or jsonb_array_length(coalesce(a.native_state->'unsettledTrades','[]'::jsonb))>0
     )) as native_balance_count,
     (
       select count(*)

@@ -16,7 +16,7 @@ import {
   assetPriceSnapshots,
   fxRates,
 } from "@/db/schema";
-import { planSimulationPeriodPreflightScan } from "@/lib/simulation-period-preflight-plan";
+import { planSimulationPeriodPreflightScan } from "@/lib/shared-domain/simulation-period-preflight-plan";
 import {
   buildSimulationOwnerHistoricalValidationEndpointDates,
   SIMULATION_OWNER_HISTORICAL_VALIDATION_POLICY,
@@ -26,7 +26,7 @@ import {
   resolveLatestCommonPrivateOwnerRawServiceDate,
   resolvePrivateOwnerRawAvailableServiceDates,
   type PrivateOwnerRawHistoryInstrumentInput,
-} from "@/lib/simulation-private-owner-raw-history";
+} from "@/lib/shared-domain/simulation-private-owner-raw-history";
 import type { SimulationResearchUniverseSelection } from "@/lib/simulation-research-universe-preflight";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
@@ -57,7 +57,9 @@ export async function getLatestCommonPrivateOwnerRawServiceDate(options: {
           and ${assetPriceSnapshots.adjustedCloseBasis}='provider_adjusted_close_v1'
           and ${assetPriceSnapshots.adjustedCloseProvider}='kis'
           and right(${assetPriceSnapshots.adjustedCloseSource},12)=':adjusted_v1'
-          and ${assetPriceSnapshots.adjustedCloseFetchedAt} is not null)`,
+        and ${assetPriceSnapshots.adjustedCloseFetchedAt} is not null
+        and (lower(trim(${assetPriceSnapshots.market})) <> 'us' or
+          ${assetPriceSnapshots.priceDate} < (${assetPriceSnapshots.adjustedCloseFetchedAt} at time zone 'America/New_York')::date))`,
         providerBindingCount: sql<number>`count(distinct (upper(trim(${assetPriceSnapshots.providerSymbol})) || '|' || upper(trim(${assetPriceSnapshots.providerExchange}))))`,
       })
       .from(assetPriceSnapshots)

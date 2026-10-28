@@ -14,6 +14,8 @@ import {
   type InvestmentLabSmallAdjustmentCalculation,
   type InvestmentLabSmallAdjustmentModel,
 } from "@/lib/investment-lab-small-adjustment";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Select as CairnSelect } from "@/components/cairn-ui";
+
 
 export function InvestmentLabSmallAdjustment({
   model,
@@ -88,10 +90,10 @@ export function InvestmentLabSmallAdjustment({
             <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
               WHAT-IF WORKBENCH
             </p>
-            <h2
+            <CairnSectionTitle
               id="investment-lab-small-adjustment-title"
               className="mt-3 text-lg font-medium sm:text-xl"
-            ><LabText value=" 작은 조정 영향 실험 " /></h2>
+            ><LabText value=" 작은 조정 영향 실험 " /></CairnSectionTitle>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다. 외부 현금, 목표비중, 추천, 주문은 반영하지 않습니다. " /></p>
           </div>
           <p className="text-sm font-semibold text-[var(--muted)]"><LabText value=" 계산 가능 계정 " />{readyAccountCount}/{model.accounts.length}
@@ -106,7 +108,7 @@ export function InvestmentLabSmallAdjustment({
           role="group" en={{"aria-label": labEnglish("조정 계정")}}
         >
           {model.accounts.map((account) => (
-            <button
+            <CairnButton variant="secondary"
               className={`min-h-10 min-w-20 shrink-0 border-b-2 px-1 text-sm font-semibold ${
                 account.account === accountCode
                   ? "border-[var(--ink)] text-[var(--ink)]"
@@ -120,16 +122,16 @@ export function InvestmentLabSmallAdjustment({
               type="button"
             >
               {account.label}
-            </button>
+            </CairnButton>
           ))}
         </LocalizedElement>
 
         {!selectedAccount || selectedAccount.status !== "ready" ? (
           <AccountUnavailable account={selectedAccount} />
         ) : (
-          <form className="mt-4 space-y-4" onSubmit={submit}>
+          <CairnForm className="mt-4 space-y-4" onSubmit={submit}>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_220px_auto] lg:items-end">
-              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 줄일 보유자산 " /><select
+              <CairnField className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 줄일 보유자산 " /><CairnSelect
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
                     setSourceKey(event.target.value);
@@ -144,10 +146,10 @@ export function InvestmentLabSmallAdjustment({
                       <LabText value={formatKrw(holding.currentValueKrw)} />
                     </option>
                   ))}
-                </select>
-              </label>
+                </CairnSelect>
+              </CairnField>
 
-              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 늘릴 보유자산 " /><select
+              <CairnField className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 늘릴 보유자산 " /><CairnSelect
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
                     setDestinationKey(event.target.value);
@@ -166,10 +168,10 @@ export function InvestmentLabSmallAdjustment({
                       <LabText value={formatKrw(holding.currentValueKrw)} />
                     </option>
                   ))}
-                </select>
-              </label>
+                </CairnSelect>
+              </CairnField>
 
-              <label className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 이동 금액 " /><input
+              <CairnField className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 이동 금액 " /><CairnInput
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal tabular-nums text-[var(--ink)]"
                   inputMode="numeric"
                   max={source ? Math.floor(source.currentValueKrw) : undefined}
@@ -183,13 +185,13 @@ export function InvestmentLabSmallAdjustment({
                   type="number"
                   value={amount}
                 />
-              </label>
+              </CairnField>
 
-              <button
+              <CairnButton variant="primary"
                 className="min-h-11 rounded-md bg-[var(--ink)] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[var(--faint)]"
                 disabled={!sourceKey || !destinationKey || !amount}
                 type="submit"
-              ><LabText value=" 영향 계산 " /></button>
+              ><LabText value=" 영향 계산 " /></CairnButton>
             </div>
 
             <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--muted)]">
@@ -200,7 +202,7 @@ export function InvestmentLabSmallAdjustment({
                 <span><LabText value="이동 가능 상한 " /><LabText value={formatKrw(source.currentValueKrw)} /></span>
               ) : null}
             </div>
-          </form>
+          </CairnForm>
         )}
       </div>
 
@@ -257,7 +259,7 @@ export function InvestmentLabSmallAdjustmentUnavailable() {
   return (
     <section className="min-w-0 py-6">
       <div className="border-y border-[var(--warning-soft)] py-4 text-sm text-[var(--warning)]">
-        <h2 className="text-lg font-semibold"><LabText value="작은 조정 영향 실험" /></h2>
+        <CairnSectionTitle className="text-lg font-semibold"><LabText value="작은 조정 영향 실험" /></CairnSectionTitle>
         <p className="mt-2"><LabText value=" 현재 보유자산 평가 근거를 읽지 못해 계산을 차단했습니다. " /></p>
       </div>
     </section>

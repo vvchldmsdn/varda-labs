@@ -6,6 +6,8 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { formatDate } from "./portfolio-format";
 import styles from "./holding-date-picker.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function HoldingDatePicker({ dates, value, onChange }: {
   dates: readonly string[];
@@ -24,22 +26,22 @@ export function HoldingDatePicker({ dates, value, onChange }: {
   }, [open]);
   const close = () => dialogRef.current?.close();
   return <>
-    <button className={styles.trigger} type="button" aria-haspopup="dialog" aria-expanded={open}
+    <CairnButton variant="secondary" className={styles.trigger} type="button" aria-haspopup="dialog" aria-expanded={open}
       aria-label={t(`조회 날짜 선택: ${value ? formatDate(value) : "미선택"}`, `Choose a date: ${value ? formatDate(value) : "No date"}`)}
       onClick={() => { dialogRef.current?.showModal(); setOpen(true); }}>
       <CalendarDays size={15} aria-hidden="true" />{value ? formatDate(value) : "—"}<ChevronDown size={14} aria-hidden="true" />
-    </button>
+    </CairnButton>
     <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId}
       onClose={() => setOpen(false)} onClick={event => { if (event.target === event.currentTarget) close(); }}>
       <div className={styles.shell}>
-        <header><div><h3 id={titleId}>{t("조회 날짜", "Choose a date")}</h3><p>{t("확인할 하루를 선택하세요.", "Choose the day you want to explore.")}</p></div>
-          <button type="button" aria-label={t("날짜 선택 취소", "Cancel date selection")} onClick={close}><X size={18} aria-hidden="true" /></button>
+        <header><div><CairnSectionTitle level="h3" id={titleId}>{t("조회 날짜", "Choose a date")}</CairnSectionTitle><p>{t("확인할 하루를 선택하세요.", "Choose the day you want to explore.")}</p></div>
+          <CairnButton variant="ghost" type="button" aria-label={t("날짜 선택 취소", "Cancel date selection")} onClick={close}><X size={18} aria-hidden="true" /></CairnButton>
         </header>
         <div className={styles.dates}>
-          {open ? [...dates].reverse().map(date => <button type="button" key={date} aria-pressed={date === value}
-            onClick={() => { onChange(date); close(); }}><span>{formatDate(date)}</span>{date === value ? <Check size={17} aria-hidden="true" /> : null}</button>) : null}
+          {open ? [...dates].reverse().map(date => <CairnButton variant="selection" type="button" key={date} aria-pressed={date === value}
+            onClick={() => { onChange(date); close(); }}><span>{formatDate(date)}</span>{date === value ? <Check size={17} aria-hidden="true" /> : null}</CairnButton>) : null}
         </div>
-        <footer><button type="button" onClick={close}>{t("취소", "Cancel")}</button></footer>
+        <footer><CairnButton variant="ghost" type="button" onClick={close}>{t("취소", "Cancel")}</CairnButton></footer>
       </div>
     </dialog>
   </>;

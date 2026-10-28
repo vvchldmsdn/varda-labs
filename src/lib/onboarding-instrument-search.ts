@@ -5,7 +5,7 @@ export type OnboardingInstrument = Readonly<{
   market: "korea" | "us";
   currency: "KRW" | "USD";
   assetType: "etf" | "stock";
-  source: "etf_master" | "etf_constituent";
+  source: "etf_master" | "etf_constituent" | "instrument_catalog";
 }>;
 
 export type OnboardingInstrumentSearchResult = Readonly<{
@@ -25,7 +25,7 @@ export function parseOnboardingInstrumentSearch(value: unknown): string | null {
 export function parseOnboardingInstrumentId(value: string) {
   const parts = value.split(":");
   const [kind, id] = parts;
-  return parts.length === 2 && (kind === "etf" || kind === "stock") && id && UUID.test(id)
+  return parts.length === 2 && (kind === "etf" || kind === "stock" || kind === "catalog") && id && UUID.test(id)
     ? { kind, id: id.toLowerCase() } as const : null;
 }
 
@@ -47,6 +47,12 @@ export function canonicalOnboardingInstrument(row: {
   // Exchange-local symbols only: do not guess an exchange from a country or an ISIN.
   if (market === "korea" ? !/^[0-9A-Z]{6}$/.test(ticker) : !/^[A-Z][A-Z0-9.-]{0,14}$/.test(ticker)) return null;
   return Object.freeze({ id: `${assetType}:${row.id.toLowerCase()}`, name, ticker, market, currency: currency as "KRW" | "USD", assetType, source: assetType === "etf" ? "etf_master" : "etf_constituent" });
+}
+
+export function canonicalCatalogInstrument(row: { id: string; name: string; ticker: string; market: string; currency: string; assetType: string }): OnboardingInstrument | null {
+  if (row.assetType !== "stock" && row.assetType !== "etf") return null;
+  const instrument = canonicalOnboardingInstrument(row, row.assetType);
+  return instrument ? Object.freeze({ ...instrument, id: `catalog:${row.id.toLowerCase()}`, source: "instrument_catalog" }) : null;
 }
 
 export function rankOnboardingInstruments(rows: readonly OnboardingInstrument[], query: string) {

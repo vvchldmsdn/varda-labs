@@ -12,6 +12,7 @@ import { importWithPorts } from '../tests/helpers/import-with-ports.mjs';
 import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 import { childEnvironment } from './reliability-ci.mjs';
 import { runContributionUiCases, runLegacyContributionUiCase } from './reliability-contribution-ui-cases.mjs';
+import { fillSettledTrade } from './reliability-trade-ui-helpers.mjs';
 import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
 
 /** Neon wire transport only. The app's SQL, tenant roles, transactions and RLS are unchanged. */
@@ -150,7 +151,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,000.00');
       await page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true }).click();
       const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
-      await dialog.getByLabel('수량', { exact: true }).fill('2'); await dialog.getByLabel('체결 총액', { exact: true }).fill('200');
+      await fillSettledTrade(dialog, '2', '200');
       const buyResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/portfolio/ledger' && response.request().method() === 'POST' && !!response.request().postDataJSON()?.mutation);
       await dialog.getByRole('button', { name: '매수 기록 저장', exact: true }).click();
       assert.equal((await buyResponse).status(), 201, 'Fast device clock must not reject the default trade time');
@@ -158,7 +159,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await expect(page.getByRole('region', { name: '보유자산' })).toContainText('1,200.00');
       await page.clock.setSystemTime(new Date(Date.now() - 60_000));
       await page.getByRole('button', { name: 'Synthetic USD holding 매도', exact: true }).click();
-      await dialog.getByLabel('수량', { exact: true }).fill('1'); await dialog.getByLabel('체결 총액', { exact: true }).fill('110');
+      await fillSettledTrade(dialog, '1', '110');
       const sellResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/portfolio/ledger' && response.request().method() === 'POST' && !!response.request().postDataJSON()?.mutation);
       await dialog.getByRole('button', { name: '매도 기록 저장', exact: true }).click();
       assert.equal((await sellResponse).status(), 201, 'Slow device clock must not reject the default trade time');
@@ -183,7 +184,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
         else await route.continue();
       });
       await page.goto(url + `/portfolio/ledger?accountId=${account}&assetId=${asset}&action=buy`);
-      await page.getByLabel('수량', { exact: true }).fill('1'); await page.getByLabel('체결 총액', { exact: true }).fill('100');
+      await fillSettledTrade(page, '1', '100');
       await page.getByRole('button', { name: '매수 기록 저장', exact: true }).click();
       await expect(page.getByText('저장 결과를 확인하지 못했어요.', { exact: false })).toBeVisible();
       assert.equal((await readState()).positions[0].quantity, '12');
@@ -206,9 +207,10 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await visitValuation('/history?currency=USD');
       await expect(page.locator('body')).toContainText('2,000.00');
       await page.goto(url + `/portfolio/ledger?accountId=${account}&assetId=${asset}&action=buy`);
+      await page.getByText('거래일·과거 기록 정정', { exact: true }).click();
       await page.getByText('과거 거래 추가·정정', { exact: true }).click();
       await page.getByLabel('시작 잔액 이후 거래를 다시 계산', { exact: true }).check();
-      await page.getByLabel('수량', { exact: true }).fill('1'); await page.getByLabel('체결 총액', { exact: true }).fill('100');
+      await fillSettledTrade(page, '1', '100');
       await page.getByText('초 단위 시각 확인·수정',{exact:true}).click();
       await page.locator('input[name="at"]').fill('2026-08-02T12:00');
       await page.getByLabel('변경 이유', { exact: true }).fill('Synthetic missing buy');
@@ -256,12 +258,12 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.getByRole('button', { name: 'Synthetic KRW holding 매수', exact: true }).click();
       const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
-      await dialog.getByLabel('수량', { exact: true }).fill('1'); await dialog.getByLabel('체결 총액', { exact: true }).fill('10000');
+      await fillSettledTrade(dialog, '1', '10000');
       await page.screenshot({ path: path.join(output, 'mobile-krw-trade.png'), fullPage: true });
       await dialog.getByRole('button', { name: '매수 기록 저장', exact: true }).click(); await expect(dialog).not.toBeVisible();
       await expect(page.getByRole('region', { name: '보유자산' })).toContainText('110,000');
       await page.getByRole('button', { name: 'Synthetic KRW holding 매도', exact: true }).click();
-      await dialog.getByLabel('수량', { exact: true }).fill('1'); await dialog.getByLabel('체결 총액', { exact: true }).fill('11000');
+      await fillSettledTrade(dialog, '1', '11000');
       await dialog.getByRole('button', { name: '매도 기록 저장', exact: true }).click(); await expect(dialog).not.toBeVisible();
       const otherState = (await ledger.readNativeLedger({ ownerUserId: other, role: 'user' }, otherAccount)).accounts[0].state;
       assert.equal(otherState.positions[0].quantity, '10'); assert.equal(otherState.cash.KRW, '101000');
@@ -282,6 +284,12 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       // The graph shows the valuation date, one day before the daily save date.
       const firstDate = page.getByRole('button', { name: /^2026\.08\.04 이전 저장점 대비/ });
       const secondDate = page.getByRole('button', { name: /^2026\.08\.05 이전 저장점 대비/ });
+      const cells = await firstDate.evaluate(element => {
+        // Measure layout, not the parent dialog's opening scale animation.
+        return { width: element.offsetWidth, height: element.offsetHeight };
+      });
+      assert.equal(cells.width, 17, 'Calendar cells must retain their chart width');
+      assert.equal(cells.height, 17, 'Form button minimum height must not overlap adjacent dates');
       await firstDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
       await secondDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
       await page.screenshot({ path: path.join(output, 'desktop-legacy-history-heatmap.png'), fullPage: true });
@@ -408,6 +416,23 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       }finally{await stale.close();}
     });
     await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
+    // Execution-only evidence intentionally leaves cash unconfirmed; run after cash-dependent journeys.
+    await check('fullapp-default-fractional-execution-preserves-cash-and-roundtrips-holdings', async () => {
+      await setIdentity(sessionTokens[1]);
+      await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
+      const ctx = { ownerUserId: other, role: 'user' };
+      const before = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
+      for (const action of ['buy', 'sell']) {
+        await page.goto(url + `/portfolio/ledger?accountId=${otherAccount}&assetId=${otherAsset}&action=${action}`);
+        await page.getByLabel('체결 수량', { exact: true }).fill('0.010709');
+        await page.getByLabel('체결 단가 · KRW', { exact: true }).fill('10000.123456');
+        await page.getByRole('button', { name: action === 'buy' ? '매수 기록 저장' : '매도 기록 저장', exact: true }).click();
+        await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.', { exact: true })).toBeVisible();
+        const after = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
+        assert.deepEqual(after.cash, before.cash, 'Execution-only records must not invent cash settlement');
+        assert.equal(after.positions[0].quantity, action === 'buy' ? '10.010709' : before.positions[0].quantity);
+      }
+    });
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };

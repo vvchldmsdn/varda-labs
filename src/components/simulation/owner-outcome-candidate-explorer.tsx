@@ -12,6 +12,8 @@ import {
   resolveResearchFanChartValueDomain,
 } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyComparison = Extract<
   SimulationOwnerCandidateComparisonResult,
@@ -53,7 +55,7 @@ export function OwnerOutcomeCandidateExplorer({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"확률 경로를 비중으로 역산"} />{" "}</p>
-          <h3 className="mt-1 text-base font-semibold"><SimulationText ko={"목적별 비중 후보"} /></h3>
+          <CairnSectionTitle level="h3" className="mt-1 text-base font-semibold"><SimulationText ko={"목적별 비중 후보"} /></CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={`${pathCount.toLocaleString("ko-KR")}개 경로를 탐색용 ${Math.ceil(pathCount / 2)}개와 확인용 ${Math.floor(pathCount / 2)}개로 분리합니다. 현재 비중보다 확인용 경로에서도 나아진 경우만 보여주며, 같은 종목·환율 자료와 같은 무작위 경로를 사용합니다.`} en={`Split ${pathCount.toLocaleString("en-US")} paths into ${Math.ceil(pathCount / 2)} selection paths and ${Math.floor(pathCount / 2)} confirmation paths. Only candidates that also improve on current weights in the confirmation paths are shown, using the same instruments, FX data and random paths.`} />{" "}</p>
         </div>
@@ -64,7 +66,7 @@ export function OwnerOutcomeCandidateExplorer({
             role="tablist"
           >
             {candidates.map((candidate) => (
-              <button
+              <CairnButton variant="secondary"
                 aria-selected={candidate.objective === selected.objective}
                 className={`min-h-9 px-3 text-sm font-semibold ${
                   candidate.objective === selected.objective
@@ -77,7 +79,7 @@ export function OwnerOutcomeCandidateExplorer({
                 type="button"
               >
                 <SimulationText ko={objectiveLabel(candidate.objective)} />
-              </button>
+              </CairnButton>
             ))}
           </div>
         ) : null}

@@ -26,6 +26,8 @@ import chartStyles from "./simulation-path-chart.module.css";
 import detailStyles from "./simulation-path-detail.module.css";
 import { ExpandableChart } from "@/components/presentation/expandable-chart";
 import { SimulationPathCanvas } from "./simulation-path-canvas";
+import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
+
 const SimulationStorageManager = lazy(() => import("./simulation-storage-manager").then(module => ({ default: module.SimulationStorageManager })));
 const SimulationPathDetailPanel = lazy(() => import("./simulation-path-detail-panel"));
 
@@ -191,7 +193,7 @@ export function SimulationFanExplorer({
               { key: "band", label: "분포 구간", en: "Distribution", icon: AreaChart },
             ] as const
           ).map(({ key, label, en, icon: Icon }) => (
-            <button
+            <CairnButton variant="selection"
               key={key}
               type="button"
               aria-pressed={mode === key}
@@ -200,7 +202,7 @@ export function SimulationFanExplorer({
             >
               <Icon size={14} aria-hidden="true" />
               <SimulationText ko={label} en={en} />
-            </button>
+            </CairnButton>
           ))}
         </div>
         <div
@@ -214,7 +216,7 @@ export function SimulationFanExplorer({
               { key: "index", label: "시작값 100" },
             ] as const
           ).map(({ key, label }) => (
-            <button
+            <CairnButton variant="selection"
               key={key}
               type="button"
               aria-pressed={unit === key}
@@ -222,7 +224,7 @@ export function SimulationFanExplorer({
               className={`${compact ? "min-h-9" : "min-h-10"} border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
             >
               <SimulationText ko={label} />
-            </button>
+            </CairnButton>
           ))}
         </div>
       </div>
@@ -348,17 +350,17 @@ export function SimulationFanExplorer({
         )}
       </div>
       {mode === "paths" && pathCount > 0 && !compact ? <div className={chartStyles.pathControls} aria-label={pt("경로 선택", "Path selection")}>
-        <button type="button" disabled={selectedPath === 0} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath - 1)} aria-label={pt("이전 경로", "Previous path")}><ChevronLeft size={14} aria-hidden="true" /></button>
-        <label><span>{pt("경로", "Path")}</span><input type="number" min={1} max={pathCount} step={1} value={selectedPath === null ? "" : selectedPath + 1} placeholder="—" aria-label={pt("경로 번호", "Path number")} onChange={(event) => selectPath(event.currentTarget.value === "" ? null : Math.floor(Number(event.currentTarget.value)) - 1)} /></label>
-        <button type="button" disabled={selectedPath === pathCount - 1} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath + 1)} aria-label={pt("다음 경로", "Next path")}><ChevronRight size={14} aria-hidden="true" /></button>
-        {selectedPath !== null ? <button type="button" onClick={() => selectPath(null)} aria-label={pt("경로 선택 해제", "Clear path selection")}><X size={13} aria-hidden="true" /></button> : null}
-        {selectedPath !== null && pathDetail ? <button ref={detailTrigger} type="button" style={{ borderRadius: 8, padding: "0 12px" }} aria-expanded={detailOpen} onClick={() => { setActiveStep(selectedStep); setDetailOpen(true); }}>{pt("경로 자세히 보기", "Path details")}</button> : null}
+        <CairnButton variant="bare" type="button" disabled={selectedPath === 0} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath - 1)} aria-label={pt("이전 경로", "Previous path")}><ChevronLeft size={14} aria-hidden="true" /></CairnButton>
+        <CairnField><span>{pt("경로", "Path")}</span><CairnInput type="number" min={1} max={pathCount} step={1} value={selectedPath === null ? "" : selectedPath + 1} placeholder="—" aria-label={pt("경로 번호", "Path number")} onChange={(event) => selectPath(event.currentTarget.value === "" ? null : Math.floor(Number(event.currentTarget.value)) - 1)} /></CairnField>
+        <CairnButton variant="bare" type="button" disabled={selectedPath === pathCount - 1} onClick={() => selectPath(selectedPath === null ? 0 : selectedPath + 1)} aria-label={pt("다음 경로", "Next path")}><ChevronRight size={14} aria-hidden="true" /></CairnButton>
+        {selectedPath !== null ? <CairnButton variant="bare" type="button" onClick={() => selectPath(null)} aria-label={pt("경로 선택 해제", "Clear path selection")}><X size={13} aria-hidden="true" /></CairnButton> : null}
+        {selectedPath !== null && pathDetail ? <CairnButton variant="bare" ref={detailTrigger} type="button" style={{ borderRadius: 8, padding: "0 12px" }} aria-expanded={detailOpen} onClick={() => { setActiveStep(selectedStep); setDetailOpen(true); }}>{pt("경로 자세히 보기", "Path details")}</CairnButton> : null}
         {selectedPath !== null && !pathDetail ? <span>{pathDetailNotice === "limit" ? pt("상세 저장이 잠시 제한됐어요. 잠시 후 다시 시도해 주세요.", "Path storage is temporarily limited. Please retry shortly.") : pathDetailNotice === "disabled" ? pt("경로 상세 기능이 현재 활성화되지 않았어요. 그래프는 계속 볼 수 있습니다.", "Path details are not enabled right now. The chart remains available.") : pathDetailNotice === "storage" ? pt("이번 실행의 상세를 저장하지 못했어요. 그래프는 계속 볼 수 있습니다.", "Details could not be saved for this execution. The chart remains available.") : pt("이 모형은 경로별 상세 상태를 제공하지 않습니다.", "This model does not provide per-path details.")}</span> : null}
         <span className={chartStyles.pathCount}>{pt(`${source.kind === "all" ? "전체" : "표본"} ${pathCount.toLocaleString()}개`, `${source.kind === "all" ? "All" : "Sample"} ${pathCount.toLocaleString()} paths`)}</span>
       </div> : null}
       {selectedPath !== null && !pathDetail && pathDetailNotice === "limit" ? <Suspense fallback={null}><SimulationStorageManager /></Suspense> : null}
       <div className="mt-2 flex items-center gap-4">
-        <input
+        <CairnInput
           className={styles.scrubber}
           type="range"
           aria-label={pt(`${executionName} 경로 시점`)}
@@ -394,7 +396,7 @@ export function SimulationFanExplorer({
             {pt(`${source.kind === "all" ? "전체" : "표본"} ${pathCount.toLocaleString()}개 경로 · 연구 분포, 수익 보장 아님`, `${source.kind === "all" ? "All" : "Sample"} ${pathCount.toLocaleString()} paths · Research distribution, not guaranteed returns`)}</span>
         </figcaption>
       )}
-      {detailOpen && pathDetail && selectedPath !== null ? <Suspense fallback={<p role="status">{pt("경로 설명을 여는 중…", "Opening path details…")}</p>}><SimulationPathDetailPanel key={`${pathDetail.executionId}:${selectedPath}`} handle={pathDetail} pathIndex={simulationFanPathIdentity(source, selectedPath) ?? selectedPath} step={Math.round(activeStep ?? execution.assumptions.horizon)} onStep={inspectStep} onClose={closeDetail} /></Suspense> : null}
+      {detailOpen && pathDetail && selectedPath !== null ? <Suspense fallback={<CairnStatus as="p" tone="neutral" role="status">{pt("경로 설명을 여는 중…", "Opening path details…")}</CairnStatus>}><SimulationPathDetailPanel key={`${pathDetail.executionId}:${selectedPath}`} handle={pathDetail} pathIndex={simulationFanPathIdentity(source, selectedPath) ?? selectedPath} step={Math.round(activeStep ?? execution.assumptions.horizon)} onStep={inspectStep} onClose={closeDetail} /></Suspense> : null}
     </figure>
     </ExpandableChart>
   );

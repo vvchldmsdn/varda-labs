@@ -1,5 +1,7 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerWalkForwardValidationResult } from "@/lib/simulation-owner-walk-forward-validation";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function OwnerWalkForwardValidationSection({
   result,
@@ -21,11 +23,11 @@ export function OwnerWalkForwardValidationSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"학습 구간과 확인 구간 분리"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-lg font-semibold"
             id="owner-walk-forward-validation-title"
           >
-            <SimulationText ko={"과거 구간 밖 검증"} />{" "}</h2>
+            <SimulationText ko={"과거 구간 밖 검증"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"앞선 60개 수익률로 후보 비중을 만든 뒤, 계산에 쓰지 않은 다음 10개 수익률에서 현재 비중과 비교합니다. 시작점을 10개씩 옮겨 총 세 번 반복해 같은 90개 구간에만 맞춘 결과인지 점검합니다."} />{" "}</p>
         </div>

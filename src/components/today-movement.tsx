@@ -44,6 +44,8 @@ import {
   selectTodayHoldingHistory,
 } from "@/lib/today-movement-view";
 import { buildTodayQuoteFreshness, formatTodayEvidenceRange } from "@/lib/today-quote-freshness";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function TodayMovement({
   data,
@@ -110,7 +112,7 @@ export function TodayMovement({
       <div className="varda-content varda-presentation-content varda-stage-content">
         <div className={styles.stage}>
           <header className={styles.stageHeader}>
-            <h1 id="today-movement-title" className={styles.stageTitle}><T ko="오늘의 움직임" en="What moved today"/></h1>
+            <CairnPageTitle id="today-movement-title" className={styles.stageTitle}><T ko="오늘의 움직임" en="What moved today"/></CairnPageTitle>
             <div className={styles.stageScope}>
             <PortfolioAnalysisScopeTabs
               basePath="/today"
@@ -174,7 +176,7 @@ export function TodayMovement({
           <section className={styles.stageContribution} aria-labelledby="contribution-title">
             <div className={`${styles.panelHeader} ${styles.contributionHeader}`}>
               <div>
-                <h2 id="contribution-title" className={styles.panelTitle}><T ko="종목별 기여" en="Contribution by holding"/></h2>
+                <CairnSectionTitle id="contribution-title" className={styles.panelTitle}><T ko="종목별 기여" en="Contribution by holding"/></CairnSectionTitle>
                 <p className={styles.evidenceIntro}><T ko="점의 길이는 실제 변동액에 비례합니다." en="The dot bars scale with the actual amount of change."/></p>
               </div>
               <p className={styles.status}><T ko="절대 변동액 순 ·" en="By absolute change ·"/> {rows.length}<T ko="개 종목" en=" holdings"/></p>
@@ -201,7 +203,7 @@ export function TodayMovement({
 
           <div className={styles.todayEvidence}>
             <div>
-              <h2 className={styles.panelTitle}><T ko="계산 근거" en="Calculation sources"/></h2>
+              <CairnSectionTitle className={styles.panelTitle}><T ko="계산 근거" en="Calculation sources"/></CairnSectionTitle>
               <p className={styles.evidenceIntro}>
                 {movement.contributionRows.length}<T ko="개 기여 근거 ·" en="contribution records ·"/> {<T ko={formatDate(data.dataHealth.latestFxRateDate)} en={translateHomeHistory(formatDate(data.dataHealth.latestFxRateDate))}/>}<T ko="환율" en="FX rate"/></p>
             </div>
@@ -278,7 +280,7 @@ function MovementBridge({
     <section aria-labelledby="movement-bridge-title">
       <div className={styles.panelHeader}>
         <div>
-          <h2 id="movement-bridge-title" className={styles.panelTitle}><T ko="오늘 변동 구성" en="Today's change breakdown"/></h2>
+          <CairnSectionTitle id="movement-bridge-title" className={styles.panelTitle}><T ko="오늘 변동 구성" en="Today's change breakdown"/></CairnSectionTitle>
           <p className={styles.evidenceIntro}><T ko="저장된 기준과 현재 근거 비교" en="Recorded baseline versus current data"/></p>
         </div>
         {movementExcludedCurrentValueKrw > 0 ? (
@@ -318,13 +320,13 @@ function HoldingDetailPanel({
     return (
       <HoldingDetailDrawer closeHref={clearHref}>
       <section className="py-7 text-sm text-[var(--warning)]">
-        <h2 id="holding-detail-title" className="text-xl font-medium">
+        <CairnSectionTitle id="holding-detail-title" className="text-xl font-medium">
           {<T ko={detail.status === "not_found"
             ? "선택한 종목을 찾지 못했습니다."
             : "같은 티커가 여러 계좌에 있어 계좌 선택이 필요합니다."} en={translateHomeHistory(detail.status === "not_found"
             ? "선택한 종목을 찾지 못했습니다."
             : "같은 티커가 여러 계좌에 있어 계좌 선택이 필요합니다.")}/>}
-        </h2>
+        </CairnSectionTitle>
         {detail.status === "ambiguous" ? (
           <div className="mt-3 flex flex-wrap gap-4">
             {detail.candidates.map((candidate) => (
@@ -376,9 +378,9 @@ function HoldingDetailPanel({
           <p className="text-[11px] font-medium text-[var(--muted)]">
             SELECTED HOLDING
           </p>
-          <h2 id="holding-detail-title" className="mt-1 text-2xl font-medium">
+          <CairnSectionTitle id="holding-detail-title" className="mt-1 text-2xl font-medium">
             {holding.name}
-          </h2>
+          </CairnSectionTitle>
           <p className="mt-1 text-xs text-[var(--muted)]">
             {accountLabels.get(holding.account) ?? <T ko="계좌" en="Account" />} · {<T ko={holding.ticker ?? "티커 없음"} en={translateHomeHistory(holding.ticker ?? "티커 없음")}/>} ·{" "}
             {holding.market.toUpperCase()} · {holding.currency}
@@ -502,7 +504,7 @@ function DetailColumn({
     <div
       className={`min-h-64 py-6 lg:px-7 ${divided ? "border-t border-[var(--wash)] lg:border-l lg:border-t-0" : "lg:pr-7"}`}
     >
-      <h3 className="text-sm font-medium">{<T ko={title} en={translateHomeHistory(title)}/>}</h3>
+      <CairnSectionTitle level="h3" className="text-sm font-medium">{<T ko={title} en={translateHomeHistory(title)}/>}</CairnSectionTitle>
       <dl className="mt-5 divide-y divide-[var(--wash)]">{children}</dl>
     </div>
   );

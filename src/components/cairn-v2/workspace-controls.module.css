@@ -1,0 +1,34 @@
+/* Shared presentation only: no global reset or dashboard/card rules. */
+.subnav a[aria-current=page]{color:var(--cairn-v2-ink);font-weight:500;background:rgba(32,33,31,.045);border-radius:6px}
+.settingsTrigger{min-height:44px;min-width:44px;justify-content:center}
+.mobileSettingsTrigger,.mobileMenu{display:none}
+.settingsContent{padding:22px 20px 18px;font-size:13px;line-height:1.6}
+.settingsContent h2{font-size:20px;font-weight:500;margin:0 36px 24px 0}
+.settingsContent h3{font-size:12px;font-weight:500;margin:0 0 12px;color:var(--cairn-v2-muted)}
+.effectSetting{display:flex;gap:12px;align-items:flex-start;min-height:48px;padding:8px 0;cursor:pointer}
+.effectSetting input{width:18px;height:18px;flex:none;margin:3px 0 0;accent-color:var(--cairn-v2-brand)}
+.effectSetting small{display:block;margin-top:4px;color:var(--cairn-v2-muted);font-size:11px}
+.settingsContent section{border-top:1px solid var(--cairn-v2-line);padding-top:18px;margin-top:20px}
+.settingsContent section p{font-size:12px;color:var(--cairn-v2-muted)}
+.settingsNote{margin-top:20px!important;color:var(--cairn-v2-muted);font-size:11px}
+@media(max-width:699px){
+ .mobileSettingsTrigger{display:grid;place-items:center;min-width:44px;min-height:44px}
+ .mobileSettingsTrigger img{width:18px;height:18px}
+ .mobileMenu{display:block;margin:0 0 20px;border-bottom:1px solid var(--cairn-v2-line)}
+ .mobileMenu>summary{display:flex;align-items:center;justify-content:space-between;min-height:44px;cursor:pointer;list-style:none;font-size:12px}
+ .mobileMenu>summary::-webkit-details-marker{display:none}
+ .mobileMenu>summary span{color:var(--cairn-v2-muted)}
+ .mobileMenu[open]>summary span{transform:rotate(180deg)}
+ .mobileMenu nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 12px;padding:4px 0 12px}
+ .mobileMenu nav a,.mobileMenu nav>span{display:flex;align-items:center;min-height:44px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+ .mobileMenu nav>span{color:var(--cairn-v2-muted)}
+ .mobileMenu a[aria-current=page]{font-weight:500;background:rgba(32,33,31,.045);border-radius:6px}
+}
+
+@media(max-width:699px){
+ header.workspaceTopbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;height:auto!important;min-height:86px;padding-block:12px!important;gap:5px 10px!important}
+ header.workspaceTopbar h1{grid-column:1/-1;max-width:none!important;padding:0!important;line-height:22px!important;font-size:12px!important}
+ header.workspaceTopbar>button{grid-column:1;grid-row:2;min-width:0}
+ header.workspaceTopbar label{grid-column:2;grid-row:2}
+ header.workspaceTopbar .mobileSettingsTrigger{grid-column:3;grid-row:2}
+}

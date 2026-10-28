@@ -6,6 +6,8 @@ import {
   resolveResearchFanChartValueDomain,
 } from "./research-fan-chart";
 import { SimulationTerminalRiskMetrics } from "./simulation-terminal-risk-metrics";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type ReadyComparison = Extract<
   FixedMixResearchComparisonResult,
@@ -30,8 +32,8 @@ export function FixedMixResearchComparisonSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="fixed-mix-comparison-title" className="text-lg font-semibold">
-            <SimulationText ko={"고정 비중 3안 공통 경로 비교"} />{" "}</h2>
+          <CairnSectionTitle id="fixed-mix-comparison-title" className="text-lg font-semibold">
+            <SimulationText ko={"고정 비중 3안 공통 경로 비교"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"25:75, 50:50, 75:25가 같은 path별 날짜 행과 블록 순서를 사용합니다. 최초 비중만 다르고 입력 행렬과 무작위 표본은 같아, 비중 차이만 비교할 수 있습니다."} />{" "}</p>
         </div>
@@ -99,9 +101,9 @@ function ReadyComparisonGrid({
                   <p className="text-xs font-semibold text-[var(--muted)]">
                     KODEX 200 : VOO
                   </p>
-                  <h3 className="mt-1 text-lg font-semibold tabular-nums">
+                  <CairnSectionTitle level="h3" className="mt-1 text-lg font-semibold tabular-nums">
                     {scenario.kodexWeightPct}:{scenario.vooWeightPct}
-                  </h3>
+                  </CairnSectionTitle>
                 </div>
                 {selected ? (
                   <span className="rounded-md bg-[var(--wash)] px-2.5 py-1 text-xs font-semibold text-[var(--brand)]">

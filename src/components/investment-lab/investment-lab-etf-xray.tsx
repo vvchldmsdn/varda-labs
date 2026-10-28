@@ -4,6 +4,8 @@ import type {
   InvestmentLabEtfXrayModel,
 } from "@/lib/investment-lab-etf-xray";
 import { InvestmentLabEtfShock } from "@/components/investment-lab/investment-lab-etf-shock";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabEtfXray({
   model,
@@ -57,10 +59,10 @@ export function InvestmentLabEtfXray({
             <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
               LOOK-THROUGH
             </p>
-            <h2
+            <CairnSectionTitle
               id="investment-lab-etf-xray-title"
               className="mt-3 text-lg font-medium sm:text-xl"
-            ><LabText value=" 포트폴리오 ETF X-ray " /></h2>
+            ><LabText value=" 포트폴리오 ETF X-ray " /></CairnSectionTitle>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 보유 ETF를 구성종목까지 펼쳐 직접 보유와 ETF 간 중복을 확인합니다. ETF별 최신 기준일을 각각 유지하며, 관측된 노출을 100%로 재정규화하지 않습니다. " /></p>
           </div>
           <p className="text-sm font-semibold text-[var(--muted)]">
@@ -124,7 +126,7 @@ export function InvestmentLabEtfXray({
 
       <section className="overflow-hidden border-y border-[var(--line)]">
         <div className="border-b border-[var(--wash)] py-4">
-          <h3 className="text-lg font-semibold"><LabText value="보유 ETF 커버리지" /></h3>
+          <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value="보유 ETF 커버리지" /></CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" reference 매핑, ETF별 기준일, 구성종목 비중 누락을 함께 표시합니다. " /></p>
         </div>
         <div className="overflow-x-auto">
@@ -155,7 +157,7 @@ export function InvestmentLabEtfXray({
 
       <section className="overflow-hidden border-y border-[var(--line)]">
         <div className="border-b border-[var(--wash)] py-4">
-          <h3 className="text-lg font-semibold"><LabText value="상위 구성종목 노출" /></h3>
+          <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value="상위 구성종목 노출" /></CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 유효한 market · currency · ticker와 비중이 모두 있는 구성종목만 합산합니다. " /></p>
         </div>
         {topComponents.length > 0 ? (
@@ -167,7 +169,7 @@ export function InvestmentLabEtfXray({
 
       <section className="overflow-hidden border-y border-[var(--line)]">
         <div className="border-b border-[var(--wash)] py-4">
-          <h3 className="text-lg font-semibold"><LabText value="숨은 중복 노출" /></h3>
+          <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value="숨은 중복 노출" /></CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 두 개 이상의 보유 ETF가 공유하거나, 같은 종목을 포트폴리오에서 직접 보유한 경우입니다. " /></p>
         </div>
         {overlapRows.length > 0 ? (
@@ -205,10 +207,10 @@ export function InvestmentLabEtfXrayUnavailable() {
       data-xray-status="unavailable"
     >
       <div className="border-y border-[var(--warning-soft)] py-4">
-        <h2
+        <CairnSectionTitle
           id="investment-lab-etf-xray-unavailable-title"
           className="text-lg font-semibold text-[var(--warning)]"
-        ><LabText value=" 포트폴리오 ETF X-ray " /></h2>
+        ><LabText value=" 포트폴리오 ETF X-ray " /></CairnSectionTitle>
         <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" ETF reference 근거를 읽지 못해 이 섹션만 표시할 수 없습니다. " /></p>
       </div>
     </section>

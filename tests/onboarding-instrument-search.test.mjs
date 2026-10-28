@@ -39,7 +39,7 @@ describe("onboarding instrument catalog", () => {
     const calls = [];
     const db = drizzle(async (query, params) => {
       calls.push({ query, params });
-      return { rows: query.includes('from "etf_masters"')
+      return { rows: query.includes('from "instrument_catalog"') ? [] : query.includes('from "etf_masters"')
         ? [[masterId, "Example ETF", "ABC", "US", "USD"]]
         : [[stockId, "Example share", "XYZ", "US", "USD"], [stockId, "Ambiguous", "XYZ", null, "USD"]] };
     });
@@ -47,20 +47,25 @@ describe("onboarding instrument catalog", () => {
     assert.deepEqual(await query.searchOnboardingInstruments(" "), []);
     assert.equal(calls.length, 0);
     const result = await query.searchOnboardingInstruments("a%'_\\");
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
     assert.equal(result.length, 2);
     for (const call of calls) {
-      assert.match(call.query, /"etf_masters"\."is_active" = \$/);
-      assert.match(call.query, /"etf_masters"\."is_sample" = \$/);
+      if (call.query.includes('from "instrument_catalog"')) {
+        assert.match(call.query, /"instrument_catalog"\."is_active" = \$/);
+      } else {
+        assert.match(call.query, /"etf_masters"\."is_active" = \$/);
+        assert.match(call.query, /"etf_masters"\."is_sample" = \$/);
+      }
       assert.match(call.query, /limit \$/);
       assert.equal(call.params.at(-1), 36);
       assert.ok(call.params.includes("%a\\%'\\_\\\\%"));
       assert.doesNotMatch(call.query, /from "assets"|from "accounts"|canonical_owner_user_id/);
       assert.doesNotMatch(call.query, /a%'/);
     }
-    assert.match(calls[1].query, /"etf_holdings"\."is_sample" = \$/);
-    assert.match(calls[1].query, /lower\("etf_holdings"\."security_type"\) = 'stock'/);
-    assert.match(calls[1].query, /max\(reference.as_of_date\)/);
+    const constituentRead = calls.find(call => call.query.includes('from "etf_holdings"'));
+    assert.match(constituentRead.query, /"etf_holdings"\."is_sample" = \$/);
+    assert.match(constituentRead.query, /lower\("etf_holdings"\."security_type"\) = 'stock'/);
+    assert.match(constituentRead.query, /max\(reference.as_of_date\)/);
     calls.length = 0;
     assert.equal(await query.resolveOnboardingInstrumentById("fake"), null);
     assert.equal(calls.length, 0);

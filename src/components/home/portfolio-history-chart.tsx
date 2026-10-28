@@ -1,4 +1,6 @@
 "use client";
+import { ReturnTimelineChart } from '@/components/return-timeline-chart';
+import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -14,6 +16,8 @@ import {
   formatShortDate,
 } from "@/components/home/portfolio-format";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
+import { Button as CairnButton, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type HistoryPoint = Readonly<{
   date: string;
@@ -51,11 +55,14 @@ const PLOT_RIGHT = 882;
 export function PortfolioHistoryChart({
   events,
   points,
+  recoveredReturn,
 }: {
   events: readonly HistoryEvent[];
   points: readonly HistoryPoint[];
+  recoveredReturn?: RecoveredReturnCurve | null;
 }) {
   const { t } = useI18n();
+  const [metric, setMetric] = useState<"value" | "return">("value");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [range, setRange] = useState<RangeKey>("ALL");
   const visiblePoints = useMemo(() => pointsForRange(points, range), [points, range]);
@@ -81,12 +88,12 @@ export function PortfolioHistoryChart({
     <section aria-labelledby="portfolio-history-title" className="min-w-0">
       <div className={styles.chartHeading}>
         <div>
-          <h2 id="portfolio-history-title" className={styles.panelTitle}><T ko="포트폴리오 흐름" en="Portfolio history"/></h2>
-          <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="저장된 실제 평가액 추이" en="Recorded portfolio values"/></p>
+          <CairnSectionTitle id="portfolio-history-title" className={styles.panelTitle}><T ko="포트폴리오 흐름" en="Portfolio history"/></CairnSectionTitle>
+          <p className="mt-1.5 text-[11px] text-[var(--muted)]">{metric === "return" ? "저장 수익률과 복구 기간 수익률" : <T ko="저장된 실제 평가액 추이" en="Recorded portfolio values"/>}</p>
         </div>
         <div className={styles.chartRanges} aria-label={t("조회 기간", "Time range")}>
           {(["1M", "3M", "6M", "ALL"] as const).map((item) => (
-            <button
+            <CairnButton variant="selection"
               key={item}
               type="button"
               aria-pressed={range === item}
@@ -100,12 +107,13 @@ export function PortfolioHistoryChart({
               }}
             >
               {item}
-            </button>
+            </CairnButton>
           ))}
         </div>
       </div>
 
-      {visiblePoints.length > 1 ? (
+      {recoveredReturn && <div className={styles.chartRanges} aria-label="그래프 지표" style={{ margin: '12px 0' }}><CairnButton variant="selection" type="button" aria-pressed={metric === 'value'} className={styles.rangeButton} onClick={() => setMetric('value')}>평가액</CairnButton><CairnButton variant="selection" type="button" aria-pressed={metric === 'return'} className={styles.rangeButton} onClick={() => setMetric('return')}>수익률</CairnButton></div>}
+      {metric === 'return' && recoveredReturn ? <ReturnTimelineChart stored={points.map(p => ({date:p.date,returnPct:p.totalReturnPct}))} curve={recoveredReturn} rangeDays={range === 'ALL' ? undefined : RANGE_DAYS[range]}/> : visiblePoints.length > 1 ? (
         <>
           <div className={styles.chartReadout}>
             <div>
@@ -335,7 +343,7 @@ export function PortfolioHistoryChart({
             ) : null}
           </div>
 
-          <input
+          <CairnInput
             aria-label={t("포트폴리오 이력 날짜 선택", "Select a portfolio history date")}
             className="portfolio-history-range mt-2 w-full md:hidden"
             max={Math.max(visiblePoints.length - 1, 0)}

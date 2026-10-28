@@ -1,3 +1,4 @@
+import {SimulationPriceEvidence} from "@/components/simulation/simulation-price-evidence";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { registerTenantSimulationPath } from "@/lib/server/simulation-path-details";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -24,6 +25,8 @@ import { resolveSimulationPathModel } from "@/lib/simulation-model-selection";
 import { getReadOnlyTenantSimulationOwnerEconomicResearch, economicResearchPresentation } from "@/db/queries/simulation-owner-economic";
 import { EconomicExecutionSection } from "@/components/simulation/economic-execution-section";
 import { SimulationLoading } from "@/components/simulation/simulation-loading";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   return localizedMetadata({ title: "시뮬레이션 | CAIRN LABS" }, "Simulation | CAIRN LABS");
@@ -141,12 +144,12 @@ async function OwnerResearchExecutionContent({ tenantContext, resultPromise, sel
   selectedScopeKey: PortfolioAnalysisScopeKey;
 }) {
   const result = await resultPromise;
-  if (pathModel === null) return <p role="alert"><SimulationText ko="계산 모형을 확인해 주세요. 경제지표 또는 과거 수익률 경로를 선택할 수 있습니다." en="Choose Economic paths or Historical paths to run a model." /></p>;
+  if (pathModel === null) return <CairnStatus as="p" tone="danger" role="alert"><SimulationText ko="계산 모형을 확인해 주세요. 경제지표 또는 과거 수익률 경로를 선택할 수 있습니다." en="Choose Economic paths or Historical paths to run a model." /></CairnStatus>;
   if (pathModel === "economic") {
     const economic = await getReadOnlyTenantSimulationOwnerEconomicResearch({ ownerResearchPromise: resultPromise, stateAsOfServiceDate, includeDisplayPaths: true });
     const registration = await registerTenantSimulationPath(tenantContext, economicPathSnapshot(economic, result.execution));
-    return <EconomicExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} result={economicResearchPresentation(economic)} baseline={result.execution} />;
+    return <><SimulationPriceEvidence frontier={result.priceFrontier} latest={result.execution.endSelection.source==="latest_common_stored"}/><EconomicExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} result={economicResearchPresentation(economic)} baseline={result.execution} /></>;
   }
   const registration = await registerTenantSimulationPath(tenantContext, bootstrapPathSnapshot(result.execution, result.preparedPaths));
-  return <OwnerResearchExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} execution={result.execution} selectedScopeKey={selectedScopeKey} />;
+  return <><SimulationPriceEvidence frontier={result.priceFrontier} latest={result.execution.endSelection.source==="latest_common_stored"}/><OwnerResearchExecutionSection pathDetail={registration.handle} pathDetailNotice={registration.notice} execution={result.execution} selectedScopeKey={selectedScopeKey} /></>;
 }

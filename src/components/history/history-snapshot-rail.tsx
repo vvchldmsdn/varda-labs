@@ -5,6 +5,8 @@ import { translateHomeHistory } from "@/components/home/home-history-messages";
 
 import { formatHistoryKrw } from "@/components/history/history-format";
 import type { HistoryOverviewPoint } from "@/lib/history-overview";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function HistorySnapshotRail({
   onSelect,
@@ -22,7 +24,7 @@ export function HistorySnapshotRail({
       <div className="flex items-end justify-between border-b border-[var(--line)] py-4 lg:pt-0">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">SNAPSHOTS</p>
-          <h2 className="mt-1 text-base font-semibold"><T ko="날짜별 기록" en="Records by date"/></h2>
+          <CairnSectionTitle className="mt-1 text-base font-semibold"><T ko="날짜별 기록" en="Records by date"/></CairnSectionTitle>
         </div>
         <p className="text-[11px] tabular-nums text-[var(--faint)]">
           {points.length}<T ko="개" en=" items"/></p>
@@ -32,7 +34,7 @@ export function HistorySnapshotRail({
         {descending.map((point) => {
           const active = point.date === selectedDate;
           return (
-            <button
+            <CairnButton variant="selection"
               key={point.date}
               type="button"
               aria-pressed={active}
@@ -61,7 +63,7 @@ export function HistorySnapshotRail({
               >
                 <T ko={formatSignedKrw(point.movementKrw)} en={formatSignedKrw(point.movementKrw, "en")}/>
               </span>
-            </button>
+            </CairnButton>
           );
         })}
       </div>

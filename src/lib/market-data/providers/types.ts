@@ -96,6 +96,7 @@ export type HistoricalPriceFailure = {
 };
 
 export type HistoricalPriceResult = {
+  pendingFinalizationCount?: number;
   provider: string;
   fetchedAt: Date;
   priceBasis: "raw_price_return" | "raw_and_provider_adjusted";

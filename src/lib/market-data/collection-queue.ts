@@ -4,11 +4,11 @@ import { sqlClient } from "@/db/client";
 import { MARKET_COLLECTION_POLICY, normalizeCollectionJobs, type CollectionInput, type CollectionJob } from "@/lib/market-data/collection-policy";
 
 export type ClaimedCollectionJob = CollectionJob & { claimToken: string; attempts: number };
-export type CollectionPartition = { provider: "kis" } | { provider: "twelve_data"; scopeHash: string };
+export type CollectionPartition = { provider: "kis"; rawCloses?: boolean; historyOnly?: boolean } | { provider: "twelve_data"; scopeHash: string };
 const KIS_PARTITION: CollectionPartition = { provider: "kis" };
 
 function partitionPrefix(partition: CollectionPartition) {
-  if (partition.provider === "kis") return "kis:";
+  if (partition.provider === "kis") return partition.rawCloses ? "kis:history:raw_close_v1:" : partition.historyOnly ? "kis:history:" : "kis:";
   if (partition.provider !== "twelve_data" || !/^[a-f0-9]{64}$/.test(partition.scopeHash)) throw new Error("collection_partition_invalid");
   return `twelve_data:${partition.scopeHash}:`;
 }
@@ -16,6 +16,15 @@ function partitionPrefix(partition: CollectionPartition) {
 /** Call only after verifying session holdings/catalog or machine authority. */
 export async function enqueueMarketCollection(inputs: readonly CollectionInput[]) {
   const jobs = normalizeCollectionJobs(inputs);
+  return enqueueJobs(jobs);
+}
+
+/** Only the authenticated cron's server-side holdings scan calls this seam. */
+export async function enqueueRawCloseCollection(jobs: readonly CollectionJob[]) {
+  if(jobs.length>40||jobs.some(j=>j.kind!=='history'||!validWindow(j.startDate,j.endDate)||
+    !/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(j.ticker)||
+    !(j.market==='us'&&j.currency==='USD'||j.market==='korea'&&j.currency==='KRW')||
+    j.key!==['kis:history:raw_close_v1',j.market,j.currency,j.ticker,j.startDate,j.endDate].join(':')))throw Error('raw_close_identity_invalid');
   return enqueueJobs(jobs);
 }
 
@@ -78,11 +87,17 @@ export async function isMarketCollectionClaimCurrent(job: ClaimedCollectionJob) 
 }
 
 export async function maintainMarketCollection(partition: CollectionPartition = KIS_PARTITION) {
+  // One-time transition from v1's permanently blocked exact-price comparison.
+  // v2 still leaves manual, foreign, unconfirmed and large revisions for review.
+  await sqlClient.query(`update market_collection_jobs set status='pending',attempts=0,available_at=now(),
+    last_code='paired_history_revision_recheck_v2',updated_at=now()
+    where status='failed' and last_code='paired_history_conflict' and starts_with(key,'kis:history:paired_v1:')
+    and starts_with(key,$1)`, [partitionPrefix(partition)]);
   await sqlClient.query(`update market_collection_jobs set status='failed', claim_token=null, leased_until=null,
     available_at=now()+interval '1 hour', last_code='worker_interrupted', updated_at=now()
     where status='running' and leased_until<=now() and attempts >= $1::integer and starts_with(key,$2)`, [MARKET_COLLECTION_POLICY.maximumAttempts, partitionPrefix(partition)]);
   await sqlClient.query(`delete from market_collection_jobs where key in (
-    select key from market_collection_jobs where status in ('done','failed') and last_code is distinct from 'paired_history_conflict' and updated_at < now()-interval '7 days' and starts_with(key,$1)
+    select key from market_collection_jobs where status in ('done','failed') and coalesce(last_code,'') not in ('paired_history_conflict','paired_history_protected_v2') and updated_at < now()-interval '7 days' and starts_with(key,$1)
     order by updated_at limit 500)`, [partitionPrefix(partition)]);
 }
 
@@ -122,9 +137,9 @@ const ENQUEUE_SQL = `with input as materialized (
   select key,kind,ticker,market,currency,"startDate","endDate" from input where (select ok from capacity)
   on conflict (key) do update set request_count = case when market_collection_jobs.status in ('pending','running') then market_collection_jobs.request_count + 1 else 1 end,
     ticker = case when market_collection_jobs.kind='fx' and market_collection_jobs.status in ('pending','failed') and market_collection_jobs.attempts>0 then excluded.ticker else market_collection_jobs.ticker end,
-    status = case when market_collection_jobs.last_code is distinct from 'paired_history_conflict' and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 'pending' else market_collection_jobs.status end,
-    enqueued_at = case when market_collection_jobs.last_code is distinct from 'paired_history_conflict' and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then now() else market_collection_jobs.enqueued_at end,
-    attempts = case when market_collection_jobs.last_code is distinct from 'paired_history_conflict' and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 0 else market_collection_jobs.attempts end
+    status = case when coalesce(market_collection_jobs.last_code,'') not in ('paired_history_conflict','paired_history_protected_v2') and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 'pending' else market_collection_jobs.status end,
+    enqueued_at = case when coalesce(market_collection_jobs.last_code,'') not in ('paired_history_conflict','paired_history_protected_v2') and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then now() else market_collection_jobs.enqueued_at end,
+    attempts = case when coalesce(market_collection_jobs.last_code,'') not in ('paired_history_conflict','paired_history_protected_v2') and market_collection_jobs.available_at <= now() and (market_collection_jobs.status='done' and market_collection_jobs.kind in ('live','fx') or market_collection_jobs.status in ('done','failed') and coalesce(market_collection_jobs.completed_at, market_collection_jobs.updated_at) <= now()-interval '5 minutes') then 0 else market_collection_jobs.attempts end
   returning key
 ) select count(*)::integer as accepted_count from written`;
 

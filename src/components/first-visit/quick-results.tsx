@@ -7,6 +7,8 @@ import { formatMoney } from "@/lib/money";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { intlLocale } from "@/lib/i18n/locale";
 import styles from "./quick-portfolio.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function formatQuickTimestamp(at: string, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(at));
@@ -21,16 +23,16 @@ export function QuickResults({ input, action, compact = false }: { input: QuickI
   const row = result.rows.find(item => item.key === selected) ?? result.rows[0];
   const money = (value: number, currency = input.currency) => formatMoney(value, currency, intlLocale(locale));
   const classification = (name: string) => t(name, ({ "미확인": "Unidentified", "주식 ETF": "Equity ETFs", "개별 주식": "Stocks", "채권 ETF": "Bond ETFs", "금 ETF": "Gold ETFs" } as Record<string, string>)[name] ?? name);
-  const breakdown = <div className={styles.breakdowns}><section><h3>{t("자산 종류", "Asset classes")}</h3>{result.assetClasses.map(item => <p key={item.name}><span>{classification(item.name)}</span><strong>{item.weightPct.toFixed(1)}%</strong></p>)}</section><section><h3>{t("거래통화 기준", "Trading currencies")}</h3>{result.currencies.map(item => <p key={item.name}><span>{classification(item.name)}</span><strong>{item.weightPct.toFixed(1)}%</strong></p>)}</section></div>;
+  const breakdown = <div className={styles.breakdowns}><section><CairnSectionTitle level="h3">{t("자산 종류", "Asset classes")}</CairnSectionTitle>{result.assetClasses.map(item => <p key={item.name}><span>{classification(item.name)}</span><strong>{item.weightPct.toFixed(1)}%</strong></p>)}</section><section><CairnSectionTitle level="h3">{t("거래통화 기준", "Trading currencies")}</CairnSectionTitle>{result.currencies.map(item => <p key={item.name}><span>{classification(item.name)}</span><strong>{item.weightPct.toFixed(1)}%</strong></p>)}</section></div>;
   return <section className={`${styles.results} ${compact ? styles.compactResult : ""}`} aria-label={t("내 입력 자산 분석", "Analysis of my inputs")}>
     <p className={styles.eyebrow}>{t("입력 기준", "ENTERED VALUES")} · {input.currency}</p>
-    <h2>{result.total !== null ? t(`${money(result.total)}, 이렇게 나뉘어 있어요.`, `${money(result.total)}, at a glance.`) : t("입력한 자산을 통화별로 확인하세요.", "Your assets, by currency.")}</h2>
-    {result.largest ? <p>{t("가장 큰 자산", "Largest holding")} <strong>{result.largest.name} · {result.largest.weightPct?.toFixed(1)}%</strong></p> : <p className={styles.partialNote} role="status">{t("같은 시점의 환율이 없어 총액과 전체 비중은 아직 계산할 수 없어요.", "A matching exchange rate is missing, so the combined total and weights are unavailable.")}</p>}
+    <CairnSectionTitle>{result.total !== null ? t(`${money(result.total)}, 이렇게 나뉘어 있어요.`, `${money(result.total)}, at a glance.`) : t("입력한 자산을 통화별로 확인하세요.", "Your assets, by currency.")}</CairnSectionTitle>
+    {result.largest ? <p>{t("가장 큰 자산", "Largest holding")} <strong>{result.largest.name} · {result.largest.weightPct?.toFixed(1)}%</strong></p> : <CairnStatus as="p" tone="neutral" className={styles.partialNote} role="status">{t("같은 시점의 환율이 없어 총액과 전체 비중은 아직 계산할 수 없어요.", "A matching exchange rate is missing, so the combined total and weights are unavailable.")}</CairnStatus>}
     {result.complete && result.rows.some(item => item.inputCurrency !== input.currency) && input.fx?.[0]?.kind === "user_input" ? <p className={styles.note}>{t("직접 입력한 가정 환율", "Your exchange-rate assumption")} · 1 USD = {Number(input.fx[0].rate).toLocaleString(intlLocale(locale), { maximumFractionDigits: 8 })} KRW</p> : null}
     {action ? <div className={styles.actions}>{action}</div> : null}
     {result.complete ? <div className={styles.chart}>
       <PortfolioAllocationRing entries={result.rows.filter((item): item is typeof item & { weightPct: number } => item.weightPct !== null)} selectedKey={row.key} onSelect={setSelected} compositionOnly />
-      <div className={styles.assetList}>{result.rows.map(item => <button type="button" aria-pressed={row.key === item.key} key={item.key} onClick={() => setSelected(item.key)}><span>{item.name}</span><strong>{item.weightPct?.toFixed(1)}%</strong></button>)}
+      <div className={styles.assetList}>{result.rows.map(item => <CairnButton variant="selection" type="button" aria-pressed={row.key === item.key} key={item.key} onClick={() => setSelected(item.key)}><span>{item.name}</span><strong>{item.weightPct?.toFixed(1)}%</strong></CairnButton>)}
         <p>{row.name} · {row.reportingValue !== null ? money(row.reportingValue) : "—"}</p>
         {row.inputCurrency !== input.currency ? <p>{t("원본 입력", "Original amount")} · {money(row.value, row.inputCurrency)}</p> : null}
       </div>

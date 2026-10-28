@@ -58,9 +58,9 @@ async function harness(t,offset) {
   const render=()=>{h.begin();return elements(view.NativeLedgerView({compact:true,initialSelection:{accountId,assetId,action:'buy'}}));};
   render();h.effect();await new Promise(resolve=>setImmediate(resolve));
   const findTime=()=>render().find(e=>e.props?.name==='at');
-  const trade=render().find(e=>typeof e.props?.edit==='function');trade.props.edit('quantity','1');trade.props.edit('total','100');
+  const trade=render().find(e=>typeof e.props?.edit==='function');trade.props.edit('quantity','1');trade.props.edit('price','100');
   return {render,findTime,sent,advance(){monotonic+=5000;serverNow='2026-09-27T07:16:53.000Z';},
-    submit:()=>render().find(e=>e.type==='form').props.onSubmit({preventDefault(){}})};
+    submit:async()=>{render().find(e=>e.type==='form').props.onSubmit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));}};
 }
 
 for(const offset of [60_000,-60_000]) it(`uses server-backed defaults and validation when the device is ${offset>0?'ahead':'behind'} by one minute`,async t=>{
@@ -76,7 +76,9 @@ it('retains a manually entered time through server resync and conflict retry',as
   const local=nativeLedgerLocalTime(Date.parse(manual));
   h.findTime().props.onChange(local);
   await h.submit();h.advance();
-  h.render().find(e=>e.type==='button'&&e.props.children==='Review latest holdings').props.onClick();
+  const retry=h.render().find(e=>e.type==='button'&&e.props.children==='Review latest holdings');
+  assert.ok(retry, 'a settled conflict response must expose a retry control');
+  retry.props.onClick();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(h.findTime().props.value,local);
   await h.submit();

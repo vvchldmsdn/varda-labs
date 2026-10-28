@@ -1,7 +1,7 @@
 import "server-only";
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
-import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
+import { scheduleRecentCloseCollection } from '@/lib/market-data/close-gap-collection';
 import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 
 import {
@@ -115,6 +115,9 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
   const now = options.now ?? new Date();
   const preparation = resolveCronCutoffPreparation(now);
   if (preparation) return runCutoffPreparation({ ...options, now, ...preparation });
+  // Runs after the response even for already-attempted/blocked snapshots.
+  // Reserve platform tail time; raw-close coverage must not depend on NAV eligibility.
+  scheduleRecentCloseCollection(Date.now()+235000);
   const snapshotDate = resolveSnapshotCycle(now).snapshotDate;
   const claim = await claimCronMarketCycleRun({
     snapshotDate,
@@ -136,8 +139,6 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
   }
 
   const runId=claim.runId;
-  // Drain even when today's cycle was already completed; preserve snapshot ordering.
-  scheduleMarketCollection();
   // Freeze native cutoff valuation before shared FX upserts. Its policy is unchanged.
   const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false, durable:true, snapshotDate }).catch(() => ({ status: "failed" as const }));
   let result: CronMarketCycleRunResult;

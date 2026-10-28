@@ -1,0 +1,11 @@
+.root{grid-column:1/-1;min-width:0}
+.root>label{display:block}
+.root .hint{margin:8px 0;font-size:12px;color:var(--cairn-v2-muted);line-height:1.6}
+.results{list-style:none;padding:0;margin:0;max-height:330px;overflow-y:auto}
+.root .result{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:48px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--cairn-v2-line);border-radius:0;background:transparent;color:var(--cairn-v2-ink);text-align:left;font:inherit;font-size:13px}
+.result>span:first-child{min-width:0;overflow-wrap:anywhere}.result>span:last-child{flex-shrink:0;font-size:12px;color:var(--cairn-v2-muted)}
+.result strong{display:block;font-weight:500}.result small{display:block;margin-top:4px;color:var(--cairn-v2-muted);font-size:12px;font-variant-numeric:tabular-nums}
+.root :focus-visible{outline:2px solid var(--cairn-v2-brand);outline-offset:3px}
+
+/* Keep the outline inside the scrollable result row so it is not clipped. */
+.root .result:focus-visible{outline-offset:-2px}

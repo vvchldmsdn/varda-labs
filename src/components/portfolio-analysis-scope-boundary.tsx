@@ -3,6 +3,8 @@ import { T } from "@/components/i18n/localized-text";
 import Link from "next/link";
 
 import type { TenantPortfolioAnalysisScopeContextResult } from "@/db/queries/portfolio-analysis-scopes";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export function PortfolioAnalysisScopeBoundary({
   basePath,
@@ -20,7 +22,7 @@ export function PortfolioAnalysisScopeBoundary({
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko={title} en={titleEn ?? title} /></h1>
+        <CairnPageTitle className="mt-2 text-2xl font-semibold tracking-normal"><T ko={title} en={titleEn ?? title} /></CairnPageTitle>
         <p className="mt-6 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-3 text-sm text-[var(--warning)]">
           <T ko={scopeBoundaryMessage(context)} en={context.state === "unavailable" ? "Account and group scopes are currently unavailable. No portfolio data was read." : context.state === "integrity_error" ? "Account or group integrity checks failed. No portfolio data was read." : "The selected account or group is unavailable. Your scope has not been replaced."} />
         </p>

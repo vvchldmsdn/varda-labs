@@ -16,6 +16,8 @@ import { getReadOnlyTenantAccountManagementModel } from "@/db/queries/account-ma
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { derivePortfolioSetupProgress } from "@/lib/portfolio-setup-progress";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { PageHeader, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -70,17 +72,10 @@ export default async function AccountManagementPage() {
     <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-6 text-[var(--ink)]">
       <SecondaryPageHeader />
       <div className="mx-auto w-full max-w-4xl space-y-5">
-        <header className="border-b border-[var(--line)] pb-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal">
-                <T ko="계좌 관리" en="Your accounts" />
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-                <T ko="증권·연금 등 실제 보유 계좌를 관리합니다. 여러 계좌를 함께 분석하려면 분석 범위로 묶어 주세요." en="Manage brokerage, pension and other holding accounts. Link them through analysis scopes to view several accounts together." />
-              </p>
-            </div>
+        <section className="border-b border-[var(--line)] pb-5">
+          <PageHeader eyebrow="Cairn Labs" title={<T ko="계좌 관리" en="Your accounts" />}
+            description={<T ko="증권·연금 등 실제 보유 계좌를 관리합니다. 여러 계좌를 함께 분석하려면 분석 범위로 묶어 주세요." en="Manage brokerage, pension and other holding accounts. Link them through analysis scopes to view several accounts together." />}
+            actions={
             <nav className="flex flex-wrap gap-2 text-sm font-semibold">
               <NavLink href="/"><T ko="홈" en="Home" /></NavLink>
               <NavLink href="/portfolio/holdings"><T ko="보유 종목" en="Holdings" /></NavLink>
@@ -88,7 +83,7 @@ export default async function AccountManagementPage() {
               <NavLink href="/portfolio/groups"><T ko="분석 범위" en="Analysis scopes" /></NavLink>
               <NavLink href="/portfolio/events?account=all"><T ko="거래 기록" en="Transactions" /></NavLink>
             </nav>
-          </div>
+          } />
           <dl className="mt-4 grid grid-cols-[1.3fr_1fr_1fr] divide-x divide-[var(--line)] border-y border-[var(--line)] py-3">
             <SummaryCell label={<T ko="서비스 기준일" en="Service date" />} value={serviceDate} />
             <SummaryCell
@@ -102,7 +97,7 @@ export default async function AccountManagementPage() {
               }
             />
           </dl>
-        </header>
+        </section>
 
         {model.state !== "ready" ? (
           <section className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
@@ -118,7 +113,7 @@ export default async function AccountManagementPage() {
               className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4"
               id="create-account"
             >
-              <h2 className="text-lg font-semibold"><T ko="새 계좌" en="New account" /></h2>
+              <CairnSectionTitle className="text-lg font-semibold"><T ko="새 계좌" en="New account" /></CairnSectionTitle>
               <p className="mt-1 text-sm text-[var(--muted)]">
                 <T ko="알아보기 쉬운 이름을 정해 주세요. 이름은 나중에 바꿀 수 있습니다." en="Choose a name you recognize. You can change it later." />
               </p>
@@ -129,7 +124,7 @@ export default async function AccountManagementPage() {
 
             <section className="space-y-3">
               <div>
-                <h2 className="text-lg font-semibold"><T ko="사용 중인 계좌" en="Active accounts" /></h2>
+                <CairnSectionTitle className="text-lg font-semibold"><T ko="사용 중인 계좌" en="Active accounts" /></CairnSectionTitle>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   <T ko="계좌 이름을 바꿔도 보유종목과 과거 기록은 그대로 유지됩니다." en="Renaming keeps holdings and historical records intact." />
                 </p>
@@ -151,7 +146,7 @@ export default async function AccountManagementPage() {
             {archivedAccounts.length > 0 ? (
               <section className="space-y-3 border-t border-[var(--line)] pt-5">
                 <div>
-                  <h2 className="text-lg font-semibold"><T ko="종료된 계좌" en="Closed accounts" /></h2>
+                  <CairnSectionTitle className="text-lg font-semibold"><T ko="종료된 계좌" en="Closed accounts" /></CairnSectionTitle>
                   <p className="mt-1 text-sm text-[var(--muted)]">
                     <T ko="과거 기록은 보존되며 언제든 계좌를 복원할 수 있습니다." en="Historical records are preserved, and you can restore these accounts." />
                   </p>

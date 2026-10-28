@@ -1,0 +1,65 @@
+.surface {
+ --paper:var(--cairn-v2-paper,#f7f7f5);
+ --surface:var(--cairn-v2-surface,#fff);
+ --ink:var(--cairn-v2-ink,#20211f);
+ --muted:var(--cairn-v2-muted,#6c6d68);
+ --faint:var(--cairn-v2-muted,#6f706b);
+ --line:var(--cairn-v2-line,#e1e1dc);
+ --wash:var(--cairn-v2-wash,#eeeee9);
+ --brand:var(--cairn-v2-brand,#c64623);
+ --accent:var(--cairn-v2-positive,#ef5a32);
+ --negative:var(--cairn-v2-negative,#3568ae);
+ min-width:0;
+ font-feature-settings:"cv02","cv03","cv04","cv11";
+}
+.surface figure { margin:0; min-width:0; }
+.stageFan { display:flex; flex-direction:column; min-width:0; }
+.fanControls { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:12px 0 18px; }
+.fanControls>div { display:flex; gap:4px; padding:3px; background:var(--wash); border-radius:24px; }
+.fanControls button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:36px; padding:7px 14px; border:0; border-radius:22px; background:transparent; color:var(--muted); font-size:11px; cursor:pointer; }
+.fanControls button[aria-pressed=true] { background:var(--paper); color:var(--ink); box-shadow:0 1px 4px #20211f0a; }
+.surface button:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+.fanReadout { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:0 0 14px; min-height:48px; }
+.fanReadout p { margin:0; font-size:12px; color:var(--ink); font-variant-numeric:tabular-nums; }
+.fanReadout p span { margin-left:12px; color:var(--muted); font-size:11px; }
+.fanReadout dl { display:flex; gap:28px; margin:0; }
+.fanReadout dt { color:var(--muted); font-size:10px; }
+.fanReadout dd { margin:4px 0 0; font-size:18px; font-variant-numeric:tabular-nums; letter-spacing:-.03em; white-space:nowrap; }
+.fanReadout strong { font-size:24px; letter-spacing:-.04em; font-weight:500; color:var(--ink); }
+.fanPlot { position:relative; flex:none; height:clamp(260px,38vh,360px); min-height:260px; min-width:0; }
+.fanReveal { animation:fanReveal 400ms ease-out both; }
+.scrubberRow { display:flex; align-items:center; gap:16px; margin-top:10px; }
+.scrubberRow>span { white-space:nowrap; font-size:11px; color:var(--muted); }
+.surface .scrubber { appearance:none; min-width:0; flex:1; height:36px; border:0; padding:0; background:transparent; cursor:pointer; }
+.scrubber::-webkit-slider-runnable-track { height:2px; background:var(--line); }
+.scrubber::-webkit-slider-thumb { appearance:none; width:14px; height:14px; margin-top:-6px; border-radius:50%; background:var(--brand); }
+.scrubber::-moz-range-track { height:2px; background:var(--line); }
+.scrubber::-moz-range-thumb { width:14px; height:14px; border:0; border-radius:50%; background:var(--brand); }
+.scrubber:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+.surface[data-preview=true] { height:100%; min-height:0; display:flex; flex-direction:column; }
+.surface[data-preview=true]>figure { height:100%; min-height:0; min-width:0; display:flex; flex-direction:column; margin:0; }
+.surface[data-preview=true]>figure>div { height:auto; min-height:90px; min-width:0; flex:1; }
+.surface[data-preview=true] svg { position:absolute; inset:0; width:100%; height:100%; min-height:0; }
+@keyframes fanReveal { from { opacity:.2; } to { opacity:1; } }
+@media(max-width:700px) {
+ .fanControls { gap:8px; margin:12px 0 18px; }
+ .fanControls button { min-height:40px; font-size:11px; padding:8px 12px; }
+ .fanControls button svg { display:none; }
+ .fanReadout { align-items:flex-end; gap:12px; }
+ .fanReadout p { font-size:11px; }
+ .fanReadout p span { display:block; margin:4px 0 0; font-size:10px; }
+ .fanReadout dl { gap:18px; }
+ .fanReadout dd { font-size:16px; }
+ .fanPlot { height:300px; min-height:260px; }
+ .surface .scrubber { height:44px; }
+ .scrubber::-webkit-slider-thumb { width:20px; height:20px; margin-top:-9px; }
+ .scrubber::-moz-range-thumb { width:20px; height:20px; }
+}
+@media(max-width:380px) {
+ .fanControls { display:grid; grid-template-columns:1fr; }
+ .fanControls>div { width:fit-content; max-width:100%; }
+ .fanReadout p { display:none; }
+ .fanReadout dl { width:100%; justify-content:space-between; }
+}
+:global([data-reduced=true]) .surface .fanReveal { animation:none; }
+@media(prefers-reduced-motion:reduce) { .surface .fanReveal { animation:none; } }

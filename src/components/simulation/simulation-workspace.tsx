@@ -17,6 +17,8 @@ import {
 import styles from "./simulation-workspace.module.css";
 import { SimulationLoading } from "./simulation-loading";
 import loadingStyles from "./simulation-loading.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <SimulationLoading phase="evidence" compact /> });
 
@@ -73,10 +75,10 @@ export function SimulationWorkspace({
         {(Object.keys(OVERLAYS) as SimulationOverlay[]).map((view) => {
           const { icon: Icon, label, description } = OVERLAYS[view];
           return (
-            <button className={styles.launcher} key={view} onClick={() => openOverlay(view)} type="button">
+            <CairnButton variant="secondary" className={styles.launcher} key={view} onClick={() => openOverlay(view)} type="button">
               <Icon aria-hidden="true" size={21} strokeWidth={1.6} />
               <span><strong><SimulationText ko={label} /></strong><span className="sr-only"><SimulationText ko={description} /></span></span>
-            </button>
+            </CairnButton>
           );
         })}
       </div>
@@ -98,11 +100,11 @@ export function SimulationWorkspace({
           <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
             <div>
               <p className="varda-kicker">SIMULATION WORKSPACE</p>
-              <h2 className="mt-1 text-xl font-medium" id={titleId}>
+              <CairnSectionTitle className="mt-1 text-xl font-medium" id={titleId}>
                 <SimulationText ko={activeDefinition?.label ?? "시뮬레이션 상세"} />
-              </h2>
+              </CairnSectionTitle>
             </div>
-            <button
+            <CairnButton variant="ghost"
               aria-label={pt("닫기")}
               className="varda-icon-button"
               onClick={closeOverlay}
@@ -110,7 +112,7 @@ export function SimulationWorkspace({
               type="button"
             >
               <X aria-hidden="true" size={18} />
-            </button>
+            </CairnButton>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
             {activeOverlay ? <RemotePanel query={query} /> : null}

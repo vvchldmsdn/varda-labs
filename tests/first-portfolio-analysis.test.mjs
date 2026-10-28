@@ -37,6 +37,7 @@ describe("first portfolio analysis", () => {
     let finishPortfolio;
     const portfolio = new Promise((resolve) => { finishPortfolio = resolve; });
     const [query] = await importWithPorts(["src/db/queries/first-portfolio-analysis.ts"], {
+      "@/db/queries/first-day-replay": { readFirstDayReplay: async () => ({ state: "unavailable", reason: "read" }) },
       "@/db/queries/portfolio-structure": { getReadOnlyTenantPortfolioStructureForScope(input) { assert.equal(input, options); calls.push("portfolio"); return portfolio; } },
       "@/db/queries/holding-analysis-data-readiness": { getReadOnlyTenantHoldingAnalysisDataReadinessForScope(input) { assert.equal(input, options); calls.push("readiness"); return Promise.reject(new Error("temporary read failure")); } },
     });

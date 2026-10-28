@@ -9,6 +9,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import styles from "@/components/onboarding/first-portfolio-analysis.module.css";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,7 @@ export default async function FirstLookPage({ searchParams }: {
   if (scopeContext.state !== "ready" || scopeContext.resolution.state !== "resolved") return <PortfolioAnalysisScopeBoundary basePath="/portfolio/first-look" context={scopeContext} title="첫 포트폴리오 분석" titleEn="Your first look" />;
   return <main className={`varda-secondary-page min-h-screen bg-[var(--paper)] text-[var(--ink)] ${styles.page}`}>
     <SecondaryPageHeader />
-    <Suspense fallback={<p role="status" className="mx-auto max-w-5xl px-6 py-16 text-sm text-[var(--muted)]"><T ko="등록한 포트폴리오를 살펴보고 있습니다." en="Taking a first look at your portfolio." /></p>}>
+    <Suspense fallback={<CairnStatus as="p" tone="neutral" role="status" className="mx-auto max-w-5xl px-6 py-16 text-sm text-[var(--muted)]"><T ko="등록한 포트폴리오를 살펴보고 있습니다." en="Taking a first look at your portfolio." /></CairnStatus>}>
       <FirstPortfolioAnalysis scope={scopeContext.resolution.scope} serviceDate={resolveSnapshotCycle().snapshotDate} tenantContext={resolution.tenantContext} />
     </Suspense>
   </main>;

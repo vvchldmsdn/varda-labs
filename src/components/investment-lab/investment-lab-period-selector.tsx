@@ -14,6 +14,8 @@ import {
   type PortfolioAnalysisScopeKey,
   type PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabPeriodSelector({
   period,
@@ -41,7 +43,7 @@ export function InvestmentLabPeriodSelector({
               COMPARISON WINDOW
             </p>
             <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
-              <h2 className="text-lg font-semibold tracking-normal"><LabText value=" 과거 비교 구간 " /></h2>
+              <CairnSectionTitle className="text-lg font-semibold tracking-normal"><LabText value=" 과거 비교 구간 " /></CairnSectionTitle>
               <p className="text-xs text-[var(--muted)]"><LabText value=" 실제 포트폴리오와 대안 세계선에 같은 기간·현금흐름을 적용합니다. " /></p>
             </div>
             {period.availableStartServiceDate &&
@@ -52,7 +54,7 @@ export function InvestmentLabPeriodSelector({
             ) : null}
           </div>
 
-          <form
+          <CairnForm
             action="/investment-lab"
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
             key={[
@@ -88,10 +90,10 @@ export function InvestmentLabPeriodSelector({
               name="end"
             />
             <div className="flex h-10 items-end gap-5">
-              <button
+              <CairnButton variant="primary"
                 className="h-9 border-b border-[var(--ink)] px-1 text-sm font-semibold text-[var(--ink)] transition-colors hover:border-[var(--brand)] hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
                 type="submit"
-              ><LabText value=" 구간 적용 " /></button>
+              ><LabText value=" 구간 적용 " /></CairnButton>
               <InvestmentLabQueryLink
                 resetForm
                 className="flex h-9 items-center border-b border-transparent px-1 text-sm text-[var(--muted)] transition-colors hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
@@ -105,7 +107,7 @@ export function InvestmentLabPeriodSelector({
                 )}
               ><LabText value=" 최신 구간 " /></InvestmentLabQueryLink>
             </div>
-          </form>
+          </CairnForm>
         </div>
 
         {period.status === "invalid" || period.status === "unavailable" ? (
@@ -166,9 +168,9 @@ function DateField({
   name: "start" | "end";
 }) {
   return (
-    <label className="grid gap-1 text-[10px] font-medium uppercase text-[var(--muted)]">
+    <CairnField className="grid gap-1 text-[10px] font-medium uppercase text-[var(--muted)]">
       <LabText value={label} />
-      <input
+      <CairnInput
         className="h-9 min-w-[160px] border-0 border-b border-[var(--line)] bg-transparent px-0 text-sm font-normal text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink)]"
         defaultValue={defaultValue ?? ""}
         max={max ?? undefined}
@@ -177,7 +179,7 @@ function DateField({
         required
         type="date"
       />
-    </label>
+    </CairnField>
   );
 }
 

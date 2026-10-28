@@ -5,6 +5,8 @@ import Link from "next/link";
 import { MethodDetails } from "@/components/explanations/method-details";
 
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const WINDOWS = [30, 90, 252] as const;
 
@@ -36,11 +38,11 @@ export function PortfolioStructureRiskAnalytics({
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[11px] font-medium text-[var(--muted)]">RISK LANDSCAPE</p>
-          <h2
+          <CairnSectionTitle
             className="mt-2 text-2xl font-medium tracking-normal text-[var(--ink)] sm:text-3xl"
             id="portfolio-risk-landscape-title"
           >
-            <PortfolioText ko={"위험 지형"} />{" "}</h2>
+            <PortfolioText ko={"위험 지형"} />{" "}</CairnSectionTitle>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
             <PortfolioText ko={"각 종목이 따로 움직이는지, 하락할 때 함께 무너지는지, 위험이 몇 종목에 집중되는지를 같은 KRW 투자자 수익률로 봅니다."} />{" "}</p>
         </div>
@@ -222,7 +224,7 @@ function CorrelationMatrix({
     <LocalizedElement aria-label={title} className="min-w-0" as="section" en={{"aria-label": portfolioEnglish(title)}}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-lg font-medium text-[var(--ink)]"><PortfolioText ko={title} /></h3>
+          <CairnSectionTitle level="h3" className="text-lg font-medium text-[var(--ink)]"><PortfolioText ko={title} /></CairnSectionTitle>
           <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--muted)]">
             <PortfolioText ko={description} />
           </p>
@@ -312,8 +314,8 @@ function RiskContributionList({ model }: { model: PortfolioRiskReadModel }) {
 
   return (
     <section aria-labelledby="risk-contribution-title" className="min-w-0">
-      <h3 className="text-lg font-medium" id="risk-contribution-title">
-        <PortfolioText ko={"종목별 위험 기여"} />{" "}</h3>
+      <CairnSectionTitle level="h3" className="text-lg font-medium" id="risk-contribution-title">
+        <PortfolioText ko={"종목별 위험 기여"} />{" "}</CairnSectionTitle>
       <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
         <PortfolioText ko={"투자금 비중이 아니라 전체 변동성에 실제로 더한 몫입니다. 값이 큰 종목부터 표시합니다."} />{" "}</p>
 

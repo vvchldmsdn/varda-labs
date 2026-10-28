@@ -12,6 +12,8 @@ import { SIMULATION_RESEARCH_HORIZON_POLICY } from "@/lib/simulation-research-ho
 import { buildSimulationHref } from "@/lib/simulation-navigation";
 import styles from "./simulation-workspace.module.css";
 import type { SimulationPathModel } from "@/lib/simulation-model-selection";
+import { PageTitle as CairnPageTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 export function SimulationInputReadinessView({model, pathModel, ownerResearchExecution, researchUniverse, selectedScopeKey, scopeCatalog}: {
  model: SimulationPageControls; ownerResearchExecution?: ReactNode; researchUniverse: string | null;
  pathModel: SimulationPathModel | null;
@@ -34,7 +36,7 @@ export function SimulationInputReadinessView({model, pathModel, ownerResearchExe
       />
       <SimulationNavigationBoundary className="varda-content varda-presentation-content varda-stage-content flex flex-col">
         <header className={styles.stageHeader}>
-          <div className={styles.stageHeading}><h1 className="varda-page-title"><SimulationText ko={"시뮬레이션"} /></h1>
+          <div className={styles.stageHeading}><CairnPageTitle className="varda-page-title"><SimulationText ko={"시뮬레이션"} /></CairnPageTitle>
             <SimulationDialog
               label="계산 조건" labelEn={simulationEnglish("계산 조건")}
               title="시뮬레이션 계산 조건" titleEn={simulationEnglish("시뮬레이션 계산 조건")}
@@ -61,20 +63,20 @@ export function SimulationInputReadinessView({model, pathModel, ownerResearchExe
           <SimulationScopeTabs scopes={scopeCatalog} selectedScopeKey={selectedScopeKey} />
         </header>
         {model.endServiceDateSelection.status === "invalid" ? (
-          <p
+          <CairnStatus as="p" tone="danger"
             data-invalid-end-query
             role="alert"
             className="border-y border-[var(--line)] py-3 text-sm text-[var(--warning)]"
           >
-            <SimulationText ko={"기준일은 하나의 YYYY-MM-DD 값으로 입력해야 합니다. 계산 조건에서 날짜를 확인해 주세요."} />{" "}</p>
+            <SimulationText ko={"기준일은 하나의 YYYY-MM-DD 값으로 입력해야 합니다. 계산 조건에서 날짜를 확인해 주세요."} />{" "}</CairnStatus>
         ) : null}
         {model.researchHorizonSelection.status === "invalid" ? (
-          <p
+          <CairnStatus as="p" tone="danger"
             data-invalid-horizon-query
             role="alert"
             className="border-y border-[var(--line)] py-3 text-sm text-[var(--warning)]"
           >
-            <SimulationText ko={"연구 기간은 63 또는 126단계만 가능합니다. 잘못된 값을 기본 기간으로 대체하지 않았습니다."} />{" "}</p>
+            <SimulationText ko={"연구 기간은 63 또는 126단계만 가능합니다. 잘못된 값을 기본 기간으로 대체하지 않았습니다."} />{" "}</CairnStatus>
         ) : null}
         <div className={styles.workspaceSlot}>
           <SimulationWorkspace

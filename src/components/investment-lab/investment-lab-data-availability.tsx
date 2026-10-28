@@ -6,6 +6,8 @@ import type {
   InvestmentLabScenarioAvailabilityReason,
   InvestmentLabScenarioAvailabilityStatus,
 } from "@/lib/investment-lab-data-availability";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabDataAvailabilityView({
   model,
@@ -34,7 +36,7 @@ export function InvestmentLabDataAvailabilityView({
       <div className="border-b border-[var(--wash)] py-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold"><LabText value="계산 데이터 준비 상태" /></h2>
+            <CairnSectionTitle className="text-lg font-semibold"><LabText value="계산 데이터 준비 상태" /></CairnSectionTitle>
             <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 보여줄 수 있는 근거와 아직 보완해야 하는 근거를 분리합니다. " /></p>
           </div>
           <span className="w-fit border-b border-[var(--muted)] pb-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" 자동 보완·DB 쓰기 없음 " /></span>
@@ -73,7 +75,7 @@ export function InvestmentLabDataAvailabilityView({
 
       <div className="px-4 py-4">
         <div className="mb-3">
-          <h3 className="font-semibold"><LabText value="시나리오별 현재 판단" /></h3>
+          <CairnSectionTitle level="h3" className="font-semibold"><LabText value="시나리오별 현재 판단" /></CairnSectionTitle>
           <p className="mt-1 text-sm text-[var(--muted)]"><LabText value=" 시장가격이 있어도 실제 평가액 근거나 과거 시점 정책이 없으면 별도로 표시합니다. " /></p>
         </div>
         <div className="overflow-x-auto">
@@ -111,7 +113,7 @@ export function InvestmentLabDataAvailabilityView({
 
       <div className="grid border-t border-[var(--wash)] lg:grid-cols-2">
         <div className="px-4 py-4 lg:border-r lg:border-[var(--wash)]">
-          <h3 className="font-semibold"><LabText value="보완 경로" /></h3>
+          <CairnSectionTitle level="h3" className="font-semibold"><LabText value="보완 경로" /></CairnSectionTitle>
           <ul className="mt-3 space-y-2 text-sm text-[var(--muted)]">
             {model.repairItems.map((item) => (
               <li key={item.id}>
@@ -121,7 +123,7 @@ export function InvestmentLabDataAvailabilityView({
           </ul>
         </div>
         <div className="border-t border-[var(--wash)] px-4 py-4 lg:border-t-0">
-          <h3 className="font-semibold"><LabText value="특수 보유자산" /></h3>
+          <CairnSectionTitle level="h3" className="font-semibold"><LabText value="특수 보유자산" /></CairnSectionTitle>
           {model.specialHoldings.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--muted)]"><LabText value=" 이 계정 범위에는 별도 처리 대상이 없습니다. " /></p>
           ) : (

@@ -26,6 +26,8 @@ import {
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -166,7 +168,7 @@ function HistoryAccessBoundary({
       <SecondaryPageHeader />
       <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
         <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-normal"><T ko="히스토리" en="History"/></h1>
+        <CairnPageTitle className="mt-2 text-2xl font-semibold tracking-normal"><T ko="히스토리" en="History"/></CairnPageTitle>
         <p className="mt-2 text-sm text-[var(--muted)]"><T ko="로그인 세션과 사용자 소유권이 확인된 기록만 조회합니다." en="Only records with a verified session and ownership are retrieved."/></p>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           <EvidenceCell

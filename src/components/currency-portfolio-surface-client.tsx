@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { RecoveredReturnChart } from '@/components/recovered-return-chart';
+import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
 import { useSearchParams } from "next/navigation";
 import { AppNavigation } from "@/components/app-navigation";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -12,10 +14,13 @@ import type { CurrencyResearchInput } from "@/lib/currency-research";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { Currency } from "@/lib/money";
 import styles from "./currency-portfolio-surface.module.css";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export type CurrencySurface = "home" | "today" | "history" | "structure" | "contribution" | "lab" | "simulation";
 const paths: Record<CurrencySurface, string> = { home: "/", today: "/today", history: "/history", structure: "/portfolio/structure", contribution: "/additional-contribution", lab: "/investment-lab", simulation: "/simulation" };
 export type CurrencyPortfolioSurfaceProps = {
+  recoveredReturn?: RecoveredReturnCurve | null;
   surface: CurrencySurface; evidence?: CurrencyTrackedInput; research?: CurrencyResearchInput | null;
   scopes: readonly PortfolioAnalysisScope[]; selectedScope: PortfolioAnalysisScope;
   economicUnsupported?: boolean;
@@ -23,7 +28,7 @@ export type CurrencyPortfolioSurfaceProps = {
   reporting?: Currency;
   contributionPolicy?: { trimDriftThresholdPct: number; minimumExecutionRatioPct: number };
 };
-export function CurrencyPortfolioSurfaceClient({ surface, evidence, reports, research, scopes, selectedScope, economicUnsupported = false, researchUnavailableReason, contributionPolicy, reporting = evidence?.reporting ?? research?.reportingCurrency ?? "USD" }: CurrencyPortfolioSurfaceProps & { reports?: Readonly<Record<Currency, CurrencyTrackedResult>> }) {
+export function CurrencyPortfolioSurfaceClient({ recoveredReturn, surface, evidence, reports, research, scopes, selectedScope, economicUnsupported = false, researchUnavailableReason, contributionPolicy, reporting = evidence?.reporting ?? research?.reportingCurrency ?? "USD" }: CurrencyPortfolioSurfaceProps & { reports?: Readonly<Record<Currency, CurrencyTrackedResult>> }) {
   const { t } = useI18n();
   const params = useSearchParams();
   const path = paths[surface];
@@ -44,9 +49,10 @@ export function CurrencyPortfolioSurfaceClient({ surface, evidence, reports, res
   return <div className={styles.surface}>
     <AppNavigation activePath={path} selectedScopeKey={selectedScope.key} />
     <div className={styles.controls}><PortfolioAnalysisScopeTabs basePath={path} scopes={scopes} selectedScopeKey={selectedScope.key} query={query} variant="underline" /><Link className={styles.ledgerLink} href={ledgerHref}>{t("보유 정보 보완 ↗", "Complete holding details ↗")}</Link></div>
-    {economicUnsupported || (surface === "simulation" && researchUnavailableReason) ? <main id="varda-main-content" className={styles.unavailable}><p className={styles.eyebrow}>{invalidSelection ? t("계산 조건", "RESEARCH SETTINGS") : t("경제지표 경로", "ECONOMIC PATHS")} · {reporting}</p><h1>{invalidSelection ? t("계산 조건을 확인해 주세요.", "Check the research settings.") : reporting === "USD" ? t("달러 기준 경제 모형은 아직 준비 중이에요.", "Economic paths are not yet available in USD.") : t("이 보유 구성의 경제 모형은 아직 준비 중이에요.", "Economic paths are not yet available for these holdings.")}</h1><p>{researchReason ?? (reporting === "USD" ? t("현재 경제 모형은 원화 수익률로 학습합니다. 달러 기준의 과거 수익률 경로를 선택할 수 있어요.", "The current economic model is calibrated to KRW returns. You can choose historical paths in USD instead.") : t("확인된 가격 이력으로 과거 수익률 경로를 계산할 수 있어요.", "You can explore historical paths using verified price history."))}</p><Link href={historicHref}>{t("과거 수익률 경로 보기 →", "Explore historical paths →")}</Link></main>
+    {recoveredReturn && (surface === 'home' || surface === 'history') && <section aria-label="복구된 기간 수익률" style={{ margin: '20px auto', padding: '24px', maxWidth: 960, background: 'var(--panel, #f7f8f3)', borderRadius: 24 }}><RecoveredReturnChart curve={recoveredReturn} /></section>}
+    {economicUnsupported || (surface === "simulation" && researchUnavailableReason) ? <main id="varda-main-content" className={styles.unavailable}><p className={styles.eyebrow}>{invalidSelection ? t("계산 조건", "RESEARCH SETTINGS") : t("경제지표 경로", "ECONOMIC PATHS")} · {reporting}</p><CairnPageTitle>{invalidSelection ? t("계산 조건을 확인해 주세요.", "Check the research settings.") : reporting === "USD" ? t("달러 기준 경제 모형은 아직 준비 중이에요.", "Economic paths are not yet available in USD.") : t("이 보유 구성의 경제 모형은 아직 준비 중이에요.", "Economic paths are not yet available for these holdings.")}</CairnPageTitle><p>{researchReason ?? (reporting === "USD" ? t("현재 경제 모형은 원화 수익률로 학습합니다. 달러 기준의 과거 수익률 경로를 선택할 수 있어요.", "The current economic model is calibrated to KRW returns. You can choose historical paths in USD instead.") : t("확인된 가격 이력으로 과거 수익률 경로를 계산할 수 있어요.", "You can explore historical paths using verified price history."))}</p><Link href={historicHref}>{t("과거 수익률 경로 보기 →", "Explore historical paths →")}</Link></main>
       : evidence && reports ? <><CurrencyTrackedView key={`${evidence.ownerId}:${selectedScope.key}:${surface}:${evidence.reporting}`} evidence={evidence} reports={reports} surface={surface === "lab" || surface === "simulation" ? undefined : surface} contributionPolicy={contributionPolicy} nativeContributionScopeKey={surface === "contribution" ? selectedScope.key : undefined} hideCurrencyControl />{surface === "structure" && research ? <CurrencyResearchView evidence={research} surface="structure" hideCurrencyControl /> : null}</>
       : research ? <CurrencyResearchView key={`${research.input.version === 3 ? research.input.ownerId : "amount"}:${selectedScope.key}:${surface}:${reporting}`} evidence={research} surface={surface === "lab" || surface === "simulation" ? surface : undefined} hideCurrencyControl />
-      : <main id="varda-main-content" className={styles.unavailable}><h1>{t("분석에 필요한 보유 정보가 부족해요.", "More holding evidence is needed.")}</h1><p>{t("보유 수량과 가격 이력을 확인한 뒤 이 화면에서 이어서 볼 수 있어요.", "Add verifiable quantities and price history to continue here.")}</p><Link href={ledgerHref}>{t("보유 정보 보완 →", "Complete holding details →")}</Link></main>}
+      : <main id="varda-main-content" className={styles.unavailable}><CairnPageTitle>{t("분석에 필요한 보유 정보가 부족해요.", "More holding evidence is needed.")}</CairnPageTitle><p>{t("보유 수량과 가격 이력을 확인한 뒤 이 화면에서 이어서 볼 수 있어요.", "Add verifiable quantities and price history to continue here.")}</p><Link href={ledgerHref}>{t("보유 정보 보완 →", "Complete holding details →")}</Link></main>}
   </div>;
 }

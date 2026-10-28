@@ -13,6 +13,8 @@ import {
   historyAccountLabel,
   historySourceLabel,
 } from "./history-format";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const WIDTH = 1120;
 const HEIGHT = 340;
@@ -42,13 +44,13 @@ export function HistoryTrajectoryChart({
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-base font-semibold tracking-normal">
+          <CairnSectionTitle level="h3" className="text-base font-semibold tracking-normal">
             {<T ko={model.lane === "balance"
               ? "저장 잔액 궤적"
               : "포트폴리오 평가액 궤적"} en={translateHomeHistory(model.lane === "balance"
               ? "저장 잔액 궤적"
               : "포트폴리오 평가액 궤적")}/>}
-          </h3>
+          </CairnSectionTitle>
           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
             {<T ko={historyAccountLabel(model.account)} en={translateHomeHistory(historyAccountLabel(model.account))}/>}<T ko="· 금액 추세만 표시 · 수익률, TWR, MDD, 성과 순위 아님" en="· Value trend only · Not returns, TWR, MDD or performance rankings"/></p>
         </div>

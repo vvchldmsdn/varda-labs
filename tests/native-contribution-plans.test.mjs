@@ -202,6 +202,6 @@ it('renders a saved USD decision on a KRW page without changing its frozen resul
     '@/components/first-visit/money-input':{MoneyInput:()=>null},
   });
   const html=renderToStaticMarkup(createElement(ui.NativeContributionPlanner,{scopeKey:'all',currency:'KRW'}));
-  assert.match(html,/<h3>Saved plan · USD<\/h3>/);assert.match(html,/Profit currency.*USD/);assert.match(html,new RegExp('href="#native-plan-'+saved.request.id+'"'));
+  assert.match(html,/<h3\b[^>]*>Saved plan · USD<\/h3>/);assert.match(html,/Profit currency.*USD/);assert.match(html,new RegExp('href="#native-plan-'+saved.request.id+'"'));
   assert.match(html,/Edit approved targets/);assert.deepEqual(saved,original);
 });

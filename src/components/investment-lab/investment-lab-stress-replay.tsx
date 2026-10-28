@@ -7,6 +7,8 @@ import type {
   InvestmentLabStressReplayStrategy,
   InvestmentLabStressReplayWindow,
 } from "@/lib/investment-lab-stress-replay";
+import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 const STRATEGY_COLORS = Object.freeze({
   current_composition: "var(--ink)",
@@ -35,15 +37,15 @@ export function InvestmentLabStressReplayView({
         <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
           STRESS REPLAY
         </p>
-        <h2
+        <CairnSectionTitle
           className="mt-3 text-lg font-medium sm:text-xl"
           id="investment-lab-stress-replay-title"
-        ><LabText value=" 지금 구성으로 과거를 다시 지나갔다면 " /></h2>
+        ><LabText value=" 지금 구성으로 과거를 다시 지나갔다면 " /></CairnSectionTitle>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 현재 보유 비중을 각 과거 구간의 첫날에 적용한 뒤 리밸런싱 없이 보유했다고 가정합니다. 당시 상장 전이거나 가격 근거가 부족한 종목은 임의로 채우지 않고 제외하며, 포함된 현재 평가액 비율을 함께 표시합니다. " /></p>
         <p className="mt-2 text-xs text-[var(--muted)]"><LabText value=" 세금·수수료·배당 재투자는 반영하지 않은 연구용 비교이며 투자 추천이 아닙니다. " /></p>
       </header>
 
-      {model.valuationBlocker ? <p role="status" className="border-y border-[var(--line)] py-5 text-sm leading-7 text-[var(--warning)]"><T ko={`${model.valuationGapCount ?? 0}개 보유종목의 현재 평가액을 확인할 수 없어 과거 구성 비교를 보류했습니다. 평가액이 확인된 종목만으로 전체 비중을 다시 계산하지 않습니다. 보유종목에서 가격과 환율 근거를 확인해 주세요.`} en={`Current valuations are unavailable for ${model.valuationGapCount ?? 0} holdings, so this replay is paused. We do not reweight only the known holdings to represent your whole portfolio. Check their price and exchange-rate evidence in Holdings.`} /></p> : null}
+      {model.valuationBlocker ? <CairnStatus as="p" tone="warning" role="status" className="border-y border-[var(--line)] py-5 text-sm leading-7 text-[var(--warning)]"><T ko={`${model.valuationGapCount ?? 0}개 보유종목의 현재 평가액을 확인할 수 없어 과거 구성 비교를 보류했습니다. 평가액이 확인된 종목만으로 전체 비중을 다시 계산하지 않습니다. 보유종목에서 가격과 환율 근거를 확인해 주세요.`} en={`Current valuations are unavailable for ${model.valuationGapCount ?? 0} holdings, so this replay is paused. We do not reweight only the known holdings to represent your whole portfolio. Check their price and exchange-rate evidence in Holdings.`} /></CairnStatus> : null}
       <div className="space-y-4">
         {model.windows.map((window) => (
           <StressWindowCard key={window.id} window={window} accountLabels={accountLabels} />
@@ -99,7 +101,7 @@ function StressWindowCard({
       <header className="border-b border-[var(--wash)] px-4 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold"><LabText value={window.label} /></h3>
+            <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value={window.label} /></CairnSectionTitle>
             <p className="mt-1 text-sm text-[var(--muted)]"><LabText value={window.description} /></p>
             <p className="mt-1 text-xs tabular-nums text-[var(--muted)]">
               {formatDate(window.startDate)} ~ {formatDate(window.endDate)}

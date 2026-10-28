@@ -1,5 +1,6 @@
 import "server-only";
 import { pairKisHistory, mergeKisPairedHistory } from "./kis-paired-history";
+import { isFinalizedKisPriceEvidence } from "@/lib/shared-domain/market-data/kis-history-finalization";
 import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 import { fetchKisWithBudget } from "@/lib/market-data/provider-budget";
 
@@ -522,11 +523,16 @@ async function fetchKisHistoricalClosePrices(
       : "KIS historical fetch completed; this provider method does not write to the database",
   );
 
+  const mergedRows=context.includeAdjusted ? mergeKisPairedHistory(series) : [...mergeKisRawHistoryRows(series)];
+  const finalizedRows=mergedRows.filter(row=>isFinalizedKisPriceEvidence(row,row.fetchedAt));
+  const pendingFinalizationCount=mergedRows.length-finalizedRows.length;
+  if(pendingFinalizationCount>0)warnings.push("provider_daily_bar_unfinalized");
   return {
     provider: "kis",
     fetchedAt,
     priceBasis: context.includeAdjusted ? "raw_and_provider_adjusted" : KIS_RAW_HISTORY_POLICY.priceBasis,
-    rows: context.includeAdjusted ? mergeKisPairedHistory(series) : [...mergeKisRawHistoryRows(series)],
+    rows: finalizedRows,
+    pendingFinalizationCount,
     failures,
     requestCount,
     warnings,

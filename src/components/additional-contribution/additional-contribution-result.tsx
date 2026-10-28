@@ -9,6 +9,8 @@ import {
   type AdditionalContributionResultPreview,
   type AdditionalContributionResultRow,
 } from "@/lib/additional-contribution-view";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export type { AdditionalContributionResultPreview } from "@/lib/additional-contribution-view";
 
@@ -132,8 +134,8 @@ export function AdditionalContributionWeightScene({
             <p className="text-[11px] font-medium text-[var(--muted)]">
               TARGET ALIGNMENT
             </p>
-            <h2 id="weight-map-title" className="mt-1 text-xl font-medium">
-              <PortfolioText ko={"비중 변화"} />{" "}</h2>
+            <CairnSectionTitle id="weight-map-title" className="mt-1 text-xl font-medium">
+              <PortfolioText ko={"비중 변화"} />{" "}</CairnSectionTitle>
           </div>
           <div className="flex flex-wrap gap-5 text-xs text-[var(--muted)]">
             <LegendDot className="bg-[var(--line)]" label="현재" />
@@ -167,11 +169,11 @@ export function AdditionalContributionEvidenceScene({
             <p className="text-[11px] font-medium text-[var(--muted)]">
               CALCULATION EVIDENCE
             </p>
-            <h2
+            <CairnSectionTitle
               id="allocation-detail-title"
               className="mt-1 text-xl font-medium"
             >
-              <PortfolioText ko={"계산 근거"} />{" "}</h2>
+              <PortfolioText ko={"계산 근거"} />{" "}</CairnSectionTitle>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
               <PortfolioText ko={"초과 종목의 계산상 매도, 매도금 재사용, MA120 조정과 종목별 최종 금액을 단계별로 확인합니다."} />{" "}</p>
           </div>

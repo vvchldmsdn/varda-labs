@@ -1,0 +1,1 @@
+.scope { composes: scope from "../../cairn-ui/tokens.module.css"; }

@@ -50,7 +50,7 @@ export function collectionRetrySeconds(attempt: number, random = Math.random()) 
 
 export function isProviderCollectionDeferred(error: unknown): error is Error & { retryAfterSeconds: number } {
   return typeof error === "object" && error !== null && "code" in error &&
-    ["provider_budget_limited", "provider_token_cooldown"].includes(String(error.code)) &&
+    ["provider_budget_limited", "provider_token_cooldown", "provider_history_pending"].includes(String(error.code)) &&
     "retryAfterSeconds" in error && Number.isFinite(Number(error.retryAfterSeconds));
 }
 

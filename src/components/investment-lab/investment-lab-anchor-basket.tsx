@@ -7,6 +7,8 @@ import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-
 import type { InvestmentLabPeriodSelection } from "@/lib/investment-lab-period-selection";
 import type { InvestmentLabAnchorSpecialHoldingEvidence } from "@/lib/investment-lab-special-holding-authority";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, SectionTitle as CairnSectionTitle, Select as CairnSelect } from "@/components/cairn-ui";
+
 
 export function InvestmentLabAnchorBasket({
   model,
@@ -58,7 +60,7 @@ export function InvestmentLabAnchorBasket({
             <p className="text-[10px] font-medium uppercase text-[var(--muted)]">
               ANCHOR RECONSTRUCTION
             </p>
-            <h2 className="mt-3 text-lg font-medium sm:text-xl"><LabText value=" 기준일 바스켓: 초기 동일비중·흐름 균등배분 " /></h2>
+            <CairnSectionTitle className="mt-3 text-lg font-medium sm:text-xl"><LabText value=" 기준일 바스켓: 초기 동일비중·흐름 균등배분 " /></CairnSectionTitle>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 선택한 과거 기준일에 실제로 저장된 종목만 사용합니다. 기준일에만 동일비중으로 시작하고 이후 실제 매수·매도 금액은 종목마다 같은 비율로 나눠 적용하며 자동 리밸런싱은 하지 않습니다. " /></p>
           </div>
           <AnchorForm
@@ -154,7 +156,7 @@ function SpecialHoldingEvidence({
       data-section="investment-lab-anchor-special-holding-evidence"
     >
       <div className="border-b border-[var(--wash)] py-4">
-        <h3 className="font-semibold"><LabText value="ticker 없는 저장 포지션 근거" /></h3>
+        <CairnSectionTitle level="h3" className="font-semibold"><LabText value="ticker 없는 저장 포지션 근거" /></CairnSectionTitle>
         <p className="mt-1 text-xs leading-5 text-[var(--muted)]"><LabText value=" 이름이나 현재 자산값으로 종목을 추론하지 않습니다. 같은 legacy 자산의 Base44 이관 스냅샷 메타데이터와 ticker가 합의될 때만 복구합니다. " /></p>
       </div>
       <div className="overflow-x-auto">
@@ -308,7 +310,7 @@ function AnchorForm({
 }) {
   if (anchorDates.length === 0) return null;
   return (
-    <form
+    <CairnForm
       action="/investment-lab"
       className="flex items-end gap-2"
       method="get"
@@ -323,7 +325,7 @@ function AnchorForm({
           value={fixedMixSelection.kodexWeightPct}
         />
       ) : null}
-      <label className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" 기준일 " /><select
+      <CairnField className="grid gap-1 text-xs font-semibold text-[var(--muted)]"><LabText value=" 기준일 " /><CairnSelect
           className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm outline-none"
           defaultValue={selectedAnchorDate ?? anchorDates[0]}
           name="basketAnchor"
@@ -333,13 +335,13 @@ function AnchorForm({
               {formatDate(date)}
             </option>
           ))}
-        </select>
-      </label>
-      <button
+        </CairnSelect>
+      </CairnField>
+      <CairnButton variant="primary"
         className="h-10 rounded-md bg-[var(--ink)] px-4 text-sm font-semibold text-white"
         type="submit"
-      ><LabText value=" 적용 " /></button>
-    </form>
+      ><LabText value=" 적용 " /></CairnButton>
+    </CairnForm>
   );
 }
 

@@ -16,6 +16,8 @@ import {
   NAVER_AUTH_BASE_PATH,
 } from "@/lib/auth/naver-auth-policy";
 import styles from "./auth-experience.module.css";
+import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function SocialSignInButtons({
   mode,
@@ -136,12 +138,12 @@ export function SocialSignInButtons({
         })}
       </AuthElement>
       {previewNotice ? (
-        <p role="status" className={styles.notice}><AuthText>{"화면 미리보기입니다. 실제 로그인은 운영 서비스에서 진행할 수 있습니다."}</AuthText></p>
+        <CairnStatus as="p" tone="neutral" role="status" className={styles.notice}><AuthText>{"화면 미리보기입니다. 실제 로그인은 운영 서비스에서 진행할 수 있습니다."}</AuthText></CairnStatus>
       ) : null}
       {error ? (
-        <p role="alert" className={styles.error}>
+        <CairnStatus as="p" tone="danger" role="alert" className={styles.error}>
           <AuthText>{error}</AuthText>
-        </p>
+        </CairnStatus>
       ) : null}
     </div>
   );
@@ -167,7 +169,7 @@ export function SignOutButton() {
 
   return (
     <div className={styles.stack}>
-      <button
+      <CairnButton variant="secondary"
         type="button"
         onClick={signOut}
         disabled={status === "pending"}
@@ -176,9 +178,9 @@ export function SignOutButton() {
       >
         <LogOut size={16} aria-hidden="true" />
         <AuthText>{status === "pending" ? "로그아웃 중" : "로그아웃"}</AuthText>
-      </button>
+      </CairnButton>
       {status === "failed" ? (
-        <p role="alert" className={styles.error}><AuthText>{"로그아웃하지 못했습니다. 로그인 상태가 유지되고 있으니 다시 시도해 주세요."}</AuthText></p>
+        <CairnStatus as="p" tone="danger" role="alert" className={styles.error}><AuthText>{"로그아웃하지 못했습니다. 로그인 상태가 유지되고 있으니 다시 시도해 주세요."}</AuthText></CairnStatus>
       ) : null}
     </div>
   );

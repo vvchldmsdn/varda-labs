@@ -81,7 +81,8 @@ export type AdditionalContributionResultRow = AdditionalContributionViewInputRow
       | "loss_position"
       | "cost_basis_unavailable"
       | "target_zero_but_loss"
-      | "target_zero_cost_basis_unavailable";
+      | "target_zero_cost_basis_unavailable"
+      | "user_sale_excluded";
     unrealizedReturnPct: number | null;
   }>;
 

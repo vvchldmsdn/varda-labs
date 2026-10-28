@@ -5,6 +5,8 @@ import { useTransition } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import type { Currency } from "@/lib/money";
 import { CairnSelect } from "@/components/presentation/cairn-select";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export const REPORTING_ROUTES = ["/", "/today", "/history", "/portfolio/structure", "/additional-contribution", "/investment-lab", "/simulation", "/portfolio/reporting"] as const;
 export function reportingCurrencyHref(pathname: string, query: string, currency: Currency) {
@@ -21,5 +23,5 @@ export function ReportingCurrencySwitch() {
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
-  return <div className="varda-reporting-control"><span>{t("분석 통화", "Analysis currency")}</span><CairnSelect className="cairn-currency-select" label={t("분석 통화", "Analysis currency")} value={params.get("currency") === "USD" ? "USD" : "KRW"} options={[{value:"KRW",label:"KRW"},{value:"USD",label:"USD"}]} disabled={pending} onValueChange={currency => { const href = reportingCurrencyHref(pathname, params.toString(), currency as Currency); startTransition(() => router.push(href, { scroll: false })); }} />{pending ? <span role="status">{t("계산 중", "Updating")}</span> : null}</div>;
+  return <div className="varda-reporting-control"><span>{t("분석 통화", "Analysis currency")}</span><CairnSelect className="cairn-currency-select" label={t("분석 통화", "Analysis currency")} value={params.get("currency") === "USD" ? "USD" : "KRW"} options={[{value:"KRW",label:"KRW"},{value:"USD",label:"USD"}]} disabled={pending} onValueChange={currency => { const href = reportingCurrencyHref(pathname, params.toString(), currency as Currency); startTransition(() => router.push(href, { scroll: false })); }} />{pending ? <CairnStatus as="span" tone="neutral" role="status">{t("계산 중", "Updating")}</CairnStatus> : null}</div>;
 }

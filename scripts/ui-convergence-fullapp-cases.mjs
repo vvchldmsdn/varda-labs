@@ -75,9 +75,10 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
       for(const action of ['buy','sell']) {
         await page.goto(`${url}/portfolio/ledger?accountId=${nativeAccount}&assetId=${nativeAsset}&action=${action}`);
         await expect(page.getByLabel(locale==='ko'?'기록 종류':'Record type',{exact:true})).toHaveValue(action);
+        await page.getByText(locale==='ko'?'거래일·과거 기록 정정':'Trade date & corrections',{exact:true}).click();
         await expect(page.getByLabel(locale==='ko'?'기록 날짜':'Record date',{exact:true})).toBeVisible();
-        await page.getByLabel(locale==='ko'?'수량':'Quantity',{exact:true}).fill('1');
-        await page.getByLabel(locale==='ko'?'체결 총액':'Executed total',{exact:true}).fill('10000');
+        await page.getByLabel(locale==='ko'?'체결 수량':'Executed quantity',{exact:true}).fill('1');
+        await page.getByLabel(locale==='ko'?'체결 단가 · KRW':'Execution price · KRW',{exact:true}).fill('10000');
         await page.getByRole('button',{name:locale==='ko'?(action==='buy'?'매수 기록 저장':'매도 기록 저장'):(action==='buy'?'Save buy record':'Save sell record'),exact:true}).click();
         await expect(page.getByRole('status').filter({hasText:locale==='ko'?'기록했어요.':'Recorded.'})).toBeVisible();
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

@@ -10,6 +10,8 @@ import type { HistoryOverviewPoint } from "@/lib/history-overview";
 import { historyPointMetric, historyPointsWithMetric, type HistoryExplorerMode } from "@/lib/history-explorer";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
 import styles from "./history-modern.module.css";
+import { Input as CairnInput } from "@/components/cairn-ui";
+
 
 const WIDTH = 960;
 const HEIGHT = 360;
@@ -98,7 +100,7 @@ export function HistoryPerformanceChart({ mode, onSelect, onInspect, points, sel
         <span className={styles.observationNote}>{<T ko={pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색"} en={translateHomeHistory(pointer ? "가장 가까운 저장일의 값" : "날짜를 따라 탐색")}/>}</span>
         <span>{displayPoints.at(-1)!.rowKind === "live" ? <T ko="현재 · " en="Current · "/> : null}{displayPoints.at(-1)!.date.replaceAll("-", ".")}</span>
       </div>
-      <input className={styles.chartKeyboard} type="range" min="0" max={displayPoints.length - 1} value={selectedIndex}
+      <CairnInput className={styles.chartKeyboard} type="range" min="0" max={displayPoints.length - 1} value={selectedIndex}
         aria-label={t("히스토리 그래프 날짜 탐색", "Explore dates on the history chart")}
         aria-valuetext={t(`${displayPoints[selectedIndex]!.date} ${metricLabel(displayPoints[selectedIndex]!, mode)}`, translateHomeHistory(`${displayPoints[selectedIndex]!.date} ${metricLabel(displayPoints[selectedIndex]!, mode)}`))}
         onChange={(event) => { leave(); onSelect(displayPoints[Number(event.target.value)]!.date); }} />

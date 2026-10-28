@@ -1,3 +1,5 @@
+import { investmentEventKey } from "@/lib/native-investment-basis";
+import { loadNativeInvestmentBasis } from "./native-investment-basis";
 import "server-only";
 import { getTenantSqlClient } from "@/db/tenant-client";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -5,7 +7,7 @@ import type { eventLedgerEntries } from "@/db/schema";
 import { projectNativeHoldingCosts, projectNativeLegacyTrade } from "@/lib/native-legacy-trade-projection";
 import type { NativePortfolioState } from "@/lib/native-portfolio-ledger";
 
-type NativeReadBoundary = { asOf?: Date; boundary?: "before" | "inclusive" };
+type NativeReadBoundary = { asOf?: Date; boundary?: "before" | "inclusive"; investment?: boolean; investmentBasis?: Awaited<ReturnType<typeof loadNativeInvestmentBasis>> };
 
 /** Read current cost lots, or the effective state at a requested valuation
  * boundary (exclusive by default). Never fill history with today's state. */
@@ -31,10 +33,11 @@ export async function loadNativeHoldingCosts(tenant: TenantContext, options: Nat
       order by a.id limit 201`, [tenant.ownerUserId, asOf, options.boundary === "inclusive"]),
   ], { readOnly: true });
   if (result[1].length > 200) throw new Error("native_holding_cost_scope_too_large");
+  const investment = options.investmentBasis ?? await loadNativeInvestmentBasis(tenant, asOf ?? undefined, options.boundary === "inclusive");
   return result[1].flatMap(row => {
     if (!row.state) throw new Error("native_holding_cost_state_missing");
     return projectNativeHoldingCosts({ accountId: String(row.accountId), account: String(row.account),
-      state: row.state as NativePortfolioState, assets: row.assets as { id: string; currency: string }[], asOf, boundary: options.boundary });
+      state: row.state as NativePortfolioState, assets: row.assets as { id: string; currency: string }[], asOf, boundary: options.boundary }).map(cost => { const current = investment.find(a => a.accountId === row.accountId && a.sourceSequence === (row.state as NativePortfolioState).sequence)?.positions.find(p => p.assetId === cost.assetId && p.currency === cost.currency && p.quantity === cost.quantity); return { ...cost, costKrw: current?.costKrw ?? null }; });
   });
 }
 
@@ -58,12 +61,22 @@ export async function loadNativeLegacyTrades(tenant: TenantContext, options: Nat
       order by e.recorded_at,e.native_sequence limit 10001`, [tenant.ownerUserId, asOf, options.boundary === "inclusive"]),
   ], { readOnly: true });
   if (result[1].length > 10000) throw new Error("native_trade_history_too_large");
+  const investment = options.investment ? options.investmentBasis ?? await loadNativeInvestmentBasis(tenant, asOf ?? undefined, options.boundary === "inclusive") : [];
   return result[1].flatMap(row => {
     const projected = projectNativeLegacyTrade(row as Parameters<typeof projectNativeLegacyTrade>[0], {
       id: String(row.accountId), code: String(row.code),
       assets: [{ id: String(row.assetId), name: String(row.name), ticker: row.ticker as string | null, legacyBase44Id: row.legacyBase44Id as string | null }],
     });
     if (!projected) throw new Error("native_trade_projection_unavailable");
+    if (options.investment) {
+      const basis = investment.find(a => a.accountId === row.accountId)?.trades.find(t => t.id === row.id && t.eventKey === investmentEventKey(projected.nativeData.event as import("@/lib/native-portfolio-ledger").NativeEvent));
+      projected.amountKrw = basis?.amountKrw ?? null;
+      projected.nativeRemainingCostKrw = basis?.remainingCostKrw ?? null;
+      projected.afterValue.trade_metrics.disposed_cost_krw = basis?.costKrw ?? null;
+      projected.afterValue.trade_metrics.realized_pnl_krw = basis?.realizedPnlKrw ?? null;
+      projected.afterValue.trade_metrics.native_cost_basis_status = basis?.costKrw != null ? "available" : "unavailable";
+      projected.nativeCostBasisStatus = projected.afterValue.trade_metrics.native_cost_basis_status;
+    }
     const time = new Date(String(row.recordedAt));
     return [{ legacyBase44Id: null, canonicalOwnerUserId: tenant.ownerUserId,
       ruleVersion: "native_legacy_read_v1", brokerRecoveryBatchId: null, brokerRecoveryData: null,

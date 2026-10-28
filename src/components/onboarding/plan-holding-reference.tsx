@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { parseDraft, PLAN_STORAGE_KEY } from "@/lib/investment-plan";
+import { Button as CairnButton } from "@/components/cairn-ui";
+
 
 function readPlanReference() {
   try {
@@ -38,7 +40,7 @@ export function PlanHoldingReference({ disabled, onSearch }: { disabled: boolean
     <p className="varda-onboarding-eyebrow">{t("계획에서 이어서 등록", "CONTINUE FROM YOUR PLAN")}</p>
     <p className="varda-onboarding-hint">{t("이름을 누르면 종목을 검색해요. 실제 종목을 확인하고 보유 수량만 추가하세요. 계획의 평가금액과 목표는 참고용이며 실제 보유자산으로 자동 저장하지 않습니다.", "Select a name to search, verify the actual instrument, then enter your quantity. Plan values and targets are references and are never saved as actual holdings automatically.")}</p>
     <ul>{draft.input.rows.map((row, index) => <li key={index}>
-      <button type="button" className="varda-onboarding-text-button" disabled={disabled} onClick={() => onSearch(row.name)}>{row.name} ↗</button>
+      <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" disabled={disabled} onClick={() => onSearch(row.name)}>{row.name} ↗</CairnButton>
       <span className="varda-onboarding-hint"> · {row.value.toLocaleString()} KRW · {t("목표", "Target")} {row.targetBps / 100}%</span>
     </li>)}</ul>
     <p className="varda-onboarding-hint">{t("수량을 등록하면 실제 보유종목의 가격 흐름을 볼 수 있어요. 매입가는 나중에 입력해도 됩니다.", "Adding quantities lets you follow your actual holdings. Purchase costs can be added later.")}</p>

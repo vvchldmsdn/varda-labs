@@ -29,6 +29,8 @@ import type {
   PortfolioAnalysisScope,
   PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabView({
   weightEvidence,
@@ -184,7 +186,7 @@ export function InvestmentLabView({
 
       <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
         <header className={styles.stageHeader}>
-          <h1 className="varda-page-title"><LabText value="투자 랩" /></h1>
+          <CairnPageTitle className="varda-page-title"><LabText value="투자 랩" /></CairnPageTitle>
           <InvestmentLabScopeTabs scopes={scopeCatalog} selectedScopeKey={selectedScope.key} />
         </header>
 
@@ -317,7 +319,7 @@ function BlockedView({
 }) {
   return (
     <section className="border-y border-[var(--brand-soft)] py-6">
-      <h2 className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 현재 계산할 수 없습니다 " /></h2>
+      <CairnSectionTitle className="text-lg font-semibold text-[var(--warning)]"><LabText value=" 현재 계산할 수 없습니다 " /></CairnSectionTitle>
       <p className="mt-2 text-sm text-[var(--warning)]"><LabText value=" 일부 결과를 추정해서 표시하지 않고 입력 증거를 차단했습니다. " /></p>
       <ul className="mt-4 space-y-2 text-sm text-[var(--warning)]">
         {model.blockers.map((blocker) => (

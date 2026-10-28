@@ -8,6 +8,8 @@ import { economicCalculationGuide } from "./economic-calculation-guide";
 import { EconomicValidationSection } from "./economic-validation-section";
 import Link from "next/link";
 import { buildPortfolioAnalysisScopeHref } from "@/lib/portfolio-analysis-scope";
+import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export function EconomicDetailPanel({ data }: { data: SimulationDetailData }) {
   if (data.panel === "validation") return <EconomicValidationSection result={data.economicValidation} />;
@@ -25,7 +27,7 @@ export function EconomicDetailPanel({ data }: { data: SimulationDetailData }) {
   const domain = resolveResearchFanChartValueDomain([current, ...comparison.outcomeCandidates.map((row) => row.execution)]);
   return <section data-economic-candidates>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h3 className="text-lg font-medium"><SimulationText ko="같은 미래, 다른 비중" en="Same paths, different weights" /></h3>
+      <CairnSectionTitle level="h3" className="text-lg font-medium"><SimulationText ko="같은 미래, 다른 비중" en="Same paths, different weights" /></CairnSectionTitle>
       <CalculationGuideDialog guide={economicCalculationGuide} label={{ ko: "탐색 원리", en: "Search method" }} title={{ ko: "비중 실험의 계산 원리", en: "How the weight experiment works" }} />
     </div>
     <p className="mt-2 text-sm leading-7 text-[var(--muted)]"><SimulationText ko={`경제 충격과 종목별 경로 ${pathCount.toLocaleString("ko-KR")}개는 그대로 두고 시작 비중만 바꿉니다. ${searchPathCount}개 경로에서 후보를 찾고 나머지 ${confirmationPathCount}개에서도 목적값이 개선된 경우만 표시합니다.`} en={`All ${pathCount.toLocaleString("en-US")} economic and holding paths stay fixed; only starting weights change. Candidates are searched on ${searchPathCount} paths and shown only if their objective also improves on the other ${confirmationPathCount}.`} /></p>
@@ -54,13 +56,13 @@ export function ObjectiveLabel({ objective }: { objective: string }) {
   return <SimulationText ko={objective === "median_growth" ? "중앙 수익률을 높이는 구성" : objective === "downside_floor" ? "하위 결과를 방어하는 구성" : "수익·하방의 균형 구성"} en={objective === "median_growth" ? "Higher median return" : objective === "downside_floor" ? "Stronger lower-tail boundary" : "Return and downside balance"} />;
 }
 function Metric({ ko, en, value }: { ko: string; en: string; value: string }) { return <div><p className="text-xs text-[var(--muted)]"><SimulationText ko={ko} en={en} /></p><p className="mt-2 font-medium tabular-nums">{value}</p></div>; }
-function Unavailable() { return <p role="status" className="py-8 text-sm leading-7"><SimulationText ko="경제지표 경로가 준비되면 이 분석을 계산할 수 있습니다. 메인 화면에서 종목 이력과 경제지표 상태를 확인해 주세요." en="This analysis needs ready economic paths. Check holding history and economic-data status on the main screen." /></p>; }
+function Unavailable() { return <CairnStatus as="p" tone="neutral" role="status" className="py-8 text-sm leading-7"><SimulationText ko="경제지표 경로가 준비되면 이 분석을 계산할 수 있습니다. 메인 화면에서 종목 이력과 경제지표 상태를 확인해 주세요." en="This analysis needs ready economic paths. Check holding history and economic-data status on the main screen." /></CairnStatus>; }
 
 function EconomicHoldingEvidence({ data }: { data: SimulationDetailData }) {
   const preflight = data.inputPreflight;
   if (!preflight) return null;
   return <section className="mt-7 border-t border-[var(--line)] pt-5" data-economic-holding-evidence>
-    <h3 className="text-lg font-medium"><SimulationText ko="포함 종목과 준비 상태" en="Holdings and input readiness" /></h3>
+    <CairnSectionTitle level="h3" className="text-lg font-medium"><SimulationText ko="포함 종목과 준비 상태" en="Holdings and input readiness" /></CairnSectionTitle>
     <p className="mt-2 text-sm leading-7 text-[var(--muted)]"><SimulationText ko="현재 평가액에서 계산 대상 종목만 100%로 환산합니다. 아래 현재 비중은 환산 전이며, 계산 비중은 경제 경로가 준비되었을 때 표시합니다. 이력이 부족한 종목을 임의의 값으로 채우지 않습니다." en="Included holdings are renormalized to 100% of modeled value. Current weights below are before that normalization; model weights appear when economic paths are ready. Missing holding history is not invented." /></p>
     <div className="mt-4 divide-y divide-[var(--line)] border-y border-[var(--line)]">
       {data.instruments.map((row) => {

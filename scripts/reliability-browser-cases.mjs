@@ -57,22 +57,22 @@ export async function runBrowserCases({admin,worker,tenant,report,output}) {
   await context.route('**/*',async route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.goto(url);
   await check('browser-commit-response-lost-refresh-relogin-exactly-one',async()=>{
-   await page.getByLabel('수량',{exact:true}).fill('2');await page.getByLabel('체결 총액',{exact:true}).fill('200');
+   await page.getByLabel('체결 수량',{exact:true}).fill('2');await page.getByLabel('체결 단가 · USD',{exact:true}).fill('100');
    await page.getByRole('button',{name:'매수 기록 저장',exact:true}).click();
    await expect(page.getByText('저장 결과를 확인하지 못했어요.',{exact:false})).toBeVisible();
    await context.addCookies([{name:'identity',value:'signed-out',url}]);await page.reload();await expect(page.getByRole('link',{name:'로그인',exact:true})).toBeVisible();
    await context.clearCookies();await page.reload();await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.',{exact:true})).toBeVisible();
-   const state=await ledger.readNativeLedger(ctx,account);assert.equal(state.entries.length,2);assert.equal(state.accounts[0].state.positions[0].quantity,'12');assert.equal(state.accounts[0].state.cash.USD,'800');
+   const state=await ledger.readNativeLedger(ctx,account);assert.equal(state.entries.length,2);assert.equal(state.accounts[0].state.positions[0].quantity,'12');assert.equal(state.accounts[0].state.cash.USD,'1000');
    await page.screenshot({path:path.join(output,'desktop-recovered.png'),fullPage:true});
   });
   await check('browser-historical-entry-and-mobile',async()=>{
-   await page.getByText('과거 거래 추가·정정',{exact:true}).click();await page.getByLabel('시작 잔액 이후 거래를 다시 계산',{exact:true}).check();
-   await page.getByLabel('수량',{exact:true}).fill('1');await page.getByLabel('체결 총액',{exact:true}).fill('100');
+   await page.getByText('거래일·과거 기록 정정',{exact:true}).click();await page.getByText('과거 거래 추가·정정',{exact:true}).click();await page.getByLabel('시작 잔액 이후 거래를 다시 계산',{exact:true}).check();
+   await page.getByLabel('체결 수량',{exact:true}).fill('1');await page.getByLabel('체결 단가 · USD',{exact:true}).fill('100');
    await page.getByText('초 단위 시각 확인·수정',{exact:true}).click();await page.locator('input[name="at"]').fill('2026-08-02T12:00');await page.getByLabel('변경 이유',{exact:true}).fill('Synthetic missing transaction');
    await page.getByLabel('시작 잔액에 이미 포함된 거래가 아닙니다.',{exact:true}).check();
    await page.getByRole('button',{name:'매수 기록 저장',exact:true}).click();
    await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.',{exact:true})).toBeVisible();
-   const state=await ledger.readNativeLedger(ctx,account);assert.equal(state.accounts[0].state.positions[0].quantity,'13');assert.equal(state.accounts[0].state.cash.USD,'700');
+   const state=await ledger.readNativeLedger(ctx,account);assert.equal(state.accounts[0].state.positions[0].quantity,'13');assert.equal(state.accounts[0].state.cash.USD,'1000');
    await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'mobile-historical.png'),fullPage:true});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    await context.addCookies([{name:'identity',value:'other',url}]);await page.reload();await expect(page.getByText('보유 정보가 바뀌었어요.',{exact:false})).toBeVisible();

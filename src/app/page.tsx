@@ -20,6 +20,8 @@ import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/por
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { buildHomeDesignPreview } from "@/lib/home-design-preview";
 import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -42,14 +44,14 @@ export default async function Home({ searchParams }: HomeProps) {
 
   if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "quick-usd") {
     const asOf = "2026-09-13T00:00:00Z";
-    return <><p role="status" className="px-6 py-2 text-xs">Synthetic portfolio · USD preview</p><QuickHome input={{ version: 2, source: "manual", currency: "USD", locale: "en", timeZone: "America/New_York", asOf,
+    return <><CairnStatus as="p" tone="neutral" role="status" className="px-6 py-2 text-xs">Synthetic portfolio · USD preview</CairnStatus><QuickHome input={{ version: 2, source: "manual", currency: "USD", locale: "en", timeZone: "America/New_York", asOf,
       rows: [{ name: "VOO", value: 1234.56, instrumentId: "us-voo", inputCurrency: "USD" }, { name: "KODEX 200", value: 1300000, instrumentId: "kr-069500", inputCurrency: "KRW" }],
       fx: [{ base: "USD", quote: "KRW", rate: "1300", observedAt: asOf, fetchedAt: asOf, source: "manual", kind: "user_input" }],
     }} createdAt={asOf} preview welcome /></>;
   }
 
   if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "quick") {
-    return <><p role="status" className="px-6 py-2 text-xs">화면 미리보기 · 가상 입력</p><QuickHome input={{ currency: "KRW", rows: [{ name: "KODEX 200", value: 3000000, instrumentId: "kr-069500" }, { name: "VOO", value: 2000000, instrumentId: "us-voo" }] }} createdAt="2026-09-13T00:00:00Z" preview welcome /></>;
+    return <><CairnStatus as="p" tone="neutral" role="status" className="px-6 py-2 text-xs">화면 미리보기 · 가상 입력</CairnStatus><QuickHome input={{ currency: "KRW", rows: [{ name: "KODEX 200", value: 3000000, instrumentId: "kr-069500" }, { name: "VOO", value: 2000000, instrumentId: "us-voo" }] }} createdAt="2026-09-13T00:00:00Z" preview welcome /></>;
   }
   if (
     process.env.NODE_ENV === "development" &&
@@ -142,7 +144,7 @@ async function DashboardContent({
     const evidence = await getTrackedCurrencyEvidence(tenant, selectedScope, "USD");
     return <CurrencyPortfolioSurface surface="home" evidence={evidence} scopes={scopes} selectedScope={selectedScope} />;
   }
-  return <>{welcome ? <p role="status" className="px-6 py-3 text-sm">입력한 자산을 저장했어요. <Link href="/plans" className="underline">저장한 구성 보기</Link></p> : null}<PortfolioDashboard data={dashboard} liveSyncEnabled /></>;
+  return <>{welcome ? <CairnStatus as="p" tone="neutral" role="status" className="px-6 py-3 text-sm">입력한 자산을 저장했어요. <Link href="/plans" className="underline">저장한 구성 보기</Link></CairnStatus> : null}<PortfolioDashboard data={dashboard} liveSyncEnabled /></>;
 }
 
 function firstSearchParam(value: string | string[] | undefined) {

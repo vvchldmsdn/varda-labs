@@ -8,9 +8,9 @@ test('owner simulation returns main output without evaluating hidden analysis an
  const ports={
   '@/db/queries/portfolio-structure':{getReadOnlyTenantPortfolioStructure:async()=>({selectedAccount:'all'}),getReadOnlyTenantPortfolioStructureForScope:async()=>({selectedAccount:'all'})},
   '@/db/queries/simulation-owner-private-history':{getLatestCommonPrivateOwnerRawServiceDate:async()=>null,getReadOnlyPrivateOwnerRawHistoryValidationBatch:async()=>null},
-  '@/lib/simulation-owner-input-candidate':{buildSimulationOwnerInputCandidate:()=>({account:'all',selection:null})},
-  '@/lib/simulation-owner-input-preflight':{buildSimulationOwnerInputPreflightModel:()=>({status:'unavailable'})},
-  '@/lib/simulation-owner-research-execution':{buildSimulationOwnerResearchExecution:()=>({status:'unavailable',executionWeights:[]}),resolveSimulationOwnerExecutionEndSelection:()=>({status:'unavailable'}),SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY:{samplePathCount:12}},
+  '@/lib/shared-domain/simulation-owner-input-candidate':{buildSimulationOwnerInputCandidate:()=>({account:'all',selection:null})},
+  '@/lib/shared-domain/simulation-owner-input-preflight':{buildSimulationOwnerInputPreflightModel:()=>({status:'unavailable'})},
+  '@/lib/shared-domain/simulation-owner-research-execution':{buildSimulationOwnerResearchExecution:()=>({status:'unavailable',executionWeights:[]}),resolveSimulationOwnerExecutionEndSelection:()=>({status:'unavailable'}),SIMULATION_OWNER_RESEARCH_EXECUTION_POLICY:{samplePathCount:12}},
   '@/lib/simulation-owner-candidate-comparison':{buildSimulationOwnerCandidateComparison:()=>({marker:++calls.candidate})},
   '@/lib/simulation-owner-walk-forward-validation':{buildSimulationOwnerWalkForwardValidation:()=>({marker:++calls.walk})},
   '@/lib/simulation-owner-historical-outcome-validation':{buildSimulationOwnerHistoricalOutcomeValidation:()=>({marker:++calls.history})},

@@ -19,6 +19,13 @@ import {
 } from "../scripts/lib/tenant-ownership-policy.mjs";
 
 const ROOT = process.cwd();
+// Deployed tables outside the historical canonical-owner migration inventory.
+// Audit metadata only: these entries do not grant database or session privileges.
+const RELEASE_WRITER_TABLE_POLICIES = [
+  { table: "contribution_effects", classification: "user_owned", canonicalOwnerRolloutScope: "not_applicable" },
+  { table: "instrument_catalog", classification: "shared_reference", canonicalOwnerRolloutScope: "not_applicable" },
+  { table: "drizzle.__drizzle_migrations", classification: "admin_system", canonicalOwnerRolloutScope: "not_applicable" },
+];
 const OWNER_A = "11111111-1111-4111-8111-111111111111";
 const OWNER_B = "22222222-2222-4222-8222-222222222222";
 const DRIZZLE_DML_PATTERN = /\.(?:insert|update|delete)\s*\(/i;
@@ -27,7 +34,7 @@ const DB_IMPORT_PATTERN =
 const RAW_SQL_DML_PATTERN =
   /\b(?:insert\s+into|update\s+[a-z_\"]+\s+set|delete\s+from|truncate)\b/i;
 const RAW_CANONICAL_OWNER_DML_PATTERN =
-  /insert\s+into\s+[^()]+\([^)]*canonical_owner_user_id|update\s+[a-z_\"]+\s+set[\s\S]{0,2000}canonical_owner_user_id\s*=|canonical_owner_user_id\s*=\s*excluded\.canonical_owner_user_id/i;
+  /insert\s+into\s+[^()]+\([^)]*canonical_owner_user_id|update\s+[a-z_\"]+\s+set(?:(?!\bwhere\b)[\s\S]){0,2000}canonical_owner_user_id\s*=|canonical_owner_user_id\s*=\s*excluded\.canonical_owner_user_id/i;
 const DRIZZLE_CANONICAL_OWNER_DML_PATTERN =
   /\.(?:values|set)\s*\(\s*\{[\s\S]{0,2000}canonicalOwnerUserId\s*:/i;
 const DB_SCHEMA_IMPORT_PATTERN =
@@ -242,8 +249,8 @@ describe("tenant writer Phase 1D-A readiness", () => {
     ].sort();
 
     assert.deepEqual(registeredPaths, discoveredPaths);
-    assert.equal(TENANT_WRITER_REGISTRY.length, 47);
-    assert.equal(registeredPaths.length, 59);
+    assert.equal(TENANT_WRITER_REGISTRY.length, 51);
+    assert.equal(registeredPaths.length, 63);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,
@@ -263,7 +270,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
   it("keeps writer target classes aligned with the table ownership policy", () => {
     const policyByTable = new Map(
-      EXPANDED_TENANT_TABLE_POLICIES.map(({ table, classification }) => [
+      [...EXPANDED_TENANT_TABLE_POLICIES, ...RELEASE_WRITER_TABLE_POLICIES].map(({ table, classification }) => [
         table,
         classification,
       ]),
@@ -289,7 +296,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
   it("keeps legacy cashflow and goal writers frozen outside owner rollout", () => {
     const policyByTable = new Map(
-      EXPANDED_TENANT_TABLE_POLICIES.map((policy) => [policy.table, policy]),
+      [...EXPANDED_TENANT_TABLE_POLICIES, ...RELEASE_WRITER_TABLE_POLICIES].map((policy) => [policy.table, policy]),
     );
     const scopeCounts = Object.fromEntries(
       ["in_scope", "intentionally_skipped_legacy", "not_applicable"].map(
@@ -316,7 +323,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.deepEqual(scopeCounts, {
       in_scope: 26,
       intentionally_skipped_legacy: 1,
-      not_applicable: 20,
+      not_applicable: 24,
     });
 
     const legacyWriter = TENANT_WRITER_REGISTRY.find(
@@ -403,6 +410,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
         "cron_market_cycle_controller",
         "expired_simulation_execution_cleanup",
         "isolated_snapshot_work_operator",
+        "missing_raw_close_collection",
         "operator_investment_lab_stress_history_completion",
         "session_holding_analysis_data_preparation",
         "session_holding_onboarding",

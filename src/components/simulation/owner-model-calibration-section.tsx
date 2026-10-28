@@ -1,5 +1,7 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerModelCalibrationResult } from "@/lib/simulation-owner-model-calibration";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 type CalibrationRow =
   SimulationOwnerModelCalibrationResult["rows"][number];
@@ -28,11 +30,11 @@ export function OwnerModelCalibrationSection({
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]">
             <SimulationText ko={"같은 과거 구간에서 실제 결과와 대조"} />{" "}</p>
-          <h2
+          <CairnSectionTitle
             className="mt-1 text-lg font-semibold"
             id="owner-model-calibration-title"
           >
-            <SimulationText ko={"과거 결과로 두 모형 점검"} />{" "}</h2>
+            <SimulationText ko={"과거 결과로 두 모형 점검"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"부트스트랩과 요인·잔차 모형이 예측한 범위를 이후 21거래일의 실제 결과와 같은 조건에서 비교합니다. 숫자가 낮을수록 과거 오차가 작았다는 뜻일 뿐, 우승 모형이나 투자 추천을 정하지 않습니다."} />{" "}</p>
         </div>

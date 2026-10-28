@@ -36,7 +36,7 @@ export async function migrationManifest(root = ROOT) {
   const journal = JSON.parse(await readFile(path.join(root, 'drizzle/meta/_journal.json'), 'utf8'));
   assert.equal(journal.dialect, 'postgresql');
   assert.deepEqual(journal.entries.slice(48,54).map(entry => entry.tag), RC_TAGS, 'RC migration range changed; review this runner');
-  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability','0060_snapshot_cutoff_observations','0061_portfolio_target_plan_rows','0062_simulation_execution_rotation','0063_holdings_snapshot_revision_repair'], 'Review any migration after execution admission');
+  assert.deepEqual(journal.entries.slice(54).map(entry => entry.tag), ['0054_simulation_executions','0055_simulation_execution_admission','0056_native_tenant_mutation','0057_native_settlement_cutoff','0058_broker_recovery_evidence','0059_trade_daily_reliability','0060_snapshot_cutoff_observations','0061_portfolio_target_plan_rows','0062_simulation_execution_rotation','0063_holdings_snapshot_revision_repair','0064_contribution_effects'], 'Review any migration after execution admission');
   const seen = new Set();
   let previousTime = -1;
   return Promise.all(journal.entries.map(async (entry, position) => {
@@ -219,6 +219,11 @@ async function executeLocal(options, manifest) {
     await verifyLegacy(admin, before);
     report.cases.push({ name: 'legacy-rows-preserved', status: 'PASS' });
     assert.equal((await admin.query('SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations')).rows[0].n, manifest.length);
+    // Public reference metadata is bootstrapped by the catalog refresh, outside the Drizzle journal.
+    // Use the exact deployed DDL in this verified loopback-only disposable cluster too.
+    const catalogDdl = await readFile(path.join(ROOT, 'scripts/sql/instrument-catalog.sql'), 'utf8');
+    await admin.query(catalogDdl); await admin.query(catalogDdl);
+    report.cases.push({ name: 'shared-instrument-catalog-ddl-idempotent', status: 'PASS' });
     await admin.query(`GRANT USAGE ON SCHEMA public TO varda_tenant_app,rc_writer,rc_table_owner;
       GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO rc_writer;
       GRANT EXECUTE ON FUNCTION apply_native_portfolio_mutation(uuid,uuid,jsonb,jsonb) TO rc_writer;`);
@@ -227,6 +232,9 @@ async function executeLocal(options, manifest) {
     await admin.query('GRANT EXECUTE ON FUNCTION snapshot_cutoff_receipt_date(timestamptz),record_snapshot_cutoff_fx(text,date,numeric,timestamptz,text,timestamptz) TO rc_writer');
     worker = new Pool({ ...connection, user: 'rc_writer' });
     tenant = new Pool({ ...connection, user: 'varda_tenant_app' });
+    assert.equal((await tenant.query('select count(*)::int n from instrument_catalog')).rows[0].n, 0);
+    await assert.rejects(tenant.query('delete from instrument_catalog'), error => error.code === '42501');
+    report.cases.push({ name: 'shared-instrument-catalog-tenant-read-only', status: 'PASS' });
     if (options.sharedExecution) {
       const { runSharedProcessCases } = await import('./simulation-execution-process-cases.mjs');
       await runSharedProcessCases({ admin, connection, environment, report });

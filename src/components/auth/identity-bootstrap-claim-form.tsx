@@ -2,6 +2,8 @@
 
 import { AuthText } from "./auth-localized";
 import { useState, type FormEvent } from "react";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 const PRESENTATION_ENDPOINT =
   "/api/identity/bootstrap-claim/present";
@@ -51,9 +53,9 @@ export function IdentityBootstrapClaimForm() {
 
   return (
     <section className="mt-6 rounded-md border border-[var(--line)] bg-white p-4">
-      <h2 className="font-medium"><AuthText>{"기존 포트폴리오 연결"}</AuthText></h2>
-      <form className="mt-3 space-y-3" onSubmit={submitClaim}>
-        <label className="block text-sm font-semibold text-[var(--muted)]"><AuthText>{"안내받은 일회용 연결 코드"}</AuthText><input
+      <CairnSectionTitle className="font-medium"><AuthText>{"기존 포트폴리오 연결"}</AuthText></CairnSectionTitle>
+      <CairnForm className="mt-3 space-y-3" onSubmit={submitClaim}>
+        <CairnField className="block text-sm font-semibold text-[var(--muted)]"><AuthText>{"안내받은 일회용 연결 코드"}</AuthText><CairnInput
             name="claim"
             type="password"
             required
@@ -62,21 +64,21 @@ export function IdentityBootstrapClaimForm() {
             disabled={locked}
             className="mt-2 block w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 font-mono text-sm text-[var(--ink)] disabled:bg-[var(--paper)] disabled:text-[var(--faint)]"
           />
-        </label>
-        <button
+        </CairnField>
+        <CairnButton variant="primary"
           type="submit"
           disabled={locked}
           className="rounded-md bg-[var(--ink)] px-4 py-2 font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           <AuthText>{status === "submitting" ? "확인 중" : "연결 코드 확인"}</AuthText>
-        </button>
-      </form>
+        </CairnButton>
+      </CairnForm>
 
       {status === "submitted" ? (
-        <p role="status" className="mt-3 text-sm text-[var(--brand)]"><AuthText>{"코드가 전달되었습니다. 서버 확인 후 계정 연결 상태가 반영됩니다."}</AuthText></p>
+        <CairnStatus as="p" tone="neutral" role="status" className="mt-3 text-sm text-[var(--brand)]"><AuthText>{"코드가 전달되었습니다. 서버 확인 후 계정 연결 상태가 반영됩니다."}</AuthText></CairnStatus>
       ) : null}
       {status === "failed" ? (
-        <p role="alert" className="mt-3 text-sm text-[var(--negative)]"><AuthText>{"코드 전달 여부를 확인하지 못했습니다. 중복 제출하지 말고 운영자에게 확인해 주세요."}</AuthText></p>
+        <CairnStatus as="p" tone="danger" role="alert" className="mt-3 text-sm text-[var(--negative)]"><AuthText>{"코드 전달 여부를 확인하지 못했습니다. 중복 제출하지 말고 운영자에게 확인해 주세요."}</AuthText></CairnStatus>
       ) : null}
     </section>
   );

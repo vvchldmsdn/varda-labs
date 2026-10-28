@@ -1,7 +1,7 @@
 import "server-only";
 import { getTenantSqlClient } from "@/db/tenant-client";
 import { readNativeContributionContext } from "@/db/queries/native-contribution-context";
-import { buildNativeContributionPlan, isNativeContributionPlanId, validNativeContributionRequest, type NativeContributionRequest, type SavedNativeContributionPlan } from "@/lib/native-contribution-plan";
+import { canonicalNativeContributionRequest, buildNativeContributionPlan, isNativeContributionPlanId, validNativeContributionRequest, type NativeContributionRequest, type SavedNativeContributionPlan } from "@/lib/native-contribution-plan";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export async function listNativeContributionPlans(tenant: TenantContext, scopeKey?: string, id?: string): Promise<SavedNativeContributionPlan[]> {
@@ -14,6 +14,7 @@ export async function listNativeContributionPlans(tenant: TenantContext, scopeKe
 
 export async function saveNativeContributionPlan(tenant: TenantContext, request: NativeContributionRequest) {
   if (!validNativeContributionRequest(request)) return { status: "blocked" as const, reason: "invalid_request" };
+  request = canonicalNativeContributionRequest(request);
   const old = (await listNativeContributionPlans(tenant, undefined, request.id))[0];
   if (old) return { status: equalRequest(old.document.request, request) ? "existing" as const : "conflict" as const, plan: old };
   const context = await readNativeContributionContext(tenant, request.scopeKey, request.reportingCurrency);
@@ -33,7 +34,7 @@ export async function saveNativeContributionPlan(tenant: TenantContext, request:
   return { status: status as "created" | "existing" | "conflict" | "limit" | "inactive", basisChanged:!!request.previewEvidenceVersion && context.status==='ready' && request.previewEvidenceVersion!==context.evidenceVersion, ...(plan ? { plan } : {}) };
 }
 function equalRequest(a: NativeContributionRequest, b: NativeContributionRequest) {
-  return a.id === b.id && a.scopeKey === b.scopeKey && a.reportingCurrency === b.reportingCurrency && a.useAvailableCash === b.useAvailableCash && a.newMoney.amount === b.newMoney.amount && a.newMoney.currency === b.newMoney.currency && a.previewEvidenceVersion===b.previewEvidenceVersion;
+  return a.id === b.id && a.scopeKey === b.scopeKey && a.reportingCurrency === b.reportingCurrency && a.useAvailableCash === b.useAvailableCash && a.newMoney.amount === b.newMoney.amount && a.newMoney.currency === b.newMoney.currency && a.previewEvidenceVersion===b.previewEvidenceVersion && JSON.stringify(canonicalNativeContributionRequest(a).excludedSellKeys??[])===JSON.stringify(canonicalNativeContributionRequest(b).excludedSellKeys??[]);
 }
 export async function deleteNativeContributionPlan(tenant: TenantContext, id: string) {
   if (!isNativeContributionPlanId(id)) throw new Error("native_plan_invalid_id");

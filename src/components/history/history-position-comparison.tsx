@@ -9,6 +9,8 @@ import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 
 
 import { HistoryPositionComparisonResult } from "./history-position-comparison-result";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function HistoryPositionComparison({
   model,
@@ -40,7 +42,7 @@ export function HistoryPositionComparison({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]"><T ko="저장 스냅샷 비교" en="Compare recorded snapshots"/></p>
-          <h3 className="mt-1 text-base font-semibold tracking-normal"><T ko="두 시점 보유 변화" en="Holdings between two dates"/></h3>
+          <CairnSectionTitle level="h3" className="mt-1 text-base font-semibold tracking-normal"><T ko="두 시점 보유 변화" en="Holdings between two dates"/></CairnSectionTitle>
           <p className="mt-1 text-xs leading-5 text-[var(--muted)]"><T ko="같은 계정·출처의 두 저장점을 비교합니다. 실시간 시세나 현재 자산 정보로 과거 기록을 보완하지 않습니다." en="Compare two snapshots from the same account and source. Historical records are not supplemented with live prices or current asset information."/></p>
         </div>
         {model.selection.status !== "idle" ? (
@@ -103,11 +105,11 @@ function ComparisonForm({
         disabled={!canCompare}
       />
       <div className="flex items-end">
-        <button
+        <CairnButton variant="primary"
           type="submit"
           disabled={!canCompare}
           className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:bg-[var(--line)]"
-        ><T ko="비교" en="Compare"/></button>
+        ><T ko="비교" en="Compare"/></CairnButton>
       </div>
     </HistoryEvidenceForm>
   );

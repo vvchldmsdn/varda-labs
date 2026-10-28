@@ -1,0 +1,40 @@
+.surface {--paper:#f7f7f5;--surface:#fff;--ink:#20211f;--muted:#6c6d68;--faint:#6f706b;--line:#e1e1dc;--wash:#eeeee9;--brand:#c64623;--accent:#ef5a32;--negative:#3568ae;font-feature-settings:"cv02","cv03","cv04","cv11";min-width:0;}
+.surface.interactiveMatrix { min-width: 0; }
+.surface .matrixReadout { display: flex; align-items: center; gap: 27px; margin: 25px 0 21px; }
+.surface .matrixReadout > div > span { color: var(--muted); font-size: 9px; }
+.surface .matrixReadout p { display: flex; gap: 10px; margin-top: 5px; font-size: 15px; font-weight: 530; }
+.surface .matrixReadout i { color: var(--faint); font-style: normal; font-weight: 400; }
+.surface .matrixReadout > strong { font-size: 47px; font-weight: 450; letter-spacing: -.06em; color: var(--brand); font-variant-numeric: tabular-nums; line-height: 1; }
+.surface .matrixReadout > strong[data-negative="true"] { color: var(--negative); }
+.surface .readoutHint { color: var(--muted); font-size: 10px; margin-left: auto; }
+.surface .matrixPairNames { display: flex; flex-wrap: wrap; gap: 5px 9px; margin-top: -9px; margin-bottom: 15px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.surface .matrixPairNames > span { color: var(--faint); }
+.surface .matrixScroll { max-width: 100%; overflow-x: auto; padding: 2px 2px 9px; }
+.surface .heatmapTable { border-collapse: separate; border-spacing: 4px; width: 100%; table-layout: fixed; }
+.surface .heatmapTable th { color: var(--muted); font-size: 10px; font-weight: 500; height: 31px; padding: 0 4px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.surface .heatmapTable th:first-child { width: 77px; text-align: left; }
+.surface .heatmapTable th[data-highlight="true"] { color: var(--brand); }
+.surface .instrumentName { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; white-space:normal; word-break:keep-all; overflow-wrap:anywhere; line-height:1.4; }
+.surface .correlationCell { padding: 0; height: clamp(35px,4.1vw,58px); }
+.surface .correlationCell button { display: block; width: 100%; height: 100%; min-height: 35px; border-radius: 6px; color: var(--ink); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; border: 1px solid transparent; transition: transform 140ms, box-shadow 140ms, opacity 140ms; animation: cell-enter 280ms ease-out backwards; animation-delay: var(--cell-delay); }
+.surface .correlationCell button[data-diagonal="true"] { color: var(--faint); }
+.surface .correlationCell button[aria-pressed="true"] { position: relative; z-index: 2; transform: scale(1.06); box-shadow: 0 4px 10px rgb(32 33 31 / .13); border-color: var(--ink); }
+.surface .correlationCell button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.surface .matrixLegend { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 9px; padding: 13px 0 23px; }
+.surface .matrixLegend > i { display: block; width: 90px; height: 5px; border-radius: 5px; background: linear-gradient(90deg,var(--negative),var(--paper),var(--accent)); }
+.surface .matrixLegend b { font-size: 9px; font-weight: 500; margin-inline: 5px; }
+.surface .matrixLegend small { margin-left: auto; font-size: 9px; }
+@keyframes cell-enter { from { opacity: .15; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+@media (max-width: 760px) { .surface .readoutHint { display: none; } .surface .matrixLegend small { display: none; } }
+@media (max-width: 600px) { .surface .matrixReadout { gap: 20px; margin: 23px 0 17px; } .surface .matrixReadout > strong { margin-left: auto; font-size: 40px; } .surface .matrixReadout p { font-size: 13px; } .surface .heatmapTable { border-spacing: 3px; } .surface .heatmapTable th:first-child { width: 64px; } .surface .heatmapTable th { font-size: 9px; } .surface .correlationCell button { font-size: 10px; } .surface .matrixLegend { gap: 5px; font-size: 8px; } .surface .matrixLegend > i { width: 64px; } .surface .matrixLegend b { font-size: 8px; } }
+@media (prefers-reduced-motion: reduce) { .surface .correlationCell button { animation: none; transition: none; } .surface .correlationCell button[aria-pressed="true"] { transform: none; } }
+.surface .heatmapTable th { height:42px; }
+.surface .heatmapTable th:first-child { width:132px; }
+
+.surface .correlationCell button{font-size:12px;min-height:44px;padding:0;border-radius:6px}
+.surface .matrixReadout p{color:var(--ink)}
+.surface .matrixScroll:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.surface .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+:global([data-reduced="true"]) .surface .correlationCell button { animation:none; transition:none; }
+:global([data-reduced="true"]) .surface .correlationCell button[aria-pressed="true"] { transform:none; }

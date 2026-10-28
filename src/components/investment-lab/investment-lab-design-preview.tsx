@@ -12,6 +12,8 @@ import {
   labPercent,
   labScenarioLabel,
 } from "./investment-lab-chart-presentation";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabDesignPreview({
   query,
@@ -34,7 +36,7 @@ export function InvestmentLabDesignPreview({
       />
       <div className="varda-content varda-presentation-content varda-stage-content flex flex-col">
         <header className={styles.stageHeader}>
-          <h1 className="varda-page-title"><LabText value="투자 랩" /></h1>
+          <CairnPageTitle className="varda-page-title"><LabText value="투자 랩" /></CairnPageTitle>
           <InvestmentLabScopeTabs scopes={dashboard.analysisScopes} selectedScopeKey={dashboard.selectedScope.key} />
         </header>
         <div className={styles.workspaceSlot}>

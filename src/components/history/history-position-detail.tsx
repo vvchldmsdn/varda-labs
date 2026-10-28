@@ -20,6 +20,8 @@ import {
   HistoryTableCell as TableCell,
   HistoryTableHeader as TableHeader,
 } from "./history-evidence-primitives";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const PERCENT_FORMATTER = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 2,
@@ -49,7 +51,7 @@ export function HistoryPositionDetail({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--muted)]"><T ko="저장 포지션 근거" en="Recorded position data"/></p>
-          <h3 className="mt-1 text-base font-semibold tracking-normal"><T ko="과거 보유 상세" en="Historical holding details"/></h3>
+          <CairnSectionTitle level="h3" className="mt-1 text-base font-semibold tracking-normal"><T ko="과거 보유 상세" en="Historical holding details"/></CairnSectionTitle>
           {model.snapshotDate && model.source ? (
             <p className="mt-1 text-xs text-[var(--muted)]">
               {model.snapshotDate} · {<T ko={historyAccountLabel(model.account)} en={translateHomeHistory(historyAccountLabel(model.account))}/>} · {" "}

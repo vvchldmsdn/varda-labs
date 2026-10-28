@@ -1,5 +1,7 @@
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationRegimeHistoricalOutcomeValidationResult } from "@/lib/simulation-regime-historical-outcome-validation";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function RegimeHistoricalOutcomeValidationSection({
   result,
@@ -22,11 +24,11 @@ export function RegimeHistoricalOutcomeValidationSection({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2
+          <CairnSectionTitle
             className="text-lg font-semibold"
             id="regime-historical-outcome-title"
           >
-            <SimulationText ko={"시장 국면 모델 과거 결과 대조"} />{" "}</h2>
+            <SimulationText ko={"시장 국면 모델 과거 결과 대조"} />{" "}</CairnSectionTitle>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--muted)]">
             <SimulationText ko={"과거 각 기준일에서 이전 120개 수익률과 당시까지 공개된 시장 요인만 사용해 분포를 만든 뒤, 실제 다음 63개 서비스 기준일 결과와 비교합니다."} />{" "}</p>
           <p className="mt-1 text-sm font-medium text-[var(--ink)]">

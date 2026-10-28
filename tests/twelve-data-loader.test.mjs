@@ -100,6 +100,7 @@ describe("existing worker independently resumes the Twelve Data partition", () =
         "@/lib/market-data/fx-refresh-job": { runUsdKrwFxCandidateJob: async () => {} },
         "@/lib/market-data/provider-budget": { withKisCollectionDeadline: async callback => callback() },
         "@/lib/market-data/latest-close-revalidation": { revalidateLatestClose: async () => {} },
+        "@/lib/market-data/close-gap-sync": { syncMissingRawCloses: async () => { throw new Error("Idle worker must not run a history job"); } },
         "@/lib/market-data/twelve-data-service": { resumeConfiguredTwelveDataService: async () => { resumed++; } },
       });
       worker.scheduleMarketCollection(); assert.equal(scheduled.length, 1); assert.equal(resumed, 0);

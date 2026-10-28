@@ -171,7 +171,8 @@ describe("simple modern design system", () => {
     assert.match(read("src/components/portfolio-dashboard.tsx"), /HoldingMovementHeatmap/);
     assert.match(read("src/components/portfolio-dashboard.tsx"), /PortfolioHistoryChart/);
     assert.match(read("src/components/today-movement.tsx"), /TodayContributionExplorer/);
-    assert.match(read("src/components/history/history-view.tsx"), /HistoryTimeExplorer/);
+    assert.match(read("src/components/history/history-view.tsx"), /RecoveredHistoryExplorer/);
+    assert.match(read("src/components/recovered-return-section.tsx"), /<HistoryTimeExplorer/);
   });
 
   it("uses animated dialogs and drawers for focused evidence", () => {

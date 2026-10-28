@@ -1,0 +1,8 @@
+{
+  "source": "736f417dbc2f6ce749df4b33e13469fd88ba247d",
+  "investmentSave": "\nwith existing as materialized (\n  select input_json, engine_version from investment_plans where owner_user_id = $1::uuid and id = $2::uuid\n), inserted as (\n  insert into investment_plans(owner_user_id, id, input_json, engine_version)\n  select $1::uuid, $2::uuid, $3::jsonb, $4::varchar\n  where investment_plan_tenant_active() and not exists(select 1 from existing)\n    and (select count(*) from investment_plans where owner_user_id = $1::uuid) < 50\n  returning id\n)\nselect case\n  when not investment_plan_tenant_active() then 'inactive'\n  when exists(select 1 from inserted) then 'created'\n  when exists(select 1 from existing where input_json = $3::jsonb and engine_version = $4::varchar) then 'existing'\n  when exists(select 1 from existing) then 'conflict'\n  else 'limit' end as status",
+  "investmentList": "select id, input_json, created_at from investment_plans where owner_user_id = $1::uuid order by created_at desc, id limit 50",
+  "investmentDelete": "delete from investment_plans where owner_user_id = $1::uuid and id = $2::uuid returning id",
+  "nativeList": "select id,created_at as \"createdAt\",document_json as document from native_contribution_plans where owner_user_id=$1::uuid and ($2::text is null or scope_key=$2) and ($3::uuid is null or id=$3::uuid) order by created_at desc,id limit 20",
+  "nativeDelete": "delete from native_contribution_plans where owner_user_id=$1::uuid and id=$2::uuid returning id"
+}

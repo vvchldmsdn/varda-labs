@@ -136,10 +136,11 @@ function validNativeMutationChecked(value: unknown): value is NativeMutation {
   if (v.history && (!strictKeys(v.history, ["reason", "notInOpening", "replaces", "afterEventId"]) || v.history.notInOpening !== true || typeof v.history.reason !== "string" || !v.history.reason.trim() || v.history.reason.length > 300 || (v.history.replaces && !UUID.test(v.history.replaces)) || (v.history.afterEventId && !UUID.test(v.history.afterEventId)) || !v.event || !["buy", "sell"].includes(v.event.type) || v.newAsset)) return false;
   if (v.opening && (!strictKeys(v.opening, ["at", "cash", "positions"]) || v.expectedSequence !== null || v.newAsset)) return false;
   if (v.event) {
-    const tradeFields = ["assetId", "quantity", "price", "currency", "settlement", "executionUnitPrice", "orderUnitPrice", "fee", "tax"];
+    const tradeFields = ["assetId", "quantity", "price", "currency", "settlement", "settlementStatus", "executionUnitPrice", "orderUnitPrice", "fee", "tax"];
     const fields: Record<string, string[]> = { deposit: ["amount", "currency"], withdraw: ["amount", "currency"], dividend: ["amount", "currency", "assetId"], fee: ["amount", "currency", "assetId"], buy: tradeFields, sell: tradeFields, exchange: ["debit", "credit", "fee"], transfer: ["direction", "amount", "currency", "transferId", "peerAccountId"], split: ["assetId", "ratio"], cost_basis: ["assetId", "costLots"] };
     if (!fields[v.event.type] || !strictKeys(v.event, ["type", "at", "dateEvidence", ...fields[v.event.type]]) || v.expectedSequence === null) return false;
     if (v.event.dateEvidence && !strictKeys(v.event.dateEvidence, ["precision", "reportedDate", "timeZone", "policy"])) return false;
+    if ((v.event.type === "buy" || v.event.type === "sell") && v.event.settlementStatus !== undefined && (v.event.settlementStatus !== "unconfirmed" || v.event.settlement !== undefined)) return false;
     if (v.event.type === "buy" || v.event.type === "sell") for (const money of [v.event.settlement, v.event.executionUnitPrice, v.event.orderUnitPrice, v.event.fee, v.event.tax]) {
       if (money != null && (!strictKeys(money, ["amount", "currency"]) || typeof money.amount !== "string" || !isCurrency(money.currency))) return false;
     }

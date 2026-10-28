@@ -14,6 +14,8 @@ import type {
   PortfolioAnalysisScope,
   PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
+
 
 const SimulationTransitionContext = createContext<ReturnType<typeof useTransition> | null>(null);
 
@@ -43,7 +45,7 @@ export function SimulationLink(props: ComponentProps<typeof Link>) {
 function SimulationPendingHint() {
   const { pending } = useLinkStatus();
   return <span className={loadingStyles.pendingHint} data-simulation-link-pending={pending || undefined}>
-    {pending ? <span role="status" className="sr-only"><SimulationText ko="계산 조건을 적용하고 있습니다." en="Applying your simulation settings." /></span> : null}
+    {pending ? <CairnStatus as="span" tone="neutral" role="status" className="sr-only"><SimulationText ko="계산 조건을 적용하고 있습니다." en="Applying your simulation settings." /></CairnStatus> : null}
   </span>;
 }
 
@@ -112,7 +114,7 @@ export function SimulationDateControl() {
   const localTransition = useTransition();
   const [pending, startTransition] = useContext(SimulationTransitionContext) ?? localTransition;
   return (
-    <form
+    <CairnForm
       className="flex flex-wrap items-end gap-3"
       data-simulation-link-pending={pending || undefined}
       onSubmit={(event) => {
@@ -124,26 +126,26 @@ export function SimulationDateControl() {
         startTransition(() => router.push(`/simulation?${next}`, { scroll: false }));
       }}
     >
-      <label className="min-w-0 text-xs text-[var(--muted)]">
+      <CairnField className="min-w-0 text-xs text-[var(--muted)]">
         <span className="mb-2 flex items-center gap-2">
           <CalendarDays size={14} aria-hidden="true" />
           <SimulationText ko={"기준일"} />{" "}</span>
-        <input
+        <CairnInput
           key={params.get("end") ?? "latest"}
           type="date"
           name="end"
           defaultValue={params.get("end") ?? ""}
           className="min-h-10 max-w-full rounded border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--ink)] focus-visible:outline-[var(--brand)]"
         />
-      </label>
-      <button
+      </CairnField>
+      <CairnButton variant="primary"
         type="submit"
         disabled={pending}
         className="flex min-h-10 items-center gap-2 rounded border border-[var(--line)] px-3 text-sm hover:bg-[var(--wash)]"
       >
         <SimulationText ko={pending ? "계산 중" : "적용"} en={pending ? "Calculating" : "Apply"} />{" "}<ArrowRight size={14} aria-hidden="true" />
-      </button>
-      <button
+      </CairnButton>
+      <CairnButton variant="secondary"
         type="button"
         disabled={pending}
         className="min-h-10 text-xs text-[var(--muted)] underline underline-offset-4"
@@ -153,8 +155,8 @@ export function SimulationDateControl() {
           startTransition(() => router.push(`/simulation?${next}`, { scroll: false }));
         }}
       >
-        <SimulationText ko={"최신 공통 기준일"} />{" "}</button>
-      {pending ? <span className={loadingStyles.inlineStatus} role="status"><span className={loadingStyles.spinner} aria-hidden="true" /><SimulationText ko="새 기준으로 계산하고 있습니다." en="Recalculating for the selected cutoff." /></span> : null}
-    </form>
+        <SimulationText ko={"최신 공통 기준일"} />{" "}</CairnButton>
+      {pending ? <CairnStatus as="span" tone="neutral" className={loadingStyles.inlineStatus} role="status"><span className={loadingStyles.spinner} aria-hidden="true" /><SimulationText ko="새 기준으로 계산하고 있습니다." en="Recalculating for the selected cutoff." /></CairnStatus> : null}
+    </CairnForm>
   );
 }

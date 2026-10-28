@@ -14,6 +14,8 @@ import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { parseTenantPositionSnapshotDateQuery } from "@/lib/tenant-position-snapshot-read-model";
 import { isTenantSnapshotScope } from "@/lib/tenant-snapshot-scope";
+import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+
 
 export const dynamic = "force-dynamic";
 
@@ -72,9 +74,9 @@ export default async function TenantPositionSnapshotsPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-normal">
+            <CairnPageTitle className="mt-2 text-2xl font-semibold tracking-normal">
               Owner-scoped position snapshots
-            </h1>
+            </CairnPageTitle>
             <p className="mt-2 text-sm text-[var(--muted)]">
               Stored daily evidence authorized only through owned accounts
             </p>

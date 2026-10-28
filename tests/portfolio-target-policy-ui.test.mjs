@@ -29,6 +29,9 @@ describe("target-weight editing and navigation", () => {
         useActionState: (action, initial) => { reducer=action; persistedState ??= initial; return [persistedState,()=>{},false]; },
         useState: initial => [typeof initial === "function" ? initial() : initial,()=>{}],
         useMemo: calculate => calculate(),
+        useRef: initial => ({ current: initial }),
+        useCallback: callback => callback,
+        useEffect: () => {},
       },
     });
     const render = revision => PortfolioTargetPolicyForm({ rows: [fixtureRow()], universeHash: "same", scopeKey: scope, approvalRevision: revision });
@@ -67,7 +70,7 @@ describe("target-weight editing and navigation", () => {
       "next/navigation": { useRouter: () => ({ push: (...args) => pushes.push(args) }) },
       "@/components/portfolio/portfolio-text": { PortfolioText: () => null, usePortfolioText: () => (ko, en) => en ?? ko },
       "@/components/onboarding/instrument-search": { InstrumentSearch: () => null },
-      react: { useState: initial => [initial, () => {}], useTransition: () => [false, callback => callback()] },
+      react: { useState: initial => [initial, () => {}], useTransition: () => [false, callback => callback()], useContext: () => null },
     });
     function elements(tree) {
       if (!tree || typeof tree !== "object") return [];

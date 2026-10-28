@@ -1,5 +1,5 @@
 import { Decimal } from "./money.ts";
-import { resolveNativeTrade } from "./native-portfolio-ledger.ts";
+import { hasUnsettledTrades, resolveNativeTrade } from "./native-portfolio-ledger.ts";
 import type { TrackedPortfolioEvidence, TrackedValuationFrame, TrackedNativePosition, TrackedTrade, TrackedRealizedTrade } from "./currency-tracked-portfolio.ts";
 import type { FxEvidence } from "./currency-valuation.ts";
 import type { NativeStoredAccount, NativeStoredEntry } from "../db/queries/native-portfolio-ledger.ts";
@@ -33,6 +33,10 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
       continue;
     }
     if (state.positions.some(p => !account.assets.some(a => a.id === p.assetId && a.currency === p.currency && Decimal.from(a.quantity).compare(p.quantity) === 0 && a.archived === (Decimal.from(p.quantity).compare(0) === 0))) || account.assets.some(a => !a.archived && !state.positions.some(p => p.assetId === a.id && Decimal.from(p.quantity).compare(a.quantity) === 0))) { complete = false; realizedTradesComplete = false; continue; }
+    const unsettled = hasUnsettledTrades(state);
+    if (state.unsettledTrades?.some(trade => includesCash(account.id) || includesAsset(account.id, trade.assetId))) {
+      complete = false; realizedTradesComplete = false; flowIssue = "settlement_unconfirmed";
+    }
     for (const p of state.positions) {
       if (!includesAsset(account.id, p.assetId)) continue;
       const row = positions.find(row => row.id === p.assetId);
@@ -41,7 +45,8 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
     }
     if (includesCash(account.id) && account.active !== false) for (const currency of ["KRW", "USD"] as const) {
       positions.push({ id: `cash:${account.id}:${currency}`, ownerId: base.ownerId, accountId: account.id, name: `${account.name} · ${currency}`, kind: "cash", cost: null,
-        observation: { quantity: state.cash[currency], price: "1", currency, at: base.asOf, priceObservedAt: base.asOf, basis: "raw", source: "native_ledger_cash" } });
+        ...(unsettled ? { unsupportedReason: "cash_not_observed" } : {}),
+        observation: unsettled ? null : { quantity: state.cash[currency], price: "1", currency, at: base.asOf, priceObservedAt: base.asOf, basis: "raw", source: "native_ledger_cash" } });
     }
   }
   if (positions.some(row => row.kind !== "cash" && !row.accountId)) complete = false;
@@ -63,7 +68,7 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
   const history: TrackedValuationFrame[] = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([at, group]) => {
     // An explicitly closed, empty account stays part of historical ownership.
     // Its zero value after closure needs no invented quote or earlier quantity.
-    const closedEmpty = ledger.accounts.filter(account => !group.accounts.has(account.id) && account.active === false && account.updatedAt && Date.parse(account.updatedAt) <= Date.parse(at) && account.state && Object.values(account.state.cash).every(value => Decimal.from(value).compare(0) === 0) && account.state.positions.every(position => Decimal.from(position.quantity).compare(0) === 0));
+    const closedEmpty = ledger.accounts.filter(account => !group.accounts.has(account.id) && account.active === false && account.updatedAt && Date.parse(account.updatedAt) <= Date.parse(at) && account.state && !hasUnsettledTrades(account.state) && Object.values(account.state.cash).every(value => Decimal.from(value).compare(0) === 0) && account.state.positions.every(position => Decimal.from(position.quantity).compare(0) === 0));
     return { at, ...(group.frames.every(frame => frame.boundary === "before") ? { boundary: "before" as const } : {}), source: "native_ledger_snapshot", positions: group.frames.flatMap(frame => frame.positions), scopeComplete: group.accounts.size + closedEmpty.length === allowed.size && group.frames.every(frame => frame.scopeComplete && frame.boundary === group.frames[0].boundary) };
   }).filter(frame => frame.scopeComplete);
   const cashFlows: NonNullable<TrackedPortfolioEvidence["cashFlows"]>[number][] = [];
@@ -115,7 +120,7 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
     for (const [id, row] of all) {
       for (const frame of [baseline, current]) if (!frame.positions.some(p => p.id === id)) {
         const leg = trades.find(t => t.positionId === id);
-        const closedZero = frame === current && row.kind === "cash" && row.observation && Decimal.from(row.observation.quantity).compare(0) === 0 && ledger.accounts.some(account => account.id === row.accountId && account.active === false && account.state && Decimal.from(account.state.cash[row.observation!.currency]).compare(0) === 0);
+        const closedZero = frame === current && row.kind === "cash" && row.observation && Decimal.from(row.observation.quantity).compare(0) === 0 && ledger.accounts.some(account => account.id === row.accountId && account.active === false && account.state && !hasUnsettledTrades(account.state) && Decimal.from(account.state.cash[row.observation!.currency]).compare(0) === 0);
         if ((!leg && !closedZero) || !row.observation) { frame.scopeComplete = false; continue; }
         const zero: TrackedNativePosition = { ...row, cost: null, costLots: [], observation: { ...row.observation, quantity: "0", at: frame.at, priceObservedAt: frame.at, price: "1", source: "zero_quantity_boundary" } };
         frame.positions = [...frame.positions, zero];

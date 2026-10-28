@@ -7,6 +7,8 @@ import {
   investmentLabFixedMixBlockerLabel,
 } from "./investment-lab-fixed-mix-presentation";
 import type { InvestmentLabFixedMixComparison } from "@/lib/investment-lab-fixed-mix-comparison";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function InvestmentLabFixedMixStandardComparison({
   model,
@@ -38,7 +40,7 @@ export function InvestmentLabFixedMixStandardComparison({
       data-section="investment-lab-fixed-mix-comparison"
     >
       <div>
-        <h3 className="text-lg font-semibold"><LabText value="표준 비중 3안 비교" /></h3>
+        <CairnSectionTitle level="h3" className="text-lg font-semibold"><LabText value="표준 비중 3안 비교" /></CairnSectionTitle>
         <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><LabText value=" 세 안은 같은 실제 평가액 날짜, 가격·환율 근거와 매수·매도 금액을 사용합니다. KODEX 비중 순서로만 배치하며 성과 순위나 추천을 만들지 않습니다. " /></p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">

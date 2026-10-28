@@ -15,12 +15,14 @@ import { InvestmentLabAnchorBasket } from "./investment-lab-anchor-basket";
 import { InvestmentLabRollingComparisonView } from "./investment-lab-rolling-comparison";
 import { InvestmentLabDisclosure } from "./investment-lab-disclosure";
 import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
+import { Status as CairnStatus } from "@/components/cairn-ui";
+
 
 export default function InvestmentLabRemotePanel({ query, weights, scopeKey }: { query: string; weights: InvestmentLabWeightEvidence; scopeKey: PortfolioAnalysisScopeKey }) {
   const { data, error, retry } = useResearchDetail<InvestmentLabDetailData>("/api/research/investment-lab", query);
   if (!data) return <ResearchDetailStatus error={error} retry={retry} />;
   if (data.panel === "composition") return <div className="space-y-8 py-5">
-    {data.unavailableSections.length ? <p role="status" className="text-sm text-[var(--warning)]"><LabText value="읽지 못한 근거: " />{data.unavailableSections.join(", ")}</p> : null}
+    {data.unavailableSections.length ? <CairnStatus as="p" tone="warning" role="status" className="text-sm text-[var(--warning)]"><LabText value="읽지 못한 근거: " />{data.unavailableSections.join(", ")}</CairnStatus> : null}
     {data.stress && <InvestmentLabStressReplayView model={data.stress} accountLabels={data.accountLabels} />}
     {data.xray && <details className="border-t border-[var(--line)] py-4"><summary className="cursor-pointer text-sm font-medium"><T ko="ETF 안의 겹치는 종목 살펴보기" en="Explore overlapping ETF holdings" /></summary><div id="investment-lab-etf-xray"><InvestmentLabEtfXray model={data.xray} /></div></details>}
   </div>;

@@ -12,6 +12,8 @@ import {
   RiskTableCell,
   RiskTableHeader,
 } from "./portfolio-risk-primitives";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function RiskDataHealth({
   model,
@@ -83,12 +85,12 @@ export function RiskDataHealth({
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <div>
-          <h3 className="text-sm font-semibold"><PortfolioText ko={"차단 및 제외"} /></h3>
+          <CairnSectionTitle level="h3" className="text-sm font-semibold"><PortfolioText ko={"차단 및 제외"} /></CairnSectionTitle>
           <BlockerList blockers={inputHealth.blockers} />
           <ExclusionTable exclusions={inputHealth.exclusions} />
         </div>
         <div>
-          <h3 className="text-sm font-semibold"><PortfolioText ko={"Source 집계"} /></h3>
+          <CairnSectionTitle level="h3" className="text-sm font-semibold"><PortfolioText ko={"Source 집계"} /></CairnSectionTitle>
           <SourceCounts
             title="Price"
             sources={inputHealth.sourceRows.price.sources}

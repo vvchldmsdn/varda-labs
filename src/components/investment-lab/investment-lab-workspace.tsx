@@ -22,8 +22,10 @@ import {
   X,
 } from "lucide-react";
 import styles from "./investment-lab-modern.module.css";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
-const RemotePanel = dynamic(() => import("./investment-lab-remote-panel"), { loading: () => <p role="status" className="py-10 text-sm"><LabText value="상세 분석을 불러오고 있습니다." /></p> });
+
+const RemotePanel = dynamic(() => import("./investment-lab-remote-panel"), { loading: () => <CairnStatus as="p" tone="neutral" role="status" className="py-10 text-sm"><LabText value="상세 분석을 불러오고 있습니다." /></CairnStatus> });
 
 type LabOverlay = InvestmentLabPanel;
 
@@ -72,16 +74,16 @@ export function InvestmentLabWorkspace({
       <div className={styles.canvas}>{showFirstSteps ? <InvestmentLabFirstSteps scopeKey={scopeKey} onOpenPanel={openOverlay} /> : comparison}</div>
 
       {!showFirstSteps ? <div className={styles.launchers}>
-        <button className={styles.launcher} onClick={() => openOverlay("weights")} type="button">
+        <CairnButton variant="secondary" className={styles.launcher} onClick={() => openOverlay("weights")} type="button">
           <SlidersHorizontal aria-hidden="true" size={22} strokeWidth={1.6} />
           <span><strong><LabText value="비중 실험" /></strong><span className="sr-only"><LabText value="자산 비중을 바꾸고 실제 경로와 비교해 보세요." /></span></span>
           <ArrowUpRight aria-hidden="true" size={18} />
-        </button>
-        <button className={styles.launcher} onClick={() => openOverlay("composition")} type="button">
+        </CairnButton>
+        <CairnButton variant="secondary" className={styles.launcher} onClick={() => openOverlay("composition")} type="button">
           <Layers3 aria-hidden="true" size={22} strokeWidth={1.6} />
           <span><strong><LabText value="구성 분석" /></strong><span className="sr-only"><LabText value="포트폴리오 구성과 종목 간 노출을 살펴보세요." /></span></span>
           <ArrowUpRight aria-hidden="true" size={18} />
-        </button>
+        </CairnButton>
       </div> : null}
       <p className={styles.stageFootnote}><LabText value="과거 기록과 가정의 비교입니다. 투자 추천이나 실제 주문으로 이어지지 않습니다." /></p>
 
@@ -101,9 +103,9 @@ export function InvestmentLabWorkspace({
           <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
             <div>
               <p className="varda-kicker">LAB WORKSPACE</p>
-              <h2 className="mt-1 text-xl font-medium" id={titleId}>
+              <CairnSectionTitle className="mt-1 text-xl font-medium" id={titleId}>
                 <LabText value={activeTitle} />
-              </h2>
+              </CairnSectionTitle>
             </div>
             <LocalizedElement as="button"
               aria-label="닫기"

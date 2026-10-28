@@ -4,8 +4,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { sqlClient } from "@/db/client";
 const requestDeadline = new AsyncLocalStorage<number>();
 
-export function withKisCollectionDeadline<T>(task: () => Promise<T>) {
-  return requestDeadline.run(Date.now() + 45_000, task);
+export function withKisCollectionDeadline<T>(task: () => Promise<T>, budgetMs=45_000) {
+  return requestDeadline.run(Math.min(requestDeadline.getStore()??Infinity,Date.now()+Math.max(0,Math.min(125_000,budgetMs))), task);
 }
 
 export class KisProviderBudgetError extends Error {

@@ -12,6 +12,8 @@ import type {
   InvestmentLabPreperiodOptimizerCandidate,
 } from "@/lib/investment-lab-preperiod-optimizer";
 import type { InvestmentLabOptimizerObjective } from "@/lib/investment-lab-preperiod-optimizer-math";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 const OBJECTIVES: readonly Readonly<{
   id: InvestmentLabOptimizerObjective;
@@ -54,7 +56,7 @@ export function InvestmentLabPreperiodOptimizerView({
               <p className="text-[11px] font-medium text-[var(--muted)]">
                 OBJECTIVE LAB
               </p>
-              <h2 className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" 과거 학습 비중 실험 " /></h2>
+              <CairnSectionTitle className="mt-2 text-lg font-medium sm:text-xl"><LabText value=" 과거 학습 비중 실험 " /></CairnSectionTitle>
               <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--muted)]"><LabText value=" 비교 시작일 이전의 공통 가격 60개 수익률만으로 비중 후보를 만들고, 이후 실제 기간에는 같은 입출금과 리밸런싱하지 않는 조건으로 비교합니다. 수동 평가 종목은 시작 비중을 유지합니다. " /></p>
             </div>
             <p className="text-sm font-semibold text-[var(--muted)]">
@@ -72,7 +74,7 @@ export function InvestmentLabPreperiodOptimizerView({
                 role="group" en={{"aria-label": labEnglish("비중 후보 선택")}}
               >
                 {OBJECTIVES.filter(objective => model.candidates.some(row => row.objective === objective.id)).map((objective) => (
-                  <button
+                  <CairnButton variant="selection"
                     aria-pressed={candidate.objective === objective.id}
                     className={`min-h-10 border-b-2 px-1 py-2 text-sm font-semibold ${
                       candidate.objective === objective.id
@@ -84,7 +86,7 @@ export function InvestmentLabPreperiodOptimizerView({
                     type="button"
                   >
                     <LabText value={objective.label} />
-                  </button>
+                  </CairnButton>
                 ))}
               </LocalizedElement>
             </div>

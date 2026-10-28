@@ -7,6 +7,8 @@ import { ManualKrxGoldPriceForm } from "@/components/manual-krx-gold-price-form"
 import { isKrxGoldManualAssetCandidate } from "@/lib/market-data/manual-asset-price";
 import type { HoldingAnalysisDataReadiness } from "@/lib/holding-analysis-data-readiness";
 import type { TenantHoldingDto } from "@/lib/tenant-holding-read-model";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+
 
 export function HoldingsManagementList({ holdings, analysisDataByHolding, nativeAccounts = [] }: {
   holdings: readonly TenantHoldingDto[];
@@ -20,7 +22,7 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
       {!active.length ? <p className="py-8 text-sm text-[var(--muted)]"><T ko="이 범위에 현재 보유 중인 종목이 없습니다." en="There are no current holdings in this scope." /></p> : active.map(holding => <article key={holding.holdingId} className="min-w-0 py-6" data-holding-management={holding.holdingId}>
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(230px,.7fr)] lg:gap-10">
           <div className="min-w-0">
-            <h2 className="break-words text-lg font-medium">{holding.name}</h2>
+            <CairnSectionTitle className="break-words text-lg font-medium">{holding.name}</CairnSectionTitle>
             <p className="mt-1 break-words text-xs leading-5 text-[var(--muted)]">{holding.accountName} · {holding.ticker ?? <T ko="티커 없음" en="No ticker" />} · <MarketLabel market={holding.market} /> / {holding.currency}</p>
             <dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
               <div><dt className="text-xs text-[var(--muted)]"><T ko="보유 수량" en="Quantity" /></dt><dd className="mt-1 break-words font-medium tabular-nums">{formatStoredNumber(holding.quantity)}</dd></div>
@@ -55,10 +57,10 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
       </article>)}
     </div>
     {archived.length ? <section className="mt-8">
-      <h2 className="text-lg font-medium"><T ko="종료된 보유종목" en="Closed holdings" /> <span className="text-[var(--muted)]">{archived.length}</span></h2>
+      <CairnSectionTitle className="text-lg font-medium"><T ko="종료된 보유종목" en="Closed holdings" /> <span className="text-[var(--muted)]">{archived.length}</span></CairnSectionTitle>
       <p className="mt-2 text-sm text-[var(--muted)]"><T ko="현재 평가에서 제외되며 수량·매입원가·과거 기록은 보존됩니다." en="Excluded from current valuation; quantity, cost and historical records are preserved." /></p>
       <div className="mt-4 divide-y divide-[var(--line)]">{archived.map(holding => <article key={holding.holdingId} className="grid min-w-0 gap-4 py-5 sm:grid-cols-[minmax(0,1fr)_230px]">
-        <div className="min-w-0"><h3 className="break-words font-medium">{holding.name}</h3><p className="mt-1 break-words text-xs text-[var(--muted)]">{holding.accountName} · {holding.ticker ?? "—"}</p><p className="mt-2 text-xs"><T ko="보유 수량" en="Quantity" /> {formatStoredNumber(holding.quantity)}</p><p className="mt-1 text-xs text-[var(--muted)]"><T ko="종료 시각" en="Closed at" /> {formatStoredTimestamp(holding.archivedAt)}</p></div>
+        <div className="min-w-0"><CairnSectionTitle level="h3" className="break-words font-medium">{holding.name}</CairnSectionTitle><p className="mt-1 break-words text-xs text-[var(--muted)]">{holding.accountName} · {holding.ticker ?? "—"}</p><p className="mt-2 text-xs"><T ko="보유 수량" en="Quantity" /> {formatStoredNumber(holding.quantity)}</p><p className="mt-1 text-xs text-[var(--muted)]"><T ko="종료 시각" en="Closed at" /> {formatStoredTimestamp(holding.archivedAt)}</p></div>
         {nativeAccounts.some(account => account.code === holding.accountCode) ? <NativeLedgerNotice accountId={nativeAccounts.find(account => account.code === holding.accountCode)?.id} assetId={holding.holdingId} action="buy" /> : <HoldingRestoreForm holdingId={holding.holdingId} updatedAt={holding.updatedAt} />}
       </article>)}</div>
     </section> : null}
