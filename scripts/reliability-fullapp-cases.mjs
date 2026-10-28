@@ -285,8 +285,8 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       const firstDate = page.getByRole('button', { name: /^2026\.08\.04 이전 저장점 대비/ });
       const secondDate = page.getByRole('button', { name: /^2026\.08\.05 이전 저장점 대비/ });
       const cells = await firstDate.evaluate(element => {
-        const cell = element.getBoundingClientRect();
-        return { width: cell.width, height: cell.height };
+        // Measure layout, not the parent dialog's opening scale animation.
+        return { width: element.offsetWidth, height: element.offsetHeight };
       });
       assert.equal(cells.width, 17, 'Calendar cells must retain their chart width');
       assert.equal(cells.height, 17, 'Form button minimum height must not overlap adjacent dates');
