@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { sqlClient } from "@/db/client";
-import { MARKET_COLLECTION_POLICY, normalizeCollectionJobs, type CollectionInput, type CollectionJob } from "@/lib/market-data/collection-policy";
+import { MARKET_COLLECTION_POLICY, normalizeCollectionJobs, type CollectionInput, type CollectionJob, type CollectionLane } from "@/lib/market-data/collection-policy";
 
 export type ClaimedCollectionJob = CollectionJob & { claimToken: string; attempts: number };
 export type CollectionPartition = { provider: "kis"; rawCloses?: boolean; historyOnly?: boolean } | { provider: "twelve_data"; scopeHash: string };
@@ -60,9 +60,12 @@ async function enqueueJobs(jobs: readonly CollectionJob[]) {
   return { queuedCount: jobs.length, retryAfterSeconds: MARKET_COLLECTION_POLICY.pollAfterSeconds };
 }
 
-export async function claimMarketCollection(partition: CollectionPartition = KIS_PARTITION): Promise<ClaimedCollectionJob | null> {
+export async function claimMarketCollection(partition: CollectionPartition = KIS_PARTITION, preferredLane: CollectionLane = "all"): Promise<ClaimedCollectionJob | null> {
+  if (!["all", "quotes", "history"].includes(preferredLane)) throw new Error("collection_lane_invalid");
+  // A preference never widens a licensed provider or a dedicated history partition.
+  const lane = partition.provider === "kis" && !partition.historyOnly && !partition.rawCloses ? preferredLane : "all";
   const claimToken = randomUUID();
-  const rows = await sqlClient.query(CLAIM_SQL, [claimToken, MARKET_COLLECTION_POLICY.jobLeaseSeconds, MARKET_COLLECTION_POLICY.maximumAttempts, partitionPrefix(partition)]);
+  const rows = await sqlClient.query(CLAIM_SQL, [claimToken, MARKET_COLLECTION_POLICY.jobLeaseSeconds, MARKET_COLLECTION_POLICY.maximumAttempts, partitionPrefix(partition), lane]);
   const row = rows[0];
   if (!row) return null;
   return { key: String(row.key), kind: row.kind as CollectionJob["kind"], ticker: String(row.ticker),
@@ -148,7 +151,9 @@ const CLAIM_SQL = `with candidate as (
     (status = 'pending' and available_at <= now() or status = 'running' and leased_until <= now())
     and attempts < $3::integer
     and starts_with(key,$4)
-  order by enqueued_at - case when kind in ('live','fx') then interval '30 seconds' else interval '0 seconds' end, key
+  order by case when $5='quotes' and kind in ('live','fx') or $5='history' and kind='history' then 0 when $5='all' then 0 else 1 end,
+    (case when starts_with(key,'kis:') then greatest(enqueued_at,available_at) else enqueued_at end)
+      - case when kind in ('live','fx') then interval '30 seconds' else interval '0 seconds' end, key
   for update skip locked limit 1
 ) update market_collection_jobs q set status='running', claim_token=$1::uuid,
   leased_until=clock_timestamp()+make_interval(secs=>$2::integer), attempts=q.attempts+1, updated_at=clock_timestamp()

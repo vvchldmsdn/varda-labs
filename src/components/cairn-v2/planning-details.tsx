@@ -1,5 +1,6 @@
 "use client";
 import { RecoveryNotice } from '@/components/recovery/recovery-notice';
+import { ContributionNextSteps } from '@/components/additional-contribution/contribution-journey';
 import { betaHref } from '@/lib/cairn-v2/navigation';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, FormActions as CairnFormActions, Status as CairnStatus } from "@/components/cairn-ui";
 
@@ -68,7 +69,7 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
       <p className={styles.muted}>읽기 전용 계산 · 실제 주문/매도/거래 저장 없음 · 수수료·세금·체결 단위 미반영</p>
 
       {view.domain?.planning?.targets.rows.some(row=>row.plannedOnly) && <p className={styles.muted}>미보유 계획 종목은 현재 보유액 0으로 계산합니다. 가격·MA 근거가 없는 경우 기존 엔진의 보류·조정 규칙을 따릅니다.</p>}
-      <p><a href={`/additional-contribution/compare?${new URLSearchParams({ scope: context.scope, amount: String(result.cashAmountKrw), currency: 'KRW', from: 'beta' })}`}>비율 매수와 환율·MA120 조정 효과 비교 →</a></p>
+      {available && <ContributionNextSteps journey={{scope:context.scope,amount,currency:'KRW',beta:true,excludeSell:excludedSales}} />}
       <AdditionalContributionAllocationTable preview={result}/>
 
       <details className={styles.planningEvidence} onToggle={event => { if (event.target === event.currentTarget) setEvidenceOpen(event.currentTarget.open); }}><summary tabIndex={0}>정책 식별·상세 합계·원가/MA 근거</summary>      <div className={styles.planningTableViewport}><table className={styles.planningTable}><caption>기존 B 엔진의 종목별 결과 · KRW</caption><thead><tr><th>종목</th><th>계산 구분</th><th>매수 배분</th><th>계산상 매도</th><th>투입 후 비중</th></tr></thead><tbody>{result.rows.map((row,i) => <tr key={row.accountCode+":"+row.ticker+":"+i}><th>{row.ticker ?? row.name}<small>{row.name} · {row.accountName}</small></th><td>{row.action === "buy" ? "매수 계산" : row.action === "trim" ? "축소 계산" : "유지"}<small>{row.trimReason==="user_sale_excluded"?"매도 제외 · 이번 계산":row.action}</small></td><td>{krw(row.allocationKrw)}</td><td>{krw(row.trimAmountKrw)}</td><td>{row.postTopupWeightPct.toFixed(2)}%</td></tr>)}</tbody></table></div>      <p className={styles.muted}>{result.policyLabel} · {result.source === "legacy_account_policy" ? "구형 계좌 정책" : "현재 승인 정책"} · {result.policyVersion} · revision {read?.approvalRevision ?? "구형 정책 계약에 없음"}<br />적용일 {result.effectiveServiceDate} · 평가 기준일 {result.serviceDate}</p><p className={styles.muted}>총 배분 재원 {krw(result.totalAvailableFundsKrw)}원 · 계산상 매도대금 {krw(result.totalTrimProceedsKrw)}원 · 투입 후 총액 · 현금 포함 {krw(result.postTopupTotalKrw)}원</p>      <p className={styles.muted}>투입 후 비중의 분모는 {krw(result.postTopupTotalKrw)}원이며 남는 현금도 포함합니다.</p><div>{result.rows.map((row,i) => <details key={row.accountCode+":"+i}><summary tabIndex={evidenceOpen ? 0 : -1}>{row.ticker ?? row.name} · 원가/MA/보류 근거</summary><dl className={styles.holdingNumbers}>

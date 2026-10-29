@@ -9,6 +9,8 @@ import { compareContribution, evaluateContributionScenario, type ComparisonBasis
 import type { Currency } from '@/lib/money';
 import styles from './contribution-comparison.module.css';
 import { ContributionEffectTracking, type EffectTrackingProps } from './contribution-effect-tracking';
+import { ContributionJourneyNav } from './contribution-journey';
+import { comparisonDraftQuery, type ComparisonDraft } from '@/lib/contribution-journey';
 
 const won = (n: number) => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(n);
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${won(Math.abs(n))}`;
@@ -21,22 +23,24 @@ const cases = [
   { name: '달러 약세', price: 0, fx: -5 },
 ] as const;
 
-export function ContributionComparisonView({ basis, initialAmount = '1000000', initialCurrency = 'KRW', preview = false, backHref, tracking }: {
-  basis: ComparisonBasisResult; initialAmount?: string; initialCurrency?: Currency; preview?: boolean; backHref: string; tracking?: EffectTrackingProps;
+export function ContributionComparisonView({ basis, initialAmount = '1000000', initialCurrency = 'KRW', preview = false, backHref, tracking, initialDraft }: {
+  basis: ComparisonBasisResult; initialAmount?: string; initialCurrency?: Currency; preview?: boolean; backHref: string; tracking?: EffectTrackingProps; initialDraft?: ComparisonDraft;
 }) {
   const router = useRouter();
   const [amount, setAmount] = useState(initialAmount);
   const [currency, setCurrency] = useState<Currency>(initialCurrency);
-  const [price, setPrice] = useState('0');
-  const [fx, setFx] = useState('0');
-  const [horizon, setHorizon] = useState('30');
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [price, setPrice] = useState(initialDraft?.price ?? '0');
+  const [fx, setFx] = useState(initialDraft?.fx ?? '0');
+  const [horizon, setHorizon] = useState(initialDraft?.horizon ?? '30');
+  const [overrides, setOverrides] = useState<Record<string, string>>(initialDraft?.overrides ?? {});
   const backQuery = new URLSearchParams(backHref.split('?')[1] ?? '');
   const scope = backQuery.get('scope') ?? 'all';
   const beta = backHref.startsWith('/beta?') || backHref === '/beta';
-  const recoveryQuery = new URLSearchParams({ scope, amount, currency, ...(beta ? { from: 'beta' } : {}), ...(preview ? { preview: 'design' } : {}) });
+  const scenarioDraft = comparisonDraftQuery({ horizon, price, fx, overrides });
+  const journey = { scope, amount, currency, beta, preview };
+  const recoveryQuery = new URLSearchParams({ scope, amount, currency, ...scenarioDraft, ...(beta ? { from: 'beta' } : {}), ...(preview ? { preview: 'design' } : {}) });
   const returnHref = `/additional-contribution/compare?${recoveryQuery}`;
-  const recoveryDraft = { amount, currency };
+  const recoveryDraft = { amount, currency, ...scenarioDraft };
   const comparison = useMemo(() => basis.status === 'ready' ? compareContribution(basis, amount, currency) : basis, [basis, amount, currency]);
   const rowPricePct = Object.fromEntries(Object.entries(overrides).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, Number(value)]));
   const valid = price.trim() !== '' && fx.trim() !== '';
@@ -45,6 +49,7 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
   return <div className={styles.content} id="varda-main-content">
     <a href={backHref} className={styles.back}>← 추가투입으로 돌아가기</a>
     <header className={styles.header}><div><p className={styles.eyebrow}>CONTRIBUTION / COMPARE</p><PageTitle>같은 투자금, 다른 배분</PageTitle><p className={styles.lead}>비율대로 샀을 때와 환율·이동평균선을 반영했을 때를 비교해 보세요.</p></div><span className={styles.badge}>가정 비교 · 실제 성과 아님</span></header>
+    <ContributionJourneyNav journey={journey} current="compare" returnHref={returnHref} />
     {preview && <Status>화면 검증용 예시 데이터입니다. 실제 계좌와 연결되지 않습니다.</Status>}
     {basis.status !== 'ready' ? basis.reason === 'choose_one_account' ? <Status tone="warning">비교할 계좌를 위에서 선택해 주세요. 계좌 사이의 자금 이동은 계산하지 않습니다.</Status> : <RecoveryNotice reasons={[basis.reason]} scope={scope} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={() => router.refresh()} details={`${reasonLabel(basis.reason)}${basis.unavailableHoldings?.length ? ` 확인 필요: ${basis.unavailableHoldings.join(', ')}.` : ''}`} /> : <>
       <div className={styles.context}>{basis.scopeLabel}<span>기준 {new Date(basis.asOf).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false })} KST</span><span>목표비중 승인 {basis.policyRevision}차</span></div>
@@ -85,7 +90,7 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
         <footer className={styles.method}><SectionHeading title="이 비교의 기준" /><p>현재 보유 평가액은 배분의 부족분을 계산할 때만 사용합니다. 결과는 새 투자금과 보류금의 가치이며 계좌 전체 수익률이 아닙니다.</p><p>같은 시점에 소수점 단위로 매수했다고 가정합니다. 매도·보유 현금 사용·다른 위험 조정·최소 집행 보충은 제외한 비교용 배분이므로 실제 전체 추천안과 다를 수 있습니다. 확인할 수 없는 환율·MA120 계수는 적용하지 않습니다.</p><p>배분은 원 단위로 계산하고 1원 미만 환산 잔액은 보류금에 포함합니다. 표시 금액은 각각 반올림하므로 표시된 합계나 차이에 1원 차이가 생길 수 있습니다.</p><p>수수료·세금·배당·환전 스프레드·현금 이자·실제 주문 단위는 반영하지 않습니다. 직접 입력한 시나리오는 가정입니다. 아래에서 배분안을 저장하면 이후 확인된 시세와 실제 매수 기록을 연결해 볼 수 있습니다.</p></footer>
       </>}
     </>}
-    {tracking && <ContributionEffectTracking tracking={tracking} amount={amount} currency={currency} evidenceVersion={basis.status === "ready" ? basis.evidenceVersion : undefined} canCalculate={comparison.status === "ready"} />}
+    {tracking && <ContributionEffectTracking key={`${tracking.sessionKey}:${tracking.accountId}`} tracking={tracking} journey={journey} amount={amount} currency={currency} evidenceVersion={basis.status === "ready" ? basis.evidenceVersion : undefined} canCalculate={comparison.status === "ready"} />}
   </div>;
 }
 

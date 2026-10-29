@@ -1,4 +1,5 @@
 export type CollectionKind = "live" | "history" | "fx";
+export type CollectionLane = "all" | "quotes" | "history";
 export type CollectionInput = Readonly<{
   kind: CollectionKind; ticker: string; market: string; currency: string;
   startDate?: string; endDate?: string;
@@ -12,6 +13,7 @@ export const MARKET_COLLECTION_POLICY = Object.freeze({
   maximumEnqueueTargets: 40, maximumWorkerJobs: 5, workerBudgetMs: 40_000,
   jobLeaseSeconds: 180, maximumAttempts: 6, historyWindowDays: 90,
   pollAfterSeconds: 10, maximumPendingJobs: 10_000,
+  quoteClaimsBeforeHistory: 2,
 } as const);
 
 /** No accounts, quantities, owner identifiers or provider credentials enter this queue. */

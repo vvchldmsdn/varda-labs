@@ -80,6 +80,12 @@
 .tracking { display: grid; gap: 24px; border-top: 1px solid var(--line); padding-top: 40px; }
 .tracking > button { justify-self: start; }
 .trackingRecord { display: grid; gap: 24px; padding: 28px 0; border-top: 1px solid var(--line); }
+.trackingRecord[data-selected=true] { border-top-color:var(--brand); }
+.recordActions { display:flex; flex-wrap:wrap; align-items:center; gap:12px 24px; font-size:13px; }
+.recordActions a { padding:10px 0; text-decoration:underline; text-underline-offset:4px; }
+.accountChoices { display:flex; flex-wrap:wrap; gap:8px; margin:24px 0; }
+.accountChoices a { border:1px solid var(--line); border-radius:999px; padding:10px 14px; font-size:13px; }
+.accountChoices a[aria-current=page] { background:var(--ink); color:var(--paper); }
 .actualResult { display: grid; gap: 20px; border-left: 2px solid var(--accent); padding: 8px 0 8px 24px; }
 .tradeChoices { display: grid; gap: 4px; margin-bottom: 20px; }
 .tradeChoices label { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); cursor: pointer; }

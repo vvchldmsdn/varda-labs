@@ -1,11 +1,11 @@
 'use client';
 import { carryRecoveryFragment } from '@/lib/recovery-navigation';
-import { RecoveryBackLink } from '@/components/recovery/recovery-return';
+import { RecoveryBackLink, RecoveryJourneyLink } from '@/components/recovery/recovery-return';
 import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { DetailHeader } from './ui/molecules';
-import Link from 'next/link';
+
 import {useCallback,useLayoutEffect,useMemo,useRef,useState,useTransition,type FormEvent} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {saveBetaTargetPolicy} from '@/app/beta/portfolio/targets/actions';
@@ -34,7 +34,7 @@ export function BetaTargetEditor({read}:{read:TargetEditorRead}){
  const navigate=(next:typeof context)=>{current.current='navigation';setNotice(null);startTransition(()=>router.push(carryRecoveryFragment(targetEditorHref(next,store?.pendingEpoch()),location.hash),{scroll:false}));};
  return <div style={{display:'contents'}} onClickCapture={event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=(event.target as Element).closest?.('a[href]') as HTMLAnchorElement|null;if(link&&link.target!=='_blank'){const next=new URL(link.href,location.href);if(next.pathname+next.search!==location.pathname+location.search)current.current='navigation';}}}><BetaShell context={context} setContext={navigate} readView={shell} workspace="targets" originalPath="/portfolio/targets">
   <section className={styles.workspace} id="target-editor" data-target-editor-state={blocked?'loading':read.state} aria-busy={blocked}>
-   <DetailHeader title="목표비중" headingProps={{ref:heading,tabIndex:-1}} actions={<><Link prefetch={false} href={href('/beta/portfolio/structure')}>포트 구조 ↗</Link><RecoveryBackLink href={href('/beta','#beta-contribution')}>추가 투자 계산 ↗</RecoveryBackLink><a href={originalHref('/portfolio/targets',context)}>기존 목표 화면 ↗</a></>} />
+   <DetailHeader title="목표비중" headingProps={{ref:heading,tabIndex:-1}} actions={<><RecoveryJourneyLink prefetch={false} href={href('/beta/portfolio/structure')}>포트 구조 ↗</RecoveryJourneyLink><RecoveryBackLink href={href('/beta','#beta-contribution')}>추가 투자 계산 ↗</RecoveryBackLink><RecoveryJourneyLink prefetch={false} href={originalHref('/portfolio/targets',context)}>기존 목표 화면 ↗</RecoveryJourneyLink></>} />
    <CairnStatus as="p" role="status">{blocked?'사용자·조회 범위를 다시 확인하는 중':read.message}</CairnStatus>
    {!blocked&&<p className={styles.muted}>분석·평가 기준 KRW · 조회 통화 {context.currency}와 별개입니다. 기준일 {read.serviceDate??'—'} · 승인본 {read.approvalRevision} · {read.policyStatus==='available'?'승인 목표':read.startingWeightSource==='current_allocation_starting_point'?'현재 비중에서 시작한 미승인 입력':'승인 근거 확인 필요'}</p>}
    {readable&&read.policyStatus!=='available'&&<p className={styles.warning}>현재 승인 목표로 적용할 수 없는 상태입니다. 편집 시작값을 승인 목표로 표시하지 않습니다. 근거: {read.policyStatus}</p>}

@@ -4,7 +4,6 @@ import { TENANT_LIVE_PRICE_SYNC_POLICY } from "../src/lib/market-data/tenant-liv
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
 const WINDOW_MS = TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds;
-const STORAGE_KEY = "varda:live-price-sync:last-bucket";
 
 describe("Today navigation refresh wiring", () => {
   it("activates shared automatic quote checks on direct Today entry and labels view time honestly", async () => {
@@ -28,10 +27,43 @@ describe("Today navigation refresh wiring", () => {
     assert.equal(today.find(element => element.type === RefreshButton).props.autoSync, true, "Today must refresh without visiting Home first");
     assert.equal(render({ activePath: "/history" }).find(element => element.type === RefreshButton).props.autoSync, true);
     assert.equal(render({ activePath: "/simulation" }).find(element => element.type === RefreshButton).props.autoSync, false);
+    assert.equal(render({ activePath: "/", autoSyncPrices: true }).find(element => element.type === RefreshButton).props.autoSync, true);
+    assert.equal(render({ activePath: "/" }).find(element => element.type === RefreshButton).props.autoSync, false, "Legacy home retains its separate refresh consumer");
     assert.match(today.find(element => element.props?.className === "varda-updated-at").props.children, /^View refreshed /);
     locale = "ko";
     assert.match(render({}).find(element => element.props?.className === "varda-updated-at").props.children, /^화면 갱신 /);
     assert.equal(render({ generatedAt: undefined }).some(element => element.type === RefreshButton), false);
+  });
+  it("connects native/KRW and USD surfaces using their actual read time while keeping fixtures and missing evidence inert",async()=>{
+    const Navigation=()=>null;
+    let params=new URLSearchParams();
+    const [component]=await importUiWithPorts(["src/components/currency-portfolio-surface-client.tsx"],{
+      "next/link":{default:()=>null},
+      "next/navigation":{useSearchParams:()=>params},
+      "@/components/app-navigation":{AppNavigation:Navigation},
+      "@/components/recovered-return-chart":{RecoveredReturnChart:()=>null},
+      "@/components/portfolio-analysis-scope-tabs":{PortfolioAnalysisScopeTabs:()=>null},
+      "@/components/currency-tracked-view":{CurrencyTrackedView:()=>null},
+      "@/components/currency-research-view":{CurrencyResearchView:()=>null},
+      "@/components/recovery/recovery-notice":{RecoveryNotice:()=>null},
+      "@/components/i18n/locale-provider":{useI18n:()=>({t:(ko)=>ko})},
+    });
+    const elements=tree=>!tree||typeof tree!=="object"?[]:Array.isArray(tree)?tree.flatMap(elements):[tree,...elements(tree.props?.children)];
+    const evidence={asOf:"2026-10-29T02:59:00.000Z",reporting:"KRW",current:{at:"2026-10-29T02:59:00.000Z",source:"owned_native_asset_and_kis_quote"}};
+    const props={evidence,scopes:[],selectedScope:{kind:"all",key:"all",label:"All"}};
+    const navigation=overrides=>elements(component.CurrencyPortfolioSurfaceClient({...props,...overrides})).find(element=>element.type===Navigation).props;
+    for(const currency of ["KRW","USD"]){
+      for(const surface of ["home","today","history"]){
+        const nav=navigation({surface,evidence:{...evidence,reporting:currency}});
+        assert.equal(nav.generatedAt,evidence.asOf,"Read time is not replaced with a quote timestamp or the render clock");
+        assert.equal(nav.autoSyncPrices,true);
+      }
+    }
+    assert.equal(navigation({surface:"structure"}).autoSyncPrices,false);
+    assert.equal(navigation({surface:"today",evidence:undefined}).generatedAt,undefined);
+    assert.equal(navigation({surface:"today",evidence:{...evidence,current:{...evidence.current,source:"synthetic_fixture"}}}).generatedAt,undefined);
+    params=new URLSearchParams("preview=design");
+    assert.equal(navigation({surface:"today"}).generatedAt,undefined);
   });
 });
 
@@ -151,7 +183,15 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 describe("portfolio refresh lifecycle", () => {
-  it("checks once on visible mount and once per later bucket without growing storage", async test => {
+  it("rejoins pending collection after leaving and returning in the same freshness bucket", async test => {
+    const h=await refreshHarness(test,{responseState:'queued'});
+    const first=h.mount();h.runMountTimer();await settle();
+    assert.equal(h.states.at(-1),'queued');
+    first.unmount();h.mount();h.runMountTimer();await settle();
+    assert.equal(h.requests.length,2);
+    assert.equal(h.states.at(-1),'queued','the new page must regain the state that enables its poller');
+  });
+  it("checks each visible entry and later bucket without retaining another page or session state", async test => {
     const h = await refreshHarness(test);
     const first = h.mount();
     assert.equal(h.requests.length, 0);
@@ -165,19 +205,18 @@ describe("portfolio refresh lifecycle", () => {
       method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: { reason: "page_view" },
     });
     assert.equal(h.requests[0].url, "/api/portfolio/live-prices/sync");
-    assert.equal(h.storage.get(STORAGE_KEY), h.bucket);
+    assert.equal(h.storage.size, 0);
     h.focus(); h.visibilityChange(); h.runInterval();
     await settle();
     assert.equal(h.requests.length, 1);
     first.unmount();
     h.mount(); h.runMountTimer();
     await settle();
-    assert.equal(h.requests.length, 1, "a route remount in the same tab and bucket must not send another automatic request");
+    assert.equal(h.requests.length, 2, "a route remount must read current readiness and resume queued work");
     h.advanceBucket(); h.runInterval();
     await settle();
-    assert.equal(h.requests.length, 2);
-    assert.equal(h.storage.size, 1);
-    assert.equal(h.storage.get(STORAGE_KEY), h.bucket);
+    assert.equal(h.requests.length, 3);
+    assert.equal(h.storage.size, 0);
   });
 
   it("skips hidden checks without consuming the bucket and catches up once on return or focus", async test => {

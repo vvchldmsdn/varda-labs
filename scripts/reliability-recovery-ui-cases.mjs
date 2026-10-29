@@ -31,6 +31,17 @@ async function captureWidths(page, output, name, focus) {
     await focus.scrollIntoViewIfNeeded();
     await expect(focus).toBeInViewport();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${name}: overflow at ${width}px`);
+    if (width <= 390 && await page.locator('.varda-topbar').count()) {
+      const header = await page.locator('.varda-topbar').evaluate(bar => {
+        const location = bar.querySelector('.varda-topbar-location')?.getBoundingClientRect();
+        const actions = bar.querySelector('.varda-topbar-actions')?.getBoundingClientRect();
+        const currency = bar.querySelector('.cairn-currency-select button > span');
+        return { separated: !location || !actions || location.right <= actions.left,
+          readableCurrency: !currency || currency.scrollWidth <= currency.clientWidth };
+      });
+      assert.equal(header.separated, true, `${name}: overlapping mobile header at ${width}px`);
+      assert.equal(header.readableCurrency, true, `${name}: clipped currency at ${width}px`);
+    }
     await page.screenshot({ path: path.join(output, `${name}-${width}.png`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });

@@ -7,3 +7,6 @@
 .savedActions button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; cursor: pointer; }
 .savedActions button:disabled { opacity: .5; cursor: wait; }
 .savedRow a:focus-visible, .savedActions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.accounts { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+.accounts a { border:1px solid var(--line); border-radius:999px; padding:10px 14px; font-size:13px; }
+.accounts a[aria-current=page] { background:var(--ink); color:var(--paper); }

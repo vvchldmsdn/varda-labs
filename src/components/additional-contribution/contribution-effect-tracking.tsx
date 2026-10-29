@@ -1,6 +1,8 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { contributionJourneyHref, contributionTradeHref, savedEffectFundingAmount, type ContributionJourney } from '@/lib/contribution-journey';
 import { Button, Checkbox, EmptyState, Field, Metric, MetricGroup, SectionHeading, Status } from '@/components/cairn-ui';
 import type { ContributionEffectView } from '@/db/queries/contribution-effects';
 import { parseMoneyInput, type Currency } from '@/lib/money';
@@ -13,46 +15,70 @@ const date = (at: string) => new Date(at).toLocaleDateString('ko-KR', { timeZone
 export function effectReason(reason: string) {
   return ({ trades_not_linked: '실제 매수 기록을 선택해 연결하면 체결 기준 성과를 확인할 수 있습니다.', execution_fx_missing: '체결일 환율이 없어 실제 매수 성과 계산을 보류했습니다.', subsequent_disposal: '연결된 종목에 이후 매도 또는 분할이 있습니다. 매도 수량의 귀속을 확정하기 전까지 실제 성과를 보류합니다.', split_requires_rebase: '주식 분할 이후 가격 기준을 다시 맞춰야 합니다.', budget_exceeded: '연결한 체결금액이 저장한 투자금을 초과합니다. 해당 투입의 거래만 선택해 주세요.', trade_unavailable: '취소·수정된 거래 또는 저장 이전 거래가 포함되어 연결을 다시 확인해야 합니다.', basis_changed: '가격이나 목표비중이 바뀌었습니다. 새로고침 후 배분안을 확인하고 저장해 주세요.', entry_quote_missing: '일부 종목의 진입 가격이 없어 사후 추적을 시작할 수 없습니다.', link_conflict: '이미 다른 추적에 연결된 거래이거나 기록이 변경됐습니다. 새로고침해 주세요.', save_conflict_or_limit: '기록이 변경됐거나 저장 한도에 도달했습니다. 새로고침 후 확인해 주세요.', quote_unavailable: '현재 가격 근거가 부족해 비교를 보류했습니다.', price_or_fx_unavailable: '가격·환율 근거가 부족해 비교를 보류했습니다.', market_incomplete: '현재 평가 근거를 확인 중입니다.', account_changed: '로그인 계정이 변경됐습니다. 새로고침해 주세요.' } as Record<string, string>)[reason] ?? '지금은 저장할 수 없습니다. 입력을 유지했으니 새로고침 후 다시 시도해 주세요.';
 }
-export function ContributionEffectTracking({ tracking, amount, currency, evidenceVersion, canCalculate }: { tracking: EffectTrackingProps; amount: string; currency: Currency; evidenceVersion?: string; canCalculate: boolean }) {
+export function ContributionEffectTracking({ tracking, amount, currency, evidenceVersion, canCalculate, journey }: { tracking: EffectTrackingProps; amount: string; currency: Currency; evidenceVersion?: string; canCalculate: boolean; journey: ContributionJourney }) {
   const router = useRouter(), pendingId = useRef<{ key: string; id: string } | null>(null);
+  const lock = useRef(false);
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   async function save() {
+    if (lock.current || !canCalculate || tracking.unavailable) return;
     if (tracking.preview) { setMessage('예시 모드에서는 저장하지 않습니다. 실제 화면에서는 현재 배분안과 진입 가격을 저장합니다.'); return; }
     const normalizedAmount = parseMoneyInput(amount, currency);
     if (normalizedAmount === null || normalizedAmount <= 0) return;
     const key = `${normalizedAmount}:${currency}:${evidenceVersion}`;
     if (pendingId.current?.key !== key) pendingId.current = { key, id: crypto.randomUUID() };
-    setBusy(true); setMessage('');
+    lock.current = true; setBusy(true); setMessage('');
     try {
       const response = await fetch('/api/contribution-effects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionKey: tracking.sessionKey, id: pendingId.current.id, accountId: tracking.accountId, amount: String(normalizedAmount), currency, evidenceVersion }) });
       const result = await response.json();
       if (!response.ok) setMessage(effectReason(result.reason));
-      else { setMessage('배분안을 저장했습니다. 이후 기록한 매수를 연결해 주세요.'); pendingId.current = null; router.refresh(); }
-    } catch { setMessage(effectReason('unavailable')); } finally { setBusy(false); }
+      else if ((result.status === 'created' || result.status === 'existing') && result.id === pendingId.current.id) { pendingId.current = null; router.push(contributionJourneyHref('tracking', journey, result.id)); }
+      else setMessage(effectReason('unavailable'));
+    } catch { setMessage(effectReason('unavailable')); } finally { lock.current = false; setBusy(false); }
   }
-  return <section className={styles.tracking} aria-label="추가투입 사후 추적">
-    <SectionHeading title="이번 선택, 나중에 다시 확인" description="배분안과 현재 가격을 저장한 뒤, 실제 매수 기록을 연결하세요. 다음 방문에는 확인된 시세로 비교합니다." />
-    <Button disabled={busy || !canCalculate || (!evidenceVersion && !tracking.preview) || tracking.unavailable} onClick={save}>{busy ? '저장 중…' : '이 배분안으로 추적 시작'}</Button>
+  return <section className={styles.tracking} id="save-allocation" aria-label="추가투입 사후 추적">
+    <SectionHeading title="03. 배분안을 저장하고 매수를 연결하세요" description="현재 조건의 두 배분안과 진입 가격을 보관합니다. 위에서 입력한 미래 시나리오는 실제 성과로 저장하지 않습니다." />
+    <Button disabled={busy || !canCalculate || (!evidenceVersion && !tracking.preview) || tracking.unavailable} onClick={save}>{busy ? '저장 중…' : '배분안 저장하고 계속'}</Button>
     {message && <Status>{message}</Status>}
-    {tracking.unavailable ? <Status tone="warning">저장한 추적 기록을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</Status> : tracking.items.length === 0 ? <EmptyState title="아직 저장한 비교가 없어요" description="현재 가격과 배분안을 지금부터 보관합니다. 과거 추천을 소급해 만들지는 않습니다." /> : tracking.items.map(item => <EffectRecord key={`${item.id}:${item.revision}`} item={item} tracking={tracking} />)}
+    {tracking.unavailable && <Status tone="warning">저장한 추적 기록을 불러오지 못했습니다. 다시 조회한 뒤 저장해 주세요.</Status>}
+    <Link prefetch={false} href={contributionJourneyHref('tracking', journey)}>저장한 배분안 {tracking.unavailable ? '' : `${tracking.items.length}건`} 다시 확인 →</Link>
     <p className={styles.note}>동일 시작 가격으로 계산한 두 배분안의 차이와 실제 체결 결과는 별개입니다. 실제 결과에는 체결 시점·가격 차이도 포함되므로 환율·MA120만의 효과로 단정하지 않습니다. 수수료·세금·배당·현금 이자는 제외합니다. 남은 투자금은 비교용 보류금이며 실제 계좌 현금이 아닙니다.</p>
   </section>;
 }
-function EffectRecord({ item, tracking }: { item: ContributionEffectView; tracking: EffectTrackingProps }) {
+
+export function ContributionEffectLibrary({ tracking, journey, selectedId }: { tracking: EffectTrackingProps; journey: ContributionJourney; selectedId?: string }) {
   const router = useRouter();
+  const [refreshing, startRefresh] = useTransition();
+  const selected = tracking.items.find(item => item.id === selectedId);
+  const items = selected ? [selected, ...tracking.items.filter(item => item.id !== selectedId)] : tracking.items;
+  return <section className={styles.tracking} aria-label="저장 배분안 목록">
+    <div className={styles.recordActions}><Link prefetch={false} href={contributionJourneyHref('compare', journey)}>새 배분안 비교·저장 ↗</Link><Button variant="secondary" disabled={refreshing} onClick={() => startRefresh(() => router.refresh())}>{refreshing ? '다시 조회 중…' : '현재 시세·거래 다시 조회'}</Button></div>
+    {tracking.unavailable ? <Status tone="warning">저장 기록을 불러오지 못했습니다. 다시 조회해 주세요.</Status> : <>
+      {selectedId && !selected && <Status tone="warning">선택한 배분안을 이 계좌에서 찾지 못했습니다. 아래 저장 기록을 확인해 주세요.</Status>}
+      {!items.length ? <EmptyState title="아직 저장한 배분안이 없어요" description="배분 비교에서 두 매수안을 저장한 뒤 실제 매수 기록을 연결할 수 있습니다." /> : items.map(item => <EffectRecord key={`${tracking.sessionKey}:${item.id}:${item.revision}`} item={item} tracking={tracking} journey={journey} selected={item.id === selectedId} />)}
+    </>}
+  </section>;
+}
+
+function EffectRecord({ item, tracking, journey, selected: active = false }: { item: ContributionEffectView; tracking: EffectTrackingProps; journey: ContributionJourney; selected?: boolean }) {
+  const router = useRouter();
+  const lock = useRef(false);
   const [selected, setSelected] = useState(item.tradeIds), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const result = item.result;
   async function link() {
+    if (lock.current) return;
     if (tracking.preview) { setMessage('예시 거래입니다. 실제 금융 기록은 변경하지 않습니다.'); return; }
-    setBusy(true); setMessage('');
+    lock.current = true; setBusy(true); setMessage('');
     try {
       const response = await fetch('/api/contribution-effects', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionKey: tracking.sessionKey, id: item.id, accountId: tracking.accountId, revision: item.revision, tradeIds: selected }) });
       const data = await response.json();
       if (!response.ok) setMessage(effectReason(data.reason)); else { setMessage('체결 연결을 저장했습니다.'); router.refresh(); }
-    } catch { setMessage(effectReason('unavailable')); } finally { setBusy(false); }
+    } catch { setMessage(effectReason('unavailable')); } finally { lock.current = false; setBusy(false); }
   }
-  return <article className={styles.trackingRecord}>
+  return <article className={styles.trackingRecord} id={`effect-${item.id}`} aria-label={`저장 배분안 ${date(item.createdAt)}`} data-selected={active}>
     <SectionHeading title={`${date(item.createdAt)} · ${amountText(item.document.comparison.budget)}원`} description={`목표비중 승인 ${item.document.comparison.basis.policyRevision}차 · ${item.document.comparison.funding} 투자금 · 저장 당시 배분 유지`} />
+    <p className={styles.note}>{item.tradeIds.length ? `실제 매수 ${item.tradeIds.length}건 연결됨` : '다음 단계: 증권사에서 체결한 매수를 기록하고 아래에서 선택해 주세요.'}</p>
+    <div className={styles.recordActions}>{!tracking.preview && <Link prefetch={false} href={contributionTradeHref(journey, item.id)}>매수 기록하러 가기 ↗</Link>}<Link prefetch={false} href={contributionJourneyHref('compare', { ...journey, amount: savedEffectFundingAmount(item.document.comparison), currency: item.document.comparison.funding })}>현재 조건으로 새 비교 ↗</Link></div>
+    <details className={styles.details}><summary>저장 당시 두 배분안 보기</summary><p className={styles.note}>기준 {date(item.document.capturedAt)} · {item.document.comparison.basis.scopeLabel} · 이후 목표·가격 변경을 소급 적용하지 않습니다.</p><div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>종목</th><th>비율 매수 · 원</th><th>조정 매수 · 원</th></tr></thead><tbody>{item.document.comparison.basis.rows.map(row => <tr key={row.allocationKey}><th>{row.metadata.name}</th><td>{amountText(item.document.comparison.ratio.amounts[row.allocationKey] ?? 0)}</td><td>{amountText(item.document.comparison.adjusted.amounts[row.allocationKey] ?? 0)}</td></tr>)}<tr><th>비교용 보류금</th><td>{amountText(item.document.comparison.ratio.cash)}</td><td>{amountText(item.document.comparison.adjusted.cash)}</td></tr></tbody></table></div></details>
     {result.status === 'ready' ? <>
       <MetricGroup><Metric label="비율 매수 가정" value={`${amountText(result.ratio)}원`} note={`${result.ratioReturnPct.toFixed(2)}%`} /><Metric label="조정 매수 가정" value={`${amountText(result.adjusted)}원`} note={`${result.adjustedReturnPct.toFixed(2)}%`} /><Metric label="같은 조건에서의 차이" value={`${signed(result.gap)}원`} /></MetricGroup>
       <p className={styles.note}>부족비중 반영 {signed(result.alignmentEffect)}원 + 환율·MA120 조정 {signed(result.adjustmentEffect)}원 · 평가 {date(result.asOf)}</p>

@@ -77,16 +77,11 @@ export function PortfolioRefreshButton({
     const check = () => {
       if (document.visibilityState !== "visible") return;
       const bucket = Math.floor(Date.now() / TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds);
-      const key = "varda:live-price-sync:last-bucket";
       if (lastBucket === bucket) return;
       lastBucket = bucket;
-      try {
-        if (window.sessionStorage.getItem(key) === String(bucket)) return;
-        // Keep one bucket and tolerate browsers that disable session storage.
-        window.sessionStorage.setItem(key, String(bucket));
-      } catch {
-        // The effect-local bucket still prevents duplicate focus/visibility requests.
-      }
+      // A new page must rejoin queued collection and resolve its current session.
+      // Tab-wide suppression lost the pending poller on original/beta navigation.
+      // Concurrent mounts still share the request; the server coalesces fresh quotes.
       void sync("page_view");
     };
     const timeout = window.setTimeout(check, 0);

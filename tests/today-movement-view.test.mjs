@@ -47,6 +47,38 @@ describe("today exclusion account labels", () => {
   });
 });
 
+describe("today selected holding trade evidence",()=>{
+  it("renders unknown net trades as missing, preserves confirmed zero, and never derives a value from an unknown flow",async()=>{
+    const [view,locale,fixture]=await importUiWithPorts([
+      "src/components/today-movement.tsx","src/components/i18n/locale-provider.tsx","src/lib/home-design-preview.ts",
+    ],{
+      "next/link":{default:({children,href})=>createElement("a",{href},children)},
+      "@/components/portfolio-primary-navigation":{PortfolioPrimaryNavigation:()=>null},
+      "@/components/portfolio-analysis-scope-tabs":{PortfolioAnalysisScopeTabs:()=>null},
+      "@/components/today/today-contribution-explorer":{TodayContributionExplorer:()=>null},
+      "@/components/today/selected-holding-history-chart":{SelectedHoldingHistoryChart:()=>null},
+      "@/components/today/holding-detail-drawer":{HoldingDetailDrawer:({children})=>createElement("aside",{"data-test-selected-holding":true},children)},
+      "@/components/presentation/presentation-dialog":{PresentationDialog:()=>null},
+    });
+    const data=fixture.buildHomeDesignPreview();
+    const holding={...data.holdings[0],dailyChangeKrw:100,previousCloseValueKrw:1000};
+    const original={...data.todayMovement.contributionRows.find(row=>row.holdingId===holding.id),holdingId:holding.id,previousValueKrw:1000,changeKrw:100};
+    const detailQuery={holdingAccount:holding.account,ticker:holding.ticker,market:holding.market};
+    const render=flow=>{
+      const props={...data,holdings:[holding],todayMovement:{...data.todayMovement,contributionRows:flow===null?[]:[{...original,tradeFlowKrw:flow}]}};
+      const before=structuredClone(props);
+      const html=renderToStaticMarkup(createElement(locale.LocaleProvider,{initialLocale:"ko"},createElement(view.TodayMovement,{data:props,detailQuery})));
+      assert.deepEqual(props,before,"Presentation must not alter stored financial evidence");
+      const selected=html.slice(html.indexOf('<aside data-test-selected-holding="true">'));
+      const field=label=>selected.match(new RegExp(`<dt[^>]*>${label}</dt>\\s*<dd[^>]*>([^<]+)</dd>`))?.[1];
+      return {flow:field("순매매"),value:field("현재 비교 평가액")};
+    };
+    assert.deepEqual(render(null),{flow:"-",value:"-"});
+    assert.deepEqual(render(0),{flow:"₩0",value:"₩1,100"});
+    assert.deepEqual(render(200),{flow:"+₩200",value:"₩1,300"});
+  });
+});
+
 describe("today quote retrieval evidence", () => {
   const now = "2026-09-10T03:37:00.000Z";
   const holding = (overrides = {}) => ({ movementEligible: true, currency: "KRW", currentPrice: 100, priceStatus: "ok", priceFetchedAt: "2026-09-10T03:36:00.000Z", priceAsOf: "2026-09-09T06:30:00.000Z", ...overrides });

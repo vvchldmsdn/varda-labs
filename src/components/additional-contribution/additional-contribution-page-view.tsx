@@ -8,6 +8,7 @@ import { ArrowUpRight, Target } from "lucide-react";
 import { AdditionalContributionAllocationTable, AdditionalContributionFlowScene, AdditionalContributionWeightScene } from "./additional-contribution-result";
 import { AdditionalContributionLogicDialog } from "./additional-contribution-logic-dialog";
 import { ContributionAdjustmentDialog } from "./contribution-adjustment-dialog";
+import { ContributionNextSteps } from './contribution-journey';
 import type { ContributionMarketContext } from "@/lib/contribution-market-context";
 import { ContributionCalculator, ContributionFundingVisual, ContributionTargetAction, type ContributionTargetActionKind } from "./contribution-calculator";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
@@ -59,7 +60,7 @@ export function AdditionalContributionPageView({ amountKrw, enableLivePriceSync 
           {preview.status === "ready" ? <>
             <dl className={styles.footerNumbers}><div><dt><PortfolioText ko={"총 매수"} /></dt><dd>{formatKrw(preview.totalAllocatedKrw)}</dd></div><div><dt><PortfolioText ko={"남는 현금"} /></dt><dd>{formatKrw(preview.residualCashKrw)}</dd></div></dl>
             <div className={styles.detailActions}>
-              <Link className={styles.textLink} href={`/additional-contribution/compare?${new URLSearchParams({ scope: selectedScope.key, amount: String(amountKrw), ...(!enableLivePriceSync ? { preview: 'design' } : {}) })}`}>추가투입 효과 비교 <ArrowUpRight size={14} aria-hidden="true" /></Link>
+              <PresentationDialog label="계획 저장·매수 연결" labelEn="Save a plan & link buys" title="계산 다음 단계" titleEn="Continue after calculating"><ContributionNextSteps journey={{scope:selectedScope.key,amount:String(amountKrw),currency:'KRW',preview:!enableLivePriceSync,excludeSell:excludedSellKeys}} /></PresentationDialog>
               <PresentationDialog label={`전체 ${preview.rows.length}종목 배분`} labelEn={portfolioEnglish(`전체 ${preview.rows.length}종목 배분`)} title="종목별 전체 배분안" titleEn={portfolioEnglish("종목별 전체 배분안")} description={`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`} descriptionEn={portfolioEnglish(`현재 평가액 ${formatKrw(preview.currentPortfolioTotalKrw)} · ${preview.policyLabel} · 가격 기준일 ${preview.serviceDate}`)} wide><AdditionalContributionAllocationTable preview={preview} /><p className={styles.modalNote}><PortfolioText ko={"목표 부족분과 MA120 근거를 반영한 계산입니다. 남는 재원은 현금으로 유지됩니다. MA120"} />{" "}<PortfolioText ko={preview.ma120Evidence.mode === "off" ? "미적용" : `${preview.ma120Evidence.usableCount}/${preview.rows.length}종목 근거 확보${preview.ma120Evidence.status === "ready" ? "" : " · 일부 근거 부족"}`} />.</p><Link className={styles.textLink} href={buildPortfolioAnalysisScopeHref("/portfolio/holdings", selectedScope.key)}><PortfolioText ko={"보유 종목 관리"} />{" "}<ArrowUpRight size={13} aria-hidden="true" /></Link></PresentationDialog>
               <AdditionalContributionLogicDialog preview={preview} />
               <ContributionAdjustmentDialog preview={preview} context={marketContext} />

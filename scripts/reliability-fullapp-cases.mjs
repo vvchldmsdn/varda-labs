@@ -276,6 +276,21 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     });
     await runContributionUiCases({page,check,admin,owner:other,account:otherAccount,asset:otherAsset,url,output});
+    await check('fullapp-journey-owner-refresh-clears-prior-plan-client-state', async () => {
+      const isPlanRead=r=>new URL(r.url()).pathname==='/api/native-contribution-plans'&&new URL(r.url()).searchParams.get('scope')==='all'&&r.request().method()==='GET';
+      const priorRead=page.waitForResponse(isPlanRead);
+      await page.goto(url + '/additional-contribution/plan?scope=all&currency=KRW');
+      const priorSession=(await (await priorRead).json()).sessionKey;
+      const planner=page.getByRole('region',{name:'추가 투자 계획',exact:true});
+      await expect(planner.getByRole('navigation',{name:'투자할 계좌 선택'})).toContainText('Synthetic KRW');
+      await setIdentity(sessionTokens[0]);
+      const nextRead=page.waitForResponse(isPlanRead);
+      await page.evaluate(()=>window.dispatchEvent(new Event('cairn-fullapp-refresh')));
+      assert.notEqual((await (await nextRead).json()).sessionKey,priorSession,'Owner change must reload client data, not just navigation labels');
+      await expect(planner.getByRole('navigation',{name:'투자할 계좌 선택'})).toContainText('Synthetic USD');
+      await expect(planner.getByRole('heading',{name:'저장한 계획',exact:true})).not.toBeVisible();
+      await expect(planner).not.toContainText('Synthetic KRW');
+    });
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
       await page.goto(url + '/history?scope=account%3A' + legacyAccount);
@@ -358,7 +373,34 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.unroute('**/api/portfolio/live-prices/sync');
     });
     await runLegacyContributionUiCase({page,check,admin,owner:legacyOwner,account:legacyAccount,asset:legacyAsset,url,output});
+    await check('fullapp-beta-home-resumes-shared-quote-refresh-after-navigation', async()=>{
+      await setIdentity(sessionTokens[0]);
+      const calls=[];
+      await page.route('**/api/portfolio/live-prices/sync', async route=>{
+        const reason=route.request().postDataJSON().reason;
+        calls.push(reason);
+        await route.fulfill({status:reason==='poll'?200:202,contentType:'application/json',body:JSON.stringify({state:reason==='poll'?'fresh':'queued'})});
+      });
+      for(const width of [1440,390,320]){
+        await page.setViewportSize({width,height:844});
+        const prior=calls.length;
+        await page.goto(url+'/beta?mode=domain&scope=account%3A'+account+'&currency=USD');
+        const refresh=page.getByRole('button',{name:'실시간 시세 갱신',exact:true});
+        await expect(refresh).toBeEnabled();
+        await expect.poll(()=>calls.length).toBeGreaterThan(prior);
+        assert.equal(calls[prior],'page_view');
+        await expect(refresh).toHaveAttribute('title',/보유 종목/);
+        const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/portfolio/live-prices/sync'&&r.request().postDataJSON().reason==='poll');
+        await response;
+        const manual=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/portfolio/live-prices/sync'&&r.request().postDataJSON().reason==='manual');
+        await refresh.click();await manual;
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        await page.screenshot({path:path.join(output,`beta-quote-refresh-${width}.png`),fullPage:true});
+      }
+      await page.unroute('**/api/portfolio/live-prices/sync');
+    });
     await check('fullapp-target-explicit-zero-refresh-and-stale-tab-save',async()=>{
+      await setIdentity(sessionTokens[2]);
       const secondAsset=randomUUID(),c=await admin.connect();
       try {
         await c.query('BEGIN');await c.query("select set_config('app.trade_reliability_version','0059',true)");
@@ -447,6 +489,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
       const ctx = { ownerUserId: other, role: 'user' };
       const before = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
+      const expectedBuy = (await admin.query('select ($1::numeric + 0.010709)::text as quantity',[before.positions[0].quantity])).rows[0].quantity;
       for (const action of ['buy', 'sell']) {
         await page.goto(url + `/portfolio/ledger?accountId=${otherAccount}&assetId=${otherAsset}&action=${action}`);
         await page.getByLabel('체결 수량', { exact: true }).fill('0.010709');
@@ -455,7 +498,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
         await expect(page.getByText('기록했어요. 홈에서 변경된 보유 정보를 확인할 수 있어요.', { exact: true })).toBeVisible();
         const after = (await ledger.readNativeLedger(ctx, otherAccount)).accounts[0].state;
         assert.deepEqual(after.cash, before.cash, 'Execution-only records must not invent cash settlement');
-        assert.equal(after.positions[0].quantity, action === 'buy' ? '10.010709' : before.positions[0].quantity);
+        assert.equal(after.positions[0].quantity, action === 'buy' ? expectedBuy : before.positions[0].quantity);
       }
     });
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',

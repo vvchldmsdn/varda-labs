@@ -51,11 +51,12 @@ function PendingHint() {
   return <span className="varda-link-pending" data-pending={pending || undefined} aria-hidden="true" />;
 }
 
-export function AppNavigation({ activePath, generatedAt, selectedScopeKey, researchHref }: {
+export function AppNavigation({ activePath, generatedAt, selectedScopeKey, researchHref, autoSyncPrices }: {
   activePath?: string;
   generatedAt?: string;
   selectedScopeKey?: PortfolioAnalysisScopeKey;
   researchHref?: string;
+  autoSyncPrices?: boolean;
 }) {
   const {t, locale} = useI18n();
   const pathname = usePathname();
@@ -86,7 +87,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
 
   function isActive(href: string) {
     if (href === currentPath) return true;
-    if (href === "/additional-contribution" && currentPath === "/additional-contribution/compare") return true;
+    if (href === "/additional-contribution" && ["/additional-contribution/plan", "/additional-contribution/compare", "/additional-contribution/tracking"].includes(currentPath)) return true;
     if (href === "/portfolio/structure" && ["/portfolio/risk", "/etfs"].includes(currentPath)) return true;
     return href === "/portfolio/manage" && (
       currentPath.startsWith("/admin/") ||
@@ -148,7 +149,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           </nav>
           {preview ? <span className="varda-topbar-preview"><i />{t("예시 데이터")}</span>
             : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `View refreshed ${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `화면 갱신 ${formatKstTime(generatedAt)}`}</span> : null}
-          {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={currentPath === "/history" || currentPath === "/today"} /> : null}
+          {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={autoSyncPrices ?? (currentPath === "/history" || currentPath === "/today")} /> : null}
           {!researchHref && !preview && REPORTING_ROUTES.some(route => route === currentPath) ? <ReportingCurrencySwitch /> : null}
           <span className="varda-topbar-language"><LanguageSwitch /></span>
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)}>
