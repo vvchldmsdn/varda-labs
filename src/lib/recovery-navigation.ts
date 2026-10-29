@@ -1,6 +1,6 @@
 /** UI continuations only. Every destination still admits scope and ownership itself. */
 const paths = new Set([
-  '/', '/additional-contribution', '/additional-contribution/compare', '/history', '/today',
+  '/', '/additional-contribution', '/additional-contribution/compare', '/additional-contribution/plan', '/additional-contribution/tracking', '/history', '/today',
   '/portfolio/risk', '/portfolio/structure', '/portfolio/targets', '/portfolio/holdings',
   '/portfolio/holdings/new', '/portfolio/first-look', '/portfolio/ledger', '/portfolio/events', '/portfolio/accounts',
   '/portfolio/manage', '/portfolio/portfolio-snapshots', '/simulation', '/investment-lab', '/market', '/plans',
@@ -10,7 +10,7 @@ const paths = new Set([
   '/beta/history/events', '/beta/history/snapshots', '/beta/portfolio/accounts', '/beta/portfolio/accounts/manage', '/beta/plans', '/beta/etfs', '/etfs',
 ]);
 const fields = new Set(['scope', 'account', 'accountId', 'currency', 'amount', 'cashAmountKrw',
-  'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window',
+  'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window', 'effectId', 'pricePct', 'fxPct', 'scenarioRows', 'action',
   'horizon', 'end', 'start', 'period', 'metric', 'date', 'analysis', 'run', 'kodexWeight', 'basketAnchor', 'q', 'asOfDate',
   'view', 'detail', 'model', 'range', 'selectedDate', 'historyDate', 'historyPeriod', 'historyMetric', 'historySource',
   '_historyDate', '_historyPeriod', '_historyMetric', '_historyScope', '_historyCurrency', '_historyReturn', '_historyDateBasis',

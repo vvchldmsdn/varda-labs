@@ -39,7 +39,13 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
       const session = createKisProviderRequestSession();
       const provider = createKisMarketDataProvider(session);
       while (processed < Math.min(40,options.maximumJobs??MARKET_COLLECTION_POLICY.maximumWorkerJobs) && Date.now() < deadline) {
-        const job = await claimMarketCollection(partition);
+        // Give interactive quotes/FX the first turns, then offer history a turn.
+        // The queue falls back immediately when a preferred lane has no ready work.
+        // Provider failures/deadlines still stop this wake; this is not a quota guarantee.
+        const preferredLane = partition.provider === "kis" && !partition.historyOnly && !partition.rawCloses
+          ? processed % (MARKET_COLLECTION_POLICY.quoteClaimsBeforeHistory + 1) === MARKET_COLLECTION_POLICY.quoteClaimsBeforeHistory ? "history" : "quotes"
+          : "all";
+        const job = await claimMarketCollection(partition, preferredLane);
         if (!job) break;
         let terminal = false, failureCode = "provider_unavailable";
         let ok = false, cacheHit = false, deferred = false, retryAfterSeconds = collectionRetrySeconds(job.attempts);
@@ -91,7 +97,7 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
         }
         await finishMarketCollection(job, { ok, deferred, terminal, code: ok ? cacheHit ? "cache_fresh" : "collected" : deferred && failureCode!=="history_finalization_pending" ? "provider_budget_wait" : failureCode, retryAfterSeconds: ok ? 0 : retryAfterSeconds });
         processed++; if (!ok) failed++; if (cacheHit) cacheHits++;
-        // One failed provider operation yields fairly instead of probing every queued symbol.
+        // One failed provider operation yields instead of probing every queued symbol.
         if (!ok && failureCode!=="history_finalization_pending") break;
       }
     },budgetMs));

@@ -21,6 +21,7 @@ import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { fixtureNotice, fixtureScopes } from "@/lib/cairn-v2/fixtures";
 import { BetaDialog, type ExpansionOrigin } from "./beta-dialog";
 import { useBetaPreferences, useBetaReadFreshness, useBetaExistingCrudAvailable } from "./beta-provider";
+import { PortfolioRefreshButton } from '@/components/home/portfolio-refresh-button';
 import styles from "./beta.module.css";
 import tokens from "./ui/tokens.module.css";
 import controls from "./workspace-controls.module.css";
@@ -90,6 +91,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
         <CairnPageTitle>{presentation?.title ?? (workspace ? workspace === "history" ? "기록 / 히스토리" : workspace === "ledger" ? "기록 / 거래·현금" : workspace === "plans" ? "계획 / 저장된 투자계획" : workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "lab" ? "분석 / 과거 비교" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
         <CairnButton variant="bare" className={styles.scopeTrigger} type="button" aria-haspopup="dialog" aria-expanded={!!scopeOrigin} onClick={(e) => { setSearch(""); setScopeOrigin({ rect: e.currentTarget.getBoundingClientRect(), trigger: e.currentTarget }); }}>{selectedScope.label}<span aria-hidden>⌄</span></CairnButton>
         <div className={styles.topbarActions}>
+          {!workspace && context.mode === 'domain' && existingCrudAvailable && <PortfolioRefreshButton autoSync compact />}
           {!workspace && readUnavailable && <CairnButton variant="bare" className={styles.retryRead} type="button" onClick={() => router.refresh()}>조회 다시 시도</CairnButton>}
         <CairnField className={styles.currency}><span className={styles.visuallyHidden}>표시 통화</span><CairnSelect aria-label="표시 통화" value={context.currency} onChange={(e) => setContext({ ...context, currency: e.target.value === "USD" ? "USD" : "KRW" })}><option>KRW</option><option>USD</option></CairnSelect></CairnField>
         <CairnButton variant="bare" className={controls.mobileSettingsTrigger} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></CairnButton>

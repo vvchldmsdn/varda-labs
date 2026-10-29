@@ -353,11 +353,11 @@ function HoldingDetailPanel({
   const fxImpactKrw = contribution?.fxChangeKrw ?? holding.fxDailyChangeKrw;
   const priceImpactKrw =
     contribution?.priceChangeKrw ?? holding.priceDailyChangeKrw;
-  const tradeFlowKrw = contribution?.tradeFlowKrw ?? 0;
+  const tradeFlowKrw = contribution?.tradeFlowKrw ?? null;
   const previousValueKrw =
     contribution?.previousValueKrw ?? holding.previousCloseValueKrw;
   const currentEvidenceKrw =
-    previousValueKrw === null || changeKrw === null
+    previousValueKrw === null || changeKrw === null || tradeFlowKrw === null
       ? null
       : previousValueKrw + changeKrw + tradeFlowKrw;
   const historyHolding = data.holdings.find(

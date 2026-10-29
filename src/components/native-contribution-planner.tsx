@@ -11,12 +11,14 @@ import {SaleExclusionPicker} from "./sale-exclusion-picker";
 import { RecoveryNotice } from "@/components/recovery/recovery-notice";
 import { parseSaleExclusionKeys } from "@/lib/additional-contribution-sale-exclusions";
 import { recoveryHref } from "@/lib/recovery-navigation";
+import { contributionJourneyHref } from '@/lib/contribution-journey';
+import { ContributionJourneyNav, ContributionNextSteps } from '@/components/additional-contribution/contribution-journey';
 import styles from "./currency-tracked-view.module.css";
 import plannerStyles from "./native-contribution-planner.module.css";
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
 
-export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: string; currency: Currency }) {
+export function NativeContributionPlanner({ scopeKey, currency, accounts }: { scopeKey: string; currency: Currency; accounts?: readonly { key: string; label: string }[] }) {
   const { locale, t } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -53,7 +55,7 @@ export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: st
   const excludedSales=saleDraft && (!saleDraft.key || !loaded || saleDraft.key===saleKey)?saleDraft.keys:[];
   const returnHref = `${pathname}?${searchParams}`;
   const recoveryDraft = { scope: scopeKey, currency, amount: cash, fundingCurrency: cashCurrency, useCash: useCash ? "1" : "0", excludeSell: excludedSales };
-  const beta = pathname === "/beta" || pathname.startsWith("/beta/");
+  const beta = pathname === "/beta" || pathname.startsWith("/beta/") || searchParams.get('from') === 'beta';
   const draftQuery = new URLSearchParams(searchParams.toString());
   for (const [key, value] of Object.entries(recoveryDraft)) {
     draftQuery.delete(key);
@@ -112,12 +114,13 @@ export function NativeContributionPlanner({ scopeKey, currency }: { scopeKey: st
     } catch { setError(t("삭제하지 못했어요. 계획을 그대로 두었습니다. 다시 시도해 주세요.", "Unable to delete. The plan is still listed; please retry.")); }
     finally { setDeleting(false); }
   }
-  const comparisonHref = `/additional-contribution/compare?${new URLSearchParams({ scope: scopeKey, amount: cash.trim() || (cashCurrency === 'USD' ? '1000' : '1000000'), currency: cashCurrency })}`;
   const document = shown?.document;
   const result = document?.result;
   return <section className={styles.contribution} aria-label={t("추가 투자 계획", "Contribution plan")}>
+    {accounts && accounts.length > 0 && <nav className={plannerStyles.accounts} aria-label={t('투자할 계좌 선택', 'Choose an account to invest in')}>{accounts.map(account => <Link key={account.key} prefetch={false} aria-current={scopeKey === account.key ? 'page' : undefined} href={contributionJourneyHref('plan', {scope:account.key,amount:cash,currency:cashCurrency,reportingCurrency:currency,useCash,beta,excludeSell:scopeKey === account.key ? excludedSales : []})}>{account.label}</Link>)}</nav>}
+    {pathname === '/additional-contribution/plan' && <ContributionJourneyNav journey={{scope:scopeKey,amount:cash,currency:cashCurrency,reportingCurrency:currency,useCash,beta,excludeSell:excludedSales}} current="plan" returnHref={`${pathname}?${draftQuery}`} />}
     <CairnSectionTitle>{t("다음 투자금 나눠보기", "Plan a contribution")}</CairnSectionTitle>
-    <Link href={comparisonHref}>{t('비율 매수와 환율·MA120 조정 효과 비교 →', 'Compare proportional buying with FX / MA120 adjustments →')}</Link>
+    <ContributionNextSteps journey={{scope:scopeKey,amount:cash,currency:cashCurrency,reportingCurrency:currency,useCash,beta,excludeSell:excludedSales}} />
     <p className={styles.note}>{t("승인한 목표 비중을 사용합니다. 저장은 계획만 남기며 실제 주문이나 보유 수량을 바꾸지 않아요.", "Uses your approved targets. Saving records a plan without placing orders or changing holdings.")}</p>
     {!loaded ? loadFailed ? <RecoveryNotice kind="retry" scope={scopeKey} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={retryRead} details={t("투자 계획을 불러오지 못했어요. 입력한 투자금과 조건은 유지됩니다.", "Unable to load plans. Your investment amount and conditions are preserved.")} /> : <CairnStatus as="p" tone="neutral" role="status">{t("목표와 보유 정보를 확인하고 있어요.", "Checking targets and holdings.")}</CairnStatus> : !context ? <RecoveryNotice reasons={[loaded.context.status === "blocked" ? loaded.context.reason : "context_mismatch"]} scope={scopeKey} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={retryRead} /> : <CairnForm onSubmit={calculate} noValidate className={styles.form}>
       <div className={styles.funds}><CairnField>{t("새 투자금", "New money")}<MoneyInput value={cash} onValueChange={value => { setCash(value); changed(); }} allowDecimals={cashCurrency === "USD"} aria-label={t("새 투자금", "New money")} placeholder="0" /></CairnField><CairnField>{t("투자금 통화", "Money currency")}<CairnSelect value={cashCurrency} onChange={event => { setCashCurrency(event.target.value as Currency); changed(); }}><option>KRW</option><option>USD</option></CairnSelect></CairnField></div>

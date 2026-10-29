@@ -42,14 +42,15 @@ it("plans use application navigation for verified sessions and the public shell 
     "@/components/secondary-page-header": { SecondaryPageHeader: App },
     "@/components/first-visit/public-nav": { PublicNav: Public },
     "@/components/first-visit/plan-libraries": { PlanLibraries: Library },
+    "@/components/additional-contribution/contribution-journey": { ContributionNextSteps: () => null },
   });
   const nodes = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
-  let tree = nodes(await route.default());
+  let tree = nodes(await route.default({searchParams:Promise.resolve({})}));
   assert.ok(tree.some(node => node.type === App));
   assert.ok(!tree.some(node => node.type === Public));
   assert.equal(tree.find(node => node.type === Library).props.showTour, false);
   state = "unauthenticated";
-  tree = nodes(await route.default());
+  tree = nodes(await route.default({searchParams:Promise.resolve({})}));
   assert.ok(tree.some(node => node.type === Public));
   assert.ok(!tree.some(node => node.type === App));
 });

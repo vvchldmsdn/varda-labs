@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { expect } from '@playwright/test';
 import { runRecoveryUiCases } from './reliability-recovery-ui-cases.mjs';
+import { runContributionJourneyUiCases } from './reliability-contribution-journey-ui-cases.mjs';
 
 async function switchLanguage(page, label) {
   const menuButton = page.getByRole('button', {name: /^(메뉴 열기|Open menu)$/});
@@ -92,6 +93,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,ass
     assert.equal(Number((await admin.query('select count(*) as n from native_contribution_plans where owner_user_id=$1',[owner])).rows[0].n),1);
     await switchLanguage(page,'한국어로 전환');
   });
+  await runContributionJourneyUiCases({page,check,admin,owner,account,asset,url,output});
 }
 
 export async function runLegacyContributionUiCase({page,check,account,url,output}) {

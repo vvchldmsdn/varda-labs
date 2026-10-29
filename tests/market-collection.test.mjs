@@ -21,9 +21,43 @@ async function fixture() {
     },
   };
   const [queue,budget]=await importWithPorts(["src/lib/market-data/collection-queue.ts","src/lib/market-data/provider-budget.ts"], {"@/db/client":{sqlClient}});
-  return {queue,budget,pg};
+  return {queue,budget,pg,sqlClient};
 }
 const target=(ticker="VOO",kind="live")=>({ticker,kind,market:"us",currency:"USD"});
+const historyTarget=ticker=>({...target(ticker,"history"),startDate:"2026-10-20",endDate:"2026-10-20"});
+
+async function workerFixture() {
+  const runtime=await fixture();
+  const state={operations:[],failure:null};
+  const operation=(kind,ticker)=>{
+    state.operations.push({kind,ticker});
+    const error=state.failure?.(kind,ticker);
+    if(error)throw error;
+  };
+  // The worker and queue are unchanged production modules. Only cache/provider I/O
+  // and the outer lease are replaced; no application DB or HTTP transport exists here.
+  const [worker]=await importWithPorts(["src/lib/market-data/collection-worker.ts"],{
+    "next/server":{after:()=>assert.fail("This fixture drains the worker directly")},
+    "@/db/client":{sqlClient:runtime.sqlClient,db:{select:()=>({from:()=>({where:()=>({limit:async()=>[]})})})}},
+    "@/db/schema":{livePriceQuotes:{},fxRates:{}},
+    "@/lib/market-data/providers/kis":{
+      getKisProviderPolicy:()=>({configured:true}),createKisProviderRequestSession:()=>({}),createKisMarketDataProvider:()=>({}),
+      fetchKisUsdKrwFxCandidate:async({target})=>{operation("fx",target.ticker);return {};},
+    },
+    "@/lib/market-data/kis-refresh-lease":{KisRefreshLeaseBusyError:class extends Error{},withKisCollectionLease:task=>task()},
+    "@/lib/market-data/provider-budget":{withKisCollectionDeadline:runtime.budget.withKisCollectionDeadline},
+    "@/lib/market-data/price-sync":{runMarketPriceSync:async({explicitTargets})=>{operation("live",explicitTargets[0].ticker);return {successCount:1,failedCount:0};}},
+    "@/lib/market-data/kis-history-cache-sync":{runKisHistoryCacheSync:async({targets})=>{
+      operation("history",targets[0].ticker);return {failedCount:0,fetchedRowCount:1,conflictCount:0,retryableRevisionCount:0};
+    }},
+    "@/lib/market-data/fx-refresh-job":{runUsdKrwFxCandidateJob:async()=>({ok:true})},
+    "@/lib/market-data/latest-close-revalidation":{revalidateLatestClose:async()=>{}},
+    "@/lib/market-data/twelve-data-service":{resumeConfiguredTwelveDataService:()=>assert.fail("Another provider was not scheduled")},
+    "@/lib/market-data/close-gap-sync":{syncMissingRawCloses:async job=>{operation("raw",job.ticker);return {complete:true};}},
+    "@/lib/snapshots/market-calendar":{resolveSnapshotCycle:()=>({snapshotDate:"2026-10-29"})},
+  });
+  return {...runtime,worker,state};
+}
 
 describe("durable market collection and distributed provider budgets",()=>{
   after(async()=>{await pg?.close();});
@@ -61,12 +95,88 @@ describe("durable market collection and distributed provider budgets",()=>{
   it("lets aged history precede newer live work and moves failed work into backoff",async()=>{
     const {queue,pg}=await fixture();
     await queue.enqueueMarketCollection([{...target("QQQ","history"),startDate:"2026-09-08",endDate:"2026-09-08"}]);
-    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '2 minutes'");
+    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '2 minutes',available_at=now()-interval '2 minutes'");
     await queue.enqueueMarketCollection([target()]);
     const history=await queue.claimMarketCollection(); assert.equal(history.kind,"history");
     await queue.finishMarketCollection(history,{ok:false,code:"provider_unavailable",retryAfterSeconds:60});
     assert.equal((await queue.claimMarketCollection()).kind,"live");
     assert.equal(await queue.claimMarketCollection(),null);
+  });
+  it("puts a ready retry behind an untried job without changing enqueue age or bypassing backoff",async()=>{
+    const {queue,pg}=await fixture();
+    await queue.enqueueMarketCollection([target("OLD")]);
+    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '4 hours',available_at=now()-interval '4 hours'");
+    const old=await queue.claimMarketCollection();
+    await queue.finishMarketCollection(old,{ok:false,code:"provider_unavailable",retryAfterSeconds:60});
+    await queue.enqueueMarketCollection([target("NEW")]);
+    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '1 minute',available_at=now()-interval '1 minute' where ticker='NEW'");
+    await pg.exec("update market_collection_jobs set available_at=now()-interval '1 second' where ticker='OLD'");
+    assert.equal((await queue.claimMarketCollection({provider:"kis"},"quotes")).ticker,"NEW");
+    const retried=await queue.claimMarketCollection({provider:"kis"},"quotes");
+    assert.equal(retried.ticker,"OLD");assert.equal(retried.attempts,2);
+    await queue.finishMarketCollection(retried,{ok:false,code:"provider_unavailable",retryAfterSeconds:60});
+    assert.equal(await queue.claimMarketCollection({provider:"kis"},"quotes"),null);
+    assert.equal((await pg.query("select enqueued_at < now()-interval '3 hours' as original_age from market_collection_jobs where ticker='OLD'")).rows[0].original_age,true);
+  });
+  it("services live and FX before aged failing history, while still stopping after each provider failure",async()=>{
+    const {queue,worker,pg,state}=await workerFixture();
+    await queue.enqueueMarketCollection(Array.from({length:17},(_,i)=>historyTarget(`H${String(i).padStart(2,"0")}`)));
+    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '4 hours',available_at=now()-interval '4 hours'");
+    await queue.enqueueMarketCollection([...Array.from({length:14},(_,i)=>target(`L${String(i).padStart(2,"0")}`)),target("L00","fx")]);
+    state.failure=kind=>kind==="history"?new Error("synthetic_history_endpoint_unavailable"):null;
+    const first=await worker.drainMarketCollection();
+    assert.equal(first.processed,3);assert.equal(first.failed,1);
+    assert.deepEqual(state.operations.map(row=>row.kind),["fx","live","history"]);
+    for(let wake=1;wake<8;wake++){
+      const before=state.operations.length;
+      const result=await worker.drainMarketCollection();
+      const work=state.operations.slice(before);
+      assert.equal(result.failed,1);
+      assert.equal(work.at(-1).kind,"history");
+      assert.equal(work.filter(row=>row.kind==="history").length,1);
+    }
+    assert.equal(state.operations.filter(row=>row.kind==="live").length,14);
+    assert.equal(state.operations.filter(row=>row.kind==="fx").length,1);
+    assert.equal((await pg.query("select count(*)::integer as n from market_collection_jobs where kind in ('live','fx') and status='done'")).rows[0].n,15);
+  });
+  it("offers history every third turn when both lanes are ready and falls back without wasting a turn",async()=>{
+    const {queue,worker,state}=await workerFixture();
+    await queue.enqueueMarketCollection([...Array.from({length:6},(_,i)=>target(`L${i}`)),historyTarget("H0"),historyTarget("H1")]);
+    const result=await worker.drainMarketCollection({maximumJobs:8});
+    assert.equal(result.processed,8);
+    assert.deepEqual(state.operations.map(row=>row.kind),["live","live","history","live","live","history","live","live"]);
+    for(const kind of ["history","live"]){
+      const runtime=await workerFixture();
+      await runtime.queue.enqueueMarketCollection(Array.from({length:5},(_,i)=>kind==="history"?historyTarget(`H${i}`):target(`L${i}`)));
+      assert.equal((await runtime.worker.drainMarketCollection()).processed,5);
+      assert.deepEqual(runtime.state.operations.map(row=>row.kind),Array(5).fill(kind));
+    }
+  });
+  it("keeps dedicated history and raw-close workers inside their original partitions",async()=>{
+    const {queue,worker,pg,state}=await workerFixture();
+    await queue.enqueueMarketCollection([target("LIVE"),target("LIVE","fx"),historyTarget("PAIRED")]);
+    const raw={key:"kis:history:raw_close_v1:us:USD:RAW:2026-10-20:2026-10-20",kind:"history",ticker:"RAW",market:"us",currency:"USD",startDate:"2026-10-20",endDate:"2026-10-20"};
+    await queue.enqueueRawCloseCollection([raw]);
+    const rawResult=await worker.drainMarketCollection({partition:{provider:"kis",rawCloses:true}});
+    assert.equal(rawResult.processed,1);assert.deepEqual(state.operations,[{kind:"raw",ticker:"RAW"}]);
+    const historyResult=await worker.drainMarketCollection({partition:{provider:"kis",historyOnly:true}});
+    assert.equal(historyResult.processed,1);assert.deepEqual(state.operations.at(-1),{kind:"history",ticker:"PAIRED"});
+    assert.equal((await pg.query("select count(*)::integer as n from market_collection_jobs where kind in ('live','fx') and status='pending'")).rows[0].n,2);
+    assert.equal(await queue.claimMarketCollection({provider:"kis",historyOnly:true},"quotes"),null);
+    assert.equal(await queue.claimMarketCollection({provider:"kis",rawCloses:true},"quotes"),null);
+  });
+  it("still yields on provider/token cooldown without consuming attempts or trying the other lane",async()=>{
+    for(const code of ["provider_budget_limited","provider_token_cooldown"]){
+      const {queue,worker,pg,state}=await workerFixture();
+      await queue.enqueueMarketCollection([historyTarget("HISTORY"),target("LIVE")]);
+      state.failure=()=>Object.assign(new Error("synthetic_cooldown"),{code,retryAfterSeconds:3600});
+      const result=await worker.drainMarketCollection();
+      assert.equal(result.processed,1);assert.equal(result.failed,1);
+      assert.deepEqual(state.operations,[{kind:"live",ticker:"LIVE"}]);
+      const rows=(await pg.query("select ticker,attempts,status,last_code,available_at>now()+interval '59 minutes' as cooling_down from market_collection_jobs order by ticker")).rows;
+      assert.equal(rows[0].ticker,"HISTORY");assert.equal(rows[0].attempts,0);
+      assert.equal(rows[1].attempts,0);assert.equal(rows[1].status,"pending");assert.equal(rows[1].last_code,"provider_budget_wait");assert.equal(rows[1].cooling_down,true);
+    }
   });
   it("terminates abandoned final attempts and bounds retained terminal jobs",async()=>{
     const {queue,pg}=await fixture();
