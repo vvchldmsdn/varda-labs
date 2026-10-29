@@ -414,6 +414,11 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       const input=(p,name)=>p.locator('ol > li').filter({hasText:name}).locator('input[type="number"]');
       try {
         await page.goto(targetUrl);await stale.goto(targetUrl);
+        // Establish a hydrated, edited revision-1 draft before another tab saves.
+        // Navigation alone can finish before this streamed form has hydrated.
+        await input(stale,'Synthetic legacy holding').fill('50');await input(stale,'Synthetic second target').fill('50');
+        await expect(stale.getByRole('button',{name:'입력 되돌리기',exact:true})).toBeEnabled();
+        await expect(stale.locator('input[name="approvalRevision"]')).toHaveValue('1');
         await input(page,'Synthetic legacy holding').fill('0');await input(page,'Synthetic second target').fill('100');
         await page.getByRole('button',{name:'목표비중 저장',exact:true}).click();
         try { await expect(page.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible(); } catch(error) { report.targetFailureText=await page.locator('main').innerText(); throw error; }
