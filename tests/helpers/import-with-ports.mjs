@@ -22,6 +22,7 @@ export async function importWithPorts(paths, ports) {
   };
   const hook = registerHooks({
     resolve(specifier, context, nextResolve) {
+      if (!context.parentURL?.startsWith(new URL("src/", root).href) || new URL(context.parentURL).searchParams.get("test-ports") !== registry) return nextResolve(specifier, context);
       if (specifier === "server-only") return { url: "data:text/javascript,export {};", shortCircuit: true };
       const canonical = specifier.startsWith(".") && context.parentURL?.startsWith(new URL("src/", root).href)
         ? "@/" + new URL(specifier, context.parentURL).pathname.slice(new URL("src/", root).pathname.length).replace(/\.ts$/, "") : specifier.replace(/\.ts$/, "");
@@ -37,7 +38,7 @@ export async function importWithPorts(paths, ports) {
       return nextResolve(specifier, context);
     },
     load(url, context, nextLoad) {
-      if (url.startsWith(new URL("src/", root).href) && new URL(url).pathname.endsWith(".ts")) {
+      if (url.startsWith(new URL("src/", root).href) && new URL(url).searchParams.get("test-ports") === registry && new URL(url).pathname.endsWith(".ts")) {
         return {
           format: "module", shortCircuit: true,
           source: ts.transpileModule(readFileSync(new URL(url), "utf8"), {

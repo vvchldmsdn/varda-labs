@@ -26,6 +26,5 @@
 .cairn-timestamp details { margin-top:2px; }
 .cairn-timestamp details input { width:100%; }
 .varda-reporting-control .cairn-currency-select { width:74px; }
-.varda-reporting-control .cairn-currency-select button { font-size:12px; }
-@media (max-width:640px) { .varda-reporting-control .cairn-currency-select { width:62px; } }
+.varda-reporting-control .cairn-currency-select button { font-size:12px; padding-inline:8px; gap:4px; }
 @media (max-width:760px) { .cairn-form-select[class] { font-size:16px; } }

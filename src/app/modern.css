@@ -159,6 +159,12 @@ html:has(.varda-mobile-menu[open]) { overflow: hidden; }
   .varda-management-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
   .varda-skip-link { left: 16px; }
 }
+@media (max-width: 480px) {
+  .varda-topbar { padding-inline: 12px; }
+  .varda-topbar-location, .varda-topbar-actions { flex: none; }
+  /* Add-holding remains in the menu; keep quotes and currency readable. */
+  .varda-topbar-add { display: none; }
+}
 @media (max-width: 359px) {
   .varda-mobile-menu-button { min-width: 44px; }
   .varda-mobile-menu-button span { display: none; }
