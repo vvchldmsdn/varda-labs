@@ -400,6 +400,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.unroute('**/api/portfolio/live-prices/sync');
     });
     await check('fullapp-target-explicit-zero-refresh-and-stale-tab-save',async()=>{
+      await setIdentity(sessionTokens[2]);
       const secondAsset=randomUUID(),c=await admin.connect();
       try {
         await c.query('BEGIN');await c.query("select set_config('app.trade_reliability_version','0059',true)");
