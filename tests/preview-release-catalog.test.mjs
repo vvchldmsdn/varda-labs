@@ -14,6 +14,7 @@ test('Preview current catalog attests actual 0047/0064 SQL and rejects weakened 
     assertPreviewReleaseCatalog(await read(), expected);
     for (const sql of [
       'alter table member_activity_daily no force row level security',
+      'alter table member_activity_profiles alter column display_name type varchar(200)',
       'grant select on member_activity_profiles to varda_tenant_app',
       'alter table contribution_effects disable trigger contribution_effects_preserve_basis',
       'drop policy contribution_effects_tenant_v1 on contribution_effects',

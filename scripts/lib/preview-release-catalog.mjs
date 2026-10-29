@@ -7,7 +7,7 @@ const TABLES = "'member_activity_daily','member_activity_profiles','contribution
 export async function readPreviewReleaseCatalog(query) {
   const statements = {
     tables: `select relname as name, relrowsecurity as rls, relforcerowsecurity as forced from pg_class where relnamespace='public'::regnamespace and relname in (${TABLES}) order by relname`,
-    columns: `select table_name, column_name, data_type, udt_name, is_nullable, column_default from information_schema.columns where table_schema='public' and table_name in (${TABLES}) order by table_name, ordinal_position`,
+    columns: `select table_name, column_name, data_type, udt_name, character_maximum_length, numeric_precision, numeric_scale, datetime_precision, is_nullable, column_default from information_schema.columns where table_schema='public' and table_name in (${TABLES}) order by table_name, ordinal_position`,
     // PostgreSQL 18 catalogs NOT NULL separately; columns.is_nullable already
     // verifies it on both PostgreSQL 17 (Neon) and 18 (local PGlite).
     constraints: `select c.relname as table_name, k.conname as name, k.contype as type, k.convalidated as validated, pg_get_constraintdef(k.oid) as definition from pg_constraint k join pg_class c on c.oid=k.conrelid where k.contype <> 'n' and c.relnamespace='public'::regnamespace and c.relname in (${TABLES}) order by c.relname,k.conname`,

@@ -52,6 +52,12 @@ async function run() {
     query,
   });
   const localMigrations = readLocalMigrations();
+  const migrationDifferences = state.appliedMigrations.flatMap((actual, index) => {
+    const expected = localMigrations[index];
+    return expected && (actual.createdAt !== expected.createdAt || actual.sha256 !== expected.sha256)
+      ? [{ tag: expected.tag, expected, actual }] : [];
+  });
+  if (migrationDifferences.length) console.log(`[preview-db] migration artifacts ${JSON.stringify(migrationDifferences)}`);
   const plan = planPreviewMigrations({
     localMigrations,
     appliedMigrations: state.appliedMigrations,
