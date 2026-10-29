@@ -1,0 +1,331 @@
+{
+  "tables": [
+    {
+      "name": "contribution_effects",
+      "rls": true,
+      "forced": true
+    },
+    {
+      "name": "member_activity_daily",
+      "rls": true,
+      "forced": true
+    },
+    {
+      "name": "member_activity_profiles",
+      "rls": true,
+      "forced": true
+    }
+  ],
+  "columns": [
+    {
+      "table_name": "contribution_effects",
+      "column_name": "owner_user_id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "contribution_effects",
+      "column_name": "id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "contribution_effects",
+      "column_name": "account_id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "contribution_effects",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "contribution_effects",
+      "column_name": "revision",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "NO",
+      "column_default": "0"
+    },
+    {
+      "table_name": "contribution_effects",
+      "column_name": "document",
+      "data_type": "jsonb",
+      "udt_name": "jsonb",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "contribution_effects",
+      "column_name": "trade_ids",
+      "data_type": "jsonb",
+      "udt_name": "jsonb",
+      "is_nullable": "NO",
+      "column_default": "'[]'::jsonb"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "column_name": "owner_user_id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_daily",
+      "column_name": "activity_date",
+      "data_type": "date",
+      "udt_name": "date",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_daily",
+      "column_name": "feature",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_daily",
+      "column_name": "views",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_daily",
+      "column_name": "visits",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_daily",
+      "column_name": "last_seen",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "column_name": "owner_user_id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "column_name": "display_name",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "column_name": "email",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "column_name": "first_seen",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "column_name": "last_seen",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_account_id_fkey",
+      "type": "f",
+      "validated": true,
+      "definition": "FOREIGN KEY (account_id) REFERENCES accounts(id)"
+    },
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_check",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((jsonb_typeof(document) = 'object'::text) AND (octet_length((document)::text) <= 524288) AND ((document ->> 'version'::text) = 'contribution_effect_v1'::text) AND ((document ->> 'accountId'::text) = (account_id)::text)))"
+    },
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_owner_user_id_fkey",
+      "type": "f",
+      "validated": true,
+      "definition": "FOREIGN KEY (owner_user_id) REFERENCES app_users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_pkey",
+      "type": "p",
+      "validated": true,
+      "definition": "PRIMARY KEY (owner_user_id, id)"
+    },
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_revision_check",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK ((revision >= 0))"
+    },
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_trade_ids_check",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((jsonb_typeof(trade_ids) = 'array'::text) AND (jsonb_array_length(trade_ids) <= 100)))"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "name": "member_activity_daily_counts",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((views > 0) AND (visits >= 0) AND (visits <= views)))"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "name": "member_activity_daily_feature",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((feature)::text = ANY ((ARRAY['home'::character varying, 'today'::character varying, 'structure'::character varying, 'contribution'::character varying, 'lab'::character varying, 'simulation'::character varying, 'history'::character varying, 'manage'::character varying, 'plans'::character varying, 'input'::character varying])::text[])))"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "name": "member_activity_daily_owner_user_id_activity_date_feature_pk",
+      "type": "p",
+      "validated": true,
+      "definition": "PRIMARY KEY (owner_user_id, activity_date, feature)"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "name": "member_activity_daily_owner_user_id_app_users_id_fk",
+      "type": "f",
+      "validated": true,
+      "definition": "FOREIGN KEY (owner_user_id) REFERENCES app_users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "name": "member_activity_profiles_owner_user_id_app_users_id_fk",
+      "type": "f",
+      "validated": true,
+      "definition": "FOREIGN KEY (owner_user_id) REFERENCES app_users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "name": "member_activity_profiles_pkey",
+      "type": "p",
+      "validated": true,
+      "definition": "PRIMARY KEY (owner_user_id)"
+    }
+  ],
+  "indexes": [
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_owner_account_idx",
+      "definition": "CREATE INDEX contribution_effects_owner_account_idx ON public.contribution_effects USING btree (owner_user_id, account_id, created_at)"
+    },
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_pkey",
+      "definition": "CREATE UNIQUE INDEX contribution_effects_pkey ON public.contribution_effects USING btree (owner_user_id, id)"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "name": "member_activity_daily_date_idx",
+      "definition": "CREATE INDEX member_activity_daily_date_idx ON public.member_activity_daily USING btree (activity_date)"
+    },
+    {
+      "table_name": "member_activity_daily",
+      "name": "member_activity_daily_owner_user_id_activity_date_feature_pk",
+      "definition": "CREATE UNIQUE INDEX member_activity_daily_owner_user_id_activity_date_feature_pk ON public.member_activity_daily USING btree (owner_user_id, activity_date, feature)"
+    },
+    {
+      "table_name": "member_activity_profiles",
+      "name": "member_activity_profiles_pkey",
+      "definition": "CREATE UNIQUE INDEX member_activity_profiles_pkey ON public.member_activity_profiles USING btree (owner_user_id)"
+    }
+  ],
+  "policies": [
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_tenant_v1",
+      "permissive": "PERMISSIVE",
+      "roles": "{varda_tenant_app}",
+      "cmd": "ALL",
+      "qual": "((owner_user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) AND investment_plan_tenant_active())",
+      "with_check": "((owner_user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid) AND investment_plan_tenant_active() AND (EXISTS ( SELECT 1\n   FROM accounts a\n  WHERE ((a.id = contribution_effects.account_id) AND (a.canonical_owner_user_id = contribution_effects.owner_user_id) AND a.is_active))))"
+    }
+  ],
+  "triggers": [
+    {
+      "table_name": "contribution_effects",
+      "name": "contribution_effects_preserve_basis",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER contribution_effects_preserve_basis BEFORE UPDATE ON public.contribution_effects FOR EACH ROW EXECUTE FUNCTION contribution_effects_preserve_basis()"
+    }
+  ],
+  "functions": [
+    {
+      "name": "contribution_effects_preserve_basis",
+      "security_definer": false,
+      "config": null,
+      "definition": "CREATE OR REPLACE FUNCTION public.contribution_effects_preserve_basis()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF NEW.document IS DISTINCT FROM OLD.document OR NEW.owner_user_id IS DISTINCT FROM OLD.owner_user_id\n    OR NEW.id IS DISTINCT FROM OLD.id OR NEW.account_id IS DISTINCT FROM OLD.account_id OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN\n    RAISE EXCEPTION 'contribution_effect_basis_immutable';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+    }
+  ],
+  "grants": [
+    {
+      "table_name": "contribution_effects",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "DELETE",
+      "is_grantable": false
+    },
+    {
+      "table_name": "contribution_effects",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "INSERT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "contribution_effects",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "contribution_effects",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "UPDATE",
+      "is_grantable": false
+    }
+  ]
+}
