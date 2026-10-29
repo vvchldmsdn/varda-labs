@@ -45,6 +45,7 @@ import "./simulation-deferred-research.test.mjs";
 import "./simulation-calculation-guide.test.mjs";
 import "./calculation-methodology.test.mjs";
 import "./portfolio-refresh-lifecycle.test.mjs";
+import "./beta-today-selection-refresh.test.mjs";
 import "./holding-price-return.test.mjs";
 import "./history-live-valuation.test.mjs";
 import "./history-service-date.test.mjs";
