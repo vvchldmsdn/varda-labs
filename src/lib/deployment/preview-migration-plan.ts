@@ -1,3 +1,5 @@
+import { previewMigrationEvidenceMatches } from "./preview-migration-compatibility.ts";
+
 const MIGRATION_HASH_PATTERN = /^[0-9a-f]{64}$/;
 
 export type LocalMigrationEvidence = {
@@ -35,10 +37,7 @@ export function planPreviewMigrations(input: {
   for (let index = 0; index < applied.length; index += 1) {
     const expected = local[index];
     const actual = applied[index];
-    if (
-      actual.createdAt !== expected.createdAt ||
-      actual.sha256 !== expected.sha256
-    ) {
+    if (!previewMigrationEvidenceMatches(expected, actual)) {
       throw new Error(
         `Database migration ledger diverges at local migration ${expected.tag}.`,
       );

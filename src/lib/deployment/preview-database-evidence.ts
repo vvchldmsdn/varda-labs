@@ -5,6 +5,7 @@ import {
   type PreviewDatabaseTargetGuardEnvironment,
 } from "./preview-database-target.ts";
 import type { AppliedMigrationEvidence } from "./preview-migration-plan.ts";
+import { canonicalizePreviewMigrationEvidence } from "./preview-migration-compatibility.ts";
 
 export const PREVIEW_DATABASE_EVIDENCE_VERSION =
   "preview_database_evidence_v21";
@@ -1244,10 +1245,7 @@ function hasReviewedMigrationLedger(state: PreviewDatabaseState) {
     state.appliedMigrations.length === reviewed.entryCount &&
     sha256Fingerprint(
       JSON.stringify(
-        state.appliedMigrations.map(({ createdAt, sha256 }) => ({
-          createdAt,
-          sha256,
-        })),
+        state.appliedMigrations.map(canonicalizePreviewMigrationEvidence),
       ),
     ) === reviewed.sha256
   );

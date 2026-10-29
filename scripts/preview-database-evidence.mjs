@@ -18,11 +18,13 @@ import {
 } from "../src/lib/deployment/preview-database-evidence.ts";
 import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
 import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-plan.ts";
+import { canonicalizePreviewMigrationEvidence } from "../src/lib/deployment/preview-migration-compatibility.ts";
+import { assertPreviewReleaseCatalog, readPreviewReleaseCatalog, readPreviewProtectedContent, assertPreviewProtectedContentPreserved, previewContentDigest } from "./lib/preview-release-catalog.mjs";
 
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v17.json",
+  "varda-preview-database-preflight-v23.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -44,23 +46,39 @@ async function run() {
   }
 
   const sql = neon(databaseUrl);
-  const query = (text) => sql.query(text);
+  // Neon HTTP calls do not share a session. Pin deparser/search-path and timestamp
+  // formatting inside each read-only transaction, never with a separate SET call.
+  const query = async (text) => (await sql.transaction([
+    sql.query("select set_config('search_path','public,pg_catalog',true), set_config('TimeZone','UTC',true)"),
+    sql.query(text),
+  ], { readOnly: true }))[1];
   const state = await readPreviewDatabaseState({
     env: process.env,
     query,
   });
   const localMigrations = readLocalMigrations();
+  const migrationDifferences = state.appliedMigrations.flatMap((actual, index) => {
+    const expected = localMigrations[index];
+    return expected && (actual.createdAt !== expected.createdAt || actual.sha256 !== expected.sha256)
+      ? [{ tag: expected.tag, expected, actual }] : [];
+  });
+  if (migrationDifferences.length) console.log(`[preview-db] migration artifacts ${JSON.stringify(migrationDifferences)}`);
   const plan = planPreviewMigrations({
     localMigrations,
     appliedMigrations: state.appliedMigrations,
     allowedPendingMigrations:
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
   });
+  const expectedCatalog = JSON.parse(readFileSync(new URL('./fixtures/preview-release-catalog.json', import.meta.url), 'utf8'));
+  assertPreviewReleaseCatalog(await readPreviewReleaseCatalog(query), expectedCatalog);
+  const protectedContent = await readPreviewProtectedContent(query);
 
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v22",
+      evidenceVersion: "preview_database_build_preflight_v23",
+      protectedContent,
+      appliedMigrations: state.appliedMigrations,
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
@@ -74,7 +92,7 @@ async function run() {
       encoding: "utf8",
       mode: 0o600,
     });
-    logEvidence(PHASE, state, plan);
+    logEvidence(PHASE, state, plan, protectedContent);
     return;
   }
 
@@ -88,7 +106,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v22",
+    "preview_database_build_preflight_v23",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -101,6 +119,10 @@ async function run() {
     before.rowCounts,
     "Preview migration changed protected row counts",
   );
+  assertPreviewProtectedContentPreserved(before.protectedContent, protectedContent);
+  // The reviewed baseline has no pending migrations. Keep even the historical
+  // CRLF checksum untouched; compatibility is a read-time interpretation only.
+  assert.deepEqual(state.appliedMigrations, before.appliedMigrations, 'Preview migration ledger changed');
   assertPreviewTargetPolicyRowsPreserved(
     before.targetPolicyRows ?? null,
     state.reviewedCatalog.targetPolicyRows,
@@ -119,7 +141,7 @@ async function run() {
   );
 
   rmSync(EVIDENCE_FILE, { force: true });
-  logEvidence(PHASE, state, plan);
+  logEvidence(PHASE, state, plan, protectedContent);
 }
 
 function assertPreflightCatalog(plan, state, localMigrations) {
@@ -164,12 +186,15 @@ function readLocalMigrations() {
   }));
 }
 
-function logEvidence(phase, state, plan) {
+function logEvidence(phase, state, plan, protectedContent) {
   console.log(
     `[preview-db] ${JSON.stringify({
       phase,
       ...publicPreviewDatabaseEvidence(state),
       migrationPlan: plan,
+      compatibleHistoricalHashes: state.appliedMigrations.filter(row => canonicalizePreviewMigrationEvidence(row).sha256 !== row.sha256).length,
+      releaseCatalog: '0047_0064_exact',
+      protectedContent: { tables: protectedContent.length, sha256: previewContentDigest(protectedContent) },
     })}`,
   );
 }

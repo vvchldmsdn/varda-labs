@@ -17,30 +17,18 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0041_natural_nitro",
-    createdAt: 1788296591419,
+    tag: "0064_contribution_effects",
+    createdAt: 1793145600000,
     sha256:
-      "d08216683c44152fb29c51e81693cdc637711c34d786235afeb74c6fcff4afad",
+      "a0f5be2f96f0c56d879423fdaf2180866d7c84a5a20974423e1b3c89a834327c",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 42,
+    entryCount: 65,
     sha256:
-      "sha256:fca9347d8d046ec5375926654ec51d310b77dc2b6d637f75a0d38a16e23ad281",
+      "sha256:e58fc89da6a09e61d671017c125f65c0b38132f57a7a12eff9166843644824cd",
   }),
-  allowedPendingMigrations: Object.freeze([
-    Object.freeze({
-      tag: "0040_noisy_agent_zero",
-      createdAt: 1788294967334,
-      sha256:
-        "042b841616312533464000ef4e3bd6b02bf038feca80e036ecd118d2db943f6f",
-    }),
-    Object.freeze({
-      tag: "0041_natural_nitro",
-      createdAt: 1788296591419,
-      sha256:
-        "d08216683c44152fb29c51e81693cdc637711c34d786235afeb74c6fcff4afad",
-    }),
-  ]),
+  // Current inherited databases only. New DDL requires a separate reviewed release.
+  allowedPendingMigrations: Object.freeze([]),
 });
 
 export type PreviewDatabaseTargetGuardEnvironment = {

@@ -416,3 +416,4 @@ import "./master-frontend-integration.test.mjs";
 import "./beta-onboarding-admission.test.mjs";
 import "./beta-saved-plans/backend.test.mjs";
 import "./beta-saved-plans/ui.test.mjs";
+import './preview-release-catalog.test.mjs';
