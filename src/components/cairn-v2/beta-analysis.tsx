@@ -6,7 +6,9 @@ import {useLayoutEffect,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {BetaShell} from './beta-shell';
 import {useBetaContext} from './use-beta-context';
-import {useBetaReadFreshness} from './beta-provider';
+import {useBetaExistingCrudAvailable,useBetaReadFreshness} from './beta-provider';
+import {RecoveryNotice} from '@/components/recovery/recovery-notice';
+import {riskRecoveryKind} from '@/lib/recovery-risk';
 import {analysisKey,blankAnalysis,type AnalysisRead} from '@/lib/cairn-v2/analysis-contract';
 import {blankDomainView} from '@/lib/cairn-v2/read-contract';
 import styles from './analysis.module.css';
@@ -19,6 +21,7 @@ const instrumentName=(row:{ticker:string;names:readonly string[]})=>row.names.fi
 
 export function BetaAnalysis({read}:{read:AnalysisRead}) {
  const [context,setContext]=useBetaContext(read.context),freshness=useBetaReadFreshness(),router=useRouter();
+ const managementAvailable=useBetaExistingCrudAvailable();
  const observed=freshness?.observed,epoch=freshness?.epoch;
  useLayoutEffect(()=>{observed?.(read.readReceipt,read.readEpoch);},[read.readReceipt,read.readEpoch,observed,epoch]);
  const visible=analysisKey(context)!==analysisKey(read.context)||freshness?.store.blocked(read.readReceipt,read.readEpoch)?blankAnalysis(context,'loading','사용자·분석 조건을 다시 확인하는 중'):read;
@@ -28,12 +31,15 @@ export function BetaAnalysis({read}:{read:AnalysisRead}) {
  const matrix=down?p?.stress.correlationMatrix:p?.correlationMatrix;
  const active=c?.instruments.find(r=>r.instrumentKey===selected)??c?.instruments[0];
  const direct=visible.direct,m=direct?.metrics;
+ const recoveryKind=model?riskRecoveryKind(model):direct&&visible.state!=='ready'?'holdings':visible.state==='unavailable'?'retry':visible.state==='empty'?'holdings':null;
+ const showRecovery=context.mode==='domain'&&visible.state!=='loading'&&visible.state!=='unauthorized'&&recoveryKind&&(recoveryKind==='retry'||managementAvailable);
 
  return <BetaShell context={context} setContext={setContext} readView={shell} workspace="analysis" originalPath={context.analysis==='holdings'?'/portfolio/structure':'/portfolio/risk'}>
  <section className={styles.workspace} data-analysis-state={visible.state} data-analysis-kind={context.analysis??'risk'}>
   <nav className={styles.mobileNav} aria-label="분석 작업 화면"><CairnButton variant="selection" aria-pressed={context.analysis!=='holdings'} onClick={()=>setContext({...context,analysis:'risk'})}>위험·분산</CairnButton><CairnButton variant="selection" aria-pressed={context.analysis==='holdings'} onClick={()=>setContext({...context,analysis:'holdings'})}>집중·통화</CairnButton></nav>
   <DetailHeader title={context.analysis==='holdings'?'집중도와 통화 노출':'위험과 분산'} description={context.analysis==='holdings'?'직접 보유 기준 · ETF 내부 기업 노출 미포함':'현재 보유 비중으로 살펴보는 과거 위험 · 미래 수익 예측 아님'} />
-  <div className={styles.readState} data-read-state={visible.state}><CairnStatus as="p" role="status">{visible.message}{context.currency==='USD'?' · 표시 통화 USD와 별개로 분석 기준 KRW':''}</CairnStatus>{visible.state==='unavailable'&&<CairnButton variant="secondary" type="button" onClick={()=>router.refresh()}>분석 다시 조회</CairnButton>}</div>
+  <div className={styles.readState} data-read-state={visible.state}><CairnStatus as="p" role="status">{visible.message}{context.currency==='USD'?' · 표시 통화 USD와 별개로 분석 기준 KRW':''}</CairnStatus>{!showRecovery&&visible.state==='unavailable'&&<CairnButton variant="secondary" type="button" onClick={()=>router.refresh()}>분석 다시 조회</CairnButton>}</div>
+  {showRecovery&&<RecoveryNotice kind={recoveryKind!} scope={context.scope} beta onRetry={()=>router.refresh()} reasons={model?[model.calculation.reason,...model.inputHealth.blockers.map(row=>row.reason)].filter((reason):reason is NonNullable<typeof reason>=>reason!==null):[visible.state]} />}
   {context.analysis!=='holdings'&&<div className={styles.toolbar}><div role="group" aria-label="상관 관측 기준"><CairnButton variant="selection" type="button" aria-pressed={!down} onClick={()=>setDown(false)}>전체 관측일</CairnButton><CairnButton variant="selection" type="button" aria-pressed={down} onClick={()=>setDown(true)}>하락일</CairnButton></div><CairnField>분석 기간<CairnNativeSelect aria-label="분석 관측 수" value={typeof context.window==='string'?context.window:'90'} onChange={e=>setContext({...context,window:e.target.value})}>{[30,90,252].map(w=><option key={w} value={w}>{w}개 관측</option>)}</CairnNativeSelect></CairnField></div>}
   {model&&<>
    <dl className={styles.basis} aria-label="위험 분석 기준"><div><dt>관측 기간</dt><dd>{model.provenance.firstServiceDate??'—'} ~ {model.provenance.lastServiceDate??'—'}</dd></div><div><dt>유효 공동 관측</dt><dd>{model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}</dd></div><div><dt>포함 범위</dt><dd>종목 {model.provenance.includedInstrumentCount} · 제외 보유 {model.provenance.excludedHoldingCount}</dd></div><div><dt>분석 통화</dt><dd>KRW</dd></div></dl>

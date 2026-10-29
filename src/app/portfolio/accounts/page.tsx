@@ -2,7 +2,7 @@ import { localizedMetadata } from "@/lib/i18n/server";
 import { T } from "@/components/i18n/localized-text";
 import type { ReactNode } from "react";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
-import Link from "next/link";
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import { redirect } from "next/navigation";
 
 import {

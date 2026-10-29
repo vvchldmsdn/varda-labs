@@ -9,8 +9,9 @@ import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { historySnapshotHref } from "@/lib/cairn-v2/snapshot-contract";
-import { historyEventHref } from "@/lib/cairn-v2/history-return";
-import { useBetaPreferences, useBetaReadFreshness } from "./beta-provider";
+import { historyDisplayReturnHref, historyEventHref, historyReturnHref } from "@/lib/cairn-v2/history-return";
+import { useBetaExistingCrudAvailable, useBetaPreferences, useBetaReadFreshness } from "./beta-provider";
+import { RecoveryNotice } from "@/components/recovery/recovery-notice";
 import { HistoryChart, historyRows } from "./beta-charts";
 import { CairnSelect } from "./reused/cairn-select";
 import { MetricControls } from "./history-detail-controls";
@@ -41,6 +42,7 @@ export function HistoryDetail({
   const displayMoney = (n: number | null, signed = false) =>
     displayReadMoney(view, n, context.currency, signed);
   const freshness = useBetaReadFreshness();
+  const managementAvailable = useBetaExistingCrudAvailable();
   const rows = historyRows(view, period);
   const timeline =
     metric === "return" && view.domain?.recoveredReturn
@@ -61,6 +63,13 @@ export function HistoryDetail({
     !!view.domain,
   );
   const stateText = readStateText(view.domain?.historyState, "저장된 평가가 없습니다.");
+  const historyState = view.domain?.historyState;
+  const recoveryKind = historyState === "unavailable" || view.domain?.historyReadStatus === "partial" ? "retry" : historyState === "empty" || historyState === "partial" || rows.filter(row => row.source !== CURRENT_VALUATION_SOURCE).length < 2 ? "history" : null;
+  const returnHref = selectedDate && !isCurrent ? historyReturnHref(context, selectedDate, freshness?.store.pendingEpoch(), new URLSearchParams({
+    _historyDate:selectedDate,_historyPeriod:period,_historyMetric:metric,_historyScope:context.scope,_historyCurrency:context.currency,_historyReturn:"origin",
+  })) : historyDisplayReturnHref(context, {period,metric}, freshness?.store.pendingEpoch());
+  const recoveryNotice = context.mode === "domain" && historyState !== "loading" && historyState !== "unauthorized" && recoveryKind && (recoveryKind === "retry" || managementAvailable)
+    ? <RecoveryNotice kind={recoveryKind} scope={context.scope} beta returnHref={returnHref} /> : null;
   const sourceControl =
     historySource.options.length > 1 ? (
       <CairnSelect
@@ -80,6 +89,7 @@ export function HistoryDetail({
         <CairnStatus as="p" className={styles.empty} role="status">
           {stateText}
         </CairnStatus>
+        {recoveryNotice}
       </div>
     );
   const unit = context.currency === "KRW" ? "원" : "USD";
@@ -114,6 +124,7 @@ export function HistoryDetail({
   const sourceKinds = [...new Set(families)];
   return (
     <div className={styles.surface}>
+      {recoveryNotice}
       <div className={styles.toolbar}>
         {sourceControl}
         <div className={styles.toolbarActions}>

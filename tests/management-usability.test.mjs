@@ -23,6 +23,7 @@ describe("holding and account management usability", () => {
       "@/components/secondary-page-header": { SecondaryPageHeader: () => null },
       "@/components/portfolio-analysis-scope-tabs": { PortfolioAnalysisScopeTabs: () => null },
       "next/link": { default: ({ href, children }) => createElement("a", { href }, children) },
+      "next/navigation": { usePathname: () => "/portfolio/holdings", useSearchParams: () => new URLSearchParams(), useRouter: () => ({}) },
       "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => signedIn ? { ok: true, tenantContext } : { ok: false } },
       "@/lib/snapshots/market-calendar": { resolveSnapshotCycle: () => ({ snapshotDate: "2026-09-09" }) },
       "@/db/queries/portfolio-analysis-scopes": { getReadOnlyTenantPortfolioAnalysisScopeContext: async input => { reads.push(input); return { state: "ready", resolution: { state: "resolved", scope: selectedScope }, catalog: { scopes: [selectedScope] } }; } },

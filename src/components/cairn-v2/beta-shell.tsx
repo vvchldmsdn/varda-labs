@@ -1,7 +1,7 @@
 "use client";
 import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Input as CairnInput, PageTitle as CairnPageTitle, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
-import Link from "next/link";
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import {remainingWorkspaceHref} from "@/lib/cairn-v2/remaining-workspace-contract";
 import {targetEditorHref} from '@/lib/cairn-v2/target-editor-contract';
 import {ownedManagementHref} from '@/lib/cairn-v2/owned-management-contract';

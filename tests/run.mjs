@@ -407,6 +407,9 @@ import "./first-day-replay.test.mjs";
 import './contribution-effect.test.mjs';
 import './contribution-effects-migration.test.mjs';
 import './contribution-effect-storage.test.mjs';
+import './recovery-navigation.test.mjs';
+import './recovery-risk.test.mjs';
+import './recovery-currency.test.mjs';
 import './contribution-investment-evidence.test.mjs';
 
 import "./master-frontend-integration.test.mjs";

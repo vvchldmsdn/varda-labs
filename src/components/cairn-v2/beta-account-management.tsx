@@ -4,7 +4,8 @@ import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, 
 
 import { DetailHeader } from './ui/molecules';
 
-import Link from 'next/link';
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
+import { carryRecoveryFragment } from '@/lib/recovery-navigation';
 import {useActionState,useCallback,useLayoutEffect,useMemo,useRef,useState,useTransition,type FormEvent} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {createBetaAccount,updateBetaAccount,archiveBetaAccount,restoreBetaAccount} from '@/app/beta/portfolio/accounts/manage/actions';
@@ -66,10 +67,10 @@ export function BetaAccountManagement({read}:{read:AccountManagementRead}) {
     const nextEpoch=crypto.randomUUID();
     store?.begin(nextEpoch);
     if(result?.status==='success')setCompletion({generation:managementKey(context)+'|'+nextEpoch,message:result.message});
-    startTransition(()=>router.replace(managementHref(context,nextEpoch),{scroll:false}));
+    startTransition(()=>router.replace(carryRecoveryFragment(managementHref(context,nextEpoch),location.hash),{scroll:false}));
   },[context,router,store]);
   const complete=useCallback((result:AccountManagementActionState,submitted:string)=>{if(submitted===currentGeneration.current)reread(result)},[reread]);
-  const navigate=(next:typeof context)=>startTransition(()=>router.push(managementHref(next,store?.pendingEpoch()),{scroll:false}));
+  const navigate=(next:typeof context)=>startTransition(()=>router.push(carryRecoveryFragment(managementHref(next,store?.pendingEpoch()),location.hash),{scroll:false}));
   const message=blocked?'사용자·조회 범위를 다시 확인하는 중':read.message;
   const shell=blankDomainView(state==='loading'?'loading':state==='unauthorized'?'unauthorized':'ready',message);
   shell.domain!.scopes=blocked?[]:read.scopes;

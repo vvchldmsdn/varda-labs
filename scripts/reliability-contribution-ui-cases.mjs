@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { expect } from '@playwright/test';
+import { runRecoveryUiCases } from './reliability-recovery-ui-cases.mjs';
 
 async function switchLanguage(page, label) {
   const menuButton = page.getByRole('button', {name: /^(메뉴 열기|Open menu)$/});
@@ -15,26 +16,28 @@ async function switchLanguage(page, label) {
   }
 }
 
-/** Actual Next pages/actions/API + local PostgreSQL. No route, query or result mocks. */
-export async function runContributionUiCases({page,check,admin,owner,account,url,output}) {
-  const scope=`account:${account}`, query=new URLSearchParams({scope,currency:'KRW'}).toString();
+/** Actual Next pages/actions/API + local PostgreSQL; recovery injects one failed GET, never a result. */
+export async function runContributionUiCases({page,check,admin,owner,account,asset,url,output}) {
   const at=new Date().toISOString(), date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date());
   await admin.query(`insert into market_regime_daily(canonical_owner_user_id,account_id,account,date,label,drivers_json,macro_stress_score,regime_score,news_sentiment_score,updated_at)
     values($1,$2,'brokerage',$3,'경계','{"macro":["synthetic evidence"],"portfolio":["synthetic evidence"],"news":["synthetic evidence"]}',30,30,0.4,$4)`,[owner,account,date,at]);
+  const recovery=await runRecoveryUiCases({page,check,account,asset,url,output});
   let savedId;
   await check('fullapp-contribution-ko-desktop-target-preview-five-factor-server-save',async()=>{
     await page.setViewportSize({width:1440,height:900});
-    await page.goto(`${url}/portfolio/targets?${new URLSearchParams({scope,from:'additional-contribution'})}`);
+    await recovery.enterTargetResolution();
     await expect(page.getByRole('heading',{name:'종목별 목표',exact:true})).toBeVisible();
     await page.locator('input[name="targetWeight:0"]').fill('100');
     await page.getByRole('button',{name:'목표비중 저장',exact:true}).click();
     await expect(page.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible();
     const target=(await admin.query("select approval_revision from portfolio_target_policy_revisions where canonical_owner_user_id=$1 and scope_account_id=$2 and lifecycle_status='approved'",[owner,account])).rows;
     assert.equal(target.length,1);
-    const loaded=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/native-contribution-plans'&&response.request().method()==='GET');
-    await page.goto(`${url}/additional-contribution?${query}`);
-    const context=await (await loaded).json();assert.equal(context.context.status,'ready');assert.equal(context.context.input.modifiers.regime.value,'경계');
+    const context=await recovery.returnAfterApproval();assert.equal(context.context.status,'ready');assert.equal(context.context.input.modifiers.regime.value,'경계');
     const planner=page.getByRole('region',{name:'추가 투자 계획',exact:true});
+    // Recovery assertions above use USD/cash/exclusions. Keep this existing calculation case unchanged.
+    await planner.getByRole('combobox',{name:'투자금 통화',exact:true}).selectOption('KRW');
+    await planner.getByRole('checkbox',{name:/^보유 현금도 사용/}).uncheck();
+    await planner.getByRole('button',{name:'매도 제외 모두 해제',exact:true}).click();
     await planner.getByRole('textbox',{name:'새 투자금',exact:true}).fill('10000');
     await planner.getByRole('button',{name:'배분 미리보기',exact:true}).click();
     const result=planner.locator('[id^="native-plan-"]');
@@ -67,6 +70,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,url
     const state=(await admin.query('select native_state from accounts where id=$1',[account])).rows[0].native_state;
     assert.equal(state.positions[0].quantity,'10');assert.equal(state.cash.KRW,'101000');
   });
+  await recovery.retryNativeRead();
   await check('fullapp-contribution-en-mobile-refresh-frozen-plan-and-evidence',async()=>{
     await switchLanguage(page,'Switch to English');
     await page.setViewportSize({width:390,height:844});await page.reload();

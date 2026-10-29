@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createElement } from "react";
+import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
@@ -68,10 +68,11 @@ test("Lab first steps preserve the selected scope and distinguish hypothetical e
   }
 });
 
-test("Lab replaces only short valid personal histories with first steps, preserving real calculation and error states", async () => {
+test("Lab replaces only short valid personal histories with first steps, preserving real calculation and error states", async t => {
   const Empty = () => null;
   const ports = {
     "./investment-lab-workspace": { InvestmentLabWorkspace: ({ showFirstSteps, comparison }) => createElement("section", { "data-first-steps": String(showFirstSteps) }, comparison) },
+    "next/navigation": { useRouter: () => ({}) },
   };
   for (const [path, name] of [
     ["@/components/portfolio-primary-navigation", "PortfolioPrimaryNavigation"],
@@ -104,4 +105,20 @@ test("Lab replaces only short valid personal histories with first steps, preserv
   assert.match(render({ observedHistory: { ...props.observedHistory, blockers: ["invalid_market_value"] } }), /data-first-steps="false"/);
   assert.match(render({ observedHistory: { ...props.observedHistory, coverage: { observedDateCount: 2 } } }), /data-first-steps="false"/);
   assert.match(render({ model: { ...props.model, observedPath: { status: "ready" } } }), /data-first-steps="false"/);
+  await t.test("blocked legacy-account lab uses its resolved account for recovery", () => {
+    const selectedScope = { kind: "account", key: "account:11111111-1111-4111-8111-111111111111", accountId: "11111111-1111-4111-8111-111111111111", accountCode: "brokerage", label: "Brokerage" };
+    const tree = InvestmentLabView({ ...props, selectedScope, scopeQuery: { account: "brokerage" }, observedHistory: { ...props.observedHistory, coverage: { ...props.observedHistory.coverage, observedDateCount: 2 } } });
+    function findElement(node, name) {
+      if (Array.isArray(node)) return node.map(child => findElement(child, name)).find(Boolean);
+      if (!isValidElement(node)) return undefined;
+      if (node.type?.name === name) return node;
+      return Object.values(node.props).map(child => findElement(child, name)).find(Boolean);
+    }
+    const blocked = findElement(tree, "BlockedView");
+    assert.ok(blocked, "a blocked existing history must offer recovery, not first steps");
+    const notice = findElement(blocked.type(blocked.props), "RecoveryNotice");
+    assert.ok(notice);
+    assert.equal(notice.props.scope, selectedScope.key, "legacy account URLs must not fall back to all accounts");
+    assert.deepEqual(notice.props.readForm, { id: "investment-lab-period-filter", fields: ["start", "end"] });
+  });
 });

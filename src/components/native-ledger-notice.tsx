@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import { T } from "@/components/i18n/localized-text";
 import { nativeLedgerHref } from "@/lib/native-ledger-compatibility";
 

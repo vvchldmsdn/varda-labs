@@ -55,6 +55,7 @@ export function InvestmentLabPeriodSelector({
           </div>
 
           <CairnForm
+            id="investment-lab-period-filter"
             action="/investment-lab"
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
             key={[

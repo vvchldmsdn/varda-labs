@@ -1,4 +1,7 @@
 'use client';
+import { carryRecoveryFragment } from '@/lib/recovery-navigation';
+import { RecoveryBackLink } from '@/components/recovery/recovery-return';
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { DetailHeader } from './ui/molecules';
@@ -23,20 +26,21 @@ export function BetaTargetEditor({read}:{read:TargetEditorRead}){
  const generation=targetEditorGeneration(context,store?.pendingEpoch()??read.readEpoch,read.readReceipt),current=useRef(generation);
  useLayoutEffect(()=>{if(!pending)current.current=generation},[generation,pending]);
  useLayoutEffect(()=>()=>{current.current='unmounted'},[]);
- const refresh=useCallback((message?:string)=>{const nextEpoch=crypto.randomUUID();current.current='refreshing';if(message){setNotice({epoch:nextEpoch,message});focusAfter.current=nextEpoch;}store?.begin(nextEpoch);startTransition(()=>router.replace(targetEditorHref(context,nextEpoch),{scroll:false}));},[context,router,store]);
+ const refresh=useCallback((message?:string)=>{const nextEpoch=crypto.randomUUID();current.current='refreshing';if(message){setNotice({epoch:nextEpoch,message});focusAfter.current=nextEpoch;}store?.begin(nextEpoch);startTransition(()=>router.replace(carryRecoveryFragment(targetEditorHref(context,nextEpoch),location.hash),{scroll:false}));},[context,router,store]);
  const action=useCallback(async(previous:PortfolioTargetPolicyActionState,data:FormData)=>{const result=await saveBetaTargetPolicy(previous,data);if(result.status==='success'&&current.current===generation&&!store?.blocked(read.readReceipt,read.readEpoch))refresh(result.message??'목표비중을 승인했습니다.');return result;},[generation,refresh,store,read.readReceipt,read.readEpoch]);
  useLayoutEffect(()=>{if(readable&&focusAfter.current===read.readEpoch){heading.current?.focus({preventScroll:true});focusAfter.current=null;}},[readable,read.readEpoch]);
  const shell=blankDomainView(blocked?'loading':read.state==='unauthorized'?'unauthorized':'ready',blocked?'사용자·조회 범위를 다시 확인하는 중':read.message);shell.domain!.scopes=blocked?[]:read.scopes;
  const href=(path:Parameters<typeof betaHref>[0],hash='')=>betaReadHref(betaHref(path,context)+hash,store?.pendingEpoch());
- const navigate=(next:typeof context)=>{current.current='navigation';setNotice(null);startTransition(()=>router.push(targetEditorHref(next,store?.pendingEpoch()),{scroll:false}));};
+ const navigate=(next:typeof context)=>{current.current='navigation';setNotice(null);startTransition(()=>router.push(carryRecoveryFragment(targetEditorHref(next,store?.pendingEpoch()),location.hash),{scroll:false}));};
  return <div style={{display:'contents'}} onClickCapture={event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=(event.target as Element).closest?.('a[href]') as HTMLAnchorElement|null;if(link&&link.target!=='_blank'){const next=new URL(link.href,location.href);if(next.pathname+next.search!==location.pathname+location.search)current.current='navigation';}}}><BetaShell context={context} setContext={navigate} readView={shell} workspace="targets" originalPath="/portfolio/targets">
   <section className={styles.workspace} id="target-editor" data-target-editor-state={blocked?'loading':read.state} aria-busy={blocked}>
-   <DetailHeader title="목표비중" headingProps={{ref:heading,tabIndex:-1}} actions={<><Link prefetch={false} href={href('/beta/portfolio/structure')}>포트 구조 ↗</Link><Link prefetch={false} href={href('/beta','#beta-contribution')}>추가 투자 계산 ↗</Link><a href={originalHref('/portfolio/targets',context)}>기존 목표 화면 ↗</a></>} />
+   <DetailHeader title="목표비중" headingProps={{ref:heading,tabIndex:-1}} actions={<><Link prefetch={false} href={href('/beta/portfolio/structure')}>포트 구조 ↗</Link><RecoveryBackLink href={href('/beta','#beta-contribution')}>추가 투자 계산 ↗</RecoveryBackLink><a href={originalHref('/portfolio/targets',context)}>기존 목표 화면 ↗</a></>} />
    <CairnStatus as="p" role="status">{blocked?'사용자·조회 범위를 다시 확인하는 중':read.message}</CairnStatus>
    {!blocked&&<p className={styles.muted}>분석·평가 기준 KRW · 조회 통화 {context.currency}와 별개입니다. 기준일 {read.serviceDate??'—'} · 승인본 {read.approvalRevision} · {read.policyStatus==='available'?'승인 목표':read.startingWeightSource==='current_allocation_starting_point'?'현재 비중에서 시작한 미승인 입력':'승인 근거 확인 필요'}</p>}
    {readable&&read.policyStatus!=='available'&&<p className={styles.warning}>현재 승인 목표로 적용할 수 없는 상태입니다. 편집 시작값을 승인 목표로 표시하지 않습니다. 근거: {read.policyStatus}</p>}
    {readable&&notice&&notice.epoch===read.readEpoch&&<CairnStatus as="p" role="status">{notice.message}</CairnStatus>}
    {!blocked&&read.state==='unavailable'&&<CairnButton variant="secondary" type="button" className={styles.retry} onClick={()=>refresh()}>목표 자료 다시 조회</CairnButton>}
+   {!blocked&&read.state==='blocked'&&available&&<RecoveryNotice beta kind="holdings" scope={context.scope} />}
    <div key={generation} hidden={!readable} inert={!enabled} aria-hidden={!readable} onSubmitCapture={(event:FormEvent)=>{if(!enabled)event.preventDefault()}}>
     {readable&&read.universeHash&&<TargetPolicyEditor rows={read.rows} accounts={read.accounts} scopeKey={context.scope} universeHash={read.universeHash} approvalRevision={read.approvalRevision} action={action}/>}
    </div>

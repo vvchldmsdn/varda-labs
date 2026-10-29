@@ -1,6 +1,7 @@
 import { MemberActivityTracker } from "@/components/member-activity-tracker";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { RecoveryReturn } from "@/components/recovery/recovery-return";
 import { getLocale } from "@/lib/i18n/server";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { LocaleDocumentTitle } from "@/components/i18n/locale-document-title";
@@ -52,6 +53,7 @@ export default async function RootLayout({
     >
       <body>
         <LocaleProvider initialLocale={locale}>
+        <Suspense fallback={null}><RecoveryReturn /></Suspense>
         {children}
         <Suspense fallback={null}><LocaleDocumentTitle /></Suspense>
         <Suspense fallback={null}><MemberActivityTracker /></Suspense>

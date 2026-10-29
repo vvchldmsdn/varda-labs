@@ -17,6 +17,8 @@ import { RiskAnalysisBasis, RiskCalculationNotice, RiskPortfolioSummary, RiskSta
 import { calculationStatusLabel, formatRiskMetric, formatRiskRatioPercent, metricReasonLabel } from "./portfolio-risk-format";
 import styles from "./risk-stage.module.css";
 import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { RecoveryNotice } from "@/components/recovery/recovery-notice";
+import { riskRecoveryKind } from "@/lib/recovery-risk";
 
 
 export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=false}:{
@@ -26,6 +28,7 @@ export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=fa
   isDesignPreview?:boolean;
 }) {
   const portfolio=model.calculation.portfolio;
+  const recoveryKind = riskRecoveryKind(model);
   const featured=model.calculation.instruments.map((instrument,index)=>({instrument,index})).toSorted((a,b)=>(b.instrument.weight??0)-(a.instrument.weight??0)||a.index-b.index).slice(0,10);
   const featuredMatrix=featured.map(({index})=>featured.map(({index:column})=>portfolio?.correlationMatrix[index]?.[column]??null));
   return <main data-page="portfolio-risk" className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]">
@@ -34,6 +37,7 @@ export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=fa
       <header className={styles.header}><div className={styles.title}><CairnPageTitle><PortfolioText ko={"위험과 분산."} /></CairnPageTitle>{isDesignPreview?<LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 90일 분석 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 90일 분석 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement>:null}</div><div className={styles.controls}><PortfolioRiskControls scopes={scopes} selectedScope={selectedScope} selection={model.selection} isDesignPreview={isDesignPreview}/></div><Link className={styles.headerLink} href={`/portfolio/structure?scope=${encodeURIComponent(selectedScope.key)}${isDesignPreview?"&preview=design":""}`}><ArrowLeft size={13} aria-hidden="true"/><PortfolioText ko={"포트 구조"} /></Link></header>
       <div className={styles.statusLine}><strong><PortfolioText ko={calculationStatusLabel(model.calculation.calculationStatus)} /></strong><span><PortfolioText ko={"관측"} />{" "}{model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}<PortfolioText ko={"일"} /></span><span><PortfolioText ko={"분석 종목"} />{" "}{model.provenance.includedInstrumentCount}<PortfolioText ko={"개"} /></span></div>
       <div className={styles.notice}><RiskCalculationNotice model={model}/></div>
+      {!isDesignPreview && recoveryKind && <RecoveryNotice kind={recoveryKind} scope={selectedScope.key} reasons={[model.calculation.reason, ...model.inputHealth.blockers.map(row => row.reason)].filter((reason): reason is NonNullable<typeof reason> => reason !== null)} />}
       {portfolio?<div className={styles.riskStage}>
         <LocalizedElement className={styles.matrix} aria-label="보유 종목 상관관계" as="section" en={{"aria-label": portfolioEnglish("보유 종목 상관관계")}}><div className={styles.matrixHeading}><CairnSectionTitle><PortfolioText ko={"상관관계 행렬"} /></CairnSectionTitle><p><PortfolioText ko={featured.length<model.calculation.instruments.length?`비중 상위 ${featured.length} / 전체 ${model.calculation.instruments.length}종목`:`전체 ${featured.length}종목`} /> {" "}<PortfolioText ko={"· KRW 환산"} /></p></div><RiskCorrelationMatrix compact instruments={featured.map(row=>row.instrument)} matrix={featuredMatrix}/></LocalizedElement>
         <dl className={styles.coreSummary}><div className={styles.coreMetric}><dt><PortfolioText ko={"연환산 변동성"} /></dt><dd>{formatRiskRatioPercent(portfolio.volatilityAnnualized)}<small><PortfolioText ko={"관측"} />{" "}{portfolio.observationCount}<PortfolioText ko={"일 기준"} /></small></dd></div><div className={styles.coreMetric}><dt><PortfolioText ko={"유효 분산 수 ENB"} /></dt><dd>{formatRiskMetric(portfolio.riskContributionEnb)}<small><PortfolioText ko={metricReasonLabel(portfolio.riskContributionEnb.reason)??"절대 위험 기여도 기준"} /></small></dd></div><div className={styles.coreMetric} data-unavailable={portfolio.sharpe.value === null}><dt>Sharpe</dt><dd>{formatRiskMetric(portfolio.sharpe)}<small><PortfolioText ko={metricReasonLabel(portfolio.sharpe.reason)??"검증된 무위험 수익률 기준"} /></small></dd></div></dl>

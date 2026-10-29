@@ -128,6 +128,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
       },
     },
     "next/link": { default: () => null },
+    "next/navigation": { usePathname: () => "/portfolio/holdings/new", useSearchParams: () => new URLSearchParams(), useRouter: () => ({}) },
     "@/components/use-market-collection-polling": { useMarketCollectionPolling: () => collectionState },
     "@/components/i18n/locale-provider": { useI18n: () => ({ t: (ko, en) => locale === "ko" ? ko : en }) },
     "@/components/i18n/management-text": { ManagementText: () => null },

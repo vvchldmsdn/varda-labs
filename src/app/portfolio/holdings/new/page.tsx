@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import { ArrowLeft } from "lucide-react";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { T } from "@/components/i18n/localized-text";

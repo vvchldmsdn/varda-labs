@@ -5,7 +5,8 @@ import { BrandLogo } from "@/components/brand-logo";
 import { REPORTING_ROUTES, ReportingCurrencySwitch } from "@/components/reporting-currency-switch";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useSyncExternalStore } from "react";
+import { carryRecoveryFragment } from "@/lib/recovery-navigation";
 import { buildBetaFrontendHref } from "@/lib/frontend-beta-link";
 import betaSwitchStyles from "./mobile-beta-switch.module.css";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -39,6 +40,12 @@ const mobileNavigation = [
   navigation[0].items[3], navigation[0].items[2],
 ];
 
+const subscribeRecovery = (notify: () => void) => {
+  window.addEventListener("hashchange", notify); window.addEventListener("popstate", notify);
+  return () => { window.removeEventListener("hashchange", notify); window.removeEventListener("popstate", notify); };
+};
+const recoverySnapshot = () => location.hash;
+
 function PendingHint() {
   const { pending } = useLinkStatus();
   return <span className="varda-link-pending" data-pending={pending || undefined} aria-hidden="true" />;
@@ -53,6 +60,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
   const {t, locale} = useI18n();
   const pathname = usePathname();
   const params = useSearchParams();
+  const recoveryHash = useSyncExternalStore(subscribeRecovery, recoverySnapshot, () => "");
   const menuRef = useRef<HTMLDialogElement>(null);
   const preview = process.env.NODE_ENV === "development" && params.get("preview") === "design";
   const scope = selectedScopeKey ?? params.get("scope");
@@ -143,7 +151,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={currentPath === "/history" || currentPath === "/today"} /> : null}
           {!researchHref && !preview && REPORTING_ROUTES.some(route => route === currentPath) ? <ReportingCurrencySwitch /> : null}
           <span className="varda-topbar-language"><LanguageSwitch /></span>
-          <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={hrefFor("/portfolio/holdings/new")}>
+          <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
           </Link>
           {!preview && !researchHref ? <a className={betaSwitchStyles.link} href={buildBetaFrontendHref(params, selectedScopeKey)} aria-label={t("베타로 보기", "Try beta")}>
@@ -172,7 +180,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
             {t("베타로 보기", "Try beta")}<ArrowUpRight size={15} aria-hidden="true" />
           </a> : null}
           <div className="varda-menu-language"><LanguageSwitch /></div>
-          <Link className="varda-menu-account" href={hrefFor("/portfolio/holdings/new")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
+          <Link className="varda-menu-account" href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
           {!preview ? <TradeRecordLinks variant="menu" accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
           <Link className="varda-menu-account" href={hrefFor("/plans")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
           {!preview ? <Link className="varda-menu-account" href="/portfolio/reporting" onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}

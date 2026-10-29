@@ -66,6 +66,7 @@ describe("plan to holding handoff", () => {
       "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
       react: { useState: initial => [initial, () => {}], useActionState: (fn, initial) => { submit = fn; return [initial, () => {}, false]; } },
       "next/link": { default: () => null },
+      "next/navigation": { usePathname: () => "/portfolio/holdings/new", useSearchParams: () => new URLSearchParams(), useRouter: () => ({}) },
       "@/components/use-market-collection-polling": { useMarketCollectionPolling: () => null },
       "@/app/portfolio/holdings/new/actions": { createHoldingBatch: async () => result },
       "@/components/i18n/locale-provider": { useI18n: () => ({ t: ko => ko }) },

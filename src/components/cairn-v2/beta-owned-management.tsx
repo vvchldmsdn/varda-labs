@@ -2,7 +2,8 @@
 import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { DetailHeader } from './ui/molecules';
-import Link from 'next/link';
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
+import { carryRecoveryFragment } from '@/lib/recovery-navigation';
 import {useCallback,useLayoutEffect,useMemo,useRef,useState,useTransition,type FormEvent,type ReactNode} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {correctBetaHolding,archiveBetaHolding,restoreBetaHolding} from '@/app/beta/portfolio/holdings/manage/actions';
@@ -32,14 +33,14 @@ export function BetaOwnedManagement({read}:{read:OwnedManagementRead}){
  const readable=!blocked&&['ready','partial','empty'].includes(read.state),enabled=available&&readable;
  const generation=ownedManagementGeneration(read.kind,context,store?.pendingEpoch()??read.readEpoch,read.readReceipt),current=useRef(generation);
  useLayoutEffect(()=>{current.current=generation},[generation]);
- const refresh=useCallback((moveFocus=false)=>{const nextEpoch=crypto.randomUUID();if(moveFocus)focusAfter.current=nextEpoch;store?.begin(nextEpoch);startTransition(()=>router.replace(ownedManagementHref(read.kind,context,nextEpoch),{scroll:false}));},[read.kind,context,router,store]);
+ const refresh=useCallback((moveFocus=false)=>{const nextEpoch=crypto.randomUUID();if(moveFocus)focusAfter.current=nextEpoch;store?.begin(nextEpoch);startTransition(()=>router.replace(carryRecoveryFragment(ownedManagementHref(read.kind,context,nextEpoch),location.hash),{scroll:false}));},[read.kind,context,router,store]);
  const afterSuccess=useCallback(()=>refresh(true),[refresh]);
  useLayoutEffect(()=>{if(!blocked&&readable&&focusAfter.current===read.readEpoch){headingRef.current?.focus({preventScroll:true});focusAfter.current=null;}},[blocked,readable,read.readEpoch]);
  useLayoutEffect(()=>{if(previousReceipt.current!==read.readReceipt){previousReceipt.current=read.readReceipt;if(!blocked&&readable&&document.activeElement===document.body)headingRef.current?.focus({preventScroll:true});}},[read.readReceipt,blocked,readable]);
  const correct=useManagementContinuation(correctBetaHolding,generation,current,afterSuccess),archive=useManagementContinuation(archiveBetaHolding,generation,current,afterSuccess),restore=useManagementContinuation(restoreBetaHolding,generation,current,afterSuccess),saveGroup=useManagementContinuation(saveBetaGroup,generation,current,afterSuccess),archiveGroup=useManagementContinuation(archiveBetaGroup,generation,current,afterSuccess);
  const state=blocked?'loading':read.state,message=blocked?'사용자·조회 범위를 다시 확인하는 중':read.message;
  const shell=blankDomainView(state==='loading'?'loading':state==='unauthorized'?'unauthorized':'ready',message);shell.domain!.scopes=blocked?[]:read.scopes;
- const navigate=(next:typeof context)=>startTransition(()=>router.push(ownedManagementHref(read.kind,next,store?.pendingEpoch()),{scroll:false}));
+ const navigate=(next:typeof context)=>startTransition(()=>router.push(carryRecoveryFragment(ownedManagementHref(read.kind,next,store?.pendingEpoch()),location.hash),{scroll:false}));
  const preventBlocked=(event:FormEvent)=>{if(!enabled)event.preventDefault()};
  return <BetaShell context={context} setContext={navigate} readView={shell} workspace={read.kind==='groups'?'groups':'holdings'} originalPath={read.kind==='groups'?'/portfolio/groups':'/portfolio/holdings'}>
   <section className={styles.workspace} id={read.kind==='groups'?'group-management':'holdings-management'} data-owned-management-state={state} data-owned-management-kind={read.kind} aria-busy={blocked}>

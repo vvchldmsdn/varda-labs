@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import type { SimulationPathHandle } from "@/lib/simulation-path-detail";
 import { SimulationText } from "@/components/simulation/simulation-text";
 import { buildPortfolioAnalysisScopeHref, type PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
@@ -206,7 +207,7 @@ export function OwnerResearchExecutionSection({
               <SimulationText ko="종목 관리에서 현재 가격과 과거 가격의 준비 상태를 확인하세요. 내 가입 전 시장 이력도 사용할 수 있으며, 개인 투자 기록이 쌓일 때까지 기다릴 필요는 없습니다." en="Check current prices and historical data readiness in holdings. Market history from before signup can be used; you do not need to wait for personal investment records." />
             )}
           </p>
-          <Link
+          {execution.reason === 'invalid_end_service_date' || execution.reason === 'invalid_horizon_selection' ? <Link
             href={buildPortfolioAnalysisScopeHref(
               execution.reason === "invalid_end_service_date" || execution.reason === "invalid_horizon_selection" ? "/simulation" : "/portfolio/holdings",
               selectedScopeKey,
@@ -219,7 +220,7 @@ export function OwnerResearchExecutionSection({
             ) : (
               <SimulationText ko="종목·분석 데이터 확인" en="Check holdings and analysis data" />
             )}
-          </Link>
+          </Link> : <RecoveryNotice scope={selectedScopeKey} reasons={[execution.reason]} readForm={{id:'simulation-date-filter',fields:['end']}} />}
         </div>
       )}
     </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import { NativeLedgerNotice } from "@/components/native-ledger-notice";
 import { NATIVE_LEDGER_REQUIRED_MESSAGE } from "@/lib/native-ledger-compatibility";
 import { useActionState, useState } from "react";

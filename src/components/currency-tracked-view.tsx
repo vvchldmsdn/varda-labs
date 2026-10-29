@@ -10,6 +10,8 @@ import { Decimal, formatMoney, parseMoneyInput, type Currency } from "@/lib/mone
 import type { CurrencyTrackedInput, CurrencyTrackedResult } from "@/lib/currency-tracked-portfolio";
 import { calculateCurrencyContribution } from "@/lib/currency-contribution";
 import { NativeContributionPlanner } from "@/components/native-contribution-planner";
+import { RecoveryNotice } from "@/components/recovery/recovery-notice";
+import { currencyRecoveryKind, type NativeViewDraft } from "@/lib/recovery-currency";
 import styles from "./currency-tracked-view.module.css";
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
@@ -18,17 +20,19 @@ type ContributionPolicy = { trimDriftThresholdPct: number; minimumExecutionRatio
 type Contribution = ReturnType<typeof calculateCurrencyContribution>;
 const ZONES = ["Asia/Seoul", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Tokyo", "UTC"];
 
-export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul", contributionPolicy, surface, hideCurrencyControl = false, nativeContributionScopeKey }: {
+export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul", contributionPolicy, surface, hideCurrencyControl = false, nativeContributionScopeKey, recoveryScope, initialView }: {
   evidence: CurrencyTrackedInput; timeZone?: string; contributionPolicy?: ContributionPolicy;
   reports: Readonly<Record<Currency, CurrencyTrackedResult>>;
   surface?: "home" | "today" | "history" | "structure" | "contribution";
   hideCurrencyControl?: boolean;
   nativeContributionScopeKey?: string;
+  recoveryScope?: string;
+  initialView?: NativeViewDraft | null;
 }) {
   const { locale, t } = useI18n();
   const [currency, setCurrency] = useState<Currency>(evidence.reporting);
-  const [zone, setZone] = useState(timeZone);
-  const [selected, setSelected] = useState("");
+  const [zone, setZone] = useState(initialView?.zone ?? timeZone);
+  const [selected, setSelected] = useState(evidence.current.positions.some(row => row.id === initialView?.selected) ? initialView!.selected! : "");
   const report = reports[currency];
   const [cash, setCash] = useState("");
   const [cashCurrency, setCashCurrency] = useState<Currency>(evidence.reporting);
@@ -92,12 +96,15 @@ export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul"
     } catch { setError(t("입력과 평가 근거를 다시 확인해 주세요.", "Please check the inputs and valuation evidence.")); }
   }
 
-  if (!report.current) return <main className={styles.page}><CairnPageTitle>{t("자산 평가를 확인할 수 없어요.", "Portfolio valuation is unavailable.")}</CairnPageTitle><p>{t("새로고침한 뒤 다시 확인해 주세요.", "Refresh the page and retry.")}</p></main>;
+  const recoveryDraft = recoveryScope ? { currency, _nativeView: JSON.stringify({ version: 1, scope: recoveryScope, view: surface ?? "reporting", currency, zone, selected } satisfies NativeViewDraft) } : undefined;
+  if (!report.current) return <main className={styles.page}><CairnPageTitle>{t("자산 평가를 확인할 수 없어요.", "Portfolio valuation is unavailable.")}</CairnPageTitle><p>{t("새로고침한 뒤 다시 확인해 주세요.", "Refresh the page and retry.")}</p>{recoveryScope && evidence.current.source !== "synthetic_fixture" && report.reason !== "owner_scope_mismatch" ? <RecoveryNotice kind="retry" scope={recoveryScope} draft={recoveryDraft} /> : null}</main>;
   const current = report.current;
   const showHoldings = !surface || ["home", "today", "structure"].includes(surface);
   const showMovement = !surface || ["home", "today"].includes(surface);
   const showHistory = !surface || surface === "history";
   const showContribution = !surface || surface === "contribution";
+  const recoveryReasons = [...current.issues.map(issue => issue.code), ...(showHistory ? report.history.flatMap(frame => frame.issues.map(issue => issue.code)) : []), ...(showMovement && report.movement?.reason ? [report.movement.reason] : [])];
+  const recoveryKind = currencyRecoveryKind(recoveryReasons) ?? (showHistory && report.history.length === 0 ? "trades" : null);
   const titles = { home: ["내 자산의 흐름", "My portfolio"], today: ["오늘의 변화를 살펴보세요.", "What moved today?"], history: ["자산이 지나온 시간", "Your portfolio over time"], structure: ["내 포트폴리오의 구성", "Inside your portfolio"], contribution: ["다음 투자금, 목표에 가깝게.", "Bring your next contribution closer to your targets."] };
   const title = surface ? titles[surface] : ["통화가 바뀌면, 평가도 달라집니다.", "One portfolio. Two perspectives."];
   const active = current.positions.find(row => row.id === selected) ?? current.positions[0];
@@ -116,6 +123,7 @@ export function CurrencyTrackedView({ evidence, reports, timeZone = "Asia/Seoul"
       {!hideCurrencyControl ? <CairnField className={styles.selectLabel}>{t("분석 통화", "Analysis currency")}<CairnSelect value={currency} onChange={event => { setCurrency(event.target.value as Currency); invalidate(); }}><option value="KRW">KRW · ₩</option><option value="USD">USD · $</option></CairnSelect></CairnField> : null}
     </header>
     {evidence.current.source === "synthetic_fixture" ? <p className={styles.notice}>{t("체험 모드 · 가상 데이터", "Preview · synthetic data")}</p> : null}
+    {recoveryScope && evidence.current.source !== "synthetic_fixture" && recoveryKind ? <RecoveryNotice kind={recoveryKind} scope={recoveryScope} reasons={recoveryReasons} draft={recoveryDraft} details={showHistory && report.history.length === 0 ? t("확인된 과거 평가가 아직 없습니다. 거래 및 시작 보유 기록을 확인할 수 있지만, 현재 원가나 거래 입력만으로 과거 평가와 수익률이 만들어지지는 않습니다.", "No past valuation has been verified yet. Review transactions and opening holdings; entering trades or current cost alone does not create historical valuations or returns.") : undefined} /> : null}
     {evidence.groupEvidence ? <details className={styles.method}><summary>{t("그룹 계산 범위", "Group calculation scope")}</summary><p>{t("선택한 계좌는 현금을 포함하고, 개별 종목은 그 종목만 포함해요.", "Selected accounts include their cash; individually selected holdings include only the holding.")}</p><p>{t("현재 구성으로 비교 가능한 시작", "Current membership window starts")} · {date(evidence.groupEvidence.stableSince)}</p></details> : null}
     <div className={styles.context}><span>{t("평가 시각", "Valued at")} · {date(current.at)}</span><details><summary>{t("시간대", "Time zone")} · {zone}</summary><CairnSelect aria-label={t("표시 시간대", "Display time zone")} value={zone} onChange={event => setZone(event.target.value)}>{[...new Set([...ZONES, timeZone])].map(value => <option key={value}>{value}</option>)}</CairnSelect><p>{t("표시 시각만 바뀝니다. 서비스 일자는 한국시간 오전 7시를 기준으로 구분해요.", "This changes display times. Service days still roll over at 7 am in Korea.")}</p></details></div>
 

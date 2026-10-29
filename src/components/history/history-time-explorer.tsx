@@ -5,6 +5,7 @@ import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { RecoveryNotice } from "@/components/recovery/recovery-notice";
 
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -50,19 +51,23 @@ export function HistoryTimeExplorer({
   details,
   status,
   recoveredReturn,
+  initialSelection,
+  recovery,
 }: {
   model: HistoryOverviewModel;
   scopeLabel: string;
   details?: ReactNode;
   status?: ReactNode;
   recoveredReturn?: RecoveredReturnCurve | null;
+  initialSelection?: { metric?: unknown; period?: unknown; date?: unknown };
+  recovery?: { scope: string; readFailed: boolean; valuationIncomplete: boolean };
 }) {
   const { t } = useI18n();
   const returnAvailable = !!recoveredReturn || historyPointsWithMetric(model.points, "return").length > 0;
   const [mode, setMode] = useState<HistoryExplorerMode>(
-    "value",
+    initialSelection?.metric === "return" && returnAvailable ? "return" : "value",
   );
-  const [range, setRange] = useState<HistoryExplorerRange>("90D");
+  const [range, setRange] = useState<HistoryExplorerRange>(RANGE_OPTIONS.find(option => option.key === initialSelection?.period)?.key ?? "90D");
   const visiblePoints = useMemo(
     () => selectHistoryRange(mode === "return" && recoveredReturn ? model.points.map(p => p.rowKind === "live" && p.recordedPoint ? p.recordedPoint : p).filter(p => p.rowKind !== "live") : historyPointsWithMetric(model.points, mode), range),
     [model.points, mode, range, recoveredReturn],
@@ -71,9 +76,14 @@ export function HistoryTimeExplorer({
     () => summarizeHistoryRange(visiblePoints),
     [visiblePoints],
   );
-  const [selectedDate, setSelectedDate] = useState(
-    model.points.at(-1)?.date ?? null,
-  );
+  const storedReturns = useMemo(() => model.points.map(point => point.rowKind === 'live' && point.recordedPoint ? point.recordedPoint : point).filter(point => point.rowKind !== 'live').map(point => ({ date: point.date, returnPct: point.totalReturnPct })), [model.points]);
+  const returnRangeDays = range === 'ALL' ? undefined : range === '30D' ? 30 : range === '90D' ? 90 : 365;
+  const returnTimeline = useMemo(() => recoveredReturn ? buildReturnTimeline(storedReturns, recoveredReturn, returnRangeDays) : [], [storedReturns, recoveredReturn, returnRangeDays]);
+  // A return hint selects only an actual observation in the currently admitted range.
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const points = mode === "return" && recoveredReturn ? returnTimeline : historyPointsWithMetric(visiblePoints, mode);
+    return points.find(point => point.date === initialSelection?.date)?.date ?? points.at(-1)?.date ?? null;
+  });
   const [inspectedDate, setInspectedDate] = useState<string | null>(null);
   const selectablePoints = historyPointsWithMetric(visiblePoints, mode);
   const selectedPoint =
@@ -81,15 +91,14 @@ export function HistoryTimeExplorer({
     selectablePoints.at(-1) ??
     null;
   const inspectedPoint = selectablePoints.find((point) => point.date === inspectedDate) ?? selectedPoint;
-  const storedReturns = useMemo(() => model.points.map(point => point.rowKind === 'live' && point.recordedPoint ? point.recordedPoint : point).filter(point => point.rowKind !== 'live').map(point => ({ date: point.date, returnPct: point.totalReturnPct })), [model.points]);
-  const returnRangeDays = range === 'ALL' ? undefined : range === '30D' ? 30 : range === '90D' ? 90 : 365;
-  const returnTimeline = useMemo(() => recoveredReturn ? buildReturnTimeline(storedReturns, recoveredReturn, returnRangeDays) : [], [storedReturns, recoveredReturn, returnRangeDays]);
   const returnPoint = returnTimeline.find(p => p.date === (inspectedDate ?? selectedDate)) ?? returnTimeline.at(-1);
   const integratedReturn = mode === 'return' && !!recoveredReturn && !!returnPoint;
   const heroDate = integratedReturn ? returnPoint!.date : inspectedPoint?.date ?? null;
   const heroReturn = integratedReturn ? returnPoint!.returnPct : inspectedPoint?.totalReturnPct ?? null;
   const heroReturnLabel = integratedReturn ? returnTimelineLabel(returnPoint!) : '저장 수익률';
   const hasLiveValuation = visiblePoints.some(point => point.rowKind === "live");
+  const recoveryKind = recovery?.readFailed ? "retry" : model.status === "no_data" || model.points.filter(point => point.rowKind !== "live" || point.recordedPoint).length < 2 ? "history" : recovery?.valuationIncomplete ? "holdings" : null;
+  const recoveryNotice = recovery && recoveryKind ? <RecoveryNotice kind={recoveryKind} scope={recovery.scope} draft={{metric:mode,period:range,...(selectedDate?{date:selectedDate}:{})}} /> : null;
 
   if (model.status === "no_data") {
     return (
@@ -98,6 +107,7 @@ export function HistoryTimeExplorer({
         <CairnPageTitle className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></CairnPageTitle>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]"><T ko="평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다." en="Values are not interpolated. Once daily portfolio snapshots are recorded, you can explore values and events by date here."/></p>
         {details ? <div className="mt-6 flex justify-center">{details}</div> : null}
+        {recoveryNotice}
       </section>
     );
   }
@@ -153,6 +163,7 @@ export function HistoryTimeExplorer({
           </div>}
         </div>
       </div>
+      {recoveryNotice}
       <footer className={styles.stageFooter}>
         <p>{integratedReturn ? "저장 수익률과 복구 기간 수익률 · 계산 기준 구분" : hasLiveValuation ? <T ko="저장 기록 + 현재 평가 · 현금흐름 미보정" en="Records + current valuation · Not adjusted for cash flows"/> : <T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/>}</p>
         <div>

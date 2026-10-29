@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RecoveryJourneyLink } from '@/components/recovery/recovery-return';
 import type { ComponentProps, ComponentType } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { ScrollableNavRail } from "@/components/scrollable-nav-rail";
@@ -18,7 +19,7 @@ export function PortfolioAnalysisScopeTabs({
   scopes,
   selectedScopeKey,
   variant = "segmented",
-  linkComponent: ScopeLink = Link,
+  linkComponent: ScopeLink = RecoveryJourneyLink,
 }: {
   basePath: string;
   query?: PortfolioAnalysisScopeQuery;

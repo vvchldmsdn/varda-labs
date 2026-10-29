@@ -1,4 +1,5 @@
 import { LabText } from "./lab-text";
+import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { T } from "@/components/i18n/localized-text";
 import { InvestmentLabEvidenceGroup } from "./investment-lab-evidence-group";
 import explanationStyles from "./investment-lab-explanation.module.css";
@@ -266,7 +267,7 @@ export function InvestmentLabView({
                     <InvestmentLabFundingPreflightView
                       model={fundingPreflight}
                     />
-                    <BlockedView model={model} />
+                    <BlockedView model={model} scopeKey={selectedScope.key} />
                   </div>
                 )}
               </>
@@ -314,8 +315,10 @@ function ReadyView({
 
 function BlockedView({
   model,
+  scopeKey,
 }: {
   model: InvestmentLabCounterfactualReadModel;
+  scopeKey: PortfolioAnalysisScope["key"];
 }) {
   return (
     <section className="border-y border-[var(--brand-soft)] py-6">
@@ -326,6 +329,7 @@ function BlockedView({
           <li key={blocker}><LabText value={blockerLabel(blocker)} /></li>
         ))}
       </ul>
+      <RecoveryNotice reasons={model.blockers} scope={scopeKey} readForm={{id:'investment-lab-period-filter',fields:['start','end']}} />
     </section>
   );
 }
