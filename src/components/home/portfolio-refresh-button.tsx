@@ -33,7 +33,8 @@ export function PortfolioRefreshButton({
   const router = useRouter();
   const [refreshPending, startTransition] = useTransition();
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const collectionState = useMarketCollectionPolling(syncState === "queued" && !designPreview);
+  const [collectionGeneration, setCollectionGeneration] = useState(0);
+  const collectionState = useMarketCollectionPolling(syncState === "queued" && !designPreview, collectionGeneration);
   const displayState = syncState === "queued" && collectionState === "fresh" ? "fresh" : syncState === "queued" && collectionState === "waiting" ? "waiting" : syncState;
   const pending = syncState === "syncing" || refreshPending;
 
@@ -45,7 +46,12 @@ export function PortfolioRefreshButton({
         const result = await requestLivePriceSync(reason);
 
         if (result.state === "synced") setSyncState("fresh");
-        else if (result.state === "queued") setSyncState("queued");
+        else if (result.state === "queued") {
+          // Each scheduled/manual attempt owns a new bounded polling window,
+          // including a fast response batched with the previous queued state.
+          setCollectionGeneration(generation => generation + 1);
+          setSyncState("queued");
+        }
         else if (result.state === "partial") setSyncState("partial");
         else if (result.state === "fresh" || result.state === "empty") {
           setSyncState("fresh");

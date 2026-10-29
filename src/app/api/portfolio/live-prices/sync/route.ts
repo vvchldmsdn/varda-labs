@@ -11,6 +11,7 @@ import { planTenantLiveFxSync } from "@/lib/market-data/tenant-live-fx-sync-poli
 import { planTenantLivePriceSync, TENANT_LIVE_PRICE_SYNC_POLICY, type TenantLivePriceTarget } from "@/lib/market-data/tenant-live-price-sync-policy";
 import { enqueueMarketCollection } from "@/lib/market-data/collection-queue";
 import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
+import { livePriceReadVersion } from "@/lib/market-data/live-price-read-version";
 import type { CollectionInput } from "@/lib/market-data/collection-policy";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     }
     const [quotes, fxEvidence] = await Promise.all([getCurrentKisQuoteEvidence(targets), getCurrentUsdKrwEvidence()]);
     const plan = planTenantLivePriceSync({ targets, quotes });
+    const readVersion = livePriceReadVersion(targets, quotes, fxEvidence);
     // A manual click does not force another provider request for a fresh shared quote.
     const fxPlan = planTenantLiveFxSync({ currencies: targets.map(t => t.currency), evidence: fxEvidence, reason: "page_view" });
     const fxTarget = selectKisUsdKrwQuoteTarget({ targets, quotes });
@@ -38,18 +40,18 @@ export async function POST(request: Request) {
     if (jobs.length === 0) {
       // Polling can wake another pending lane without admitting arbitrary instruments.
       scheduleMarketCollection();
-      return response({ state: targets.length ? "fresh" : "empty", freshTargetCount: plan.freshTargetCount, targetCount: targets.length });
+      return response({ state: targets.length ? "fresh" : "empty", freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion });
     }
     if (reason === "poll") {
       scheduleMarketCollection();
-      return response({ state: "queued", retryAfterSeconds: 10, freshTargetCount: plan.freshTargetCount }, 202);
+      return response({ state: "queued", retryAfterSeconds: 10, freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion }, 202);
     }
     if (!getKisProviderPolicy().configured) return response({ state: "provider_unavailable" }, 503);
     // Keep the instrument cap separate from the one shared FX request.
     const result = await enqueueMarketCollection(jobs.filter(job => job.kind !== "fx"));
     if (jobs.some(job => job.kind === "fx")) await enqueueMarketCollection(jobs.filter(job => job.kind === "fx"));
     scheduleMarketCollection();
-    return response({ state: "queued", queuedTargetCount: jobs.length, freshTargetCount: plan.freshTargetCount, targetCount: targets.length,
+    return response({ state: "queued", queuedTargetCount: jobs.length, freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion,
       retryAfterSeconds: result.retryAfterSeconds }, 202, { "Retry-After": String(result.retryAfterSeconds) });
   } catch { return response({ state: "service_unavailable" }, 503); }
 }
