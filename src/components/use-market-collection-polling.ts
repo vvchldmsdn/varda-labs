@@ -11,9 +11,9 @@ function wakeCollection() {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "poll" }),
   }).then(async response => {
     if (!response.ok) return { state: "unavailable", signature: "unavailable" };
-    const data = await response.json() as { state?: string; freshTargetCount?: number; targetCount?: number };
+    const data = await response.json() as { state?: string; freshTargetCount?: number; targetCount?: number; readVersion?: string };
     const state = data.state ?? "unavailable";
-    return { state, signature: `${state}:${data.freshTargetCount ?? ""}:${data.targetCount ?? ""}` };
+    return { state, signature: `${state}:${data.freshTargetCount ?? ""}:${data.targetCount ?? ""}:${data.readVersion ?? ""}` };
   }).catch(() => ({ state: "unavailable", signature: "unavailable" })).finally(() => { waking = null; });
   return waking;
 }
@@ -37,7 +37,8 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
       // This endpoint reports current quotes only. History readiness remains a
       // server-read concern; continuing its refreshes must not relabel fresh quotes.
       setOutcome(count >= 12 && state !== "fresh" ? "waiting" : state);
-      // Refresh only changed quote readiness; history progresses in separate 30s checks.
+      // Refresh changed evidence too: equal ready counts can hide price/FX updates.
+      // History progresses in separate 30s checks.
       if (state !== "unavailable" && (signature !== previousSignature || keepCheckingHistory && (count % 3 === 1 || count === 12))) {
         startTransition(() => router.refresh());
       }

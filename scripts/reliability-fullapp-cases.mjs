@@ -14,6 +14,7 @@ import { childEnvironment } from './reliability-ci.mjs';
 import { runContributionUiCases, runLegacyContributionUiCase } from './reliability-contribution-ui-cases.mjs';
 import { fillSettledTrade } from './reliability-trade-ui-helpers.mjs';
 import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
+import { runAutoRefreshUiCases } from './reliability-auto-refresh-ui-cases.mjs';
 
 /** Neon wire transport only. The app's SQL, tenant roles, transactions and RLS are unchanged. */
 export function createSqlBridge({ worker, tenant, connectionStrings, token }) {
@@ -59,7 +60,8 @@ async function port() {
 export async function runFullAppCases({ admin, worker, tenant, report, output, stage, browserCache }) {
   const owner = randomUUID(), other = randomUUID(), account = randomUUID(), asset = randomUUID();
   const otherAccount = randomUUID(), otherAsset = randomUUID(), legacyOwner = randomUUID(), legacyAccount = randomUUID(), legacyAsset = randomUUID();
-  const identities = { [randomBytes(24).toString('hex')]: owner, [randomBytes(24).toString('hex')]: other, [randomBytes(24).toString('hex')]: legacyOwner };
+  const autoRefreshOwner = randomUUID();
+  const identities = { [randomBytes(24).toString('hex')]: owner, [randomBytes(24).toString('hex')]: other, [randomBytes(24).toString('hex')]: legacyOwner, [randomBytes(24).toString('hex')]: autoRefreshOwner };
   const sessionTokens = Object.keys(identities);
   const context = { ownerUserId: owner, role: 'user' };
   const sql = sqlTransport(worker, new Set()), tenantSql = sqlTransport(tenant, new Set());
@@ -412,6 +414,11 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       const input=(p,name)=>p.locator('ol > li').filter({hasText:name}).locator('input[type="number"]');
       try {
         await page.goto(targetUrl);await stale.goto(targetUrl);
+        // Establish a hydrated, edited revision-1 draft before another tab saves.
+        // Navigation alone can finish before this streamed form has hydrated.
+        await input(stale,'Synthetic legacy holding').fill('50');await input(stale,'Synthetic second target').fill('50');
+        await expect(stale.getByRole('button',{name:'입력 되돌리기',exact:true})).toBeEnabled();
+        await expect(stale.locator('input[name="approvalRevision"]')).toHaveValue('1');
         await input(page,'Synthetic legacy holding').fill('0');await input(page,'Synthetic second target').fill('100');
         await page.getByRole('button',{name:'목표비중 저장',exact:true}).click();
         try { await expect(page.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible(); } catch(error) { report.targetFailureText=await page.locator('main').innerText(); throw error; }
@@ -501,6 +508,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
         assert.equal(after.positions[0].quantity, action === 'buy' ? expectedBuy : before.positions[0].quantity);
       }
     });
+    await runAutoRefreshUiCases({admin,browser,owner:autoRefreshOwner,identityToken:sessionTokens[3],url,output,report});
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };

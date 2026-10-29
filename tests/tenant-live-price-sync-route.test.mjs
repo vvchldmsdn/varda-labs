@@ -89,6 +89,19 @@ function request({ url = "http://localhost/api/portfolio/live-prices/sync", head
 }
 
 describe("tenant live-price enqueue and after boundary", () => {
+  it("returns a stable owned-evidence receipt that changes for prices and FX, not unrelated instruments", async () => {
+    const f = await fixture({ targets:[{...target,currency:'usd'}], quotes: [quote()] });
+    const read = async () => (await (await f.route.POST(request({body:{reason:'poll'}}))).json()).readVersion;
+    const first = await read();
+    assert.match(first, /^[a-f0-9]{64}$/);
+    assert.equal(await read(), first);
+    f.config.quotes.push({...quote(),ticker:'UNOWNED',price:'999'});
+    assert.equal(await read(), first);
+    f.config.quotes[0].price='101';
+    const priceChanged=await read(); assert.notEqual(priceChanged,first);
+    f.config.fx.usdKrw='1401';
+    assert.notEqual(await read(),priceChanged);
+  });
   it("authorizes exact tenant holdings, returns 202 first, then consumes only shared instrument work", async () => {
     const f = await fixture({ fx: null });
     const response = await f.route.POST(request());

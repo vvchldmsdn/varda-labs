@@ -111,7 +111,7 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     return fakeStorage;
   } });
   const descriptors = new Map(["window", "document", "fetch"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-  const response = (state, ok = true) => ({ ok, json: async () => ({ state }) });
+  const response = (state, ok = true) => ({ ok, json: async () => typeof state === 'string' ? { state } : state });
   Object.defineProperty(globalThis, "window", { value: fakeWindow, configurable: true, writable: true });
   Object.defineProperty(globalThis, "document", { value: fakeDocument, configurable: true, writable: true });
   Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: (url, options) => {
@@ -323,6 +323,16 @@ describe("portfolio refresh lifecycle", () => {
 });
 
 describe("market collection quote and history polling", () => {
+  it("refreshes changed prices and FX even when ready instrument counts stay the same", async test => {
+    const h = await refreshHarness(test, { autoRespond: false });
+    h.mountPolling(); h.runMountTimer();
+    for (const [index, readVersion] of ['quote-1-fx-1', 'quote-2-fx-1', 'quote-2-fx-2', 'quote-2-fx-2'].entries()) {
+      const tick = h.runPollingInterval();
+      h.respond(index, {state:'queued', freshTargetCount:1, targetCount:2, readVersion});
+      await tick;
+    }
+    assert.equal(h.refreshCount, 3, 'Changed evidence must reach the page; identical evidence must not refresh it repeatedly');
+  });
   it("keeps fresh quotes fresh at timeout while still refreshing pending history", async test => {
     const h = await refreshHarness(test, { responseState: "fresh" });
     h.mountPolling(true);
