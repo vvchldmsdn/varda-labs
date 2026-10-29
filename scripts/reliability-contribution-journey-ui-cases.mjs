@@ -48,6 +48,7 @@ export async function runContributionJourneyUiCases({page,check,admin,owner,acco
       await page.getByRole('button',{name:'배분안 저장하고 계속',exact:true}).click();
       const response=await savedResponse;
       assert.equal(response.status(),201);const saved=await response.json();
+      await expect(page.locator('.varda-sidebar .varda-sidebar-link[href^="/additional-contribution"]')).toHaveAttribute('aria-current','page');
       await expect(page).toHaveURL(new RegExp(`/additional-contribution/tracking\\?.*effectId=${saved.id}`));
       const record=page.locator(`[id="effect-${saved.id}"]`);
       await expect(record).toHaveAttribute('data-selected','true');

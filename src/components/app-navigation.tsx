@@ -87,7 +87,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
 
   function isActive(href: string) {
     if (href === currentPath) return true;
-    if (href === "/additional-contribution" && currentPath === "/additional-contribution/compare") return true;
+    if (href === "/additional-contribution" && ["/additional-contribution/plan", "/additional-contribution/compare", "/additional-contribution/tracking"].includes(currentPath)) return true;
     if (href === "/portfolio/structure" && ["/portfolio/risk", "/etfs"].includes(currentPath)) return true;
     return href === "/portfolio/manage" && (
       currentPath.startsWith("/admin/") ||
