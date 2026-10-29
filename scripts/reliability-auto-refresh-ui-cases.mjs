@@ -10,11 +10,17 @@ import { resolveSnapshotCycle, buildCycleForSnapshotDate } from '../src/lib/snap
 export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,url,output,report}) {
   const account=randomUUID(),asset=randomUUID(),ticker='999997';
   const now=new Date(),{snapshotDate}=resolveSnapshotCycle(now),cycle=buildCycleForSnapshotDate(snapshotDate,now);
-  await admin.query("insert into app_users(id,status,role) values($1,'active','user')",[owner]);
-  await admin.query("insert into auth_identities(app_user_id,provider,provider_subject) values($1::uuid,'neon_auth',$1::text)",[owner]);
-  await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'brokerage','Auto refresh QA','brokerage','KRW')",[account,owner]);
-  await admin.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price) values($1,$2,$3,'brokerage','Auto refresh holding',$4,'korea','KRW','stock',10,100)",[asset,owner,account,ticker]);
-  await admin.query("insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,asset_id,asset_name,ticker,asset_type,market,currency,snapshot_date,source,quantity,unit_price,market_value_krw,fx_rate,captured_at) values($1,$2,'brokerage',$3,'Auto refresh holding',$4,'stock','korea','KRW',$5,'varda_manual_daily_snapshot',10,100,1000,1,$6)",[owner,account,asset,ticker,snapshotDate,cycle.cycleEndAt]);
+  const seed=await admin.connect();
+  try {
+    await seed.query("BEGIN");
+    await seed.query("select set_config('app.trade_reliability_version','0059',true)");
+    await seed.query("insert into app_users(id,status,role) values($1,'active','user')",[owner]);
+    await seed.query("insert into auth_identities(app_user_id,provider,provider_subject) values($1::uuid,'neon_auth',$1::text)",[owner]);
+    await seed.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'brokerage','Auto refresh QA','brokerage','KRW')",[account,owner]);
+    await seed.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price) values($1,$2,$3,'brokerage','Auto refresh holding',$4,'korea','KRW','stock',10,100)",[asset,owner,account,ticker]);
+    await seed.query("insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,asset_id,asset_name,ticker,asset_type,market,currency,snapshot_date,source,quantity,unit_price,market_value_krw,fx_rate,captured_at) values($1,$2,'brokerage',$3,'Auto refresh holding',$4,'stock','korea','KRW',$5,'varda_manual_daily_snapshot',10,100,1000,1,$6)",[owner,account,asset,ticker,snapshotDate,cycle.cycleEndAt]);
+    await seed.query("COMMIT");
+  } catch(error) { await seed.query("ROLLBACK"); throw error; } finally { seed.release(); }
   const quote=price=>admin.query("insert into live_price_quotes(ticker,market,currency,provider,source,quote_type,status,price,price_as_of,fetched_at) values($1,'korea','KRW','kis','kis','live','ok',$2,now(),now()) on conflict(market,ticker,provider) do update set price=excluded.price,price_as_of=excluded.price_as_of,fetched_at=excluded.fetched_at",[ticker,price]);
   for(const viewport of [{width:1440,height:900},{width:1366,height:768},{width:390,height:844}]) {
     for(const surface of ['home','today','beta']) {
@@ -39,6 +45,7 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
         const expectPrice=async price=>{
           await expect(visible()).toContainText((surface==='today'?(price-100)*10:price*10).toLocaleString('en-US'),{timeout:30000});
           if(surface==='beta')await expect(page.locator('[data-beta-card="today"]')).toContainText(((price-100)*10).toLocaleString('en-US'));
+          await expect(surface==='beta'?page.locator('[data-beta-card="today"]'):page.locator('body')).toContainText(`${(price-100).toFixed(2)}%`);
         };
         await expectPrice(200);
         await expect.poll(()=>requests.length).toBeGreaterThan(0);
