@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-plan.ts";
-import { canonicalizePreviewMigrationEvidence, PREVIEW_MIGRATION_HASH_COMPATIBILITY } from "../src/lib/deployment/preview-migration-compatibility.ts";
+import { canonicalizePreviewMigrationEvidence, PREVIEW_MIGRATION_HASH_COMPATIBILITY, PREVIEW_MIGRATION_HASH_COMPATIBILITIES } from "../src/lib/deployment/preview-migration-compatibility.ts";
 import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
 
 const LOCAL = Object.freeze([
@@ -125,15 +125,65 @@ describe("documented migration artifact compatibility", () => {
     ]) assert.throws(() => planPreviewMigrations({ localMigrations: [local], appliedMigrations: [recorded], allowedPendingMigrations: [] }), /ledger diverges/);
   });
 
-  it("accepts the current full ledger with that one artifact but never permits new pending DDL", () => {
+  it("accepts the current full ledger with all four artifacts but never permits new pending DDL", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
     const local = journal.entries.map(entry => ({ tag: entry.tag, createdAt: entry.when, sha256: hash(readFileSync('drizzle/' + entry.tag + '.sql')) }));
-    const recorded = local.map(entry => entry.tag === known.tag ? knownApplied : applied(entry));
+    const recorded = Object.freeze(local.map(entry => {
+      const artifact = PREVIEW_MIGRATION_HASH_COMPATIBILITIES.find(row => row.tag === entry.tag);
+      return Object.freeze({ createdAt: entry.createdAt, sha256: artifact?.appliedSha256 ?? entry.sha256 });
+    }));
+    const before = JSON.stringify(recorded);
+    assert.equal("sha256:" + hash(JSON.stringify(recorded.map(canonicalizePreviewMigrationEvidence))), PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger.sha256);
     const input = { localMigrations: local, appliedMigrations: recorded, allowedPendingMigrations: PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations };
     assert.equal(planPreviewMigrations(input).appliedCount, 65);
+    assert.equal(JSON.stringify(recorded), before, "comparison must preserve every raw applied hash");
     assert.deepEqual(planPreviewMigrations(input).pendingTags, []);
     assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -1) }), /not allowlisted: 0064_contribution_effects/);
     assert.throws(() => planPreviewMigrations({ ...input, localMigrations: [...local, migration("0065_unreviewed", local.at(-1).createdAt + 1, "f")] }), /not allowlisted: 0065_unreviewed/);
     assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: [...recorded.slice(0, 47), { ...knownApplied, sha256: "f".repeat(64) }, ...recorded.slice(48)] }), /ledger diverges at local migration 0047_member_activity/);
   });
 });
+
+for (const artifact of PREVIEW_MIGRATION_HASH_COMPATIBILITIES.slice(1)) {
+  describe(artifact.tag + " historical byte evidence", () => {
+    const local = Object.freeze({ tag: artifact.tag, createdAt: artifact.createdAt, sha256: artifact.canonicalSha256 });
+    const recorded = Object.freeze({ createdAt: artifact.createdAt, sha256: artifact.appliedSha256 });
+    it("reproduces the exact applied hash from the unchanged repository SQL", () => {
+      const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
+      assert.equal(journal.entries.find(entry => entry.tag === artifact.tag).when, artifact.createdAt);
+      const sql = readFileSync("drizzle/" + artifact.tag + ".sql", "utf8");
+      assert.doesNotMatch(sql, /\r/);
+      assert.equal(hash(sql), artifact.canonicalSha256);
+      let historical = sql.replaceAll("\n", "\r\n");
+      if (artifact.tag === "0058_broker_recovery_evidence") {
+        const lines = sql.split("\n");
+        assert.equal(lines.length - 1, 54);
+        // Exactly 1-based newline positions 22-25 remain LF; all others are CRLF.
+        historical = lines.map((line, index) => line + (index < lines.length - 1
+          ? index >= 21 && index <= 24 ? "\n" : "\r\n" : "")).join("");
+        assert.equal(Buffer.byteLength(historical), 4356);
+        assert.equal((historical.match(/\r\n/g) ?? []).length, 50);
+        assert.equal((historical.match(/(?<!\r)\n/g) ?? []).length, 4);
+        assert.notEqual(hash(sql.replaceAll("\n", "\r\n")), artifact.appliedSha256);
+      }
+      assert.equal(historical.replaceAll("\r\n", "\n"), sql);
+      assert.equal(hash(historical), artifact.appliedSha256);
+    });
+
+    it("accepts only its exact identity while preserving the raw record", () => {
+      assert.deepEqual(canonicalizePreviewMigrationEvidence(recorded), applied(local));
+      assert.equal(recorded.sha256, artifact.appliedSha256);
+      assert.deepEqual(planPreviewMigrations({ localMigrations: [local], appliedMigrations: [recorded], allowedPendingMigrations: [] }).pendingTags, []);
+      const wrongDate = { ...recorded, createdAt: artifact.createdAt + 1 };
+      const wrongHash = { ...recorded, sha256: "f".repeat(64) };
+      assert.deepEqual(canonicalizePreviewMigrationEvidence(wrongDate), wrongDate);
+      assert.deepEqual(canonicalizePreviewMigrationEvidence(wrongHash), wrongHash);
+      for (const [expected, actual] of [
+        [local, wrongDate], [local, wrongHash],
+        [{ ...local, tag: artifact.tag.slice(0, 4) + "_unreviewed" }, recorded],
+        [{ ...local, createdAt: artifact.createdAt + 1 }, wrongDate],
+        [{ ...local, sha256: artifact.appliedSha256 }, applied(local)],
+      ]) assert.throws(() => planPreviewMigrations({ localMigrations: [expected], appliedMigrations: [actual], allowedPendingMigrations: [] }), /ledger diverges/);
+    });
+  });
+}

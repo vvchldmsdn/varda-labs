@@ -36,6 +36,7 @@ export const PREVIEW_PROTECTED_TABLES = Object.freeze([
   'accounts', 'assets', 'event_ledger_entries', 'holding_onboarding_evidence',
   'holding_state_corrections', 'holding_lifecycle_events', 'daily_portfolio_snapshots',
   'daily_position_snapshots', 'native_contribution_plans', 'contribution_effects',
+  'broker_recovery_batches', 'portfolio_target_plan_rows',
   'member_activity_daily', 'member_activity_profiles',
 ]);
 export async function readPreviewProtectedContent(query) {

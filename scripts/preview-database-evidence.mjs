@@ -46,7 +46,12 @@ async function run() {
   }
 
   const sql = neon(databaseUrl);
-  const query = (text) => sql.query(text);
+  // Neon HTTP calls do not share a session. Pin deparser/search-path and timestamp
+  // formatting inside each read-only transaction, never with a separate SET call.
+  const query = async (text) => (await sql.transaction([
+    sql.query("select set_config('search_path','public,pg_catalog',true), set_config('TimeZone','UTC',true)"),
+    sql.query(text),
+  ], { readOnly: true }))[1];
   const state = await readPreviewDatabaseState({
     env: process.env,
     query,
