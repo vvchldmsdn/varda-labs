@@ -43,7 +43,7 @@ export function carryRecoveryFragment(href: string, hash: string): string {
 }
 export function recoveryKind(reasons: readonly string[]): RecoveryKind {
   // A changed/read-failed basis is retried, never 'repaired' by overwriting targets.
-  if (reasons.some(r => /fetch_failed|query_failed|basis_changed|request_mismatch|conflict|integrity/.test(r))) return 'retry';
+  if (reasons.some(r => /fetch_failed|query_failed|basis_changed|request_mismatch|planning_valuation_mismatch|planning_vector_mismatch|planning_policy_mismatch|conflict|integrity/.test(r))) return 'retry';
   if (reasons.some(r => /target.*missing|targets_required|target.*universe|target_universe_changed/.test(r))) return 'targets';
   if (reasons.includes('owner_input_unavailable')) return 'holdings';
   if (reasons.some(r => /trade|event|flow|cost_basis/.test(r))) return 'trades';
