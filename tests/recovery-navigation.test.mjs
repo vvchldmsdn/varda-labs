@@ -60,6 +60,10 @@ it('read failures take precedence over editable data and missing FX does not sen
   assert.equal(recoveryKind(['observations_missing']), 'market');
   assert.equal(recoveryKind(['cost_basis_missing']), 'trades');
   assert.equal(recoveryKind(['holdings_empty']), 'holdings');
+  for (const reason of ['planning_valuation_mismatch', 'planning_vector_mismatch', 'planning_policy_mismatch']) {
+    assert.equal(recoveryKind([reason]), 'retry', 'read disagreements must not ask the user to edit valid holdings');
+  }
+  assert.equal(recoveryKind(['planning_valuation_incomplete']), 'holdings');
   assert.equal(recoveryDestination('retry', 'all', true), null);
   assert.equal(new URL(recoveryDestination('market', 'account:abc', true), 'https://local.test').pathname, '/portfolio/holdings');
   assert.equal(new URL(recoveryDestination('history', 'account:abc', true), 'https://local.test').searchParams.get('detail'), 'raw');

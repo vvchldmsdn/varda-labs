@@ -108,7 +108,7 @@ function safeReadyPreview(preview: ReadyContribution): ReadyContribution {
     totalAvailableFundsKrw: preview.totalAvailableFundsKrw, totalBaseNeedKrw: preview.totalBaseNeedKrw, minimumExecutionTargetKrw: preview.minimumExecutionTargetKrw,
     minimumExecutionSatisfied: preview.minimumExecutionSatisfied, totalAllocatedKrw: preview.totalAllocatedKrw, residualCashKrw: preview.residualCashKrw,
     ma120Evidence: preview.ma120Evidence, blockers: [...preview.blockers], rows: preview.rows.map(row => ({
-      accountCode: row.accountCode, accountName: row.accountName, name: row.name, market: row.market, currency: row.currency, ticker: row.ticker,
+      accountCode: row.accountCode, accountName: row.accountName, name: row.name, assetType: row.assetType, market: row.market, currency: row.currency, ticker: row.ticker,
       action: row.action, currentValueKrw: row.currentValueKrw, costBasisKrw: row.costBasisKrw, unrealizedReturnPct: row.unrealizedReturnPct,
       currentWeightPct: row.currentWeightPct, targetWeightPct: row.targetWeightPct, allocationKey: row.allocationKey, driftRatioPct: row.driftRatioPct, strategicAllocationKrw: row.strategicAllocationKrw,
       trimReason: row.trimReason, trimAmountKrw: row.trimAmountKrw, postTrimValueKrw: row.postTrimValueKrw,

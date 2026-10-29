@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { additionalContributionCostBasisKrw } from "../src/lib/additional-contribution-policy-input.ts";
 import { buildTargetPolicyHoldingUniverse } from "../src/lib/target-policy-holding-universe.ts";
 import { buildTargetPolicyReviewPacket } from "../src/lib/target-policy-review-packet.ts";
+import { adaptContribution, parseContributionInput } from "../src/lib/cairn-v2/planning-contract.ts";
 
 const ownerUserId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const accountId = "11111111-1111-4111-8111-111111111111";
@@ -13,6 +14,33 @@ const now = new Date("2026-09-08T01:00:00Z");
 let moduleSequence = 0;
 
 describe("additional contribution query to policy integration", () => {
+  it("preserves tickerless identity from the shared query through beta admission and serialization", async () => {
+    // Same names with different asset types must remain distinct; no account-specific exception.
+    for (const assetType of ["commodity", "pension", "stock"]) {
+      const fixture = makeFixture();
+      fixture.model.rows = [
+        modelRow("AAA", 550000.12345, 5000, { ticker: null, assetName: "Manual holding", assetType }),
+        modelRow("BBB", 450000.54321, 5000),
+      ];
+      const preview = await run(await loadQuery(fixture));
+      assert.equal(preview.status, "ready");
+      assert.equal(preview.rows[0].assetType, assetType);
+      const args = betaAdmission(fixture, preview);
+      const admitted = adaptContribution(args);
+      assert.equal(admitted.state, "ready", JSON.stringify(admitted.blockers));
+      assert.equal(admitted.result.rows[0].assetType, assetType);
+      assert.deepEqual(admitted.result.rows.map(row=>row.currentValueKrw), preview.rows.map(row=>row.currentValueKrw));
+      for (const change of [
+        { assetType: "another_type" }, { assetType: null }, { name: "Another holding" },
+        { accountCode: "foreign" }, { currentValueKrw: preview.rows[0].currentValueKrw + 1 },
+      ]) {
+        const changed = { ...preview, rows: preview.rows.map((row,index)=>index ? row : {...row,...change}) };
+        assert.deepEqual(adaptContribution({...args,preview:changed}).blockers, ["planning_valuation_mismatch"]);
+      }
+      assert.deepEqual(adaptContribution({...args,after:{...args.after,rows:args.after.rows.slice(1)}}).blockers, ["planning_basis_changed"]);
+    }
+  });
+
   it("uses null defaults and honors explicit zero through the actual query and engine", async () => {
     const fixture = makeFixture();
     const query = await loadQuery(fixture);
@@ -106,6 +134,7 @@ describe("additional contribution query to policy integration", () => {
     const result = await run(await loadQuery(fixture), 1000);
     assert.equal(result.status, "ready");
     assert.equal(result.source, "legacy_account_policy");
+    assert.deepEqual(result.rows.map(row=>row.assetType), fixture.model.rows.map(row=>row.assetType));
     assert.deepEqual(result.rows.map((row) => row.targetWeightPct), [100, 0]);
     assert.equal(result.rows[1].trimReason, "eligible_zero_target_exit");
     assert.deepEqual(result.rows.map((row) => row.allocationKey), fixture.model.rows.map((row) => `${accountId}:${row.assetId}`));
@@ -230,6 +259,23 @@ describe("additional contribution query to policy integration", () => {
 
 function run(query, cashAmountKrw = 100000) {
   return query.getReadOnlyTenantAdditionalContributionPreviewForScope({ cashAmountKrw, scope, tenantContext, now });
+}
+
+function betaAdmission(fixture, preview) {
+  const model = {
+    ...fixture.model, scope, serviceDate: preview.serviceDate,
+    startingWeightSource: "approved_policy", exactPolicyUniverse: true,
+    currentUniverseHash: "fixture-universe", plannedTargetRows: [],
+    approvedPolicy: {status:"available",policy:{...fixture.model.approvedPolicy.policy,
+      policyVersion:"portfolio_target_policy_v1",approvalRevision:1,universeHash:"fixture-universe",vectorHash:"fixture-vector"}},
+    structure: {...fixture.model.structure, exclusions:[],holdingRows:fixture.model.rows.map(row=>({
+      ...row,account:row.accountCode,name:row.assetName,priceAsOf:"2026-09-08T00:00:00Z",
+      currentWeightPct:row.currentValueKrw / preview.currentPortfolioTotalKrw * 100,
+    }))},
+  };
+  return {preview:{...preview,policyVersion:"portfolio_target_policy_v1"},before:model,after:structuredClone(model),
+    legacyBefore:null,legacyAfter:null,targets:{state:"ready"},
+    context:{mode:"domain",scope:scope.key,currency:"KRW"},serviceDate:preview.serviceDate,input:parseContributionInput("100000")};
 }
 
 function modelRow(ticker, currentValueKrw, targetWeightBps, overrides = {}) {

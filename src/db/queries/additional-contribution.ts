@@ -308,6 +308,7 @@ function adaptLegacyPreview({
           accountCode: row.accountCode,
           accountName: row.accountName,
           assetName: row.assetName,
+          assetType: row.assetType ?? null,
           currency: row.currency,
           ma120Evidence: evidence,
           market: row.market,
@@ -372,6 +373,7 @@ function buildPolicyRows({
         accountCode: row.accountCode,
         accountName: row.accountName,
         assetName: row.assetName,
+        assetType: row.assetType ?? null,
         currency: row.currency,
         ma120Evidence: evidence,
         market: row.market,
@@ -386,6 +388,7 @@ function mapPolicyResult<T extends Readonly<{
   accountCode: string;
   accountName: string;
   assetName: string;
+  assetType: string | null;
   currency: string | null;
   ma120Evidence: AdditionalContributionMa120EvidenceView;
   market: string | null;
@@ -464,6 +467,7 @@ function mapPolicyResult<T extends Readonly<{
       maEffectiveMultiplier: row.maEffectiveMultiplier,
       market: row.metadata.market,
       name: row.metadata.assetName,
+      assetType: row.metadata.assetType,
       postTopupValueKrw: row.postTradeValueKrw,
       postTopupWeightPct: row.postTradeWeightPct,
       postTrimValueKrw: row.postTrimValueKrw,
