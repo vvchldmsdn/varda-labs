@@ -24,7 +24,9 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  const d=view.domain, movement=movementDisplay(view), freshness=useBetaReadFreshness();
  const readoutId=useId();
  const [selection,setSelection]=useState<{read:string;key:string}|null>(null);
- const readKey=JSON.stringify([context.scope,context.currency,view.asOf]);
+ // Selection belongs to the analysis scope, not to a quote observation time.
+ // Resolve the key against current rows below so refreshed evidence is never cached.
+ const readKey=JSON.stringify([context.mode,context.scope,context.currency]);
  if(!d || ["loading","unauthorized"].includes(d.state)) return <p role="status" className={styles.status}>{movement.message ?? "조회 근거 확인 중"}</p>;
  const market=d.currentHoldingMovement;
  const rows=[...(market?.rows ?? [])].sort((a,b)=>Math.abs(b.changeKrw)-Math.abs(a.changeKrw));
