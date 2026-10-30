@@ -50,9 +50,9 @@ export default function SimulationResultDetail({ read, context, heading = true }
     </Status>}
     <div className={styles.context}>
       <StatusPill>과거 수익률 재표본</StatusPill>
-      <span>{chart.assumptions.horizon}개 관측 단계</span>
+
       <span>{formatNumber(pathCount, { maximumFractionDigits: 0 })}개 경로 {source.kind === "all" ? "전체 표시" : "표본 표시"}</span>
-      <span>관측 기준 {execution.source?.lastServiceDate}</span>
+
       <span>미래 예측 아님</span>
     </div>
 
@@ -62,9 +62,9 @@ export default function SimulationResultDetail({ read, context, heading = true }
 
     <MetricGroup className={styles.metrics}>
       <Metric label="종료 수익률 중앙값" value={formatPercent(terminal.p50ReturnPct, 2, true)}
-        tone={terminal.p50ReturnPct < 0 ? "negative" : "positive"} note="전체 계산 경로의 중간 결과" />
+        tone={terminal.p50ReturnPct < 0 ? "negative" : "positive"} />
       <Metric label="손실로 끝난 경로" value={formatPercent(terminal.lossProbabilityPct, 1)}
-        note="시작값보다 낮게 끝난 비율" />
+ />
       <Metric label="최대 낙폭 중앙값 · P50" value={formatPercent(terminal.maxDrawdownP50Pct, 1)}
         note={`P90 ${formatPercent(terminal.maxDrawdownP90Pct, 1)} · 약 10% 경로는 이보다 더 하락`} />
     </MetricGroup>
@@ -109,7 +109,7 @@ export default function SimulationResultDetail({ read, context, heading = true }
     <details className={styles.disclosure}>
       <summary>계산 방식과 결과 읽는 법<span aria-hidden="true">＋</span></summary>
       <dl className={styles.methodGrid}>
-        <div><dt>사용한 관측</dt><dd>{execution.source?.firstServiceDate} — {execution.source?.lastServiceDate}</dd><dd>{execution.source?.returnStepCount}개 수익률 관측 · 날짜별 저장 환율</dd></div>
+        <div><dt>계산 기간</dt><dd>{chart.assumptions.horizon}개 관측 단계</dd></div><div><dt>사용한 관측</dt><dd>{execution.source?.firstServiceDate} — {execution.source?.lastServiceDate}</dd><dd>{execution.source?.returnStepCount}개 수익률 관측 · 날짜별 저장 환율</dd></div>
         <div><dt>경로 계산</dt><dd>과거 수익률을 평균 {chart.assumptions.expectedBlockLength}단계 블록으로 재표본 추출</dd><dd>초기 비중 유지 · 중간 리밸런싱 없음</dd></div>
         <div><dt>분포 읽기</dt><dd>P50은 시점별 중앙값이며 특정 경로 하나가 아닙니다. P10–P90는 모형 안의 80% 구간입니다.</dd></div>
         <div><dt>계산 범위</dt><dd>{model.candidate.historicalPriceBasis === 'provider_adjusted_close' ? 'KRW 기준 제공사 조정 종가와 날짜별 환율을 사용합니다. 배당 재투자 총수익, 비용·세금은 보장하지 않습니다.' : 'KRW 기준 원가격 수익률입니다. 배당·분할 조정 총수익, 비용·세금은 반영하지 않았습니다.'}</dd></div>

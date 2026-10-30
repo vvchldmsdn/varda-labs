@@ -16,7 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { isCurrentWorkspaceLink, supportsExactFrontendChoice, workspacePresentation } from "@/lib/cairn-v2/workspace-presentation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { betaReadHref, betaHref, originalHref, purposeDestinations, type BetaContext } from "@/lib/cairn-v2/navigation";
-import { retryReadNeeded, homeReadMessage } from "@/lib/cairn-v2/read-display";
+import { retryReadNeeded } from "@/lib/cairn-v2/read-display";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { fixtureNotice, fixtureScopes } from "@/lib/cairn-v2/fixtures";
 import { BetaDialog, type ExpansionOrigin } from "./beta-dialog";
@@ -97,7 +97,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
         <CairnButton variant="bare" className={controls.mobileSettingsTrigger} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></CairnButton>
         </div>
       </header>
-      {!workspace && readView?.domain && <CairnStatus as="p" role="status" data-read-state={readView.domain.state} className={styles.readStatus}>{homeReadMessage(readView)}</CairnStatus>}
+      {!workspace && readView?.domain && (readView.domain.valueState !== "ready" || readUnavailable) && <CairnStatus as="p" role="status" data-read-state={readView.domain.state} className={styles.readStatus}>{readUnavailable ? "일부 자료를 불러오지 못했어요. 다시 조회해 주세요." : readView.domain.message}</CairnStatus>}
       {workspace && readUnavailable && <CairnButton variant="bare" className={styles.continueLink} type="button" onClick={() => router.refresh()}>조회 다시 시도</CairnButton>}
       {readView?.domain?.state === "unauthorized" && <a className={styles.continueLink} href={readHref(betaHref(workspace === "history" ? "/beta/history" : workspace === "structure" ? "/beta/portfolio/structure" : "/beta", { ...context, scope: "all" }))}>기본 범위 접근 다시 확인</a>}
       {context.mode === "domain" && workspace && <details className={controls.mobileMenu}>
@@ -106,7 +106,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
       </details>}
       {children}
       <div className={`${styles.homeUtilities} ${existingCrudAvailable && workspace ? styles.crudUtilities : ""}`}>
-      <footer className={styles.homeFooter}><span>{context.mode === "domain" ? existingCrudAvailable ? "기존 서비스의 데이터·관리 기능과 연결" : "읽기 전용 · 관리·저장 화면 미연결" : fixtureNotice}</span>{context.mode !== "domain" && <a href={originalHref(originalPath, context)}>기존 화면으로 ↗</a>}</footer>
+      <footer className={styles.homeFooter}><span>{context.mode === "domain" ? existingCrudAvailable ? "" : "읽기 전용 · 관리·저장 화면 미연결" : fixtureNotice}</span>{context.mode !== "domain" && <a href={originalHref(originalPath, context)}>기존 화면으로 ↗</a>}</footer>
       {context.mode === "domain" && <details className={styles.developmentTools}><summary id="beta-read-support">지원 범위 안내</summary><p>{existingCrudAvailable ? "계좌·보유·범위·목표·거래·계획 관리는 기존 처리 경로를 사용합니다. 각 작업에서 로그인·소유권과 지원 조건을 확인합니다. 원장 기록은 증권사 주문이 아닙니다. 보유 기반 추가 투자 계획의 새 계산·저장과 기타 온보딩은 별도입니다. 시세 수집은 관리 기능과 별도 설정을 따릅니다." : "이 환경에서는 연결된 읽기 화면을 사용할 수 있습니다. 관리·저장 화면은 제공하지 않습니다. 기존 관리 화면으로 이동하지 않습니다."}</p></details>}
       {context.mode !== "domain" && <details className={styles.developmentTools} aria-label="개발용 검증 설정"><summary>개발 검증 설정</summary><div className={styles.developmentSettings}>
         <CairnField>Fixture <CairnSelect aria-label="개발용 fixture 상태" value={context.fixture} onChange={(e) => setContext({ ...context, fixture: e.target.value as BetaContext["fixture"] })}><option value="standard">기본</option><option value="empty">빈 상태</option><option value="partial">부분 데이터</option><option value="large">큰 금액 · 긴 이름</option></CairnSelect></CairnField>

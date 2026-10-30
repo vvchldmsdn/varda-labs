@@ -39,6 +39,7 @@ export function AuthRecovery({
   const availability = getAuthMethodAvailability();
   return (
     <AuthShell
+      compact
       preview={designPreview}
       alternate={{
         href: `/auth/sign-in${designPreview ? "?preview=design" : ""}`,

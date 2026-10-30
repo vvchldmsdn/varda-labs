@@ -99,8 +99,7 @@ export function SimulationWorkspace({
         <div className="varda-presentation-dialog-shell">
           <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
             <div>
-              <p className="varda-kicker">SIMULATION WORKSPACE</p>
-              <CairnSectionTitle className="mt-1 text-xl font-medium" id={titleId}>
+              <CairnSectionTitle className="text-xl font-medium" id={titleId}>
                 <SimulationText ko={activeDefinition?.label ?? "시뮬레이션 상세"} />
               </CairnSectionTitle>
             </div>

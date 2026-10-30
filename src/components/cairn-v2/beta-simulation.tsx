@@ -37,7 +37,7 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
   return <BetaShell context={context} setContext={next => { setEdited(null); setContext({ ...next, run: undefined }); }}
     readView={shell} workspace="simulation" originalPath="/simulation">
     <section className={styles.workspace} data-simulation-state={visible.state} data-result-identity={visible.resultIdentity}>
-      <DetailHeader title="현재 보유 연구" description="과거의 움직임으로 현재 포트폴리오의 여러 흐름을 살펴봅니다."
+      <DetailHeader title="현재 보유 연구" description="과거 수익률로 살펴보는 가상 경로"
         actions={<StatusPill>분석 기준 KRW</StatusPill>} />
       <CairnForm key={key} className={styles.conditions} aria-label="연구 조건" aria-describedby="simulation-condition-help"
         onChange={() => setEdited(key)}

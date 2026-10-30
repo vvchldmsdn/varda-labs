@@ -42,7 +42,7 @@
 .trackLegend {display:flex;flex-wrap:wrap;gap:12px;font-size:10px;margin-top:6px!important;}
 .trackLegend span {display:flex;gap:5px;align-items:center;}
 .trackLegend i {width:5px;height:5px;border-radius:50%;}
-.plotNote {font-size:10px;line-height:1.6;margin-top:9px!important;}
+.plotNote {margin-top:9px!important;}
 .footer {display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px 24px;margin-top:22px;padding-top:10px;border-top:1px solid var(--cairn-v2-line);}
 .links {display:flex;flex-wrap:wrap;gap:8px 22px;}
 .links a,.evidence summary {display:flex;align-items:center;min-height:40px;font-size:12px;}

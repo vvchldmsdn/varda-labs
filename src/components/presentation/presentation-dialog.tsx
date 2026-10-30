@@ -5,7 +5,7 @@ import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Maximize2, X } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Button as CairnButton, InfoDisclosure, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
 export function PresentationDialog({
@@ -89,14 +89,13 @@ export function PresentationDialog({
         <div className="varda-presentation-dialog-shell">
           <header className="varda-dialog-header flex shrink-0 items-start justify-between gap-5">
             <div className="min-w-0">
-              <p className="varda-kicker">DETAIL VIEW</p>
-              <CairnSectionTitle className="mt-2 text-xl font-medium" id={titleId}>
+              <CairnSectionTitle className="text-xl font-medium" id={titleId}>
                 {t(title, titleEn)}
               </CairnSectionTitle>
               {description ? (
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]" id={descriptionId}>
-                  {t(description, descriptionEn)}
-                </p>
+                <InfoDisclosure summary={t("안내", "About this view")}>
+                  <p id={descriptionId}>{t(description, descriptionEn)}</p>
+                </InfoDisclosure>
               ) : null}
             </div>
             <CairnButton variant="ghost"

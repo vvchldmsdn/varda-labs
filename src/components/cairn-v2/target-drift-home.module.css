@@ -1,5 +1,4 @@
 .button {min-width:0;}
-.button .name {display:block;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:1.4;}
-.button strong {margin-bottom:4px;}
-@media(max-width:699px) {.button .name {max-width:42%;font-size:11px;} .button>span:first-child {flex-shrink:0;}}
-@container history-home (max-width:510px) {.button .name {max-width:42%;font-size:11px;}}
+.button .name {display:block;max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;font-size:13px;line-height:1.5;grid-column:1;}
+.button strong {margin-bottom:0;}
+@media(max-width:699px) { .button .name {grid-column:1 / -1;} }

@@ -12,7 +12,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import type { PortfolioTargetPolicyActionState } from "@/lib/portfolio-target-policy-write";
 import { currentTargetEditorWeights, parseDisplayedTargetPercent, targetInputPercent, type PortfolioTargetEditorRow } from "./portfolio-target-policy-editor";
 import styles from "./portfolio-target-policy.module.css";
-import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, InfoDisclosure, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
 
 const INITIAL_STATE: PortfolioTargetPolicyActionState = Object.freeze({ status: "idle", message: null });
@@ -127,13 +127,15 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
         <p className={styles.total} data-valid={totalIsValid}><strong>{totalBps === null ? "—" : percent(totalBps / 100)}</strong><span>%</span></p>
         <div className={styles.totalTrack} aria-hidden="true"><span style={{ width: `${Math.min(100, (totalBps ?? 0) / 100)}%` }} data-valid={totalIsValid} /></div>
         <p className={styles.totalStatus} aria-live="polite" data-valid={totalIsValid}>{totalIsValid ? <Check size={16} aria-hidden="true" /> : null}{status}</p>
-        <p className={styles.summaryNote}>{t("추가 투입과 포트폴리오 분석에 사용할 나의 기준입니다. 저장해도 주문은 실행되지 않습니다.", "Your reference for contribution calculations and portfolio analysis. Saving does not place any orders.")}</p>
         <div className={styles.saveArea}>
           <CairnButton variant="primary" className={`cairn-primary ${styles.save}`} disabled={isDesignPreview || pending || !totalIsValid || editorRows.length === removed.length} type="submit">{pending ? <span className={styles.spinner} aria-hidden="true" /> : null}{t(pending ? "저장 중" : "목표비중 저장", pending ? "Saving…" : "Save targets")}<ArrowRight size={17} aria-hidden="true" /></CairnButton>
-          {isDesignPreview ? <p>{t("예시 데이터입니다. 편집만 체험할 수 있으며 저장하지 않습니다.", "Demo data. Try editing; changes cannot be saved.")}</p> : <p>{t("저장하면 이 범위의 새 승인본으로 적용됩니다.", "Saving creates a new approved revision for this scope.")}</p>}
+          {isDesignPreview ? <p>{t("예시 데이터입니다. 편집만 체험할 수 있으며 저장하지 않습니다.", "Demo data. Try editing; changes cannot be saved.")}</p> : null}
         </div>
         {state.message && !editedSinceSubmit && !(onSaved && state.status === "success") ? <CairnStatus as="div" tone="neutral" className={styles.feedback} role="status" data-success={state.status === "success"}><ManagementText>{state.message}</ManagementText>{state.status === "success" && returnHref && returnLabel ? <Link href={returnHref}>{t(returnLabel.ko, returnLabel.en)}<ArrowRight size={15} aria-hidden="true" /></Link> : null}</CairnStatus> : null}
-        <details className={styles.rules}><summary>{t("저장 기준 알아보기", "About saving targets")}<span aria-hidden="true">+</span></summary><ul><li>{t("각 비중은 0~100%, 소수점 둘째 자리까지 입력합니다.", "Each weight must be 0–100%, with up to two decimal places.")}</li><li>{t("합계는 정확히 100%여야 합니다. 0% 종목도 기록에 남습니다.", "The total must be exactly 100%. Holdings with a 0% target remain in the record.")}</li><li>{t("같은 종목이어도 계좌가 다르면 각각 설정합니다.", "The same holding in different accounts has a separate target in each account.")}</li><li>{t("이전 승인본은 덮어쓰지 않고 이력으로 보존합니다.", "Previous approvals remain in history; they are not overwritten.")}</li><li>{t("편집 중 보유종목 구성이 바뀌면 다시 확인한 뒤 저장해야 합니다.", "If holdings change while editing, review the updated list before saving.")}</li></ul></details>
+        <InfoDisclosure summary={t("저장 기준 알아보기", "About saving targets")}>
+          <p>{t("추가 투입과 포트폴리오 분석에 사용할 기준입니다. 저장해도 주문은 실행되지 않습니다.", "Your reference for contribution calculations and portfolio analysis. Saving does not place any orders.")}</p>
+          <ul className="mt-2 grid list-disc gap-2 pl-4"><li>{t("각 비중은 0~100%, 소수점 둘째 자리까지 입력합니다.", "Each weight must be 0–100%, with up to two decimal places.")}</li><li>{t("합계는 정확히 100%여야 합니다. 0% 종목도 기록에 남습니다.", "The total must be exactly 100%. Holdings with a 0% target remain in the record.")}</li><li>{t("같은 종목이어도 계좌가 다르면 각각 설정합니다.", "The same holding in different accounts has a separate target in each account.")}</li><li>{t("저장하면 새 승인본으로 적용되며, 이전 승인본은 이력으로 보존합니다.", "Saving applies a new approved revision and preserves previous approvals in history.")}</li><li>{t("편집 중 보유종목 구성이 바뀌면 다시 확인한 뒤 저장해야 합니다.", "If holdings change while editing, review the updated list before saving.")}</li></ul>
+        </InfoDisclosure>
       </aside>
     </CairnForm>
   );

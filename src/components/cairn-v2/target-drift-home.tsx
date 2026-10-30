@@ -16,7 +16,7 @@ export function TargetDriftHome({ view, onOpen }: { view: BetaView; onOpen: (tri
   const unavailable = view.domain ? targetMessage(view) : "목표 없음";
   const explanation = known ? (name ?? "종목") + " · 현재 비중 − 승인 목표의 가장 큰 차이 " + driftNumber(drift, 2) + "%p. 수익률이 아닙니다." : unavailable;
   return <section className={styles.card + " " + styles.drift} data-beta-card="drift">
-    <CairnButton variant="secondary" type="button" className={styles.driftButton + " " + home.button} id="beta-target-drift" aria-label="목표 편차 확대" title={explanation} data-expand onClick={event => onOpen(event.currentTarget)}>
+    <CairnButton variant="bare" type="button" className={styles.driftButton + " " + home.button} id="beta-target-drift" aria-label="목표 편차 확대" title={explanation} data-expand onClick={event => onOpen(event.currentTarget)}>
       <span>{label}<Image unoptimized src="/cairn-v2/figma/75-305-28460.svg" width="12" height="12" alt="" /></span>
       <strong>{driftNumber(drift)}<small>%p</small></strong>
       <span className={home.name} title={name ?? unavailable}>{known ? name : unavailable}</span>

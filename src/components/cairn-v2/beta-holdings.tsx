@@ -28,8 +28,8 @@ export function BetaHoldings({read}:{read:HoldingsRead}) {
   const readable=visible.state==='ready'||visible.state==='partial';
   return <BetaShell context={context} setContext={navigate} readView={shell} workspace="holdings" originalPath="/portfolio/holdings">
     <section className={styles.workspace} id="stored-holdings" data-holdings-state={visible.state}>
-      <DetailHeader title="저장 보유 근거" description={<>활성 계좌의 원본 통화·수량·저장 가격입니다. 현재 시세 평가와 구분합니다.{context.currency==='USD'?' · USD로 재환산하지 않습니다.':''}</>} />
-      <CairnStatus as="p" role="status">{visible.message}</CairnStatus>
+      <DetailHeader title="보유종목" description={<>저장된 수량·가격 기준{context.currency==='USD'?' · USD로 재환산하지 않습니다.':''}</>} />
+      {visible.state!=="ready"&&<CairnStatus as="p" role="status">{visible.message}</CairnStatus>}
       {readable&&<>
         <div className={styles.filter}><CairnSelect label="보유 기록 보기" value={filter} options={[{value:'active',label:'보유 중'},{value:'archived',label:'보관 기록'},{value:'all',label:'확인 기록 전체'}]} onValueChange={next=>{if(['active','archived','all'].includes(next))setFilter(next)}}/>
           <p className={styles.muted}>확인한 행 {visible.rows.length}개 · 보유 중 {active.length} · 보관 {archived.length} · 제외 {visible.excludedHoldingCount}개</p>
