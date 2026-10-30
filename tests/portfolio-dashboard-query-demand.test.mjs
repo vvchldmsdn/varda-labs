@@ -146,8 +146,8 @@ describe("dashboard query demand and independent market reads", () => {
       "next/image": { default: props => createElement("img", Object.fromEntries(Object.entries(props).filter(([name]) => name !== "priority"))) },
     });
     for (const [initialLocale, missingLabel, fxLabel, preservedLabel] of [
-      ["ko", "원가·거래 근거 부족", "매입 당시 환율에 따른 환차손익은 포함하지 않습니다", "과거 거래와 저장된 평가 기록은 바뀌지 않습니다"],
-      ["en", "Cost or trade evidence is incomplete", "excludes FX gains or losses since purchase", "Past trades and saved valuations are not rewritten"],
+      ["ko", "원가·거래 근거 부족", "현재 환율 기준, 매입 이후 환차손익 제외", "과거 거래와 저장된 평가 기록은 바뀌지 않습니다"],
+      ["en", "Cost or trade evidence is incomplete", "uses current FX and excludes FX gains or losses since purchase", "Past trades and saved valuations are not rewritten"],
     ]) {
       const render = component => renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, component));
       assert.match(render(createElement(PortfolioDashboard, { data: after })), new RegExp(missingLabel));
