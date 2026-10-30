@@ -5,7 +5,7 @@ import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fr
 import os from 'node:os';
 import path from 'node:path';
 import { load } from 'js-yaml';
-import { childEnvironment, JOBS, parseOptions, SOURCE_DIRECTORIES, SOURCE_FILES, stageSource } from './reliability-ci.mjs';
+import { childEnvironment, JOBS, parseOptions, runProductionBuild, SOURCE_DIRECTORIES, SOURCE_FILES, stageSource } from './reliability-ci.mjs';
 import { permitsConnection } from './reliability-ci-network.mjs';
 
 test('regular workflow always checks every PR/master with stable names and read-only permissions', async () => {
@@ -34,6 +34,23 @@ test('regular workflow always checks every PR/master with stable names and read-
     assert.equal(checkout.with['persist-credentials'], false);
     for (const step of job.steps.filter(step => step.uses)) assert.match(step.uses, /@[a-f0-9]{40}$/);
   }
+});
+
+test('production CI runs deployment prebuild checks and stops before compiling on source drift', async () => {
+  const calls = [];
+  const record = async (_context, name, args) => calls.push({ name, args });
+  await runProductionBuild({}, record);
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(calls.slice(0, -1).map(({ args }) => `node ${args.join(' ')}`).join(' && '), pkg.scripts.prebuild);
+  assert.equal(calls.at(-1).name, 'production-build');
+
+  calls.length = 0;
+  await assert.rejects(runProductionBuild({}, async (context, name, args) => {
+    await record(context, name, args);
+    if (name === 'verify-shared-domains') throw new Error('Synthetic UI source/output drift');
+  }), /source\/output drift/);
+  assert.equal(calls.at(-1).name, 'verify-shared-domains');
+  assert.ok(!calls.some(({ name }) => name === 'production-build'));
 });
 
 test('CI arguments cannot select a remote DB or silently omit PostgreSQL tools', () => {

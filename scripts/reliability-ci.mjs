@@ -96,6 +96,13 @@ async function runNode({ stage, output, environment, report }, name, args) {
   }
 }
 
+export async function runProductionBuild(context, run = runNode) {
+  // Match npm prebuild in the isolated workspace before compiling the app.
+  await run(context, 'prepare-balance-ocr', ['scripts/prepare-balance-ocr.mjs']);
+  await run(context, 'verify-shared-domains', ['scripts/verify-shared-domains.mjs']);
+  await run(context, 'production-build', ['node_modules/next/dist/bin/next', 'build', '--webpack']);
+}
+
 async function executeJob(root, job, pgBin) {
   const outputRoot = path.join(root, 'output', 'reliability-ci');
   await mkdir(outputRoot, { recursive: true });
@@ -124,7 +131,7 @@ async function executeJob(root, job, pgBin) {
     } else if (job === 'unit-tests') {
       await runNode(context, 'full-tests', ['--no-warnings', 'tests/run.mjs']);
     } else if (job === 'production-build') {
-      await runNode(context, 'production-build', ['node_modules/next/dist/bin/next', 'build', '--webpack']);
+      await runProductionBuild(context);
     } else if (job === 'postgres-integration') {
       await runNode(context, 'postgres-integration', ['scripts/reliability-ci-postgres.mjs', '--pg-bin', pgBin, '--report', path.join(output, 'postgres-report.json')]);
       const result = JSON.parse(await readFile(path.join(output, 'postgres-report.json'), 'utf8'));
