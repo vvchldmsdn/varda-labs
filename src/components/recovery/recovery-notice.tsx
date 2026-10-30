@@ -1,7 +1,7 @@
 'use client';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/cairn-ui';
+import { Button, InfoDisclosure } from '@/components/cairn-ui';
 import { useI18n } from '@/components/i18n/locale-provider';
 import { recoveryDestination, recoveryHref, recoveryKind, recoveryReturnHref, type RecoveryKind } from '@/lib/recovery-navigation';
 import styles from './recovery.module.css';
@@ -37,12 +37,13 @@ export function RecoveryNotice({ reasons = [], kind, scope, beta = false, return
     if (href) start(() => router.push(href));
   }
   return <section className={styles.notice} aria-label={t('해결 방법', 'Next steps')} data-recovery-kind={selected} aria-busy={pending}>
-    <h3>{t(c[0], c[3])}</h3><p>{t(c[1], c[4])}</p>
+    <h3>{t(c[0], c[3])}</h3>
     <div className={styles.actions}>
       {(selected === 'retry' || allowResolve) && <Button type="button" variant="primary" disabled={pending} onClick={selected === 'retry' ? retry : resolve}>{pending ? t('확인 중…', 'Loading…') : t(c[2], c[5])}</Button>}
       {selected !== 'retry' && <Button type="button" variant="secondary" disabled={pending} onClick={retry}>{t('다시 조회', 'Reload')}</Button>}
     </div>
     {selected !== 'retry' && allowResolve && <small>{t('현재 입력을 유지한 채 돌아올 수 있어요.', 'Return with your current inputs preserved.')}</small>}
+    <InfoDisclosure summary={t('도움말', 'Help')}><p>{t(c[1], c[4])}</p></InfoDisclosure>
     {(details || reasons.length > 0) && <details><summary>{t('상세 확인 사유', 'Technical details')}</summary><p>{details ?? reasons.join(' · ')}</p></details>}
   </section>;
 }

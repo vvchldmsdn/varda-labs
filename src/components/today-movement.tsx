@@ -44,7 +44,7 @@ import {
   selectTodayHoldingHistory,
 } from "@/lib/today-movement-view";
 import { buildTodayQuoteFreshness, formatTodayEvidenceRange } from "@/lib/today-quote-freshness";
-import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { InfoDisclosure, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
 export function TodayMovement({
@@ -136,12 +136,10 @@ export function TodayMovement({
             <dl className={styles.summaryMetric}>
               <dt><T ko="가격 영향" en="Price impact"/></dt>
               <dd className={toneClass(attribution.priceImpactKrw)}>{<T ko={formatSignedKrw(attribution.priceImpactKrw)} en={translateHomeHistory(formatSignedKrw(attribution.priceImpactKrw))}/>}</dd>
-              <dd className={styles.status}><T ko="보유 종목의 가격 변화" en="Changes in holding prices"/></dd>
             </dl>
             <dl className={styles.summaryMetric}>
               <dt><T ko="환율 영향" en="FX impact"/></dt>
               <dd className={toneClass(attribution.fxImpactKrw)}>{<T ko={formatSignedKrw(attribution.fxImpactKrw)} en={translateHomeHistory(formatSignedKrw(attribution.fxImpactKrw))}/>}</dd>
-              <dd className={styles.status}><T ko="원화 환산 가치의 변화" en="Changes in KRW conversion value"/></dd>
             </dl>
           <div className={styles.stageNote}>
           {!movement.ready ? (
@@ -154,13 +152,13 @@ export function TodayMovement({
             <div className={styles.baselineSummary}>
               <span><T ko="비교 기준" en="Baseline"/></span>
               <strong>{<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</strong>
-              <p>{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p>
             </div>
           )}
           {freshness.staleQuoteCount + freshness.missingQuoteCount > 0 || freshness.fxNeedsRefresh ? <p className="text-[var(--warning)]"><T ko="일부 시세·환율 갱신 대기" en="Some quotes or FX await a refresh"/></p> : null}
-          <details className={`cairn-details ${styles.quoteDetails}`} data-today-quote-freshness>
-            <summary><T ko="시세·비교 기준" en="Quote & baseline details"/></summary>
+          <div className={styles.quoteDetails}>
+          <InfoDisclosure summary={<T ko="시세·비교 기준" en="Quote & baseline details"/>} data-today-quote-freshness>
             <div>
+              {movement.ready ? <p>{<T ko={sourceLabel(movement.source)} en={translateHomeHistory(sourceLabel(movement.source))}/>} · {rows.length}<T ko="개 기여 근거" en="contribution records"/></p> : null}
               <p><T ko="시세 조회" en="Quotes retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange(freshness.fetched, data.generatedAt)}</span></p>
               {freshness.hasFxExposure ? <p><T ko="환율 조회" en="FX retrieved"/> <span className="tabular-nums">{formatTodayEvidenceRange({ oldest: freshness.fxFetchedAt, newest: freshness.fxFetchedAt }, data.generatedAt)}</span></p> : null}
               {data.baselineExecutionCapturedAt ? <p><T ko="기준 평가 시각" en="Baseline valued at"/> {formatTodayEvidenceRange({ oldest: data.baselineExecutionCapturedAt, newest: data.baselineExecutionCapturedAt }, data.generatedAt)}</p> : null}
@@ -169,7 +167,8 @@ export function TodayMovement({
               <p className="mt-1"><T ko="저장된 가격 근거 시각" en="Recorded price evidence time"/> {formatTodayEvidenceRange(freshness.observed, data.generatedAt)}</p>
               <p className="mt-1"><T ko="KIS 가격 근거 시각은 조회 시각으로 기록됩니다." en="KIS price evidence is recorded at retrieval time."/></p>
             </div>
-          </details>
+          </InfoDisclosure>
+          </div>
           </div>
           </section>
 
@@ -177,7 +176,6 @@ export function TodayMovement({
             <div className={`${styles.panelHeader} ${styles.contributionHeader}`}>
               <div>
                 <CairnSectionTitle id="contribution-title" className={styles.panelTitle}><T ko="종목별 기여" en="Contribution by holding"/></CairnSectionTitle>
-                <p className={styles.evidenceIntro}><T ko="점의 길이는 실제 변동액에 비례합니다." en="The dot bars scale with the actual amount of change."/></p>
               </div>
               <p className={styles.status}><T ko="절대 변동액 순 ·" en="By absolute change ·"/> {rows.length}<T ko="개 종목" en=" holdings"/></p>
             </div>
@@ -242,7 +240,6 @@ export function TodayMovement({
             </PresentationDialog>
           ) : null}
           </div>
-          <p><T ko="가격 영향 + 환율 영향 = 평가액 변동" en="Price impact + FX impact = value change"/></p>
           </footer>
         </div>
         {hasHoldingDetail ? (

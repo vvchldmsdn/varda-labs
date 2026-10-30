@@ -19,7 +19,7 @@
 .varda-stage-content > :not(dialog) { min-height: 0; }
 .varda-stage-page nav[data-scope-rail] { padding: 0; min-width: 0; }
 .varda-stage-page nav[data-scope-rail] a { font-size: 12px; min-height: 38px; padding-block: 6px 12px; }
-.varda-stage-page .varda-presentation-detail-trigger { min-height: 36px; padding: 7px 12px; background: transparent; font-size: 11px; border-radius: 20px; }
+.varda-stage-page .varda-presentation-detail-trigger { min-height: 44px; padding: 10px 14px; background: transparent; font-size: 13px; border-radius: 20px; }
 .varda-stage-page .varda-presentation-detail-trigger:hover { background: var(--wash); }
 .varda-stage-page .varda-sidebar { padding-top: 22px; padding-bottom: 14px; }
 .varda-stage-page .varda-sidebar-brand { margin-bottom: 22px; }

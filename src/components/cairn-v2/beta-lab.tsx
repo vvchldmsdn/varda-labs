@@ -28,14 +28,14 @@ export function BetaLab({read}:{read:LabRead}){
  const scopeLabel=visible.scopes.find(s=>s.key===context.scope)?.label??'현재 조회 범위';
  return <BetaShell workspace="lab" context={context} setContext={next=>startTransition(()=>router.push(labHref(next,{...p,run:undefined},freshness?.store.pendingEpoch()),{scroll:false}))} readView={shell} originalPath="/investment-lab">
  <section className={styles.workspace} id="lab-comparison" data-lab-state={dirty?'dirty':visible.state}>
-  <DetailHeader title="같은 거래금액, 다른 과거 경로" eyebrow={"과거 비교 · "+scopeLabel} description="저장된 실제 관측과 KODEX 200 비교 · 미래 예측이나 투자 권고가 아닙니다." />
+  <DetailHeader title="과거 투자 비교" eyebrow={"과거 비교 · "+scopeLabel} description="실제 기록과 가상 투자 비교" />
   <CairnForm className={styles.conditions} onSubmit={e=>{e.preventDefault();nav({...p,start:values.start||undefined,end:values.end||undefined,run:'1'})}}>
    <CairnField>시작일<CairnInput aria-label="과거 비교 시작일" type="date" value={values.start} onChange={e=>setDraft({...values,start:e.target.value})}/></CairnField>
    <CairnField>종료일<CairnInput aria-label="과거 비교 종료일" type="date" value={values.end} onChange={e=>setDraft({...values,end:e.target.value})}/></CairnField>
    <CairnButton variant="primary" className={styles.primary} type="submit" disabled={pending}>{pending?'비교 확인 중…':'과거 비교 실행'}</CairnButton>
    <CairnButton variant="secondary" type="button" disabled={pending} onClick={()=>{setDraft(null);nav({...p,start:undefined,end:undefined,run:undefined})}}>기본 기간 선택</CairnButton>
   </CairnForm>
-  <CairnStatus as="p" role="status" className={styles.status}>{dirty?'기간 변경 · 다시 실행하기 전에는 이전 결과를 표시하지 않습니다':visible.message}</CairnStatus>
+  {(dirty||visible.state!=="ready")&&<CairnStatus as="p" role="status" className={styles.status}>{dirty?'기간 변경 · 다시 실행하기 전에는 이전 결과를 표시하지 않습니다':visible.message}</CairnStatus>}
   <p className={styles.note}>분석 기준 KRW · 표시 통화가 USD여도 환산하지 않습니다. 날짜를 비우면 원본의 기본 허용 기간을 실행 시 확인합니다.</p>
   {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&<RecoveryNotice beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
   {model&&<>

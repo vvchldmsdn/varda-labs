@@ -30,10 +30,10 @@ export function ContributionFundingVisual({ cash, trims, total, residual, rows }
       <div className={styles.fundingSources}><span>{"신규"}{" "}{formatKrw(cash)}</span><i aria-hidden="true">+</i><span>{"계산상 매도"}{" "}{formatKrw(trims)}</span></div>
       <div className={styles.fundingTotal}><span>{"매수 가능 재원"}</span><strong>{formatKrw(total)}</strong></div>
       <div key={signature} className={styles.fundingBar} role="group" aria-label={("매수 가능 재원의 배분")}>
-        {segments.map((row, index) => <CairnButton variant="selection" key={row.key} type="button" className={styles.fundingSegment} aria-label={(`${row.name}, ${formatKrw(row.amount)}, 재원의 ${total > 0 ? (row.amount / total * 100).toFixed(1) : "0"}%`)} aria-pressed={active?.key === row.key} onPointerEnter={() => setSelected(row.key)} onFocus={() => setSelected(row.key)} onClick={() => setSelected(row.key)} style={{ width: `${total > 0 ? row.amount / total * 100 : 0}%`, background: FUND_COLORS[index % FUND_COLORS.length], "--bar-delay": `${index * 35}ms` } as CSSProperties} />)}
+        {segments.map((row, index) => <CairnButton variant="bare" key={row.key} type="button" className={styles.fundingSegment} aria-label={(`${row.name}, ${formatKrw(row.amount)}, 재원의 ${total > 0 ? (row.amount / total * 100).toFixed(1) : "0"}%`)} aria-pressed={active?.key === row.key} onPointerEnter={() => setSelected(row.key)} onFocus={() => setSelected(row.key)} onClick={() => setSelected(row.key)} style={{ width: `${total > 0 ? row.amount / total * 100 : 0}%`, background: FUND_COLORS[index % FUND_COLORS.length], "--bar-delay": `${index * 35}ms` } as CSSProperties} />)}
       </div>
       <div className={styles.fundingSelection} aria-live="polite"><span>{active?.name ?? "배분 가능한 종목 없음"}</span><strong>{active ? formatKrw(active.amount) : "—"}</strong><ArrowRight size={14} aria-hidden="true" /></div>
-      <div className={styles.fundingLegend} aria-label={("배분 종목 선택")}>{segments.map((row, index) => <CairnButton variant="selection" key={row.key} type="button" aria-pressed={active?.key === row.key} onClick={() => setSelected(row.key)}><i style={{ background: FUND_COLORS[index % FUND_COLORS.length] }} />{row.name}</CairnButton>)}</div>
+      <div className={styles.fundingLegend} aria-label={("배분 종목 선택")}>{segments.map((row, index) => <CairnButton variant="bare" key={row.key} type="button" aria-pressed={active?.key === row.key} onClick={() => setSelected(row.key)}><i style={{ background: FUND_COLORS[index % FUND_COLORS.length] }} />{row.name}</CairnButton>)}</div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus, InfoDisclosure } from "@/components/cairn-ui";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -194,7 +194,7 @@ export function HistoryDetail({
         <div className={styles.plot}>
           <div className={styles.plotHeading}>
             <CairnSectionTitle level="h3">{metric === "value" ? "평가액의 흐름" : "수익률의 흐름"}</CairnSectionTitle>
-            <p>날짜를 따라 탐색</p>
+
           </div>
           <HistoryChart view={view} />
           <div className={styles.periodControls} role="group" aria-label="히스토리 기간">
@@ -241,11 +241,11 @@ export function HistoryDetail({
               </p>
             </div>
           )}
-          <p className={styles.plotNote}>
+          <InfoDisclosure summary="그래프 읽는 법" className={styles.plotNote}><p>
             {rows.some((row) => row.source === CURRENT_VALUATION_SOURCE)
               ? "마지막 주황 점은 홈과 같은 현재 평가입니다. 점선은 저장된 평가와 현재 평가를 구분합니다."
               : "확인된 관측점을 연결한 표시입니다. 빈 날짜의 평가나 수익률을 만들지 않습니다."}
-          </p>
+          </p></InfoDisclosure>
         </div>
       </div>
       <footer className={styles.footer}>
@@ -261,7 +261,7 @@ export function HistoryDetail({
                   metric,
                 })}
               >
-                이 날짜의 거래·이벤트 근거 읽기 ↗
+                거래 내역 ↗
               </Link>
               {!isCurrent && selected && (
                 <Link
@@ -273,7 +273,7 @@ export function HistoryDetail({
                     selected.storageSnapshotDate ?? selected.date,
                   )}
                 >
-                  이 날짜의 저장된 평가 읽기 ↗
+                  저장 평가 ↗
                 </Link>
               )}
             </>

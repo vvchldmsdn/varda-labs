@@ -1,4 +1,5 @@
 "use client";
+import { InfoDisclosure } from "@/components/cairn-ui";
 import { useId, useState } from "react";
 import Link from "next/link";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
@@ -45,11 +46,11 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
       </dl>
     </div>
 
-    <div className={styles.visibleBasis}>
+    <InfoDisclosure summary="평가 기준" className={styles.visibleBasis}>
       {context.currency === "USD" && <p>현재 KRW 평가의 환산 표시 · 과거 USD 성과 아님</p>}
       <p>USD/KRW {snapshotDecimal(domain.moneyBasis.structure.usdKrwRate)} · 환율 관측일 {domain.moneyBasis.structure.rateDate ?? "미제공"}</p>
       {domain.nonInvestmentCount > 0 && <p>비투자자산 {domain.nonInvestmentCount}개 · {displayReadMoney(view, domain.nonInvestmentValueKrw, context.currency, false, "dashboard")} {unit} 별도 · 아래 투자자산 비중에 미포함</p>}
-    </div>
+    </InfoDisclosure>
 
     {investment && <section className={styles.costSection} aria-label="투자자산 보유 수익률">
       <SectionHeading title="보유 원가와 손익" actions={costCoverage && <StatusPill tone={partialCost ? "muted" : "positive"}>원가 확인 {costCoverage.confirmed}/{costCoverage.total}종목</StatusPill>} />
@@ -64,7 +65,7 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
     </section>}
 
     <section className={styles.composition} aria-label="투자자산 구성">
-      <SectionHeading title="투자자산 구성" description="확인된 평가액 내 비중 · 종목을 선택하면 상세 근거를 볼 수 있습니다" />
+      <SectionHeading title="투자자산 구성"  />
       <div className={styles.ribbon} role="img" aria-label="확인 소계 내 종목별 비중 · 아래 목록에서 종목 선택" data-value-ribbon>
         {view.rows.map(row => <span key={row.key} style={{ flexBasis: `${row.weightPct}%`, background: row.color }} title={`${row.name} · ${snapshotDecimal(row.weightPct)}%`} data-weight={row.weightPct} />)}
       </div>
