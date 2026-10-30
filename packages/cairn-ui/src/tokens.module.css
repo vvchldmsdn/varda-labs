@@ -19,13 +19,16 @@
   --cairn-ui-radius-small: 10px;
   --cairn-ui-radius-control: 14px;
   --cairn-ui-radius-panel: 24px;
-  --cairn-ui-caption-size: 11px;
-  --cairn-ui-body-size: 13px;
-  --cairn-ui-card-title-size: 13px;
-  --cairn-ui-section-title-size: 15px;
+  --cairn-ui-caption-size: 12px;
+  --cairn-ui-body-size: 15px;
+  --cairn-ui-card-title-size: 15px;
+  --cairn-ui-section-title-size: 18px;
   --cairn-ui-detail-title-size: clamp(22px, 2vw, 28px);
   --cairn-ui-title-weight: 550;
   --cairn-ui-metric-size: clamp(23px, 2.2vw, 30px);
   --cairn-ui-hero-size: clamp(34px, 4.5vw, 56px);
   --cairn-ui-focus: 2px solid var(--cairn-ui-brand);
+  --cairn-ui-motion-fast: 160ms;
+  --cairn-ui-motion-enter: 280ms;
+  --cairn-ui-ease: cubic-bezier(.2,.8,.2,1);
 }

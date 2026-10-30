@@ -1,0 +1,15 @@
+.disclosure { min-width:0; color:var(--cairn-ui-muted,#6c6d68); font-size:13px; line-height:1.65; }
+.disclosure > summary { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; padding:10px 0; list-style:none; cursor:pointer; font-weight:500; }
+.disclosure > summary::-webkit-details-marker { display:none; }
+.disclosure > summary:hover { color:var(--cairn-ui-ink,#20211f); }
+.disclosure > summary:focus-visible { outline:var(--cairn-ui-focus,2px solid #c64623); outline-offset:4px; border-radius:8px; }
+.disclosure > summary svg { flex:none; transition:transform 200ms cubic-bezier(.2,.8,.2,1); }
+.disclosure[open] > summary svg { transform:rotate(180deg); }
+.content { padding:4px 0 20px; max-width:80ch; overflow-wrap:anywhere; }
+.content > :first-child { margin-top:0; }
+.content > :last-child { margin-bottom:0; }
+.disclosure[open] > .content { animation:reveal 220ms ease-out; }
+@keyframes reveal { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+@media(prefers-reduced-motion:reduce) { .disclosure > summary svg { transition:none; } .disclosure[open] > .content { animation:none; } }
+:global([data-reduced=true]) .disclosure > summary svg { transition:none; }
+:global([data-reduced=true]) .disclosure[open] > .content { animation:none; }
