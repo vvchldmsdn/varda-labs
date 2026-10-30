@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Button, Field, Input, SectionHeading, Status } from "@/components/cairn-ui";
+import { Button, Field, InfoDisclosure, Input, SectionHeading, Status } from "@/components/cairn-ui";
 import { InstrumentSearch, type InstrumentChoice } from "./instrument-search";
 import { balanceQuantity, type BalancePhotoRow } from "@/lib/balance-photo";
 import type { HoldingDraft } from "@/lib/holding-batch";
@@ -40,17 +40,19 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false 
   const valid = rows.length > 0 && rows.length <= remaining && rows.every(row => row.instrument && row.verified && balanceQuantity(row.quantity));
   return <section className={styles.panel} aria-label="잔고 사진으로 시작하기">
     <div className={styles.intro}>
-      <SectionHeading title="잔고 사진으로 시작하기" description="사진 한 장으로 종목과 수량을 옮겨 보세요." />
-      <div className={styles.steps}><span>1 사진 읽기</span><span>2 종목·수량 확인</span><span>3 목록 저장</span></div>
-      <p>이 기기에서 읽습니다. 사진은 서버로 전송하거나 보관하지 않아요. 종목명과 보유 수량 제목이 보이도록 찍어 주세요.</p>
+      <SectionHeading title="잔고 사진으로 시작하기" />
+      <p>기기에서 읽기 · 사진 전송·보관 없음</p>
     </div>
     <div className={styles.choose}><Button type="button" variant="secondary" disabled={busy || rows.length > 0 || remaining < 1} onClick={() => fileInput.current?.click()}>잔고 사진 선택 ↗</Button><Input ref={fileInput} type="file" hidden aria-label="잔고 사진 파일" accept="image/jpeg,image/png,image/webp" disabled={busy || rows.length > 0 || remaining < 1} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void recognize(file); }} /></div>
+    <InfoDisclosure summary="사진 등록 안내">
+      <p>종목명과 보유 수량 제목까지 포함해 주세요. 읽은 종목과 수량은 직접 확인한 뒤 저장합니다.</p>
+      <p>수량은 소수점 6자리까지 확인합니다. 매입가·평가금액은 자동 등록하지 않으며, 중복 사진이나 일반·소수점 잔고도 자동 합산하지 않습니다.</p>
+    </InfoDisclosure>
     {progress !== null && <><Status as="p" role="status">{progress < 30 ? "처음에는 인식 도구를 준비하는 데 시간이 걸릴 수 있어요." : `사진을 읽고 있어요 · ${progress}%`}</Status><progress className={styles.progress} max={100} value={progress} aria-label="사진 인식 진행" /><Button type="button" variant="secondary" onClick={() => { generation.current++; task.current?.abort(); task.current = null; setProgress(null); setMessage("인식을 취소했어요."); }}>취소</Button></>}
     {message && <Status as="p" role="status">{message}</Status>}
     {error && <Status as="p" tone="danger" role="alert">{error}</Status>}
     {rows.length > 0 && <div className={styles.review}>
       <details><summary>선택한 잔고 사진 보기</summary>{/* Keep the local blob on this device; never send it to the optimizer. */}{photo && <Image unoptimized width={945} height={2048} src={photo} className={styles.photo} alt="선택한 잔고 사진, 저장 전 수량 대조용" />}</details>
-      <p className={styles.note}>수량은 소수점 6자리까지 확인합니다. 매입가·평가금액은 자동 등록하지 않아요. 중복 사진이나 일반·소수점 잔고는 자동 합산하지 않습니다.</p>
       <div className={styles.rows}>{rows.map(row => <div className={styles.row} key={row.key} data-active={active === row.key}>
         <div><strong>{row.instrument?.name ?? row.label}</strong><small>{row.quantity || "수량 확인 필요"}주 · {row.verified ? "확인 완료" : "확인 필요"}</small></div>
         <div className={styles.actions}><Button variant="secondary" type="button" disabled={busy} onClick={() => setActive(row.key)}>확인</Button><Button variant="ghost" type="button" disabled={busy} aria-label={`${row.label} 제외`} onClick={() => { const next = rows.filter(item => item.key !== row.key); setRows(next); if (active === row.key) setActive(next[0]?.key ?? ""); }}>제외</Button></div>

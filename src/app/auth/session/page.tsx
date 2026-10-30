@@ -55,7 +55,7 @@ export default async function SessionPage({
   );
 
   return (
-    <AuthShell preview={preview} alternate={{ href: "/", label: "포트폴리오" }}>
+    <AuthShell compact preview={preview} alternate={{ href: "/", label: "포트폴리오" }}>
       <section className={styles.panel}>
         <AuthHeading
           eyebrow="YOUR ACCOUNT"

@@ -478,7 +478,9 @@
 .workspaceShell .crudUtilities .developmentSettings {max-width:100%;}
 
 /* A full-width target summary keeps long names readable at every card width. */
-.homeShell .history { --cairn-v2-surface-mask:none; }
+.homeShell .history { display:flex; flex-direction:column; --cairn-v2-surface-mask:none; }
+.homeShell .history .cardHeader { flex:none; }
+.homeShell .history .compactChart { flex:1; min-height:0; height:auto; margin-top:16px; }
 .homeShell .history::before, .homeShell .drift::before { inset:0; mask:none; border-radius:24px; }
 .homeShell .history .cardHeader { padding-right:0; flex-wrap:wrap; }
 .homeShell .history .cardHeader h2 { min-width:0; }
@@ -493,7 +495,7 @@
 @media(hover:hover) { .homeShell .card:not(.heatmap):hover { background-color:#ffffff40; } }
 @media(max-width:699px) {
   .homeShell .driftButton { padding:18px 20px; gap:6px 12px; }
-  .homeShell .driftButton strong { font-size:30px; }
+  .homeShell .driftButton strong { grid-row:1; font-size:30px; }
   .homeShell .leftGrid { grid-template-rows:200px 204px 345px auto auto; }
 }
 @media(prefers-reduced-motion:reduce) { .homeShell .card { transition:none; } }

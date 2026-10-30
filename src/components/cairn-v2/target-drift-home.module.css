@@ -1,3 +1,4 @@
 .button {min-width:0;}
 .button .name {display:block;max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;font-size:13px;line-height:1.5;grid-column:1;}
 .button strong {margin-bottom:0;}
+@media(max-width:699px) { .button .name {grid-column:1 / -1;} }

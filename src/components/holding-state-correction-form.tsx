@@ -13,7 +13,7 @@ import {
   HOLDING_STATE_CORRECTION_POLICY,
   type HoldingStateCorrectionActionState,
 } from "@/lib/holding-state-correction";
-import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput , Status as CairnStatus } from "@/components/cairn-ui";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, InfoDisclosure, Input as CairnInput , Status as CairnStatus } from "@/components/cairn-ui";
 
 
 const INITIAL_STATE: HoldingStateCorrectionActionState = Object.freeze({
@@ -76,9 +76,9 @@ export function HoldingStateCorrectionForm({
             type="number"
           />
         </CairnField>
-        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가는 선택입니다. 비워 두면 기존 값을 유지하며, 미등록 상태라면 나중에 입력할 수 있습니다." en="Average cost is optional. Leave it blank to keep the saved value, or add it later if it is not recorded yet." /></p>
-        {currency === "USD" ? <p className="text-xs leading-5 text-[var(--muted)]"><T ko="달러 기준 1좌당 매입가를 입력하세요. 현재 보유손익의 원화 환산에는 현재 환율을 사용하므로, 매입 당시 환율에 따른 환차손익은 포함하지 않습니다." en="Enter the purchase price per unit in USD. Current holding profit/loss is converted to KRW at the current exchange rate, so it excludes FX gains or losses since purchase." /></p> : null}
-        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가만 바꾸면 현재 평가액과 수량은 유지됩니다. 과거 거래와 저장된 평가 기록은 바뀌지 않습니다." en="Changing only average cost keeps the current value and quantity unchanged. Past trades and saved valuations are not rewritten." /></p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가 선택 · 비워 두면 기존 값 유지" en="Optional cost · leave blank to keep the saved value" /></p>
+        {currency === "USD" ? <p className="text-xs leading-5 text-[var(--muted)]"><T ko="USD 매입가 · 원화 손익은 현재 환율 기준, 매입 이후 환차손익 제외" en="Cost in USD · KRW profit/loss uses current FX and excludes FX gains or losses since purchase" /></p> : null}
+        <InfoDisclosure summary={<T ko="정정 기준" en="How corrections work" />}><p><T ko="매입가만 바꾸면 현재 평가액과 수량은 유지됩니다. 과거 거래와 저장된 평가 기록은 바뀌지 않습니다. 미등록 매입가는 나중에 입력할 수 있습니다." en="Changing only average cost keeps the current value and quantity unchanged. Past trades and saved valuations are not rewritten. You can add an unrecorded cost later." /></p></InfoDisclosure>
         <CairnField className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"정정 사유 (선택)"}</ManagementText><ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}
@@ -89,7 +89,7 @@ export function HoldingStateCorrectionForm({
           />
         </CairnField>
 
-        <p className="text-xs leading-5 text-[var(--muted)]"><ManagementText>{"오입력 정정 전용입니다. 매수·매도 거래나 현금 흐름으로 기록되지 않습니다."}</ManagementText></p>
+        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="오입력 정정 전용 · 매매·입출금 기록 아님" en="Input corrections only · not a trade or cash-flow record" /></p>
         <CairnButton variant="primary"
           className="w-full rounded-md bg-[var(--ink)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}

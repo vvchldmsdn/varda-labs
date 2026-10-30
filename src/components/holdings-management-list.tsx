@@ -18,6 +18,7 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
   const active = holdings.filter(holding => holding.archivedAt === null);
   const archived = holdings.filter(holding => holding.archivedAt !== null);
   return <div data-holdings-management-list>
+    {holdings.some(holding => nativeAccounts.some(account => account.code === holding.accountCode)) ? <div className="mb-4"><NativeLedgerNotice showLink={false} /></div> : null}
     <div className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
       {!active.length ? <p className="py-8 text-sm text-[var(--muted)]"><T ko="이 범위에 현재 보유 중인 종목이 없습니다." en="There are no current holdings in this scope." /></p> : active.map(holding => <article key={holding.holdingId} className="min-w-0 py-6" data-holding-management={holding.holdingId}>
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(230px,.7fr)] lg:gap-10">
@@ -30,7 +31,7 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
             </dl>
           </div>
           <div className="min-w-0 border-t border-[var(--line)] pt-4 lg:border-0 lg:pt-1">
-            {nativeAccounts.some(account => account.code === holding.accountCode) ? <NativeLedgerNotice accountId={nativeAccounts.find(account => account.code === holding.accountCode)?.id} assetId={holding.holdingId} action="sell" /> : <>
+            {nativeAccounts.some(account => account.code === holding.accountCode) ? <NativeLedgerNotice accountId={nativeAccounts.find(account => account.code === holding.accountCode)?.id} assetId={holding.holdingId} action="sell" showExplanation={false} /> : <>
               <HoldingStateCorrectionForm averageCost={holding.averageCost} currency={holding.currency} holdingId={holding.holdingId} quantity={holding.quantity} updatedAt={holding.updatedAt} />
               <HoldingArchiveForm holdingId={holding.holdingId} updatedAt={holding.updatedAt} />
             </>}
@@ -61,7 +62,7 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
       <p className="mt-2 text-sm text-[var(--muted)]"><T ko="현재 평가에서 제외되며 수량·매입원가·과거 기록은 보존됩니다." en="Excluded from current valuation; quantity, cost and historical records are preserved." /></p>
       <div className="mt-4 divide-y divide-[var(--line)]">{archived.map(holding => <article key={holding.holdingId} className="grid min-w-0 gap-4 py-5 sm:grid-cols-[minmax(0,1fr)_230px]">
         <div className="min-w-0"><CairnSectionTitle level="h3" className="break-words font-medium">{holding.name}</CairnSectionTitle><p className="mt-1 break-words text-xs text-[var(--muted)]">{holding.accountName} · {holding.ticker ?? "—"}</p><p className="mt-2 text-xs"><T ko="보유 수량" en="Quantity" /> {formatStoredNumber(holding.quantity)}</p><p className="mt-1 text-xs text-[var(--muted)]"><T ko="종료 시각" en="Closed at" /> {formatStoredTimestamp(holding.archivedAt)}</p></div>
-        {nativeAccounts.some(account => account.code === holding.accountCode) ? <NativeLedgerNotice accountId={nativeAccounts.find(account => account.code === holding.accountCode)?.id} assetId={holding.holdingId} action="buy" /> : <HoldingRestoreForm holdingId={holding.holdingId} updatedAt={holding.updatedAt} />}
+        {nativeAccounts.some(account => account.code === holding.accountCode) ? <NativeLedgerNotice accountId={nativeAccounts.find(account => account.code === holding.accountCode)?.id} assetId={holding.holdingId} action="buy" showExplanation={false} /> : <HoldingRestoreForm holdingId={holding.holdingId} updatedAt={holding.updatedAt} />}
       </article>)}</div>
     </section> : null}
   </div>;
