@@ -1,4 +1,6 @@
 export const labCopyB: Readonly<Record<string, string>> = {
+  "같은 기간과 투자금으로 비교해요.": "Compare over the same period with the same invested amounts.",
+  "기간 적용": "Apply period",
   "가격 충격은 -100%부터 +100% 사이의 숫자로 입력해야 합니다.": "Enter a price shock between −100% and +100%.",
   "직접 보유와 ETF 경유 노출 합계가 유효 범위를 벗어났습니다.": "Combined direct and ETF exposure is outside the valid range.",
   "구성종목 또는 평가 근거를 확인해야 합니다.": "Constituent or valuation data needs checking.",

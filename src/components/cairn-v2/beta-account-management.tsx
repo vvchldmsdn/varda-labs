@@ -1,6 +1,7 @@
 'use client';
 import {useActionFormReset} from '@/components/cairn-ui/client';
-import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Fieldset as CairnFieldset, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Fieldset as CairnFieldset, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+import { Wallet } from 'lucide-react';
 
 import { DetailHeader } from './ui/molecules';
 
@@ -12,6 +13,7 @@ import {createBetaAccount,updateBetaAccount,archiveBetaAccount,restoreBetaAccoun
 import type {AccountManagementActionState} from '@/lib/account-management';
 import {managementHref,managementKey,type AccountManagementRead,type ManagedAccount} from '@/lib/cairn-v2/account-management-contract';
 import {accountsHref} from '@/lib/cairn-v2/account-contract';
+import {ownedManagementHref} from '@/lib/cairn-v2/owned-management-contract';
 import {domainQueryContext} from '@/lib/cairn-v2/read-service';
 import {blankDomainView} from '@/lib/cairn-v2/read-contract';
 import {BetaShell} from './beta-shell';
@@ -76,8 +78,8 @@ export function BetaAccountManagement({read}:{read:AccountManagementRead}) {
   shell.domain!.scopes=blocked?[]:read.scopes;
   return <BetaShell context={context} setContext={navigate} readView={shell} workspace="accounts" originalPath="/portfolio/accounts">
     <section className={styles.workspace} id="account-management" data-account-management-state={state} aria-busy={blocked}>
-      <DetailHeader title="계좌 관리" description="본인 계좌의 생성·이름 수정·보관·복원입니다. 기존 화면과 같은 저장·권한 검사를 사용합니다." actions={<Link className={styles.textLink} prefetch={false} href={accountsHref(context,store?.pendingEpoch())}>계좌 현황 ↗</Link>} />
-      <CairnStatus as="p" className={styles.readStatus} role="status">{blocked?'사용자·조회 범위를 다시 확인하는 중':read.message}</CairnStatus>
+      <DetailHeader title="계좌 관리" actions={<Link className={styles.textLink} prefetch={false} href={accountsHref(context,store?.pendingEpoch())}>계좌 현황 ↗</Link>} />
+      {(blocked||read.state!=='ready')&&<CairnStatus as="p" className={styles.readStatus} role="status">{blocked?'계좌를 확인하고 있어요':read.message}</CairnStatus>}
       {!available&&<p className={styles.notice}>이 실행 환경에서는 계좌 저장 기능이 연결되지 않았습니다. 현재 화면에서 변경을 보낼 수 없습니다.</p>}
       {completion?.generation===generation&&completion.message&&<CairnStatus as="p" tone="success" className={styles.success} role="status">{completion.message}</CairnStatus>}
       {!blocked&&read.state==='unavailable'&&<CairnButton variant="secondary" className={styles.secondary} type="button" onClick={()=>reread()}>계좌 관리 다시 조회</CairnButton>}
@@ -89,6 +91,7 @@ export function BetaAccountManagement({read}:{read:AccountManagementRead}) {
           ...archived.map(account=>({id:account.id,name:account.name,meta:account.currency+' · 보관',group:'보관 계좌',content:<ArchivedAccount account={account} generation={generation} enabled={enabled} onSuccess={complete}/>})),
         ]}/>
       </div>
+      {ready&&<ActionGroup label="계좌와 연결된 자산" className={styles.related}><Link prefetch={false} href={ownedManagementHref('holdings',context,store?.pendingEpoch())}><ActionContent icon={<Wallet size={22}/>} title="보유 종목 관리" description="수량과 매입가 확인" /></Link></ActionGroup>}
       <details className={styles.evidence}>
         <summary>계좌 상태와 저장 근거</summary>
         <p>상단 범위는 현재 접근과 이동 문맥입니다. 관리 목록은 로그인한 소유자의 전체 계좌를 포함하며 표시 통화 선택으로 계좌의 저장 통화를 바꾸지 않습니다.</p>
@@ -118,7 +121,7 @@ function CreateAccount({generation,enabled,onSuccess}:FormProps) {
         <div className={styles.nameField}><CairnField htmlFor="new-account-name">계좌 이름</CairnField><CairnInput id="new-account-name" name="name" type="text" autoComplete="off" maxLength={100} required value={name} onChange={event=>setName(event.target.value)}/></div>
         <CairnButton variant="primary" className={styles.primary} type="submit">{action.pending?'생성 중…':'계좌 생성'}</CairnButton>
       </CairnFieldset>
-      <p className={styles.muted}>KRW 기준의 투자 계좌 · 최대 64개 활성 계좌</p>
+      <p className={styles.muted}>KRW 기준 · 미국 주식도 등록할 수 있어요.</p>
       <ActionMessage state={action.state} pending={action.pending}/>
     </CairnForm>
   </section>;
@@ -135,7 +138,7 @@ function ActiveAccount({account,generation,enabled,onSuccess}:FormProps&{account
   const confirmed=confirmation.version===account.updatedAt&&confirmation.value;
   return <article className={styles.accountRow} aria-busy={busy}>
     <div className={styles.accountHeading}><h4>{account.name}</h4><span className={styles.muted}>{account.accountType} · {account.currency}</span></div>
-    <p className={styles.references}>미보관 보유 기록 <span>{account.activeHoldingCount}</span> · 미종료 범위 연결 <span>{account.openGroupReferenceCount}</span></p>
+    <dl className={styles.references}><div><dt>보유 기록</dt><dd>{account.activeHoldingCount}</dd></div><div><dt>연결된 분석 범위</dt><dd>{account.openGroupReferenceCount}</dd></div></dl>
     <CairnForm action={update.formAction} onSubmit={update.onSubmit} onReset={update.onReset} aria-label={account.name+' 이름 수정'}>
       <CairnFieldset className={styles.fields} disabled={!enabled||busy}>
         <IdentityFields account={account}/>
@@ -144,15 +147,17 @@ function ActiveAccount({account,generation,enabled,onSuccess}:FormProps&{account
       </CairnFieldset>
       <ActionMessage state={update.state} pending={update.pending}/>
     </CairnForm>
+    <details className={styles.archiveDisclosure}><summary>계좌 보관</summary>
     <CairnForm className={styles.archiveForm} action={archive.formAction} onSubmit={archive.onSubmit} onReset={archive.onReset} aria-label={account.name+' 보관'}>
       <CairnFieldset className={styles.archiveFields} disabled={!enabled||busy||archiveBlocked}>
         <IdentityFields account={account}/>
         <CairnField className={styles.confirm}><CairnCheckbox name="archiveConfirmed" value="yes" required checked={confirmed} onChange={event=>setConfirmation({version:account.updatedAt,value:event.target.checked})}/><span>기록을 유지한 채 계좌를 보관합니다.</span></CairnField>
-        <CairnButton variant="primary" className={styles.secondary} type="submit">{archive.pending?'보관 중…':'계좌 보관'}</CairnButton>
+        <CairnButton variant="danger" type="submit">{archive.pending?'보관 중…':'계좌 보관'}</CairnButton>
       </CairnFieldset>
       {archiveBlocked&&<p className={styles.notice}>보관 불가: {account.activeHoldingCount>0?'미보관 보유 기록 '+account.activeHoldingCount+'개':''}{account.activeHoldingCount>0&&account.openGroupReferenceCount>0?' · ':''}{account.openGroupReferenceCount>0?'미종료 범위 연결 '+account.openGroupReferenceCount+'개':''}가 있습니다.</p>}
       <ActionMessage state={archive.state} pending={archive.pending}/>
     </CairnForm>
+    </details>
     <AccountEvidence account={account}/>
   </article>;
 }
@@ -177,7 +182,7 @@ function IdentityFields({account}:{account:ManagedAccount}) {
   return <><input name="accountId" type="hidden" value={account.id}/><input name="expectedUpdatedAt" type="hidden" value={account.updatedAt}/></>;
 }
 function ActionMessage({state,pending}:{state:AccountManagementActionState;pending:boolean}) {
-  return <CairnStatus as="p" className={styles.actionMessage} data-action-state={pending?'pending':state.status} role="status" aria-live="polite">{pending?'기존 계좌 저장 규칙을 확인하는 중…':state.message}</CairnStatus>;
+  return <CairnStatus as="p" className={styles.actionMessage} data-action-state={pending?'pending':state.status} role="status" aria-live="polite">{pending?'저장 중…':state.message}</CairnStatus>;
 }
 function AccountEvidence({account}:{account:ManagedAccount}) {
   return <details className={styles.rowEvidence}><summary>계좌 기록 근거</summary><dl>

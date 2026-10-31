@@ -1,5 +1,5 @@
 "use client";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus, InfoDisclosure } from "@/components/cairn-ui";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus, InfoDisclosure, ActionGroup, ActionContent } from "@/components/cairn-ui";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -173,23 +173,6 @@ export function HistoryDetail({
               </p>
             )}
           </div>
-          <div className={styles.periodSummary}>
-            <p className={styles.eyebrow}>저장 기간 평가액 변화</p>
-            <p
-              className={styles.periodValue}
-              data-tone={tone(comparison.value)}
-              data-history-period-change
-            >
-              {displayMoney(comparison.value, true)}
-              <small>{unit}</small>
-            </p>
-            <p className={styles.note}>{comparison.reason}</p>
-            {comparison.value !== null && <p className={styles.note}>투자 수익·손실과 다릅니다.</p>}
-          </div>
-          <p className={styles.range}>
-            {rows[0]?.date ?? "기록 없음"} — {rows.at(-1)?.date ?? "기록 없음"}
-            <span>{rows.length}개 관측점 · 달력 기간</span>
-          </p>
         </aside>
         <div className={styles.plot}>
           <div className={styles.plotHeading}>
@@ -248,8 +231,27 @@ export function HistoryDetail({
           </p></InfoDisclosure>
         </div>
       </div>
+      <div className={styles.comparison}>
+          <div className={styles.periodSummary}>
+            <p className={styles.eyebrow}>저장 기간 평가액 변화</p>
+            <p
+              className={styles.periodValue}
+              data-tone={tone(comparison.value)}
+              data-history-period-change
+            >
+              {displayMoney(comparison.value, true)}
+              <small>{unit}</small>
+            </p>
+            <p className={styles.note}>{comparison.reason}</p>
+            {comparison.value !== null && <p className={styles.note}>투자 수익·손실과 다릅니다.</p>}
+          </div>
+          <p className={styles.range}>
+            {rows[0]?.date ?? "기록 없음"} — {rows.at(-1)?.date ?? "기록 없음"}
+            <span>{rows.length}개 관측점 · 달력 기간</span>
+          </p>
+      </div>
       <footer className={styles.footer}>
-        <div className={styles.links}>
+        <ActionGroup label="선택 날짜 더 살펴보기" className={styles.links}>
           {view.domain && selectedDate && (
             <>
               <Link
@@ -261,7 +263,7 @@ export function HistoryDetail({
                   metric,
                 })}
               >
-                거래 내역 ↗
+                <ActionContent title="이날 거래 보기" description={selectedDate} />
               </Link>
               {!isCurrent && selected && (
                 <Link
@@ -273,12 +275,12 @@ export function HistoryDetail({
                     selected.storageSnapshotDate ?? selected.date,
                   )}
                 >
-                  저장 평가 ↗
+                  <ActionContent title="저장된 평가 확인" description="선택 날짜의 원본 기록" />
                 </Link>
               )}
             </>
           )}
-        </div>
+        </ActionGroup>
         <details className={styles.evidence}>
           <summary>출처·포함 범위 근거</summary>
           <dl>

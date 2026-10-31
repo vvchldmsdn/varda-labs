@@ -6,7 +6,7 @@
 
 | 작업 영역 | 먼저 읽을 기준 | 적용 범위와 주의점 |
 | --- | --- | --- |
-| 화면 구성 | [Presentation composition](design/presentation-composition-redesign.md) | 데스크톱은 큰 시각화와 관련 핵심 요약을 한 장면에 배치하고 상세 정보는 명확한 진입점으로 제공한다. |
+| 화면 구성 | [Presentation composition](design/presentation-composition-redesign.md) | 2026-10-31 보완 우선. 핵심 결과·다음 행동을 먼저 배치하고 자연스러운 스크롤을 허용한다. 글자·버튼을 줄여 한 viewport에 맞추는 옛 조건은 적용하지 않는다. |
 | 색상·카드·동작 | [Visual interaction](design/visual-interaction-redesign.md) | 밝은 paper/ink, 절제된 주황 강조와 음수의 파랑, 필요한 곳의 완결된 시각화 카드. 이 문서의 옛 세로 배치는 위 구성 문서가 대체한다. |
 | 실제 스타일 | [layout.tsx](../src/app/layout.tsx), [presentation.css](../src/app/presentation.css), [modern.css](../src/app/modern.css), [motion.css](../src/app/motion.css), [stage.css](../src/app/stage.css), [locale.css](../src/app/locale.css) | 토큰과 import 순서, 뒤의 미디어 규칙까지 확인한다. 문서에 있는 옛 색상값을 CSS 위에 덮어쓰지 않는다. |
 | 신규 사용자 | [New-user experience](new-user-experience.md) | 수량·현재 보유자산으로 시작, 원가는 선택 입력, 실제 개인 기록과 공용 시장 이력 분리. 아래의 최신 모바일·반복 QA 보완을 함께 적용한다. |

@@ -1,13 +1,11 @@
 "use client";
 
 import { useLabI18n } from "./lab-text";
-import { labEnglish } from "./lab-copy";
-import { LocalizedElement } from "@/components/i18n/localized-element";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CalendarDays, Info, Table2, X } from "lucide-react";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Button as CairnButton, IconButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
 export function InvestmentLabDialog({
@@ -79,15 +77,14 @@ export function InvestmentLabDialog({
             <CairnSectionTitle className="text-base font-medium" id={id}>
               {displayedTitle}
             </CairnSectionTitle>
-            <LocalizedElement as="button"
-              aria-label="닫기"
-              className="varda-icon-button"
+            <IconButton
+              label={l("닫기")}
               onClick={() => ref.current?.close()}
-              title="닫기"
-              type="button" en={{"aria-label": labEnglish("닫기"), "title": labEnglish("닫기")}}
+              title={l("닫기")}
+              type="button"
             >
               <X aria-hidden="true" size={18} />
-            </LocalizedElement>
+            </IconButton>
           </header>
           <div className="varda-dialog-content min-h-0 overflow-y-auto overscroll-contain">
             {open ? typeof children === "function" ? children() : children : null}

@@ -81,7 +81,7 @@ export function HistoryChart({
   const max = Math.max(...valid);
   const extent = max - min || 1;
   const plot = compact
-    ? { width: 485, height: 288, left: 4, right: 481, top: 102, bottom: 274 }
+    ? { width: 485, height: 230, left: 4, right: 481, top: 18, bottom: 216 }
     : { width: 864, height: 410, left: 12, right: 852, top: 22, bottom: 382 };
   const axis = historyAxis(rows);
   const points = values.map((value, i) =>
@@ -156,7 +156,7 @@ export function HistoryChart({
       )}
       <svg
         viewBox={`0 0 ${plot.width} ${plot.height}`}
-        preserveAspectRatio={compact ? "xMidYMid meet" : "none"}
+        preserveAspectRatio="none"
         role="img"
         tabIndex={compact ? undefined : 0}
         aria-label={

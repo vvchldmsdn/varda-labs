@@ -38,7 +38,7 @@
 .identity p { font-size: 10px; color: var(--muted); margin-top: 5px; overflow-wrap: anywhere; }
 .weightInput > label { display: block; font-size: 10px; color: var(--muted); text-align: right; margin-bottom: 5px; }
 .weightInput > div { position: relative; }
-.weightInput input { min-width: 0; width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 8px 26px 8px 9px; text-align: right; font-size: 18px; font-weight: 550; font-variant-numeric: tabular-nums; appearance: textfield; }
+.weightInput input[data-cairn-control] { min-width: 0; width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 8px 26px 8px 9px; text-align: right; font-size: 18px; font-weight: 550; font-variant-numeric: tabular-nums; appearance: textfield; }
 .weightInput input::-webkit-inner-spin-button, .weightInput input::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .weightInput input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .weightInput input[aria-invalid="true"] { border-color: var(--warning); }
@@ -106,7 +106,7 @@
   .identity { gap: 8px; }
   .identity label { font-size: 13px; }
   .rowNumber { flex-basis: 15px; font-size: 9px; }
-  .weightInput input { font-size: 17px; }
+  .weightInput input[data-cairn-control] { font-size: 17px; }
   .comparison, .rowDetails, .fieldError, .restriction { margin-left: 23px; }
   .comparison { gap: 10px; }
   .comparison > span { min-width: 72px; font-size: 9px; }
@@ -124,28 +124,28 @@
 .heading p:last-child { font-size:12px; margin-top:8px; }
 .context { padding:12px 0; }
 .notice { margin-bottom:16px; padding-block:6px; }
-.columns { display:grid; grid-template-columns:minmax(0,1fr) 80px 90px; gap:16px; padding:0 0 10px; color:var(--muted); font-size:11px; }
+.columns { display:grid; grid-template-columns:minmax(0,1fr) 80px 108px; gap:16px; padding:0 0 10px; color:var(--muted); font-size:11px; }
 .columns > span:not(:first-child) { text-align:right; }
-.row { grid-template-columns:minmax(0,1fr) 80px 90px; gap:0 16px; padding:12px 0 4px; align-items:center; }
+.row { grid-template-columns:minmax(0,1fr) 80px 108px; gap:0 16px; padding:12px 0 4px; align-items:center; }
 .identity { gap:8px; }
 .rowNumber { display:none; }
-.identity label { font-size:13px; }
+.identity label { font-size:16px; }
 .identity p { margin-top:2px; }
 .weightInput { grid-column:3; grid-row:1; }
 .weightInput > label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-.weightInput input { min-height:44px; font-size:16px; background:transparent; }
+.weightInput input[data-cairn-control] { min-height:56px; font-size:22px; border-radius:12px; background:var(--surface); }
 .comparison { grid-column:2; grid-row:1; margin:0; justify-content:flex-end; }
 .comparison .tracks { display:none; }
 .comparison > span { min-width:0; font-size:12px; text-align:right; }
 .rowDetails { grid-column:1 / -1; margin:0; }
-.rowDetails summary { min-height:32px; font-size:10px; width:fit-content; gap:8px; }
+.rowDetails summary { min-height:44px; font-size:12px; width:fit-content; gap:8px; }
 .fieldError,.restriction { margin-left:0; }
 @media(max-width:760px) {
  .heading { padding:10px 0 12px; }
- .heading h1 { font-size:25px; }
+ .heading h1 { font-size:32px; }
  .heading p:last-child { margin-top:7px; }
  .editorHeading { padding-bottom:12px; }
- .columns,.row { grid-template-columns:minmax(0,1fr) 54px 70px; column-gap:10px; }
+ .columns,.row { grid-template-columns:minmax(0,1fr) 54px 94px; column-gap:10px; }
  .comparison > span { font-size:11px; }
  .mobileTotal { min-height:48px; }
  .form { gap:16px; }

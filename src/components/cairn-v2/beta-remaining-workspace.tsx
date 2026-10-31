@@ -28,10 +28,9 @@ export function BetaRemainingWorkspace({read}:{read:RemainingWorkspaceRead}){
  return <BetaShell workspace={read.kind} context={context} setContext={move} readView={shell} originalPath={read.kind==='ledger'?'/portfolio/ledger':'/plans'}>
   <section className={styles.workspace} id={read.kind==='ledger'?'trade-ledger':'saved-plans'} data-remaining-kind={read.kind} data-remaining-state={blocked?'loading':read.state} aria-busy={blocked}>
    <DetailHeader title={read.kind==='ledger'?'거래·현금 기록':'저장된 투자계획'} actions={<Link prefetch={false} href={home}>홈으로 ↗</Link>} />
-   <p role="status">{blocked?'사용자·조회 범위를 다시 확인하는 중':read.message}</p>
+   {(blocked||read.state!=='ready')&&<p role="status">{blocked?'불러오는 중…':read.message}</p>}
    {ready&&read.kind==='plans'&&<ContributionNextSteps journey={{scope:context.scope,currency:'KRW',reportingCurrency:context.currency,beta:true,amount:typeof context.cashAmountKrw==='string'?context.cashAmountKrw:undefined}} />}
-   {ready&&read.kind==='ledger'&&<a className={styles.note} href="/portfolio/trades/import">사진 여러 장으로 거래 가져오기 ↗</a>}
-   {!blocked&&read.state==='ready'&&<p className={styles.note}>{read.kind==='ledger'?'원장은 로그인한 본인의 계좌를 다시 확인합니다. 상단 조회 범위는 기록 목록의 소유권을 대신하지 않습니다. 거래 기록과 저장 평가일은 별개입니다.':'저장 목록은 본인 소유 계획 전체입니다. 상단 통화·범위 변경으로 원래 계획의 통화나 금액을 바꾸지 않습니다.'}</p>}
+   {ready&&read.kind==='ledger'&&<Link className={styles.importLink} prefetch={false} href="/portfolio/trades/import">사진으로 거래 가져오기 ↗</Link>}
    {read.kind==='plans'?<div hidden={!ready} inert={!ready} aria-hidden={!ready}><SavedPlanLibrary generation={generation} suspended={!ready}/></div>:<div key={generation} hidden={!ready} inert={!ready} aria-hidden={!ready}>
     {ready&&<LocaleProvider initialLocale="ko"><NativeLedgerView embedded homeHref={home} {...ledgerNavigation} initialSelection={read.selection} onSaved={()=>{if(current.current!==generation||store?.blocked(read.readReceipt,read.readEpoch))return;const epoch=crypto.randomUUID();store?.begin(epoch);start(()=>router.replace(carryRecoveryFragment(remainingWorkspaceHref('ledger',context,epoch,read.selection),location.hash),{scroll:false}));}}/></LocaleProvider>}
    </div>}

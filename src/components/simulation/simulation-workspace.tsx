@@ -17,7 +17,7 @@ import {
 import styles from "./simulation-workspace.module.css";
 import { SimulationLoading } from "./simulation-loading";
 import loadingStyles from "./simulation-loading.module.css";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, Button as CairnButton, IconButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
 const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading: () => <SimulationLoading phase="evidence" compact /> });
@@ -25,9 +25,9 @@ const RemotePanel = dynamic(() => import("./simulation-remote-panel"), { loading
 type SimulationOverlay = "weights" | "validation" | "evidence";
 
 const OVERLAYS = {
-  weights: { label: "비중 실험", icon: SlidersHorizontal, description: "구성을 조정했을 때 분포와 위험의 차이를 비교합니다." },
-  validation: { label: "과거 검증", icon: ScanLine, description: "과거 구간 밖에서 실제 결과와 모형의 예측을 대조합니다." },
-  evidence: { label: "모형·데이터", icon: Database, description: "포함 종목과 데이터 누락, 모형의 가정을 확인합니다." },
+  weights: { label: "비중 실험", title: "비중을 바꿔 비교하기", titleEn: "Compare different weights", icon: SlidersHorizontal, description: "같은 조건에서 구성별 차이", descriptionEn: "Different allocations, same conditions" },
+  validation: { label: "과거 검증", title: "과거 결과와 비교하기", titleEn: "Compare with past outcomes", icon: ScanLine, description: "학습에 쓰지 않은 구간의 결과", descriptionEn: "Outcomes outside the fitting period" },
+  evidence: { label: "모형·데이터", title: "사용한 자료 확인하기", titleEn: "Review the inputs", icon: Database, description: "포함 종목과 계산 가정", descriptionEn: "Included holdings and assumptions" },
 } as const;
 
 export function SimulationWorkspace({
@@ -71,17 +71,16 @@ export function SimulationWorkspace({
         <div className={loadingStyles.settledResult}>{paths}</div>
       </div>
 
-      <div className={styles.launchers}>
+      <ActionGroup label={pt("시뮬레이션 이어서 살펴보기", "Explore the simulation")}>
         {(Object.keys(OVERLAYS) as SimulationOverlay[]).map((view) => {
-          const { icon: Icon, label, description } = OVERLAYS[view];
+          const { icon: Icon, title, titleEn, description, descriptionEn } = OVERLAYS[view];
           return (
-            <CairnButton variant="secondary" className={styles.launcher} key={view} onClick={() => openOverlay(view)} type="button">
-              <Icon aria-hidden="true" size={21} strokeWidth={1.6} />
-              <span><strong><SimulationText ko={label} /></strong><span className="sr-only"><SimulationText ko={description} /></span></span>
+            <CairnButton variant="bare" key={view} onClick={() => openOverlay(view)} type="button">
+              <ActionContent icon={<Icon size={22} strokeWidth={1.6} />} title={<SimulationText ko={title} en={titleEn} />} description={<SimulationText ko={description} en={descriptionEn} />} />
             </CairnButton>
           );
         })}
-      </div>
+      </ActionGroup>
 
       <dialog
         aria-labelledby={titleId}
@@ -103,15 +102,14 @@ export function SimulationWorkspace({
                 <SimulationText ko={activeDefinition?.label ?? "시뮬레이션 상세"} />
               </CairnSectionTitle>
             </div>
-            <CairnButton variant="ghost"
-              aria-label={pt("닫기")}
-              className="varda-icon-button"
+            <IconButton
+              label={pt("닫기")}
               onClick={closeOverlay}
               title={pt("닫기")}
               type="button"
             >
               <X aria-hidden="true" size={18} />
-            </CairnButton>
+            </IconButton>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
             {activeOverlay ? <RemotePanel query={query} /> : null}

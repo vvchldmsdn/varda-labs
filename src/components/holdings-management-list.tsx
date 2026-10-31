@@ -8,6 +8,7 @@ import { isKrxGoldManualAssetCandidate } from "@/lib/market-data/manual-asset-pr
 import type { HoldingAnalysisDataReadiness } from "@/lib/holding-analysis-data-readiness";
 import type { TenantHoldingDto } from "@/lib/tenant-holding-read-model";
 import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import styles from "@/components/portfolio/management-forms.module.css";
 
 
 export function HoldingsManagementList({ holdings, analysisDataByHolding, nativeAccounts = [] }: {
@@ -17,7 +18,7 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
 }) {
   const active = holdings.filter(holding => holding.archivedAt === null);
   const archived = holdings.filter(holding => holding.archivedAt !== null);
-  return <div data-holdings-management-list>
+  return <div className={styles.holdingList} data-holdings-management-list>
     {holdings.some(holding => nativeAccounts.some(account => account.code === holding.accountCode)) ? <div className="mb-4"><NativeLedgerNotice showLink={false} /></div> : null}
     <div className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
       {!active.length ? <p className="py-8 text-sm text-[var(--muted)]"><T ko="이 범위에 현재 보유 중인 종목이 없습니다." en="There are no current holdings in this scope." /></p> : active.map(holding => <article key={holding.holdingId} className="min-w-0 py-6" data-holding-management={holding.holdingId}>
@@ -25,7 +26,7 @@ export function HoldingsManagementList({ holdings, analysisDataByHolding, native
           <div className="min-w-0">
             <CairnSectionTitle className="break-words text-lg font-medium">{holding.name}</CairnSectionTitle>
             <p className="mt-1 break-words text-xs leading-5 text-[var(--muted)]">{holding.accountName} · {holding.ticker ?? <T ko="티커 없음" en="No ticker" />} · <MarketLabel market={holding.market} /> / {holding.currency}</p>
-            <dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
+            <dl className={`mt-5 grid grid-cols-2 gap-4 text-sm ${styles.holdingMetrics}`}>
               <div><dt className="text-xs text-[var(--muted)]"><T ko="보유 수량" en="Quantity" /></dt><dd className="mt-1 break-words font-medium tabular-nums">{formatStoredNumber(holding.quantity)}</dd></div>
               <div><dt className="text-xs text-[var(--muted)]"><T ko="평균 매입가" en="Average cost" /></dt><dd className="mt-1 break-words font-medium tabular-nums">{nativeAccounts.some(account => account.code === holding.accountCode) ? <T ko="거래 원장에서 확인" en="See acquisition costs in the ledger" /> : holding.averageCost === null ? <T ko="미등록" en="Not recorded" /> : `${formatStoredNumber(holding.averageCost)} ${holding.currency}`}</dd>{holding.averageCost === null && !nativeAccounts.some(account => account.code === holding.accountCode) ? <dd className="mt-1 text-xs text-[var(--muted)]"><T ko="나중에 입력할 수 있어요." en="You can add it later." /></dd> : null}</div>
             </dl>

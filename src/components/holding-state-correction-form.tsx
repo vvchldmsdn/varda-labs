@@ -14,6 +14,7 @@ import {
   type HoldingStateCorrectionActionState,
 } from "@/lib/holding-state-correction";
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, InfoDisclosure, Input as CairnInput , Status as CairnStatus } from "@/components/cairn-ui";
+import styles from "@/components/portfolio/management-forms.module.css";
 
 
 const INITIAL_STATE: HoldingStateCorrectionActionState = Object.freeze({
@@ -44,14 +45,14 @@ export function HoldingStateCorrectionForm({
   const messageId = `holding-correction-${holdingId}`;
 
   return (
-    <details className="min-w-[230px]">
-      <summary className="cursor-pointer text-sm font-semibold text-[var(--ink)]"><ManagementText>{"수량·평균매입가 정정"}</ManagementText></summary>
-      <CairnForm action={action} className="mt-3 space-y-3" onReset={actionFormOnReset} ref={actionFormRef}>
+    <details className={styles.disclosure}>
+      <summary><ManagementText>{"수량·평균매입가 정정"}</ManagementText></summary>
+      <CairnForm action={action} className={styles.form} onReset={actionFormOnReset} ref={actionFormRef}>
         {state.message === NATIVE_LEDGER_REQUIRED_MESSAGE ? <NativeLedgerNotice assetId={holdingId} action="cost_basis" /> : null}
         <input name="assetId" type="hidden" value={holdingId} />
         <input name="expectedUpdatedAt" type="hidden" value={updatedAt} />
 
-        <CairnField className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"현재 보유 수량"}</ManagementText><CairnInput
+        <CairnField><ManagementText>{"현재 보유 수량"}</ManagementText><CairnInput
             aria-describedby={messageId}
             className={fieldClassName}
             defaultValue={quantity}
@@ -63,7 +64,7 @@ export function HoldingStateCorrectionForm({
             type="number"
           />
         </CairnField>
-        <CairnField className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"1좌당 평균 매입가 ("}</ManagementText>{currency})
+        <CairnField><ManagementText>{"1좌당 평균 매입가 ("}</ManagementText>{currency})
           <ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}
@@ -76,10 +77,9 @@ export function HoldingStateCorrectionForm({
             type="number"
           />
         </CairnField>
-        <p className="text-xs leading-5 text-[var(--muted)]"><T ko="매입가 선택 · 비워 두면 기존 값 유지" en="Optional cost · leave blank to keep the saved value" /></p>
-        {currency === "USD" ? <p className="text-xs leading-5 text-[var(--muted)]"><T ko="USD 매입가 · 원화 손익은 현재 환율 기준, 매입 이후 환차손익 제외" en="Cost in USD · KRW profit/loss uses current FX and excludes FX gains or losses since purchase" /></p> : null}
-        <InfoDisclosure summary={<T ko="정정 기준" en="How corrections work" />}><p><T ko="매입가만 바꾸면 현재 평가액과 수량은 유지됩니다. 과거 거래와 저장된 평가 기록은 바뀌지 않습니다. 미등록 매입가는 나중에 입력할 수 있습니다." en="Changing only average cost keeps the current value and quantity unchanged. Past trades and saved valuations are not rewritten. You can add an unrecorded cost later." /></p></InfoDisclosure>
-        <CairnField className="block text-xs font-semibold text-[var(--ink)]"><ManagementText>{"정정 사유 (선택)"}</ManagementText><ManagementElement as="input"
+        <p className={styles.hint}><T ko="매입가 선택 · 비워 두면 기존 값 유지" en="Optional cost · leave blank to keep the saved value" /></p>
+        <details className={styles.optional}><summary><T ko="메모 추가" en="Add a note" /></summary>
+        <CairnField><ManagementText>{"정정 사유 (선택)"}</ManagementText><ManagementElement as="input"
             aria-describedby={messageId}
             className={fieldClassName}
             maxLength={HOLDING_STATE_CORRECTION_POLICY.reasonMaximumLength}
@@ -88,10 +88,11 @@ export function HoldingStateCorrectionForm({
             type="text"
           />
         </CairnField>
+        </details>
 
         <p className="text-xs leading-5 text-[var(--muted)]"><T ko="오입력 정정 전용 · 매매·입출금 기록 아님" en="Input corrections only · not a trade or cash-flow record" /></p>
         <CairnButton variant="primary"
-          className="w-full rounded-md bg-[var(--ink)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          size="lg"
           disabled={pending}
           type="submit"
         >
@@ -107,10 +108,11 @@ export function HoldingStateCorrectionForm({
         >
           <ManagementText>{state.message}</ManagementText>
         </CairnStatus>
+        <InfoDisclosure summary={<T ko="정정 기준" en="How corrections work" />}><p><T ko="매입가만 바꾸면 현재 평가액과 수량은 유지됩니다. 과거 거래와 저장된 평가 기록은 바뀌지 않습니다. 미등록 매입가는 나중에 입력할 수 있습니다." en="Changing only average cost keeps the current value and quantity unchanged. Past trades and saved valuations are not rewritten. You can add an unrecorded cost later." /></p>{currency === "USD" ? <p><T ko="USD 매입가 · 원화 손익은 현재 환율 기준, 매입 이후 환차손익 제외" en="Cost in USD · KRW profit/loss uses current FX and excludes FX gains or losses since purchase" /></p> : null}</InfoDisclosure>
       </CairnForm>
     </details>
   );
 }
 
 const fieldClassName =
-  "mt-1 w-full rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-right text-sm font-normal tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]";
+  "w-full font-normal tabular-nums";

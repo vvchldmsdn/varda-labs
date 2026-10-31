@@ -5,8 +5,7 @@ import { T } from "@/components/i18n/localized-text";
 import { InvestmentLabFirstSteps } from "./investment-lab-first-steps";
 import { CalculationGuideDialog } from "@/components/explanations/calculation-guide-dialog";
 import { investmentLabCalculationGuide } from "./investment-lab-calculation-guide";
-import { labEnglish } from "./lab-copy";
-import { LocalizedElement } from "@/components/i18n/localized-element";
+import { useI18n } from "@/components/i18n/locale-provider";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
@@ -16,13 +15,12 @@ import type { PortfolioAnalysisScopeKey } from "@/lib/portfolio-analysis-scope";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { resolveInvestmentLabPanel, type InvestmentLabPanel } from "@/lib/investment-lab-panel";
 import {
-  ArrowUpRight,
   Layers3,
   SlidersHorizontal,
   X,
 } from "lucide-react";
 import styles from "./investment-lab-modern.module.css";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, Button as CairnButton, IconButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 
 const RemotePanel = dynamic(() => import("./investment-lab-remote-panel"), { loading: () => <CairnStatus as="p" tone="neutral" role="status" className="py-10 text-sm"><LabText value="상세 분석을 불러오고 있습니다." /></CairnStatus> });
@@ -42,6 +40,7 @@ export function InvestmentLabWorkspace({
   tools?: ReactNode;
   showFirstSteps?: boolean;
 }) {
+  const { t } = useI18n();
   const { panel: activeOverlay, select, query } = useResearchPanelNavigation(resolveInvestmentLabPanel);
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -71,21 +70,13 @@ export function InvestmentLabWorkspace({
     <div className={styles.workspace} data-lab-workspace="integrated">
       <div className={styles.toolbar}><span>{showFirstSteps ? <T ko="현재 구성으로 하는 가상 실험" en="Hypothetical experiments with today's holdings" /> : <LabText value="같은 기간 · 같은 투자금 흐름" />}</span><div>{tools}<CalculationGuideDialog guide={investmentLabCalculationGuide} label={{ ko: "계산 원리", en: "How it works" }} title={{ ko: "투자 방법만 바꿔 보면", en: "What if you changed the investment method?" }} /></div></div>
 
-      <div className={styles.canvas}>{showFirstSteps ? <InvestmentLabFirstSteps scopeKey={scopeKey} onOpenPanel={openOverlay} /> : comparison}</div>
+      <div className={styles.canvas}>{showFirstSteps ? <InvestmentLabFirstSteps preview={new URLSearchParams(query).get("preview") === "design"} scopeKey={scopeKey} onOpenPanel={openOverlay} /> : comparison}</div>
 
-      {!showFirstSteps ? <div className={styles.launchers}>
-        <CairnButton variant="secondary" className={styles.launcher} onClick={() => openOverlay("weights")} type="button">
-          <SlidersHorizontal aria-hidden="true" size={22} strokeWidth={1.6} />
-          <span><strong><LabText value="비중 실험" /></strong><span className="sr-only"><LabText value="자산 비중을 바꾸고 실제 경로와 비교해 보세요." /></span></span>
-          <ArrowUpRight aria-hidden="true" size={18} />
-        </CairnButton>
-        <CairnButton variant="secondary" className={styles.launcher} onClick={() => openOverlay("composition")} type="button">
-          <Layers3 aria-hidden="true" size={22} strokeWidth={1.6} />
-          <span><strong><LabText value="구성 분석" /></strong><span className="sr-only"><LabText value="포트폴리오 구성과 종목 간 노출을 살펴보세요." /></span></span>
-          <ArrowUpRight aria-hidden="true" size={18} />
-        </CairnButton>
-      </div> : null}
-      <p className={styles.stageFootnote}><LabText value="과거 기록과 가정의 비교입니다. 투자 추천이나 실제 주문으로 이어지지 않습니다." /></p>
+      {!showFirstSteps ? <ActionGroup label={t("다른 관점으로 살펴보기", "Explore another perspective")}>
+        <CairnButton variant="bare" onClick={() => openOverlay("weights")} type="button"><ActionContent icon={<SlidersHorizontal />} title={<T ko="비중을 바꾸면 어떨까요?" en="What if the weights changed?" />} description={<T ko="다른 구성과 비교" en="Compare another allocation" />} /></CairnButton>
+        <CairnButton variant="bare" onClick={() => openOverlay("composition")} type="button"><ActionContent icon={<Layers3 />} title={<T ko="내 종목은 얼마나 겹칠까요?" en="Where do my holdings overlap?" />} description={<T ko="ETF 구성과 과거 구간 살펴보기" en="Explore ETF holdings and past periods" />} /></CairnButton>
+      </ActionGroup> : null}
+      <p className={styles.stageFootnote}><T ko="과거 기록과 가상의 비교 · 실제 거래 아님" en="Historical and hypothetical comparison · No actual trades" /></p>
 
       <dialog
         aria-labelledby={titleId}
@@ -102,20 +93,18 @@ export function InvestmentLabWorkspace({
         <div className="varda-presentation-dialog-shell">
           <header className="varda-dialog-header flex shrink-0 items-center justify-between gap-4">
             <div>
-              <p className="varda-kicker">LAB WORKSPACE</p>
               <CairnSectionTitle className="mt-1 text-xl font-medium" id={titleId}>
                 <LabText value={activeTitle} />
               </CairnSectionTitle>
             </div>
-            <LocalizedElement as="button"
-              aria-label="닫기"
-              className="varda-icon-button"
+            <IconButton
+              label={t("닫기", "Close")}
               onClick={closeOverlay}
-              title="닫기"
-              type="button" en={{"aria-label": labEnglish("닫기"), "title": labEnglish("닫기")}}
+              title={t("닫기", "Close")}
+              type="button"
             >
               <X aria-hidden="true" size={18} />
-            </LocalizedElement>
+            </IconButton>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content varda-overlay-surface">
             {activeOverlay ? <RemotePanel query={query} weights={weights} scopeKey={scopeKey} /> : null}

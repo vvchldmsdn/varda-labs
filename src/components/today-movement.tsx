@@ -4,6 +4,9 @@ import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
+import guided from "./today/today-layout.module.css";
+import { ActionGroup, ActionContent } from "@/components/cairn-ui";
+import { History } from "lucide-react";
 import styles from "@/components/home/portfolio-overview.module.css";
 import type { ReactNode } from "react";
 
@@ -110,7 +113,7 @@ export function TodayMovement({
       />
 
       <div className="varda-content varda-presentation-content varda-stage-content">
-        <div className={styles.stage}>
+        <div className={`${styles.stage} ${guided.page}`}>
           <header className={styles.stageHeader}>
             <CairnPageTitle id="today-movement-title" className={styles.stageTitle}><T ko="오늘의 움직임" en="What moved today"/></CairnPageTitle>
             <div className={styles.stageScope}>
@@ -124,8 +127,8 @@ export function TodayMovement({
             </div>
           </header>
 
-          <div className={styles.todayStageMain}>
-          <section className={styles.stageSummary} aria-labelledby="today-movement-title" tabIndex={0}>
+          <div className={guided.body}>
+          <section className={guided.summary} aria-labelledby="today-movement-title">
             <div className={styles.balance}>
               <span><T ko={scopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko={data.dataHealth.movementExcludedAssetCount>0?"상장 종목 변동":"오늘 평가액 변동"} en={data.dataHealth.movementExcludedAssetCount>0?"Listed holdings change":"Today's value change"}/></span>
               <strong className={toneClass(attribution.changeKrw)}>
@@ -172,7 +175,7 @@ export function TodayMovement({
           </div>
           </section>
 
-          <section className={styles.stageContribution} aria-labelledby="contribution-title">
+          <section className={guided.contributions} aria-labelledby="contribution-title">
             <div className={`${styles.panelHeader} ${styles.contributionHeader}`}>
               <div>
                 <CairnSectionTitle id="contribution-title" className={styles.panelTitle}><T ko="종목별 기여" en="Contribution by holding"/></CairnSectionTitle>
@@ -183,6 +186,7 @@ export function TodayMovement({
           </section>
           </div>
 
+          <ActionGroup label="변동의 흐름 더 살펴보기"><Link href={`/history?scope=${encodeURIComponent(data.selectedScope.key)}${designPreview ? "&preview=design" : ""}`}><ActionContent icon={<History size={22}/>} title={<T ko="지난 변동과 이어서 보기" en="Explore the history behind this change"/>} description={<T ko="날짜별 평가액과 수익률" en="Value and returns over time"/>}/></Link></ActionGroup>
           <footer className={styles.stageFooter}>
           <div className={styles.stageLaunchers}>
           <PresentationDialog label="변동 구성·계산 근거" labelEn={"Breakdown and calculation"} title="오늘 변동의 구성과 근거" titleEn={"Today's change breakdown"} description="가격·환율·순매매를 실제 기준 가격과 현재 가격으로 비교합니다." descriptionEn={"Compare price, FX and net trades using actual baseline and current prices."} wide>

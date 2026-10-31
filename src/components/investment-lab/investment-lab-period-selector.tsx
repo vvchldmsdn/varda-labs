@@ -14,7 +14,7 @@ import {
   type PortfolioAnalysisScopeKey,
   type PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
-import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput } from "@/components/cairn-ui";
 
 
 export function InvestmentLabPeriodSelector({
@@ -39,16 +39,10 @@ export function InvestmentLabPeriodSelector({
       <section data-period-status={period.status}>
         <div className="grid gap-5">
           <div className="min-w-0">
-            <p className="text-[10px] font-medium text-[var(--muted)]">
-              COMPARISON WINDOW
-            </p>
-            <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
-              <CairnSectionTitle className="text-lg font-semibold tracking-normal"><LabText value=" 과거 비교 구간 " /></CairnSectionTitle>
-              <p className="text-xs text-[var(--muted)]"><LabText value=" 실제 포트폴리오와 대안 세계선에 같은 기간·현금흐름을 적용합니다. " /></p>
-            </div>
+            <p className="text-sm text-[var(--muted)]"><LabText value="같은 기간과 투자금으로 비교해요." /></p>
             {period.availableStartServiceDate &&
             period.availableEndServiceDate ? (
-              <p className="mt-2 text-[11px] tabular-nums text-[var(--faint)]"><LabText value=" 선택 가능 " />{formatDate(period.availableStartServiceDate)} ~{" "}
+              <p className="mt-2 text-sm tabular-nums text-[var(--muted)]"><LabText value=" 선택 가능 " />{formatDate(period.availableStartServiceDate)} ~{" "}
                 {formatDate(period.availableEndServiceDate)}
               </p>
             ) : null}
@@ -57,7 +51,7 @@ export function InvestmentLabPeriodSelector({
           <CairnForm
             id="investment-lab-period-filter"
             action="/investment-lab"
-            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            className="flex flex-wrap items-end gap-4"
             key={[
               scopeKey,
               period.status,
@@ -90,14 +84,13 @@ export function InvestmentLabPeriodSelector({
               min={period.availableStartServiceDate}
               name="end"
             />
-            <div className="flex h-10 items-end gap-5">
+            <div className="flex flex-wrap items-center gap-4">
               <CairnButton variant="primary"
-                className="h-9 border-b border-[var(--ink)] px-1 text-sm font-semibold text-[var(--ink)] transition-colors hover:border-[var(--brand)] hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
                 type="submit"
-              ><LabText value=" 구간 적용 " /></CairnButton>
+              ><LabText value="기간 적용" /></CairnButton>
               <InvestmentLabQueryLink
                 resetForm
-                className="flex h-9 items-center border-b border-transparent px-1 text-sm text-[var(--muted)] transition-colors hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
+                className="inline-flex min-h-12 items-center px-2 text-sm text-[var(--muted)] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
                 href={buildPortfolioAnalysisScopeHref(
                   "/investment-lab",
                   scopeKey,
@@ -118,12 +111,6 @@ export function InvestmentLabPeriodSelector({
           >
             <LabText value={periodReasonLabel(period.reason)} />
           </p>
-        ) : period.status === "current_writer" ? (
-          <p className="mt-3 text-sm font-medium text-[var(--brand)]"><LabText value=" 최신 비교 가능 구간 " />{formatDate(period.selectedStartServiceDate!)} ~{" "}
-            {formatDate(period.selectedEndServiceDate!)}<LabText value="를 자동 적용했습니다. " /></p>
-        ) : period.status === "selected" ? (
-          <p className="mt-3 text-sm font-medium text-[var(--brand)]"><LabText value=" 선택 구간 " />{formatDate(period.selectedStartServiceDate!)} ~{" "}
-            {formatDate(period.selectedEndServiceDate!)}<LabText value="를 다시 계산했습니다. " /></p>
         ) : null}
       </section>
     </InvestmentLabDialog>
@@ -169,10 +156,10 @@ function DateField({
   name: "start" | "end";
 }) {
   return (
-    <CairnField className="grid gap-1 text-[10px] font-medium uppercase text-[var(--muted)]">
+    <CairnField className="min-w-0 flex-1 basis-48">
       <LabText value={label} />
       <CairnInput
-        className="h-9 min-w-[160px] border-0 border-b border-[var(--line)] bg-transparent px-0 text-sm font-normal text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink)]"
+        style={{ minHeight: 48 }}
         defaultValue={defaultValue ?? ""}
         max={max ?? undefined}
         min={min ?? undefined}

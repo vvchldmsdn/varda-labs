@@ -32,7 +32,7 @@ import type {
   HistoryOverviewModel,
   HistoryOverviewPoint,
 } from "@/lib/history-overview";
-import { Button as CairnButton, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Button as CairnButton, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionGroup, ActionContent } from "@/components/cairn-ui";
 
 
 const RANGE_OPTIONS: readonly Readonly<{
@@ -105,7 +105,7 @@ export function HistoryTimeExplorer({
       <section className="border-y border-[var(--line)] py-16 text-center">
         <p className="text-xs font-medium text-[var(--muted)]">HISTORY</p>
         <CairnPageTitle className="mt-3 text-2xl font-semibold"><T ko="아직 탐색할 기록이 없습니다." en="No records to explore yet."/></CairnPageTitle>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]"><T ko="평가액을 임의로 보간하지 않습니다. 일일 포트폴리오 스냅샷이 저장되면 같은 화면에서 날짜별 흐름과 이벤트를 함께 볼 수 있습니다." en="Values are not interpolated. Once daily portfolio snapshots are recorded, you can explore values and events by date here."/></p>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]"><T ko="첫 평가를 저장하면 흐름이 쌓이기 시작해요." en="Save your first valuation to start your history."/></p>
         {details ? <div className="mt-6 flex justify-center">{details}</div> : null}
         {recoveryNotice}
       </section>
@@ -150,7 +150,7 @@ export function HistoryTimeExplorer({
               {RANGE_OPTIONS.map((option) => <CairnButton variant="selection" key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</CairnButton>)}
             </div>
           </div>
-          <p className={styles.railNote}>{scopeLabel} · {integratedReturn ? returnTimeline.filter(p => p.returnPct !== null).length : rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br />{integratedReturn ? "같은 날짜 축에서 저장 수익률과 복구한 기간 수익률을 살펴봅니다. 기준이 바뀌는 지점은 구분합니다." : hasLiveValuation ? <T ko="과거 저장 기록에 오늘의 현재 평가를 연결합니다. 오늘 값은 저장 스냅샷이 아닙니다." en="Recorded history connects to today's current valuation. Today's point is not a saved snapshot."/> : <T ko="저장된 값의 흐름을 살펴봅니다. 곡선은 관측점을 연결한 표시입니다." en="Explore recorded values. The curve visually connects observed points."/>}</p>
+          <p className={styles.railNote}>{scopeLabel} · {integratedReturn ? returnTimeline.filter(p => p.returnPct !== null).length : rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br /><T ko={integratedReturn ? "저장·복구 기준 구분" : hasLiveValuation ? "오늘은 현재 평가 · 저장 전" : "저장된 평가"} en={integratedReturn ? "Recorded and reconstructed bases differ" : hasLiveValuation ? "Today is live · not saved" : "Recorded valuations"} /></p>
           {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{typeof status === "string" ? <T ko={status} en={translateHomeHistory(status)}/> : status}</div> : null}
         </aside>
         <div className={styles.plot}>
@@ -166,11 +166,11 @@ export function HistoryTimeExplorer({
       {recoveryNotice}
       <footer className={styles.stageFooter}>
         <p>{integratedReturn ? "저장 수익률과 복구 기간 수익률 · 계산 기준 구분" : hasLiveValuation ? <T ko="저장 기록 + 현재 평가 · 현금흐름 미보정" en="Records + current valuation · Not adjusted for cash flows"/> : <T ko="저장값 · 현금흐름 미보정" en="Recorded values · Not adjusted for cash flows"/>}</p>
-        <div>
-          <PresentationDialog mountOnOpen label="날짜별 기록" labelEn={"Records by date"} title="날짜별 기록과 현재 평가" titleEn={"Records and current valuation by date"}>
+        <ActionGroup label={t("히스토리 더 살펴보기", "Explore your history")} className={styles.historyActions}>
+          <PresentationDialog mountOnOpen label="날짜별 기록" triggerContent={<ActionContent title={t("날짜별 기록 보기", "Explore records by date")} description={t("그날의 평가와 거래를 함께", "Valuations and trades together")} />} title="날짜별 기록과 현재 평가" titleEn={"Records and current valuation by date"}>
             <HistorySnapshotRail onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
           </PresentationDialog>
-          <PresentationDialog mountOnOpen label="기간 요약·근거" labelEn={"Period summary and sources"} title="히스토리 계산 근거" titleEn={"History calculation sources"} description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." descriptionEn={"Review changes over the selected period and the records behind each date."} wide>
+          <PresentationDialog mountOnOpen label="기간 요약·근거" triggerContent={<ActionContent title={t("기간 요약 살펴보기", "Explore the period summary")} description={t("평가액 변화와 계산 근거", "Value changes and their sources")} />} title="히스토리 계산 근거" titleEn={"History calculation sources"} description="선택 범위의 변화 요약과 날짜별 저장 근거를 확인합니다." descriptionEn={"Review changes over the selected period and the records behind each date."} wide>
             <dl className={styles.overview}>
               <div><dt className={styles.label}><T ko={heroReturnLabel} en={heroReturnLabel}/></dt><dd className={`${styles.value} ${tone(heroReturn)}`}>{<T ko={formatSignedPercent(heroReturn)} en={translateHomeHistory(formatSignedPercent(heroReturn))}/>} </dd>{!integratedReturn && <dd className={styles.note}><T ko="손익" en="Gain/loss"/> {<T ko={formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.totalPnlKrw ?? null))}/>}</dd>}</div>
               <div><dt className={styles.label}><T ko="기간 평가액 변화" en="Period value change"/></dt><dd className={`${styles.value} ${tone(rangeSummary.changeKrw)}`}>{<T ko={formatRangeComparison(rangeSummary, "changeKrw")} en={translateHomeHistory(formatRangeComparison(rangeSummary, "changeKrw"))}/>}</dd><dd className={styles.note}><T ko="현금흐름 미보정" en="Not adjusted for cash flows"/></dd></div>
@@ -182,8 +182,8 @@ export function HistoryTimeExplorer({
             <HistoryCalendar onSelect={setSelectedDate} points={visiblePoints} selectedDate={selectedPoint?.date ?? null} />
             {model.riskPointCount > 0 ? <StoredRiskHistory points={visiblePoints} /> : null}
           </PresentationDialog>
-          {details}
-        </div>
+        </ActionGroup>
+        {details}
       </footer>
     </section>
   );

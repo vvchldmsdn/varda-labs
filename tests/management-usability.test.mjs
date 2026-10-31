@@ -6,6 +6,33 @@ import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import { accountActionMessageKo, accountTypeLabel } from "../src/lib/i18n/account-management-copy.ts";
 
 describe("holding and account management usability", () => {
+  it("keeps inactive workbench forms mounted and selects records without submitting", async () => {
+    let selected;
+    const [component] = await importUiWithPorts(["src/components/cairn-v2/management-workbench.tsx"], {
+      react: {
+        useId: () => "management-test",
+        useState: initial => [selected ?? initial, next => { selected = next; }],
+      },
+    });
+    const items = ["first", "second"].map(id => ({
+      id, name: `Account ${id}`, meta: "KRW", group: "Accounts",
+      content: createElement("form", { "data-draft": id }, createElement("input", { name: "name", defaultValue: `${id} draft` })),
+    }));
+    const props = { label: "계좌", items, create: createElement("form", { "data-draft": "new" }) };
+    const initial = component.ManagementWorkbench(props);
+    const collect = node => Array.isArray(node) ? node.flatMap(collect) : !node || typeof node !== "object" ? [] : [node, ...collect(node.props?.children)];
+    const buttons = collect(initial).filter(node => node.type === "button");
+    assert.equal(buttons.length, 3);
+    assert.ok(buttons.every(node => node.props.type === "button"));
+    buttons.find(node => node.props["aria-controls"] === "management-test-second").props.onClick();
+    const switched = renderToStaticMarkup(component.ManagementWorkbench(props));
+    assert.match(switched, /id="management-test-first" hidden=""/);
+    assert.match(switched, /id="management-test-second" aria-label=/);
+    assert.match(switched, /value="first draft"/);
+    assert.match(switched, /value="second draft"/);
+    assert.match(switched, /data-draft="new"/);
+  });
+
   it("renders partial-read warnings in both languages and keeps blocked holdings out of the list", async () => {
     let locale = "ko", signedIn = true;
     const tenantContext = { appUserId: "session-user" };

@@ -3,7 +3,6 @@
 .workspace h3{margin:0 0 18px;font-size:18px;font-weight:500;letter-spacing:-.025em}
 .workspace h4{margin:0;font-size:17px;font-weight:500;overflow-wrap:anywhere}
 .workspace p{margin:12px 0;line-height:1.7}
-.workspace input,.workspace button{font:inherit}
 .heading,.accountHeading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .muted{font-size:12px;color:var(--cairn-v2-muted)}
 .textLink{min-height:44px;display:inline-flex;align-items:center;font-size:13px;text-decoration:underline;text-underline-offset:4px}
@@ -16,22 +15,25 @@
 .fields,.archiveFields,.restoreFields{min-width:0;margin:0;padding:0;border:0;display:flex;align-items:flex-end;gap:18px}
 .fields:disabled,.archiveFields:disabled,.restoreFields:disabled{opacity:.6}
 .nameField{display:grid;gap:7px;flex:1;min-width:0}
-.nameField label{color:var(--cairn-v2-muted);font-size:12px}
-.nameField input{box-sizing:border-box;min-height:48px;width:100%;min-width:0;padding:8px 0;border:0;border-bottom:1px solid var(--cairn-v2-line);border-radius:0;outline-offset:4px;background:transparent;color:var(--cairn-v2-ink);font-size:18px}
-.primary,.secondary{min-height:44px;min-width:88px;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;cursor:pointer;white-space:nowrap}
-.primary{border:1px solid var(--cairn-v2-ink);border-radius:4px;background:var(--cairn-v2-ink);color:var(--cairn-v2-paper,#f5f5f0)}
-.secondary{border:1px solid var(--cairn-v2-line);border-radius:4px;background:transparent;color:var(--cairn-v2-ink)}
+.nameField label{color:var(--cairn-v2-muted);font-size:13px}
+.nameField input{min-height:56px;font-size:20px}
+.primary,.secondary{min-height:48px;min-width:104px;white-space:nowrap}
 .primary:disabled,.secondary:disabled{cursor:not-allowed}
 .accountSection{padding-top:32px;min-width:0}
 .count{margin-left:8px;color:var(--cairn-v2-muted);font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}
 .accountRow{min-width:0;max-width:940px;padding:24px 0;border-bottom:1px solid var(--cairn-v2-line)}
 .accountRow:first-of-type{padding-top:6px}
 .accountHeading{justify-content:flex-start;gap:10px}
-.references{font-size:12px;color:var(--cairn-v2-muted)}
-.references span{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--cairn-v2-ink)}
-.archiveForm{margin-top:14px}
+.references{display:flex;flex-wrap:wrap;gap:28px;margin:20px 0 28px;font-size:13px;color:var(--cairn-v2-muted)}
+.references dd{margin:8px 0 0;font-size:28px;letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:var(--cairn-v2-ink)}
+.archiveForm{padding-bottom:20px}
+.archiveDisclosure{margin-top:28px;border-top:1px solid var(--cairn-v2-line)}
+.archiveDisclosure>summary{display:flex;justify-content:space-between;align-items:center;min-height:56px;padding:12px 0;font-size:14px;color:var(--cairn-v2-negative);list-style:none;cursor:pointer}
+.archiveDisclosure>summary::-webkit-details-marker{display:none}
+.archiveDisclosure>summary::after{content:'+';font-size:22px}
+.archiveDisclosure[open]>summary::after{content:'−'}
 .archiveFields,.restoreFields{align-items:center;justify-content:space-between;flex-wrap:wrap}
-.confirm{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font-size:13px}
+.confirm{display:flex;align-items:center;gap:10px;min-height:52px;cursor:pointer;font-size:13px}
 .confirm input{flex:none;width:18px;height:18px;margin:0;accent-color:var(--cairn-v2-brand)}
 .confirm span{line-height:1.6}
 .actionMessage{min-height:1.7em;font-size:12px;color:var(--cairn-v2-muted)}
@@ -46,4 +48,5 @@
 .workspace :focus-visible{outline:2px solid var(--cairn-v2-brand);outline-offset:3px}
 @media(max-width:600px){.workspace{padding:18px 0}.workspace h2{font-size:24px}.heading{gap:8px}.fields{align-items:stretch;flex-direction:column;gap:12px}.fields button{align-self:flex-start}.accountRow{padding:20px 0}.archiveFields,.restoreFields{align-items:flex-start;flex-direction:column;gap:10px}.rowEvidence dl{grid-template-columns:1fr;gap:4px}.rowEvidence dd{margin-bottom:8px}.createSection{padding-top:20px}}
 
-.accountRow{padding-top:4px!important;border-bottom:0}.createSection{padding-top:4px;border-bottom:0}.accountHeading h4{font-size:22px}.archiveForm{margin-top:28px}.forms{max-width:1100px}
+.accountRow{padding-top:4px!important;border-bottom:0}.createSection{padding-top:4px;border-bottom:0}.accountHeading h4{font-size:22px}.forms{max-width:1100px}
+.related{max-width:1100px;margin-top:32px}

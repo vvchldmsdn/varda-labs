@@ -7,7 +7,8 @@ import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
-import { ArrowUpRight, Sigma, Target } from "lucide-react";
+import { ArrowUpRight, Plus, ChartPie, Target } from "lucide-react";
+import home from "@/components/home/dashboard-discovery.module.css";
 import styles from "@/components/home/portfolio-overview.module.css";
 
 import { FxImpactPopover } from "@/components/home/fx-impact-popover";
@@ -32,7 +33,7 @@ import {
   type PortfolioAnalysisScope,
   type PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
-import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionGroup, ActionContent } from "@/components/cairn-ui";
 
 
 export function PortfolioDashboard({
@@ -80,7 +81,7 @@ export function PortfolioDashboard({
       />
 
       <div className="varda-content varda-presentation-content varda-stage-content">
-        <div className={styles.stage}>
+        <div className={`${styles.stage} ${home.stage}`}>
           <header className={styles.stageHeader}>
             <CairnPageTitle id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></CairnPageTitle>
             <div className={styles.stageScope}>
@@ -100,8 +101,8 @@ export function PortfolioDashboard({
             </div>
           </header>
 
-          <div className={styles.homeStageMain}>
-          <section className={styles.stageSummary} aria-labelledby="portfolio-overview-title">
+          <div className={home.overview}>
+          <section className={`${styles.stageSummary} ${home.summary}`} aria-labelledby="portfolio-overview-title">
             <div className={styles.balance}>
               <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="투자자산 평가액" en="Invested asset value"/></span>
               <strong>{<T ko={formatKrw(data.totalValueKrw)} en={translateHomeHistory(formatKrw(data.totalValueKrw))}/>}</strong>
@@ -127,15 +128,12 @@ export function PortfolioDashboard({
             </div>
           </section>
 
+          <ActionGroup label="내 자산 더 살펴보기">
+            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산하기" en="Plan a contribution" />} description={<T ko="내 목표에 맞는 배분을 찾아요" en="Find an allocation for your targets" />} /></Link>
+            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="내 자산 비중 살펴보기" en="Explore your allocation" />} description={<T ko="목표와 얼마나 가까울까요?" en="How close are you to your targets?" />} /></Link>
+          </ActionGroup>
+
           <div className={styles.stageVisual}>
-            <HoldingMovementHeatmap key={data.selectedScope.key} history={data.holdingHistory} riskHref={riskHref} structureHref={structureHref} stage />
-          </div>
-          </div>
-
-
-          <footer className={styles.stageFooter}>
-            <div className={styles.stageLaunchers}>
-              <PresentationDialog label="평가액 흐름" labelEn={"Value history"} title="포트폴리오 평가액 흐름" titleEn={"Portfolio value history"} description="저장된 실제 평가액과 입출금·매매 기록을 함께 확인합니다." descriptionEn={"Review recorded portfolio values alongside cash flows and trades."} wide>
               <LocalizedElement as="section" en={{"aria-label": "Asset history"}} className={styles.chartPanel} aria-label="자산 이력">
               <RecoveredPortfolioHistoryChart accountId={!designPreview && data.selectedScope.kind === 'account' ? data.selectedScope.accountId : undefined}
                 key={data.selectedScope.key}
@@ -152,6 +150,16 @@ export function PortfolioDashboard({
                 points={data.recentSnapshots}
               />
               </LocalizedElement>
+
+          </div>
+          </div>
+
+
+
+          <footer className={styles.stageFooter}>
+            <div className={styles.stageLaunchers}>
+              <PresentationDialog label="종목별 흐름 보기" labelEn="Explore holding trends" title="종목별 흐름" titleEn="Holding trends" wide>
+              <HoldingMovementHeatmap key={data.selectedScope.key} history={data.holdingHistory} riskHref={riskHref} structureHref={structureHref} />
               </PresentationDialog>
 
               <PresentationDialog label="변동 근거" labelEn={"Change details"} title="오늘의 근거와 자산 흐름" titleEn={"Today's changes and their sources"} wide>
@@ -181,9 +189,6 @@ export function PortfolioDashboard({
               </div>
               </LocalizedElement>
               </PresentationDialog>
-              <Link className={styles.textLink} href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)}>
-                <Sigma aria-hidden="true" size={15} strokeWidth={1.6} /><T ko="투입 금액 계산" en="Plan a contribution"/></Link>
-              <Link className={styles.textLink} href={structureHref}><T ko="포트폴리오 구조" en="Portfolio allocation"/> <ArrowUpRight aria-hidden="true" size={14} /></Link>
             </div>
             <p>
               USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}

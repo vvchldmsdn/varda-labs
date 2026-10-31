@@ -11,8 +11,7 @@ import { useBetaContext } from "./use-beta-context";
 import { useBetaReadFreshness, useBetaExistingCrudAvailable } from "./beta-provider";
 import { blankDomainView } from "@/lib/cairn-v2/read-contract";
 import { blankSimulation, simulationKey, SIMULATION_RESEARCH_HORIZON_POLICY, type SimulationRead } from "@/lib/cairn-v2/simulation-contract";
-import { DetailHeader, EmptyState } from "./ui/molecules";
-import { StatusPill } from "./ui/atoms";
+import { EmptyState } from "./ui/molecules";
 import SimulationResultDetail from "./simulation-result-detail";
 import styles from "./simulation.module.css";
 
@@ -22,6 +21,7 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
   const router = useRouter();
   const crudAvailable = useBetaExistingCrudAvailable();
   const [edited, setEdited] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(read.model?.execution.status !== "ready");
   const [running, startRun] = useTransition();
   const key = simulationKey(context);
   const observed = freshness?.observed;
@@ -37,8 +37,9 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
   return <BetaShell context={context} setContext={next => { setEdited(null); setContext({ ...next, run: undefined }); }}
     readView={shell} workspace="simulation" originalPath="/simulation">
     <section className={styles.workspace} data-simulation-state={visible.state} data-result-identity={visible.resultIdentity}>
-      <DetailHeader title="현재 보유 연구" description="과거 수익률로 살펴보는 가상 경로"
-        actions={<StatusPill>분석 기준 KRW</StatusPill>} />
+      <p className={styles.intro}>현재 구성을 유지한 가상 경로 · KRW 기준</p>
+      <details className={styles.settings} open={settingsOpen} onToggle={event => setSettingsOpen(event.currentTarget.open)}>
+      <summary>계산 조건<span>{typeof context.horizon === "string" ? context.horizon : SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon}단계</span></summary>
       <CairnForm key={key} className={styles.conditions} aria-label="연구 조건" aria-describedby="simulation-condition-help"
         onChange={() => setEdited(key)}
         onSubmit={event => {
@@ -48,20 +49,21 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
           const next = { ...context, horizon: String(data.get("horizon")), end: String(data.get("end")) || undefined, run: "1" };
           startRun(() => { if (simulationKey(next) === key) router.refresh(); else setContext(next); });
         }}>
-        <CairnField>앞으로 살펴볼 기간
+        <CairnField>살펴볼 기간
           <CairnSelect disabled={visible.state === "loading"} name="horizon" aria-label="연구 기간"
             defaultValue={typeof context.horizon === "string" ? context.horizon : String(SIMULATION_RESEARCH_HORIZON_POLICY.defaultHorizon)}>
             {SIMULATION_RESEARCH_HORIZON_POLICY.allowedHorizons.map(horizon =>
-              <option key={horizon} value={horizon}>{horizon}개 관측 단계</option>)}
+              <option key={horizon} value={horizon}>{horizon}단계</option>)}
           </CairnSelect>
         </CairnField>
-        <CairnField>과거 관측 기준일
+        <CairnField>기준일 · 선택
           <CairnInput disabled={visible.state === "loading"} type="date" name="end" aria-label="저장 관측 기준일"
             defaultValue={typeof context.end === "string" ? context.end : ""} />
         </CairnField>
         <CairnButton variant="primary" type="submit" disabled={visible.state === "loading" || visible.state === "unauthorized"}>{running ? "연구 확인 중…" : "연구 실행"}</CairnButton>
-        <p id="simulation-condition-help">기준일을 비우면 최신 공통 관측을 사용합니다. 관측 단계는 달력 날짜와 다릅니다.</p>
+        <p id="simulation-condition-help">빈 날짜는 최신 공통 관측 기준 · 단계는 거래 관측 수입니다.</p>
       </CairnForm>
+      </details>
       {ready ? <div className={styles.result}><SimulationResultDetail read={visible} context={context} heading={false} /></div> :
         <EmptyState title={visible.state === "loading" ? "연구 결과를 준비하고 있습니다" : visible.state === "idle" ? "조건을 확인하고 연구를 시작하세요" : "연구를 완료할 수 없습니다"}
           description={visible.model?.historyRecovery?'최근 조정 종가에 확인이 필요한 날짜가 있습니다. 요청한 기준일은 바꾸지 않았습니다.':visible.message}

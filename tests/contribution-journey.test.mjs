@@ -115,6 +115,7 @@ function nodes(tree) {
 test('design journey controls never offer native plan writes while live controls retain them', async () => {
   const [ui] = await importUiWithPorts(['src/components/additional-contribution/contribution-journey.tsx'], {
     'next/link': { default: element('link') },
+    '@/components/recovery/recovery-return': { RecoveryJourneyLink: element('link') },
     '@/components/i18n/locale-provider': { useI18n: () => ({ t: ko => ko }) },
   });
   const links = tree => nodes(tree).filter(node => typeof node.props?.href === 'string').map(node => new URL(node.props.href, 'https://test.invalid'));

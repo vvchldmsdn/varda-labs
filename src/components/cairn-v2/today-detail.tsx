@@ -1,6 +1,8 @@
 "use client";
 import { useId, useState } from "react";
 import Link from "next/link";
+import { ActionGroup, ActionContent } from "@/components/cairn-ui";
+import { History } from "lucide-react";
 import type { BetaView, BetaMovementRow } from "@/lib/cairn-v2/read-contract";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
@@ -38,16 +40,12 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  return <section className={styles.detail} aria-label="오늘 변동 상세">
   <header className={styles.heading}>
    <dl className={styles.primaryMetrics}>
-    <Metric label="가격·환율 수익률" value={formatPercent(market?.returnPct ?? null,2,true)} size="hero" tone={tone(market?.returnPct ?? null)} note="현재 보유 수량을 같은 수량으로 비교" />
+    <Metric label="가격·환율 수익률" value={formatPercent(market?.returnPct ?? null,2,true)} size="hero" tone={tone(market?.returnPct ?? null)} note="현재 수량 기준 · KRW" />
     <Metric label="가격·환율 변동액" value={money(market?.changeKrw ?? null,true)} unit={context.currency} tone={tone(market?.changeKrw ?? null)} note={market?.partial ? "비교 가능한 종목의 소계" : "수량 증가·감소 효과 제외"} />
    </dl>
    <div className={styles.basis}><span>비교 기준</span><strong>{d.comparisonDate ?? "기준일 미제공"}</strong><p>{sourceLabel(d.movementSource)}</p></div>
   </header>
-  <div className={styles.coverage}><StatusPill tone={market?.partial ? "muted" : "positive"}>비교 {market?.includedCount ?? 0}종목 · 제외 {market?.excludedCount ?? 0}종목</StatusPill><span>KRW 기준 · 매매 수량 변화가 수익률에 포함되지 않습니다</span></div>
-  {market?.valuationChangeKrw !== null && market?.valuationChangeKrw !== undefined && <div className={styles.movementBridge}>
-    <dl><Metric label="저장 평가액 대비 변화" value={money(market.valuationChangeKrw,true)} unit={context.currency}/><Metric label="수량 변화 효과" value={money(market.quantityChangeKrw,true)} unit={context.currency} note="기준 가격으로 환산한 보유량 변화"/></dl>
-    <p>평가액 변화에는 매수·매도에 따른 보유량 변화가 포함됩니다. 위 수익률은 현재 보유 종목의 가격·환율 비교이며, 실제 계좌의 기간 수익률과는 다릅니다.</p>
-  </div>}
+  <div className={styles.coverage}><StatusPill tone={market?.partial ? "muted" : "positive"}>비교 {market?.includedCount ?? 0}종목 · 제외 {market?.excludedCount ?? 0}종목</StatusPill><span>매매 수량 변화 제외</span></div>
   {!rows.length&&movement.message&&<p className={styles.notice} role="status">{movement.message}</p>}
   {context.currency==="USD"&&<p className={styles.notice}>금액은 현재 환율로 환산한 표시입니다. 수익률은 KRW 기준입니다.</p>}
   {excluded.length>0&&<p className={styles.exclusions}>비교 제외 · {excluded.map(row=>(row.assetName??row.ticker??"종목 확인 전")+" ("+reasonLabel(row.reason)+")").join(" · ")}</p>}
@@ -68,11 +66,15 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
      <p className={styles.eyebrow}>선택한 종목</p><h3>{active.name??"이름 확인 전"}</h3><p>{active.accountLabel??"계좌 확인 전"} · {active.market??"시장 미제공"}</p>
      <strong className={styles.selectedAmount} data-tone={tone(active.changeKrw)}>{money(active.changeKrw,true)} <small>{context.currency}</small></strong>
      <dl><Metric label="가격·환율 수익률" value={formatPercent(active.returnPct,2,true)} /><Metric label="같은 수량의 기준 평가" value={formatNumber(active.previousValueKrw,{maximumFractionDigits:0})} unit="원" /></dl>
-     <p className={styles.selectedNote}>현재 보유 수량에 기준 가격·환율과 현재 가격·환율을 각각 적용합니다. 추가 매수 금액은 수익에 포함하지 않습니다.</p>
+     <p className={styles.selectedNote}>같은 수량의 가격·환율 변화입니다.</p>
      {active.identityStatus==="unmatched"&&<p className={styles.notice}>변동 근거는 있으나 현재 종목 이름을 연결하지 못했습니다.</p>}
     </aside>}
    </div>
-  </>:<p className={styles.empty}>표시할 종목별 변동 근거가 없습니다. 확인되지 않은 값을 채우지 않습니다.</p>}
+  </>:<p className={styles.empty}>비교할 종목별 기록이 아직 없어요.</p>}
+  {market?.valuationChangeKrw !== null && market?.valuationChangeKrw !== undefined && <details className={styles.movementBridge}><summary>평가액 변화와 왜 다른가요?</summary>
+    <dl><Metric label="저장 평가액 대비 변화" value={money(market.valuationChangeKrw,true)} unit={context.currency}/><Metric label="수량 변화 효과" value={money(market.quantityChangeKrw,true)} unit={context.currency} note="기준 가격으로 환산한 보유량 변화"/></dl>
+    <p>평가액 변화에는 매수·매도에 따른 보유량 변화가 포함됩니다. 위 수익률은 현재 보유 종목의 가격·환율 비교이며, 실제 계좌의 기간 수익률과는 다릅니다.</p>
+  </details>}
   <details className={styles.evidence}><summary>숫자·시세·비교 근거</summary>
    {rows.length>0&&<>
    <div className={styles.tableScroll} tabIndex={0} aria-label="종목별 변동 원본 숫자 표">
@@ -85,7 +87,7 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
    <p>종목별 값은 동일 수량의 기준 평가와 현재 평가 차이입니다. 미확인 가격·환율은 제외하며, 전체 수익률로 확대 해석하지 않습니다.</p>
    <p>원본 상태: {d.movementSource??"none"}{d.movementReason?" · "+d.movementReason:""}{d.movementRead?.reasons.length?" · "+d.movementRead.reasons.join(", "):""}</p>
   </details>
-  <Link className={styles.link} prefetch={false} href={betaReadHref(betaHref("/beta/history",context),freshness?.store.pendingEpoch())}>저장 평가 이력 보기 ↗</Link>
+  <ActionGroup label="오늘 변동 더 살펴보기"><Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),freshness?.store.pendingEpoch())}><ActionContent icon={<History size={22}/>} title="지난 변동과 이어서 보기" description="날짜별 평가액과 수익률"/></Link></ActionGroup>
  </section>;
 }
 

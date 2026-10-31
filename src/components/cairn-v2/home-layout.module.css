@@ -1,0 +1,32 @@
+.dashboard { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(300px,1.3fr); align-items:start; gap:20px; }
+.dashboard [data-beta-card] { grid-column:auto; grid-row:auto; height:auto; min-width:0; padding:var(--cairn-ui-space-5,24px); border-radius:var(--cairn-ui-radius-panel,24px); background:var(--cairn-ui-paper,#f7f7f5); }
+.dashboard [data-beta-card]::before { display:none; }
+.dashboard [data-cairn-card-header] h2 { font-size:16px; }
+.dashboard > :is([data-beta-card=value],[data-beta-card=today]) { min-height:220px; }
+.dashboard > [data-beta-card=structure] { grid-column:3; grid-row:2; min-height:350px; }
+.dashboard > [data-beta-card=structure] > div:last-child { flex:none; height:auto; margin:16px auto 0; }
+.dashboard [data-allocation-ring] { max-width:270px; margin-inline:auto; }
+.dashboard [data-allocation-ring] > p { position:static!important; margin-top:10px!important; font-size:12px!important; }
+.history { display:flex; flex-direction:column; grid-column:1/3; min-width:0; gap:16px; }
+.history > [data-beta-card=history] { min-height:335px; }
+.history > [data-beta-card=drift] { display:block; padding:0; }
+.dashboard .noAllocation { grid-template-columns:1fr; }
+.dashboard .noAllocation > :last-child { display:none; }
+.dashboard [data-beta-card].noHistory,.dashboard [data-beta-card].noHoldings { min-height:0; }
+.calculate[data-cairn-button] { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:52px; margin-top:24px; padding:14px 18px; border-radius:var(--cairn-ui-radius-control,14px); font-size:var(--cairn-ui-body-size,15px); }
+.explore { margin-top:28px; }
+.explore h2 { margin-bottom:14px; font-size:19px; font-weight:550; }
+@media(min-width:700px) and (max-width:1100px) {
+ .dashboard { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .dashboard > [data-beta-card=contribution],.history { grid-column:1/-1; }
+ .dashboard > [data-beta-card=structure] { grid-column:1/-1; grid-row:auto; }
+}
+@media(max-width:699px) {
+ .dashboard { display:flex; flex-direction:column; align-items:stretch; gap:16px; }
+ .dashboard > [data-beta-card] { align-self:stretch; }
+ .dashboard [data-beta-card] { padding:20px; border-radius:22px; }
+ .dashboard > :is([data-beta-card=value],[data-beta-card=today]) { min-height:0; }
+ .history { gap:12px; } .history > [data-beta-card=history] { min-height:300px; }
+ .history > [data-beta-card=drift] { padding:0; }
+ .explore { margin-top:28px; }
+}

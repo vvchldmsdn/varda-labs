@@ -23,14 +23,16 @@ export function NativeTradeFields({ kind, fields, unit, quantity, edit }: {
   catch (cause) { problem = cause instanceof Error ? cause.message : "invalid_input"; }
   const fmt = (value: string) => formatMoney(Number(value), settlementCurrency, locale === "en" ? "en-US" : "ko-KR");
   return <>
-    <div className={styles.holdingQuantity}><span>{t("현재 보유", "Currently held")} · {quantity}</span>{kind === "sell" ? <CairnButton variant="secondary" type="button" className={styles.secondary} disabled={Number(quantity) <= 0} onClick={() => edit("quantity", quantity)}>{t("전량", "All")}</CairnButton> : null}</div>
-    <CairnField>{t("체결 수량", "Executed quantity")}<CairnInput inputMode="decimal" name="quantity" value={fields.quantity ?? ""} onChange={event => edit("quantity", event.target.value)} placeholder="0" required /></CairnField>
-    <CairnField>{t("체결 단가", "Execution price")} · {unit}{cashMode ? t(" · 선택", " · optional") : ""}<CairnInput inputMode="decimal" name="price" value={fields.price ?? ""} onChange={event => edit("price", event.target.value)} placeholder="0" required={!cashMode} /></CairnField>
-    {!cashMode && !legacyUnit ? <p className={styles.note}>{t("증권사에 나온 수량·단가 그대로 입력하세요. 현금 출금액 없이 저장할 수 있어요.", "Enter your broker’s quantity and price. No cash debit is required.")}</p> : null}
-    {!cashMode && consideration ? <p className={styles.settlement} aria-live="polite"><span>{t("총 체결금액 · 수량 × 단가", "Total consideration · quantity × price")}</span><strong style={{overflowWrap:"anywhere"}}>{exactTradeAmount(consideration.amount)} {consideration.currency}</strong></p> : null}
-    <details open={cashMode || legacyUnit ? true : undefined}>
-      <summary>{t("수수료·정산 정보 (선택)", "Fees & settlement (optional)")}</summary>
-      {!cashMode && !legacyUnit ? <p className={styles.note}>{t("투자자산 원가·수익률은 체결금액 기준으로 확인합니다. 현금 정산은 별도이며 필수가 아닙니다.", "Investment cost and returns use execution consideration. Cash settlement is separate and optional.")}</p> : null}
+    <div className={styles.holdingQuantity}><span>{t("현재 보유", "Currently held")} <strong>{quantity}</strong></span>{kind === "sell" ? <CairnButton variant="secondary" type="button" className={styles.secondary} disabled={Number(quantity) <= 0} onClick={() => edit("quantity", quantity)}>{t("전량", "All")}</CairnButton> : null}</div>
+    <div className={styles.executionFields}>
+      <CairnField>{t("체결 수량", "Executed quantity")}<CairnInput inputMode="decimal" name="quantity" value={fields.quantity ?? ""} onChange={event => edit("quantity", event.target.value)} placeholder="0" required /></CairnField>
+      <CairnField>{t("체결 단가", "Execution price")} · {unit}{cashMode ? t(" · 선택", " · optional") : ""}<CairnInput inputMode="decimal" name="price" value={fields.price ?? ""} onChange={event => edit("price", event.target.value)} placeholder="0" required={!cashMode} /></CairnField>
+    </div>
+    {!cashMode && !legacyUnit ? <p className={styles.note}>{t("증권사에 나온 수량·단가 그대로. 현금 정산은 선택이에요.", "Use your broker’s quantity and price. Cash settlement is optional.")}</p> : null}
+    {!cashMode && consideration ? <div className={styles.executionTotal} aria-live="polite"><span>{t("총 체결금액", "Total consideration")}</span><strong>{exactTradeAmount(consideration.amount)} <small>{consideration.currency}</small></strong><span>{t("수량 × 단가 · 수수료·세금 제외", "Quantity × price · before fees and tax")}</span></div> : null}
+    <details className={styles.options} open={cashMode || legacyUnit ? true : undefined}>
+      <summary>{t("수수료·정산", "Fees & settlement")}<span>{t("선택", "Optional")}</span></summary>
+      {!cashMode && !legacyUnit ? <p className={styles.note}>{t("원가·수익률은 체결금액 기준이에요.", "Cost and returns use execution consideration.")}</p> : null}
       {legacyUnit ? <p className={styles.note}>{t("이전 기록은 수량 × 단가로 현금을 정산한 거래입니다. 정정 시 기존 정산 방식을 유지합니다.", "This older record settled cash from quantity × price. Corrections preserve that original method.")}</p> : null}
       <div className={`${styles.tradeKinds} ${styles.tradeModeOptions}`} role="group" aria-label={t("정산 입력 방식", "Settlement input")}>
         <CairnButton variant="selection" type="button" aria-pressed={netMode} onClick={() => edit("inputMode", "net")}><span>{t("정산 금액", "Net settlement")}</span><small>{kind === "buy" ? t("실제 출금액 · 비용 포함", "Actual debit · includes costs") : t("실제 입금액 · 비용 차감 후", "Actual credit · after costs")}</small></CairnButton>
@@ -38,12 +40,12 @@ export function NativeTradeFields({ kind, fields, unit, quantity, edit }: {
       </div>
       {cashMode ? <>
         <p className={styles.note}>{netMode
-          ? kind === "buy" ? t("수수료·세금을 포함한 최종 출금액입니다. 주문금액과 구분해 주세요.", "Final debit including fees and tax, not the order budget.") : t("수수료·세금을 뺀 최종 입금액입니다.", "Final credit after fees and tax.")
-          : t("수수료·세금 제외 금액입니다. 실제 결제 통화를 선택하세요.", "Gross total before fees and tax. Select the actual settlement currency.")}</p>
+          ? kind === "buy" ? t("수수료·세금 포함 출금액이에요. 주문금액과 달라요.", "Actual debit including fees and tax, not the order budget.") : t("수수료·세금을 뺀 입금액이에요.", "Actual credit after fees and tax.")
+          : t("수수료·세금 제외 금액과 결제 통화를 입력하세요.", "Enter the total before costs and its settlement currency.")}</p>
         <div className={styles.row}><CairnField>{netMode ? kind === "buy" ? t("실제 출금액", "Actual debit") : t("실제 입금액", "Actual credit") : t("체결 총액", "Gross total")}<MoneyInput value={(netMode ? fields.netTotal : fields.total) ?? ""} allowDecimals={settlementCurrency === "USD"} onValueChange={value => edit(netMode ? "netTotal" : "total", value)} required /></CairnField><CairnField>{t("결제 통화", "Settlement currency")}<CairnSelect className="cairn-form-select" value={settlementCurrency} onChange={event => edit("settlementCurrency", event.target.value)}><option>KRW</option><option>USD</option></CairnSelect></CairnField></div>
       </> : null}
       <div className={styles.grid}>{(["fee", "tax"] as const).map(key => <CairnField key={key}>{key === "fee" ? t("수수료", "Fee") : t("세금", "Tax")} · {settlementCurrency}<MoneyInput value={fields[key] ?? ""} allowDecimals={settlementCurrency === "USD"} onValueChange={value => edit(key, value)} required={netMode} placeholder={netMode ? t("없으면 0", "0 if none") : t("모르면 비워두세요", "Leave blank if unknown")} /></CairnField>)}</div>
-      <p className={styles.note}>{netMode ? t("정산액에 포함된 비용입니다. 없는 항목은 0, 모르는 항목은 확인 후 입력하세요. 이중 차감하지 않습니다.", "Costs included in net settlement. Enter 0 only if none; verify unknown costs. They are not deducted twice.") : !cashMode && !legacyUnit ? t("정산액을 모르면 비용도 참고 정보로만 기록하며 현금을 차감하지 않습니다.", "Until settlement is known, costs are recorded as evidence without debiting cash.") : t("비용은 체결 총액과 별도로 반영합니다. 모르면 비워두세요.", "Costs are applied separately from gross. Leave blank if unknown.")}</p>
+      <p className={styles.note}>{netMode ? t("정산액에 포함된 비용이에요. 없으면 0, 모르면 확인 후 입력해 주세요. 중복 차감하지 않아요.", "Costs already included in settlement. Enter 0 only if none; verify unknown costs. No double deduction.") : !cashMode && !legacyUnit ? t("정산액 없이 입력한 비용은 참고용이에요. 현금은 차감하지 않아요.", "Without settlement, costs are reference-only. Cash is unchanged.") : t("비용은 체결 총액에 별도로 반영해요. 모르면 비워 두세요.", "Costs apply separately from gross. Leave blank if unknown.")}</p>
       {(cashMode || legacyUnit) ? <CairnButton variant="secondary" type="button" className={styles.secondary} onClick={() => edit("inputMode", "execution")}>{t("정산액 없이 체결만 기록", "Record execution without settlement")}</CairnButton> : null}
       <CairnField>{t("주문 참고 단가 · 선택", "Order reference price · optional")} · {unit}<CairnInput inputMode="decimal" value={fields.orderPrice ?? ""} onChange={event => edit("orderPrice", event.target.value)} /></CairnField>
     </details>
