@@ -230,6 +230,9 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await page.goto(`${url}/beta?${new URLSearchParams({ mode: 'domain', scope, currency: 'KRW', cashAmountKrw: '235000' })}#beta-contribution`);
     const dialog = page.getByRole('dialog', { name: '추가 투자', exact: true });
     await expect(dialog).toBeVisible();
+    const card = page.locator('[data-beta-card="contribution"]');
+    await expect(card).toContainText('목표비중을 먼저 확인해 주세요');
+    await expect(card).not.toContainText('target_policy_missing');
     await expect(targetNotice(dialog)).toBeVisible();
     await dialog.getByRole('textbox', { name: '신규 투자금', exact: true }).fill(betaDraft.cashAmountKrw);
     const picker = await openExclusions(dialog);

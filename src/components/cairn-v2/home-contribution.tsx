@@ -1,4 +1,5 @@
 "use client";
+import { RecoveryTitle } from "@/components/recovery/recovery-notice";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
 import home from "./home-contribution.module.css";
@@ -46,7 +47,9 @@ export function ContributionHome({ view, dirty = false }: { view: BetaView; dirt
             ? "신규 투자금 · KRW"
             : dirty
               ? "입력 변경 · 계산 대기"
-              : (read?.message ?? "계산 대기")}
+              : read?.state === "blocked" || read?.state === "unavailable"
+                ? <RecoveryTitle reasons={read.blockers} kind={read.state === "unavailable" ? "retry" : undefined} />
+                : (read?.message ?? "계산 대기")}
         </p>
       </div>
       {result && (
