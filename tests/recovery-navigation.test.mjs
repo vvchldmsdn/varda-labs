@@ -69,7 +69,7 @@ it('read failures take precedence over editable data and missing FX does not sen
   assert.equal(new URL(recoveryDestination('history', 'account:abc', true), 'https://local.test').searchParams.get('detail'), 'raw');
 });
 
-const [{ RecoveryNotice }] = await importUiWithPorts(['src/components/recovery/recovery-notice.tsx'], {
+const [{ RecoveryNotice }, { ContributionHome }] = await importUiWithPorts(['src/components/recovery/recovery-notice.tsx', 'src/components/cairn-v2/home-contribution.tsx'], {
   'next/navigation': { useRouter: () => ({ refresh() {}, push() {} }) },
 });
 it('readonly recovery still offers a retry while withholding edit navigation and a false return promise', () => {
@@ -81,4 +81,31 @@ it('history recovery explicitly distinguishes later corrections from historical 
   const html = renderToStaticMarkup(createElement(RecoveryNotice, { kind:'history' }));
   assert.match(html, /저장 기록 확인하기/);
   assert.match(html, /현재 원가 수정만으로 과거 평가와 수익률이 만들어지지는/);
+});
+it('beta contribution card explains blocked reads without showing internal codes or fabricated results', () => {
+  const read = (state, blockers) => ({ state, blockers, result: null, message: '추가 투자 계산 보류 · ' + blockers.join(' · ') });
+  const render = (contribution, dirty = false) => renderToStaticMarkup(createElement(ContributionHome, {
+    view: { domain: { state: 'ready', planning: { contribution } } }, dirty,
+  }));
+  for (const [state, blockers, expected] of [
+    ['blocked', ['target_policy_missing'], /목표비중/],
+    ['blocked', ['target_policy_missing', 'query_failed'], /자료를 다시/],
+    ['blocked', ['target_policy_conflict'], /자료를 다시/],
+    ['blocked', ['price_unavailable'], /가격·환율/],
+    ['unavailable', ['target_policy_missing'], /자료를 다시/],
+  ]) {
+    const html = render(read(state, blockers));
+    assert.match(html, expected);
+    for (const code of blockers) assert.equal(html.includes(code), false);
+    assert.doesNotMatch(html, /총 매수 배분|data-funding-amount/);
+  }
+  const dirty = render(read('blocked', ['target_policy_missing']), true);
+  assert.match(dirty, /입력 변경/);
+  assert.doesNotMatch(dirty, /목표비중|target_policy_missing/);
+  const ready = render({ state: 'ready', blockers: [], result: {
+    cashAmountKrw: 10000, rows: [], residualCashKrw: 10000, totalAllocatedKrw: 0,
+    totalAvailableFundsKrw: 10000, totalTrimProceedsKrw: 0,
+  } });
+  assert.match(ready, /총 매수 배분<\/dt><dd>0/);
+  assert.match(ready, /data-funding-amount="10000"/);
 });

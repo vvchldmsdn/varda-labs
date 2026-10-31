@@ -16,6 +16,11 @@ const copy = {
   retry: ['자료를 다시 확인해 주세요', '조회가 완료되지 않았거나 계산 기준이 바뀌었습니다. 입력한 조건을 유지하고 다시 불러올 수 있어요.', '다시 불러오기', 'Reload the latest data', 'The read failed or its basis changed. Reload while keeping your inputs.', 'Try again'],
 } as const;
 const icons = { history: History, targets: SlidersHorizontal, holdings: Wallet, trades: ListChecks, market: ChartNoAxesCombined, retry: RefreshCw };
+export function RecoveryTitle({ reasons = [], kind }: { reasons?: readonly string[]; kind?: RecoveryKind }) {
+  const { t } = useI18n();
+  const c = copy[kind ?? recoveryKind(reasons)];
+  return <>{t(c[0], c[3])}</>;
+}
 export function RecoveryNotice({ reasons = [], kind, scope, beta = false, returnHref, draft, readForm, onRetry, details, allowResolve = true }: {
   reasons?: readonly string[]; kind?: RecoveryKind; scope?: string; beta?: boolean; returnHref?: string;
   draft?: Record<string, string | string[]>; readForm?: {id: string; fields: readonly string[]}; onRetry?: () => void; details?: string; allowResolve?: boolean;
@@ -40,7 +45,7 @@ export function RecoveryNotice({ reasons = [], kind, scope, beta = false, return
     if (href) start(() => router.push(href));
   }
   return <section className={styles.notice} aria-label={t('해결 방법', 'Next steps')} data-recovery-kind={selected} aria-busy={pending}>
-    <div className={styles.heading}><span className={styles.icon} aria-hidden="true"><Icon size={24} /></span><h3>{t(c[0], c[3])}</h3></div>
+    <div className={styles.heading}><span className={styles.icon} aria-hidden="true"><Icon size={24} /></span><h3><RecoveryTitle kind={selected} /></h3></div>
     <div className={styles.actions}>
       {(selected === 'retry' || allowResolve) && <Button type="button" variant="primary" disabled={pending} onClick={selected === 'retry' ? retry : resolve}>{pending ? t('확인 중…', 'Loading…') : t(c[2], c[5])}<ArrowRight size={18} aria-hidden="true" /></Button>}
       {selected !== 'retry' && <Button type="button" variant="ghost" disabled={pending} onClick={retry}><RefreshCw size={16} aria-hidden="true" />{t('다시 조회', 'Reload')}</Button>}
