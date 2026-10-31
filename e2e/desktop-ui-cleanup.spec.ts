@@ -36,7 +36,7 @@ test("selected ring and native select stay in sync without changing segment geom
   await segments.nth(2).click();
   await expect(segments.nth(2)).toHaveAttribute("aria-pressed", "true");
   expect(await segments.evaluateAll(nodes => nodes.map(node => node.getAttribute("d")))).toEqual(before);
-  await expect(page.getByRole("link", { name: "상관·위험 보기", exact: true })).toHaveAttribute("href", /scope=all/);
+  await expect(page.getByRole("navigation", { name: "포트폴리오 더 살펴보기", exact: true }).getByRole("link", { name: /^함께 움직이는 종목 보기/ })).toHaveAttribute("href", /scope=all/);
   await expect(page.getByRole("link", { name: "ETF 구성종목 보기" })).toHaveAttribute("href", "/etfs?scope=all");
 });
 

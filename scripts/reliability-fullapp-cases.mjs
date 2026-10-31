@@ -296,7 +296,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
       await page.goto(url + '/history?scope=account%3A' + legacyAccount);
-      await page.getByRole('button', { name: '기간 요약·근거', exact: true }).click();
+      await page.getByRole('button', { name: /^기간 요약 살펴보기/ }).click();
       await expect(page.getByRole('heading', { name: '기록 리듬', exact: true })).toBeVisible();
       // The graph shows the valuation date, one day before the daily save date.
       const firstDate = page.getByRole('button', { name: /^2026\.08\.04 이전 저장점 대비/ });
@@ -311,7 +311,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await secondDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
       await page.screenshot({ path: path.join(output, 'desktop-legacy-history-heatmap.png'), fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 }); await page.reload();
-      await page.getByRole('button', { name: '기간 요약·근거', exact: true }).click();
+      await page.getByRole('button', { name: /^기간 요약 살펴보기/ }).click();
       await firstDate.click();
       await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
