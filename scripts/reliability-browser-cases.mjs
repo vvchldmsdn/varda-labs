@@ -66,7 +66,7 @@ export async function runBrowserCases({admin,worker,tenant,report,output}) {
    await page.screenshot({path:path.join(output,'desktop-recovered.png'),fullPage:true});
   });
   await check('browser-historical-entry-and-mobile',async()=>{
-   await page.getByText('거래일·과거 기록 정정',{exact:true}).click();await page.getByText('과거 거래 추가·정정',{exact:true}).click();await page.getByLabel('시작 잔액 이후 거래를 다시 계산',{exact:true}).check();
+   await page.locator('summary').filter({hasText:/^거래일·정정/}).click();await page.getByText('과거 거래 추가·정정',{exact:true}).click();await page.getByLabel('시작 잔액 이후 거래를 다시 계산',{exact:true}).check();
    await page.getByLabel('체결 수량',{exact:true}).fill('1');await page.getByLabel('체결 단가 · USD',{exact:true}).fill('100');
    await page.getByText('초 단위 시각 확인·수정',{exact:true}).click();await page.locator('input[name="at"]').fill('2026-08-02T12:00');await page.getByLabel('변경 이유',{exact:true}).fill('Synthetic missing transaction');
    await page.getByLabel('시작 잔액에 이미 포함된 거래가 아닙니다.',{exact:true}).check();

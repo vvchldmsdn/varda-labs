@@ -209,7 +209,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await visitValuation('/history?currency=USD');
       await expect(page.locator('body')).toContainText('2,000.00');
       await page.goto(url + `/portfolio/ledger?accountId=${account}&assetId=${asset}&action=buy`);
-      await page.getByText('거래일·과거 기록 정정', { exact: true }).click();
+      await page.locator('summary').filter({ hasText: /^거래일·정정/ }).click();
       await page.getByText('과거 거래 추가·정정', { exact: true }).click();
       await page.getByLabel('시작 잔액 이후 거래를 다시 계산', { exact: true }).check();
       await fillSettledTrade(page, '1', '100');
