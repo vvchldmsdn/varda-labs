@@ -421,7 +421,9 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /당시 실제\s*보유량·매매 내역을 재현한 성과가 아니며/);
     assert.match(view, /데이터가 부족한 행만 제외하고/);
     assert.match(view, /내 포트폴리오 확률 경로/);
-    assert.match(view, /현재 구성과 최근 90개 공동 수익률/);
+    assert.match(view, /최근 90개 공동 수익률/);
+    assert.match(view, /현재 구성의 가상 연구/);
+    assert.match(view, /과거 보유·매매 기록을 재현하지 않습니다/);
     assert.match(view, /제외한 비중은 이력을 꾸며내지 않고/);
     assert.match(view, /조회 시 계산 · 저장 안 함/);
     assert.match(view, /변동성 완화 후보 비교/);
@@ -515,7 +517,8 @@ describe("Simulation input readiness route boundary", () => {
     assert.match(view, /\{rows\.length\}<SimulationText ko=\{"개 관측 수익률"\} \/>/);
     assert.match(view, /<SimulationText ko=\{"전체"\} \/>\{" "\}\{rows\.length\}<SimulationText ko=\{"개 수익률 표 보기"\} \/>/);
     assert.match(view, /예측·시뮬레이션 경로 아님/);
-    assert.match(view, /결과는 수익\s*보장, 추천 또는 주문 근거가 아닙니다/);
+    assert.match(view, /미래 수익을 보장하지 않습니다/);
+    assert.match(view, /추천 또는 주문 근거로 사용하지 않습니다/);
     assert.match(view, /과거\s*날짜로 자동 대체/);
     assert.doesNotMatch(
       view,

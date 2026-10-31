@@ -204,11 +204,13 @@ describe("dashboard query demand and independent market reads", () => {
     for (const [initialLocale, pendingLabel, baselineLabel] of [["ko", "일일 기준 기록 준비 중", "마지막 기준일"], ["en", "Awaiting the daily baseline", "Last baseline"]]) {
       for (const component of [PortfolioDashboard, TodayMovement]) {
         const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, createElement(component, { data: home })));
-        const summary = html.match(/<section class="stageSummary"[\s\S]*?<\/section>/)?.[0];
+        const summaryTitleId = component === TodayMovement ? "today-movement-title" : "portfolio-overview-title";
+        const summary = html.match(new RegExp(`<section\\b[^>]*\\baria-labelledby="${summaryTitleId}"[^>]*>[\\s\\S]*?<\\/section>`))?.[0];
+        assert.ok(summary, `${component.name}/${initialLocale}: the movement summary is rendered`);
         const expectedLabel = component === TodayMovement
           ? (initialLocale === "ko" ? "일일 기준 기록이 없어 오늘 변동을 계산할 수 없어요." : "Today's change needs a daily baseline.")
           : pendingLabel;
-        assert.ok(summary?.replaceAll("&#x27;", "'").includes(expectedLabel), `${component.name}/${initialLocale}: cutoff evidence is missing without claiming work is running`);
+        assert.ok(summary.replaceAll("&#x27;", "'").includes(expectedLabel), `${component.name}/${initialLocale}: cutoff evidence is missing without claiming work is running`);
         assert.ok(summary.includes(baselineLabel), `${component.name}/${initialLocale}: the older date is labeled as the last baseline`);
         assert.ok(summary.includes("2026.09.08"));
         assert.ok(summary.includes("stageWarning"), "the notice uses the visible mobile and desktop warning slot");
