@@ -40,7 +40,7 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
         await page.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
         await page.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('1');
         await page.getByRole('button',{name:'목록에 추가',exact:true}).click();
-        await page.getByText('매입가·현재가 추가 또는 수정',{exact:true}).click();
+        await page.getByText('매입가·현재가 (선택)',{exact:true}).click();
         await page.getByLabel('현재 1주 가격 (선택)',{exact:true}).fill('100');
         await page.getByRole('button',{name:'1종목 저장',exact:true}).click();
         await expect(page.getByRole('status').filter({hasText:'1종목이 포트폴리오에 담겼어요.'})).toBeVisible();

@@ -87,7 +87,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await expect(shortage).toBeVisible();
     // The real one-holding/zero-history model has null end weights, hence
     // invalid_input. Its separate coverage evidence must still guide to data preparation.
-    await shortage.getByText('상세 확인 사유', { exact: true }).click();
+    await shortage.getByText('확인이 필요한 이유', { exact: true }).click();
     await expect(shortage.locator('details[open]')).toContainText('invalid_input');
     await shortage.getByRole('button', { name: '분석 데이터 준비 확인', exact: true }).click();
     await expect(page).toHaveURL(current => current.pathname === '/portfolio/holdings');

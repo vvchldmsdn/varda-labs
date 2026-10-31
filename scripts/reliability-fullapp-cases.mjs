@@ -478,11 +478,11 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
       await page.goto(url + `/beta/portfolio/holdings/new?mode=domain&scope=account:${otherAccount}&currency=KRW`);
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '잔고 사진 선택', exact: true })).toHaveCount(0);
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toHaveAttribute('href', `/portfolio/ledger?accountId=${otherAccount}&action=buy`);
       const admittedUrl = page.url();
       await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(balanceAccount);
-      await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: '잔고 사진 선택', exact: true })).toBeVisible();
       await expect(page.locator('[data-holding-onboarding-read-state]')).toHaveAttribute('data-holding-onboarding-read-state', 'ready');
       assert.equal(page.url(), admittedUrl, 'Form account changes must not invalidate the beta server read');
       await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(otherAccount);
