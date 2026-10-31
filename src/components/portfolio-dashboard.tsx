@@ -20,6 +20,7 @@ import {
   formatPercent,
   formatSignedKrw,
   toneClass,
+  valueTone,
 } from "@/components/home/portfolio-format";
 import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-button";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
@@ -33,7 +34,7 @@ import {
   type PortfolioAnalysisScope,
   type PortfolioAnalysisScopeKey,
 } from "@/lib/portfolio-analysis-scope";
-import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionGroup, ActionContent } from "@/components/cairn-ui";
+import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionGroup, ActionContent, ValueText } from "@/components/cairn-ui";
 
 
 export function PortfolioDashboard({
@@ -48,6 +49,7 @@ export function PortfolioDashboard({
   const movementReady = data.dataHealth.movementReady;
   const baselineIsDelayed = data.dataHealth.movementReason === "stale_baseline_snapshot";
   const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
+  const todayReturnPct = movementReady ? data.todayReturnPct : null;
   const topContributor = movementReady
     ? selectLargestMovementContributor(data.holdings)
     : null;
@@ -110,8 +112,9 @@ export function PortfolioDashboard({
             </div>
             <dl className={styles.summaryMetric}>
               <dt><T ko="오늘 변동" en="Today"/></dt>
-              <dd className={toneClass(todayChangeKrw)}>
-                {<T ko={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"} en={translateHomeHistory(movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기")}/>}
+              <dd className={`${home.movementValue} ${toneClass(todayChangeKrw)}`}>
+                <span><T ko={movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기"} en={translateHomeHistory(movementReady ? formatSignedKrw(todayChangeKrw) : "계산 대기")}/></span>
+                {movementReady ? <ValueText className={home.movementRate} tone={valueTone(todayReturnPct)}>{formatPercent(todayReturnPct, true)}</ValueText> : null}
               </dd>
               <dd className={styles.status}><T ko={baselineIsDelayed ? "마지막 기준일" : "기준일"} en={baselineIsDelayed ? "Last baseline" : "As of"}/> {<T ko={formatDate(data.movementBaselineDate)} en={translateHomeHistory(formatDate(data.movementBaselineDate))}/>}</dd>
             </dl>

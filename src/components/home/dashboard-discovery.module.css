@@ -5,6 +5,8 @@ div.stage { height:auto; gap:var(--cairn-ui-space-5,24px); }
 .summary > :last-child > strong { display:inline-block; margin-right:16px; }
 .summary > :last-child > p { display:inline; }
 .overview > .summary > div:first-child > strong { white-space:normal; overflow-wrap:anywhere; font-size:clamp(32px,3vw,48px); }
+.summary .movementValue { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; }
+.movementValue > .movementRate { font-size:18px; line-height:1.45; letter-spacing:-.02em; }
 @media(max-width:699px) {
  .overview > .summary { grid-template-columns:repeat(2,minmax(0,1fr)); padding:20px; gap:24px 16px; }
  .summary > :first-child { grid-column:1/-1; }
