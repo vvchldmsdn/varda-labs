@@ -1,6 +1,5 @@
-import { localizedMetadata } from "@/lib/i18n/server";
+import { getLocale, localizedMetadata } from "@/lib/i18n/server";
 import { T } from "@/components/i18n/localized-text";
-import type { ReactNode } from "react";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
 import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import { redirect } from "next/navigation";
@@ -11,12 +10,13 @@ import {
   ArchivedAccountRow,
 } from "@/components/account-management";
 import { PortfolioReadAccessBoundary } from "@/components/portfolio-read-access-boundary";
-import { PortfolioSetupProgressPanel } from "@/components/portfolio-setup-progress";
 import { getReadOnlyTenantAccountManagementModel } from "@/db/queries/account-management";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { derivePortfolioSetupProgress } from "@/lib/portfolio-setup-progress";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
-import { PageHeader, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, PageHeader, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Layers3, ListChecks, Plus, Wallet } from "lucide-react";
+import styles from "@/components/portfolio/management-forms.module.css";
 
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function generateMetadata() {
 }
 
 export default async function AccountManagementPage() {
-  const resolution = await resolveCurrentTenantContext();
+  const [resolution, locale] = await Promise.all([resolveCurrentTenantContext(), getLocale()]);
   if (!resolution.ok) {
     if (resolution.failure.code === "identity_unlinked") {
       redirect("/portfolio/onboarding");
@@ -71,33 +71,9 @@ export default async function AccountManagementPage() {
   return (
     <main className="varda-secondary-page min-h-screen bg-[var(--paper)] px-4 py-6 text-[var(--ink)]">
       <SecondaryPageHeader />
-      <div className="mx-auto w-full max-w-4xl space-y-5">
-        <section className="border-b border-[var(--line)] pb-5">
-          <PageHeader eyebrow="Cairn Labs" title={<T ko="계좌 관리" en="Your accounts" />}
-            description={<T ko="증권·연금 등 실제 보유 계좌를 관리합니다. 여러 계좌를 함께 분석하려면 분석 범위로 묶어 주세요." en="Manage brokerage, pension and other holding accounts. Link them through analysis scopes to view several accounts together." />}
-            actions={
-            <nav className="flex flex-wrap gap-2 text-sm font-semibold">
-              <NavLink href="/"><T ko="홈" en="Home" /></NavLink>
-              <NavLink href="/portfolio/holdings"><T ko="보유 종목" en="Holdings" /></NavLink>
-              <NavLink href="/portfolio/holdings/new"><T ko="종목 추가" en="Add holding" /></NavLink>
-              <NavLink href="/portfolio/groups"><T ko="분석 범위" en="Analysis scopes" /></NavLink>
-              <NavLink href="/portfolio/events?account=all"><T ko="거래 기록" en="Transactions" /></NavLink>
-            </nav>
-          } />
-          <dl className="mt-4 grid grid-cols-[1.3fr_1fr_1fr] divide-x divide-[var(--line)] border-y border-[var(--line)] py-3">
-            <SummaryCell label={<T ko="서비스 기준일" en="Service date" />} value={serviceDate} />
-            <SummaryCell
-              label={<T ko="사용 중인 계좌" en="Active accounts" />}
-              value={model.state === "ready" ? String(activeAccounts.length) : "-"}
-            />
-            <SummaryCell
-              label={<T ko="종료된 계좌" en="Closed accounts" />}
-              value={
-                model.state === "ready" ? String(archivedAccounts.length) : "-"
-              }
-            />
-          </dl>
-        </section>
+      <div className={styles.pageSections}>
+        <PageHeader title={<T ko="계좌 관리" en="Your accounts" />}
+          actions={<Link className={styles.link} href="/portfolio/manage"><T ko="전체 관리" en="All settings" /></Link>} />
 
         {model.state !== "ready" ? (
           <section className="rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] p-4 text-sm text-[var(--warning)]">
@@ -105,33 +81,29 @@ export default async function AccountManagementPage() {
           </section>
         ) : (
           <>
-            {setupProgress ? (
-              <PortfolioSetupProgressPanel progress={setupProgress} />
+            {setupProgress && !setupProgress.isComplete && activeAccounts.length > 0 ? (
+              <ActionGroup label={locale === "en" ? "Add your first holding" : "첫 종목 등록"}>
+                <Link href={setupProgress.nextAction.href} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="이제 종목을 담아 볼까요?" en="Ready to add your holdings?" />} description={<T ko="종목과 수량으로 시작해요" en="Start with a holding and quantity" />} /></Link>
+              </ActionGroup>
             ) : null}
 
             <section
-              className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4"
+              className={styles.card}
               id="create-account"
             >
-              <CairnSectionTitle className="text-lg font-semibold"><T ko="새 계좌" en="New account" /></CairnSectionTitle>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                <T ko="알아보기 쉬운 이름을 정해 주세요. 이름은 나중에 바꿀 수 있습니다." en="Choose a name you recognize. You can change it later." />
-              </p>
-              <div className="mt-4">
+              <CairnSectionTitle><T ko="새 계좌" en="New account" /></CairnSectionTitle>
+              <div className="mt-6">
                 <AccountCreateForm />
               </div>
             </section>
 
-            <section className="space-y-3">
+            <section className={styles.accountList}>
               <div>
-                <CairnSectionTitle className="text-lg font-semibold"><T ko="사용 중인 계좌" en="Active accounts" /></CairnSectionTitle>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  <T ko="계좌 이름을 바꿔도 보유종목과 과거 기록은 그대로 유지됩니다." en="Renaming keeps holdings and historical records intact." />
-                </p>
+                <CairnSectionTitle><T ko="사용 중인 계좌" en="Active accounts" /> <span className={styles.countLabel}>{activeAccounts.length}</span></CairnSectionTitle>
               </div>
               {activeAccounts.length === 0 ? (
-                <div className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
-                  <T ko="첫 계좌를 만든 다음 보유종목을 추가해 주세요." en="Create your first account, then add holdings." />
+                <div className={styles.emptyState}>
+                  <Wallet size={28} aria-hidden="true" /><p><T ko="아직 등록한 계좌가 없어요" en="No accounts yet" /></p>
                 </div>
               ) : (
                 activeAccounts.map((account) => (
@@ -144,44 +116,27 @@ export default async function AccountManagementPage() {
             </section>
 
             {archivedAccounts.length > 0 ? (
-              <section className="space-y-3 border-t border-[var(--line)] pt-5">
-                <div>
-                  <CairnSectionTitle className="text-lg font-semibold"><T ko="종료된 계좌" en="Closed accounts" /></CairnSectionTitle>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    <T ko="과거 기록은 보존되며 언제든 계좌를 복원할 수 있습니다." en="Historical records are preserved, and you can restore these accounts." />
-                  </p>
-                </div>
+              <details className={styles.disclosure}>
+                <summary><span><T ko="종료된 계좌" en="Closed accounts" /> · {archivedAccounts.length}</span></summary>
+                <p className={styles.hint}><T ko="기록은 그대로, 언제든 복원할 수 있어요." en="Records are kept. Restore an account anytime." /></p>
+                <div className={styles.accountList}>
                 {archivedAccounts.map((account) => (
                   <ArchivedAccountRow
                     account={account}
                     key={`${account.id}:${account.updatedAt}`}
                   />
                 ))}
-              </section>
+                </div>
+              </details>
             ) : null}
           </>
         )}
+        <ActionGroup label={locale === "en" ? "Explore your assets" : "자산 관리 이어가기"} layout="list">
+          <Link href="/portfolio/holdings"><ActionContent icon={<Wallet size={22} />} title={<T ko="보유 종목 확인" en="View holdings" />} /></Link>
+          <Link href="/portfolio/groups"><ActionContent icon={<Layers3 size={22} />} title={<T ko="여러 계좌 함께 보기" en="Group accounts together" />} description={<T ko="분석 범위 설정" en="Set up an analysis scope" />} /></Link>
+          <Link href="/portfolio/events?account=all"><ActionContent icon={<ListChecks size={22} />} title={<T ko="거래 기록 보기" en="View transactions" />} /></Link>
+        </ActionGroup>
       </div>
     </main>
-  );
-}
-
-function SummaryCell({ label, value }: { label: ReactNode; value: string }) {
-  return (
-    <div className="min-w-0 px-2 first:pl-0 last:pr-0 sm:px-4">
-      <dt className="text-xs font-semibold text-[var(--muted)]">{label}</dt>
-      <dd className="mt-2 text-sm font-semibold tabular-nums sm:text-lg">{value}</dd>
-    </div>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      className="inline-flex min-h-11 items-center rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[var(--ink)] hover:bg-[var(--wash)]"
-      href={href}
-    >
-      {children}
-    </Link>
   );
 }

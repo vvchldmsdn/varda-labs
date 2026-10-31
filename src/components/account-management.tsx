@@ -7,6 +7,7 @@ import { NATIVE_ACCOUNT_BALANCE_MESSAGE } from "@/lib/native-ledger-compatibilit
 import { useActionState } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { accountActionMessageKo, accountTypeLabel } from "@/lib/i18n/account-management-copy";
+import styles from "@/components/portfolio/management-forms.module.css";
 
 import {
   archiveAccount,
@@ -32,7 +33,7 @@ export function AccountCreateForm() {
   const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state, { resetOnSuccess: true });
 
   return (
-    <CairnForm action={action} className="space-y-3" ref={actionFormRef} onReset={actionFormOnReset}>
+    <CairnForm action={action} className={styles.form} ref={actionFormRef} onReset={actionFormOnReset}>
       <CairnField className="block text-sm font-semibold text-[var(--ink)]">
         {t("계좌 이름", "Account name")}
         <CairnInput
@@ -44,12 +45,12 @@ export function AccountCreateForm() {
           type="text"
         />
       </CairnField>
-      <p className="text-xs leading-5 text-[var(--muted)]">
-        {t("평가액은 원화로 표시합니다. 미국 주식 등 외화 종목도 등록할 수 있습니다.", "Valuations are shown in KRW. You can also add holdings in foreign currencies, including US stocks.")}
+      <p className={styles.hint}>
+        {t("원화 기준 · 미국 주식도 담을 수 있어요.", "Reported in KRW · US holdings welcome.")}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <CairnButton variant="primary"
-          className={primaryButtonClassName}
+          size="lg"
           disabled={pending}
           type="submit"
         >
@@ -59,7 +60,7 @@ export function AccountCreateForm() {
       </div>
       {state.status === "success" && state.createdAccountId && !pending ? (
         <Link
-          className={`inline-flex items-center ${secondaryButtonClassName}`}
+          className={styles.link}
           href={{ pathname: "/portfolio/holdings/new", query: { accountId: state.createdAccountId } }}
         >
           {t("이 계좌에 종목 추가", "Add holdings to this account")}
@@ -85,15 +86,15 @@ export function AccountEditor({ account }: { account: AccountModel }) {
     account.activeHoldingCount > 0 || account.openGroupReferenceCount > 0;
 
   return (
-    <article className="rounded-md border border-[var(--line)] bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className={styles.card}>
+      <div className={styles.heading}>
         <div className="min-w-0 max-w-full">
-          <p className="break-words font-semibold text-[var(--ink)]">{account.name}</p>
+          <h3>{account.name}</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">
             {t(...accountTypeLabel(account.accountType))} / {account.currency}
           </p>
         </div>
-        <dl className="flex gap-4 text-right text-xs text-[var(--muted)]">
+        <dl className={styles.counts}>
           <div>
             <dt>{t("보유 종목", "Holdings")}</dt>
             <dd className="mt-1 font-semibold text-[var(--ink)]">
@@ -110,13 +111,13 @@ export function AccountEditor({ account }: { account: AccountModel }) {
       </div>
 
       <Link
-        className={`mt-4 inline-flex items-center ${secondaryButtonClassName}`}
+        className={styles.link}
         href={{ pathname: "/portfolio/holdings/new", query: { accountId: account.id } }}
       >
         {t("이 계좌에 종목 추가", "Add holdings to this account")}
       </Link>
 
-      <CairnForm action={updateAction} className="mt-4 flex flex-wrap items-end gap-3" onReset={updateActionFormOnReset} ref={updateActionFormRef}>
+      <CairnForm action={updateAction} className={styles.inlineForm} onReset={updateActionFormOnReset} ref={updateActionFormRef}>
         <IdentityFields account={account} />
         <CairnField className="min-w-0 w-full flex-1 text-sm font-semibold text-[var(--ink)] sm:min-w-56">
           {t("계좌 이름", "Account name")}
@@ -130,7 +131,6 @@ export function AccountEditor({ account }: { account: AccountModel }) {
           />
         </CairnField>
         <CairnButton variant="primary"
-          className={secondaryButtonClassName}
           disabled={updatePending}
           type="submit"
         >
@@ -139,13 +139,15 @@ export function AccountEditor({ account }: { account: AccountModel }) {
         <ActionMessage state={updateState} />
       </CairnForm>
 
+      <details className={`${styles.disclosure} ${styles.danger}`}>
+        <summary>{t("계좌 종료", "Close account")}</summary>
       <CairnForm
         action={archiveAction}
-        className="mt-4 flex flex-col gap-3 border-t border-[var(--wash)] pt-4 sm:flex-row sm:items-center sm:justify-between" onReset={archiveActionFormOnReset} ref={archiveActionFormRef}
+        className={styles.form} onReset={archiveActionFormOnReset} ref={archiveActionFormRef}
       >
         <IdentityFields account={account} />
         <div className="min-w-0 flex-1">
-          <CairnField className="flex items-start gap-2 text-sm text-[var(--muted)]">
+          <CairnField className={styles.confirmation}>
             <CairnInput
               className="mt-0.5 h-4 w-4 accent-[var(--negative)]"
               disabled={archiveBlocked}
@@ -165,7 +167,6 @@ export function AccountEditor({ account }: { account: AccountModel }) {
           ) : null}
         </div>
         <CairnButton variant="danger"
-          className={dangerButtonClassName}
           disabled={archiveBlocked || archivePending}
           type="submit"
         >
@@ -173,6 +174,7 @@ export function AccountEditor({ account }: { account: AccountModel }) {
         </CairnButton>
         <ActionMessage state={archiveState} />
       </CairnForm>
+      </details>
     </article>
   );
 }
@@ -183,17 +185,16 @@ export function ArchivedAccountRow({ account }: { account: AccountModel }) {
   const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state);
 
   return (
-    <article className="flex flex-col gap-3 rounded-md border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+    <article className={`${styles.card} ${styles.archived}`}>
       <div className="min-w-0">
         <p className="break-words font-semibold text-[var(--muted)]">{account.name}</p>
         <p className="mt-1 text-xs text-[var(--faint)]">
           {t("종료됨", "Closed")} / {t(...accountTypeLabel(account.accountType))} / {account.currency}
         </p>
       </div>
-      <CairnForm action={action} className="flex flex-wrap items-center gap-3" onReset={actionFormOnReset} ref={actionFormRef}>
+      <CairnForm action={action} className={styles.form} onReset={actionFormOnReset} ref={actionFormRef}>
         <IdentityFields account={account} />
         <CairnButton variant="primary"
-          className={secondaryButtonClassName}
           disabled={pending}
           type="submit"
         >
@@ -235,11 +236,4 @@ function ActionMessage({ state }: { state: AccountManagementActionState }) {
   );
 }
 
-const fieldClassName =
-  "mt-1.5 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--ink)]";
-const primaryButtonClassName =
-  "min-h-11 rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
-const secondaryButtonClassName =
-  "min-h-11 rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--wash)] disabled:cursor-not-allowed disabled:opacity-50";
-const dangerButtonClassName =
-  "min-h-11 rounded-md border border-[var(--warning-soft)] bg-white px-4 py-2 text-sm font-semibold text-[var(--negative)] disabled:cursor-not-allowed disabled:opacity-50";
+const fieldClassName = "w-full font-normal";

@@ -28,6 +28,7 @@ export function OnboardingView({
   return (
     <AuthShell
       preview={preview}
+      compact
       alternate={{ href: connectionHref, label: "내 계정" }}
     >
       <AuthElement as="section" className={styles.onboardingPanel} aria-label="포트폴리오 시작">
@@ -57,7 +58,7 @@ export function OnboardingView({
               eyebrow="01 / A FRESH START"
               title="나만의 포트폴리오"
               description={
-                <><AuthText>{"새 포트폴리오는 빈 기록에서 시작합니다."}</AuthText><br /><AuthText>{"이전 서비스의 기록이 있다면 기존 데이터를 연결해 주세요."}</AuthText></>
+                <AuthText>{"새 포트폴리오는 빈 기록에서 시작합니다."}</AuthText>
               }
             />
             <SelfServiceTenantOnboardingForm preview={preview} />
@@ -74,7 +75,7 @@ export function OnboardingView({
               eyebrow="02 / YOUR FIRST ACCOUNT"
               title="첫 계좌 등록"
               description={
-                <><T ko="보유한 종목을 담을 공간을 준비할게요." en="Let’s prepare a home for your holdings." /><br /><AuthText>{"계좌번호나 금융기관 비밀번호는 필요하지 않습니다."}</AuthText></>
+                <AuthText>{"계좌번호나 금융기관 비밀번호는 필요하지 않습니다."}</AuthText>
               }
             />
             <OnboardingAccountForm preview={preview} />
@@ -101,10 +102,9 @@ export function OnboardingView({
                 href={preview ? "/portfolio/holdings/new?preview=design" : "/portfolio/holdings/new"}
               >
                 <Plus size={17} aria-hidden="true" /><AuthText>{"보유 종목 추가"}</AuthText></Link>
-              <Link className={styles.secondaryButton} href="/"><AuthText>{"지금은 홈 둘러보기"}</AuthText><ArrowRight size={16} aria-hidden="true" />
+              <Link className={styles.secondaryButton} href={preview ? "/?preview=design" : "/"}><AuthText>{"지금은 홈 둘러보기"}</AuthText><ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
-            <p className={styles.note}><AuthText>{"종목을 등록하기 전에는 평가액과 수익률이 비어 있을 수 있습니다."}</AuthText></p>
           </>
         )}
       </AuthElement>

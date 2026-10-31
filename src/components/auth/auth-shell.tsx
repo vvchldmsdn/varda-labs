@@ -1,7 +1,7 @@
 import { AuthText } from "./auth-localized";
 import { BrandLogo } from "@/components/brand-logo";
 import Link from "next/link";
-import { ArrowUpRight, ChartNoAxesCombined, LockKeyhole, ScanLine, Waypoints } from "lucide-react";
+import { ArrowUpRight, LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 import styles from "./auth-experience.module.css";
 import { AuthOrbit } from "./auth-orbit";
@@ -42,16 +42,8 @@ export function AuthShell({
       </header>
       <div className={`${styles.stage} ${compact ? styles.compactStage : ""}`}>
         {!compact ? <aside className={styles.introduction}>
-          <p className={styles.introEyebrow}>A CLEARER VIEW OF YOUR WEALTH</p>
           <CairnSectionTitle><AuthText>{"나의 자산을,"}</AuthText><br /><AuthText>{"더 선명하게."}</AuthText></CairnSectionTitle>
-          <p><AuthText>{"흩어진 자산의 오늘을 살펴보고,"}</AuthText><br /><AuthText>{"기록을 바탕으로 다음을 계획하세요."}</AuthText></p>
           <AuthOrbit />
-          <div className={styles.introFeatures}>
-            <span><ScanLine size={18} aria-hidden="true" /><AuthText>{"한눈에 보는 자산과 변화"}</AuthText></span>
-            <span><ChartNoAxesCombined size={18} aria-hidden="true" /><AuthText>{"기록으로 확인하는 나의 흐름"}</AuthText></span>
-            <span><Waypoints size={18} aria-hidden="true" /><AuthText>{"다양한 가정으로 탐색하는 가능성"}</AuthText></span>
-          </div>
-          <p className={styles.introSignature}>YOUR ASSETS. YOUR PERSPECTIVE.</p>
         </aside> : null}
         <div className={styles.formStage}>{children}</div>
       </div>
@@ -65,7 +57,6 @@ export function AuthShell({
 }
 
 export function AuthHeading({
-  eyebrow,
   title,
   description,
 }: {
@@ -74,7 +65,7 @@ export function AuthHeading({
   description: ReactNode;
 }) {
   return (
-    <PageHeader className={styles.heading} eyebrow={eyebrow}
+    <PageHeader className={styles.heading}
       title={<AuthText>{title}</AuthText>}
       description={<AuthText>{description}</AuthText>} />
   );

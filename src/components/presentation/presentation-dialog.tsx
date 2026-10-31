@@ -5,7 +5,7 @@ import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Maximize2, X } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
-import { Button as CairnButton, InfoDisclosure, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Button as CairnButton, IconButton, InfoDisclosure, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
 export function PresentationDialog({
@@ -17,6 +17,7 @@ export function PresentationDialog({
   titleEn,
   descriptionEn,
   triggerClassName,
+  triggerContent,
   mountOnOpen = false,
   wide = false,
 }: {
@@ -28,6 +29,7 @@ export function PresentationDialog({
   titleEn?: string;
   descriptionEn?: string;
   triggerClassName?: string;
+  triggerContent?: ReactNode;
   /** For children built in a Client Component; server children must be deferred at the server boundary. */
   mountOnOpen?: boolean;
   wide?: boolean;
@@ -69,8 +71,8 @@ export function PresentationDialog({
         }}
         type="button"
       >
-        <span>{typeof label === "string" ? t(label, labelEn) : label}</span>
-        <Maximize2 aria-hidden="true" size={15} strokeWidth={1.6} />
+        {triggerContent ?? <><span>{typeof label === "string" ? t(label, labelEn) : label}</span>
+        <Maximize2 aria-hidden="true" size={15} strokeWidth={1.6} /></>}
       </CairnButton>
       <dialog
         aria-describedby={description ? descriptionId : undefined}
@@ -98,16 +100,15 @@ export function PresentationDialog({
                 </InfoDisclosure>
               ) : null}
             </div>
-            <CairnButton variant="ghost"
-              aria-label={t("닫기", "Close")}
+            <IconButton
+              label={t("닫기", "Close")}
               autoFocus
-              className="varda-icon-button"
               onClick={close}
               title={t("닫기", "Close")}
               type="button"
             >
               <X aria-hidden="true" size={18} />
-            </CairnButton>
+            </IconButton>
           </header>
           <div className="varda-dialog-content varda-presentation-dialog-content">
             {!mountOnOpen || open ? children : null}

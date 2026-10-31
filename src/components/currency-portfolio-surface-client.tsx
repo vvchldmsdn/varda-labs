@@ -16,7 +16,7 @@ import type { CurrencyResearchInput } from "@/lib/currency-research";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { Currency } from "@/lib/money";
 import styles from "./currency-portfolio-surface.module.css";
-import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, PageTitle as CairnPageTitle } from "@/components/cairn-ui";
 
 
 export type CurrencySurface = "home" | "today" | "history" | "structure" | "contribution" | "lab" | "simulation";
@@ -61,5 +61,6 @@ export function CurrencyPortfolioSurfaceClient({ recoveredReturn, surface, evide
       : evidence && reports ? <><CurrencyTrackedView key={`${evidence.ownerId}:${selectedScope.key}:${surface}:${evidence.reporting}`} evidence={evidence} reports={reports} surface={surface === "lab" || surface === "simulation" ? undefined : surface} contributionPolicy={contributionPolicy} nativeContributionScopeKey={surface === "contribution" ? selectedScope.key : undefined} recoveryScope={recoveryScope} initialView={initialView} hideCurrencyControl />{surface === "structure" && research ? <CurrencyResearchView evidence={research} surface="structure" recoveryScope={recoveryScope} initialView={initialView} hideCurrencyControl /> : null}</>
       : research ? <CurrencyResearchView key={`${research.input.version === 3 ? research.input.ownerId : "amount"}:${selectedScope.key}:${surface}:${reporting}`} evidence={research} surface={surface === "lab" || surface === "simulation" ? surface : undefined} recoveryScope={recoveryScope} initialView={initialView} hideCurrencyControl />
       : <main id="varda-main-content" className={styles.unavailable}><CairnPageTitle>{t("분석에 필요한 보유 정보가 부족해요.", "More holding evidence is needed.")}</CairnPageTitle><p>{t("보유 수량과 가격 이력을 확인한 뒤 이 화면에서 이어서 볼 수 있어요.", "Review verified quantities and price history, then return here.")}</p>{allowRecovery && <RecoveryNotice kind={currencyRecoveryKind(researchUnavailableReason ? [researchUnavailableReason] : []) ?? "holdings"} scope={selectedScope.key} />}</main>}
+  {(surface === "today" || surface === "structure") && <ActionGroup label={t("이어서 살펴보기", "Explore more")} className={styles.discovery}><Link href={`${surface === "today" ? "/history" : "/portfolio/risk"}?scope=${encodeURIComponent(selectedScope.key)}&currency=${reporting}`}><ActionContent title={surface === "today" ? t("지난 변동과 이어서 보기", "Explore changes over time") : t("함께 움직이는 종목 보기", "Explore how holdings move together")} /></Link></ActionGroup>}
   </div>;
 }

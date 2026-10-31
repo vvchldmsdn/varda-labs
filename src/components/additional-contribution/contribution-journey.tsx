@@ -1,5 +1,7 @@
 'use client';
-import Link from 'next/link';
+import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
+import { ActionGroup, ActionContent } from '@/components/cairn-ui';
+import { Bookmark, ArrowLeftRight, ReceiptText } from 'lucide-react';
 import { useI18n } from '@/components/i18n/locale-provider';
 import { contributionJourneyHref, contributionTargetsHref, type ContributionJourney } from '@/lib/contribution-journey';
 import styles from './contribution-journey.module.css';
@@ -17,9 +19,9 @@ export function ContributionJourneyNav({ journey, current, returnHref }: { journ
 /** Both frontends expose the same existing writers, without equating their different calculations. */
 export function ContributionNextSteps({ journey }: { journey: ContributionJourney }) {
   const { t } = useI18n();
-  return <nav className={styles.next} aria-label={t('투자 계획 이어가기', 'Continue your investment plan')}>
-    {!journey.preview && <Link prefetch={false} href={contributionJourneyHref('plan', journey)}><strong>{t('보유 기반 계획 계산·저장', 'Calculate & save a holdings plan')} <span aria-hidden="true">↗</span></strong><small>{t('매도·보유 현금 조건을 포함해 계산하고 당시 결과를 보관합니다.', 'Calculate with sale and available-cash conditions and keep the dated result.')}</small></Link>}
-    <Link prefetch={false} href={contributionJourneyHref('compare', journey)}><strong>{t('새 투자금 배분 비교·저장', 'Compare & save new-money allocations')} <span aria-hidden="true">↗</span></strong><small>{t('매도 없이 두 매수 배분안을 비교하고 실제 매수를 연결합니다.', 'Compare two buy-only allocations, then link your actual purchases.')}</small></Link>
-    <Link prefetch={false} href={contributionJourneyHref('tracking', journey)}><strong>{t('저장한 배분안·매수 연결', 'Saved allocations & linked buys')} <span aria-hidden="true">↗</span></strong><small>{t('저장 당시 조건을 유지하고 현재 시세로 다시 확인합니다.', 'Keep the original assumptions and review them at current prices.')}</small></Link>
-  </nav>;
+  return <ActionGroup label={t('투자 계획 이어가기', 'Continue your investment plan')}>
+    {!journey.preview && <Link prefetch={false} data-primary="true" href={contributionJourneyHref('plan', journey)}><ActionContent icon={<Bookmark />} title={t('이 조건으로 계획 만들기', 'Create a plan with these inputs')} description={t('매도·보유 현금 포함', 'Includes sales and available cash')} /></Link>}
+    <Link prefetch={false} href={contributionJourneyHref('compare', journey)}><ActionContent icon={<ArrowLeftRight />} title={t('두 배분안 비교하기', 'Compare two allocations')} description={t('새 투자금만 · 매도 없이', 'New money only · No sales')} /></Link>
+    <Link prefetch={false} href={contributionJourneyHref('tracking', journey)}><ActionContent icon={<ReceiptText />} title={t('저장한 배분안 보기', 'View saved allocations')} description={t('매수 기록 연결·효과 확인', 'Link buys and review results')} /></Link>
+  </ActionGroup>;
 }

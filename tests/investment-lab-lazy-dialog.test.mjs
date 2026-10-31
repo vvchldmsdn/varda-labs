@@ -62,8 +62,8 @@ test("Lab first steps preserve the selected scope and distinguish hypothetical e
     assert.match(html, /href="\/simulation\?scope=account%3A11111111-1111-4111-8111-111111111111"/);
     assert.equal((html.match(/<button/g) ?? []).length, 2);
     assert.doesNotMatch(html, /<table|<svg[^>]+data-past-return/);
-    assert.match(html, locale === "ko" ? /내 과거 수익이나 실제 매매 기록이 되지 않아요/ : /not your past returns or actual trades/);
-    assert.match(html, locale === "ko" ? /확인된 가격·평가액 범위/ : /verified price and valuation evidence/);
+    assert.match(html, locale === "ko" ? /내 과거 수익률 아님/ : /Not your historical return/);
+    assert.match(html, locale === "ko" ? /확인된 시장 자료/ : /verified market history/);
     if (locale === "en") assert.doesNotMatch(html, /[가-힣]/);
   }
 });

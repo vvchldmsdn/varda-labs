@@ -1,1 +1,13 @@
-.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.actions>button{border:1px solid var(--line);background:transparent;color:var(--ink);padding:8px 13px;min-height:44px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer}.actions>button:disabled{opacity:.35;cursor:not-allowed}.actions>span{font-size:12px;color:var(--muted)}.dialog{padding:0;width:min(600px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 64px);border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink);margin:auto;overflow:auto;overscroll-behavior:contain}.dialog::backdrop{background:rgb(0 0 0/.36)}.shell{padding:24px}.shell>header{display:flex;justify-content:space-between;align-items:center;gap:16px}.shell h2{font-size:21px;letter-spacing:-.025em;font-weight:550;margin:0;overflow-wrap:anywhere}.shell>header>button{flex:none;display:grid;place-items:center;width:44px;height:44px;border:0;background:transparent;color:var(--ink);cursor:pointer}.actions button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}@media(max-width:600px){.dialog{margin:auto auto 20px;max-height:calc(100dvh - 76px)}.shell{padding:18px}.shell h2{font-size:19px}}@media(prefers-reduced-motion:reduce){.dialog{animation:none;transition:none}}
+.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.actions>span{font-size:13px;color:var(--muted)}
+.dialog{padding:0;width:min(620px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 48px);border:1px solid var(--line);border-radius:28px;background:var(--paper);color:var(--ink);margin:auto;overflow:auto;overscroll-behavior:contain;scroll-padding-block:24px 88px}
+.dialog::backdrop{background:rgb(24 28 23/.38);backdrop-filter:blur(6px)}
+.dialog[open]{animation:trade-enter 200ms cubic-bezier(.2,.8,.2,1)}
+.shell{padding:28px 32px 16px}.shell>header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
+.shell>header>div{min-width:0}.shell h2{font-size:clamp(24px,3vw,30px);letter-spacing:-.04em;font-weight:500;margin:4px 0;overflow-wrap:anywhere;line-height:1.35}
+.shell>header>button{flex:0 0 44px;min-width:44px;min-height:44px}
+.actions button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@keyframes trade-enter{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){.dialog{width:calc(100vw - 16px);margin:auto auto 8px;max-height:calc(100dvh - 24px);border-radius:24px}.shell{padding:24px 20px 12px}.shell h2{font-size:25px}}
+@media(max-width:359px){.shell{padding-inline:16px}.shell h2{font-size:23px}}
+@media(prefers-reduced-motion:reduce){.dialog[open]{animation:none;transition:none}}

@@ -27,6 +27,7 @@ export function InvestmentLabDesignPreview({
   return (
     <main
       className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]"
+      data-page="investment-lab"
       data-lab-design-preview
     >
       <PortfolioPrimaryNavigation

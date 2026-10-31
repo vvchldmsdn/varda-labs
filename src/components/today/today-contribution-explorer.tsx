@@ -6,6 +6,8 @@ import { useI18n } from "@/components/i18n/locale-provider";
 
 import Link from "next/link";
 import { useId, useState, type CSSProperties } from "react";
+import guided from "./today-layout.module.css";
+import { Button as CairnButton, ActionGroup, ActionContent } from "@/components/cairn-ui";
 import styles from "@/components/home/portfolio-overview.module.css";
 import interaction from "./today-interaction.module.css";
 
@@ -14,7 +16,7 @@ import {
   formatSignedKrw,
   toneClass,
 } from "@/components/home/portfolio-format";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
 export type TodayContributionDisplayRow = Readonly<{
@@ -60,11 +62,11 @@ export function TodayContributionExplorer({
   }
 
   return (
-    <div className={`${styles.explorer} ${interaction.explorer}`}>
+    <div className={`${guided.explorer} ${interaction.explorer}`}>
       <div className={styles.contributionRows}>
         <div className={styles.axisLabels} aria-hidden="true"><span><T ko="감소" en="Decrease"/></span><span><T ko="증가" en="Increase"/></span></div>
         <div
-          className={styles.contributionScroll}
+          className={guided.rows}
           tabIndex={0}
           aria-label={t("종목별 변동 기여 목록", "Value change contributions by holding")}
           onKeyDown={(event) => {
@@ -90,7 +92,7 @@ export function TodayContributionExplorer({
               <div key={row.key}>
               <Link
                 aria-current={row.selected ? "true" : undefined}
-                className={`${styles.contributionRow} ${interaction.desktopRow}`}
+                className={`${guided.row} ${interaction.desktopRow}`}
                 data-holding-detail-trigger="row"
                 data-active={activeRow?.key === row.key}
                 style={{ "--row-delay": `${Math.min(rowIndex * 35, 280)}ms` } as CSSProperties}
@@ -103,9 +105,9 @@ export function TodayContributionExplorer({
               >
                 <ContributionRowContent row={row} maximum={maxMagnitude} active={activeRow?.key === row.key} />
               </Link>
-              <CairnButton variant="selection"
+              <CairnButton variant="bare"
                 type="button"
-                className={`${styles.contributionRow} ${interaction.mobileRow}`}
+                className={`${guided.row} ${interaction.mobileRow}`}
                 data-today-select-holding={row.key}
                 data-active={mobileSelectedRow?.key === row.key}
                 aria-pressed={mobileSelectedRow?.key === row.key}
@@ -121,8 +123,8 @@ export function TodayContributionExplorer({
         </div>
       </div>
 
-      <aside className={`${styles.activeContribution} ${interaction.desktopSummary}`} aria-live="polite">
-        <p className={styles.eyebrow}>CONTRIBUTION DETAIL</p>
+      <aside className={`${guided.selected} ${interaction.desktopSummary}`} aria-live="polite">
+        <p className={styles.eyebrow}><T ko="선택한 종목" en="Selected holding"/></p>
         <CairnSectionTitle level="h3" key={`name:${activeRow?.key}`} className={styles.activeValue}>
           {activeRow?.name ?? "-"}
         </CairnSectionTitle>
@@ -139,7 +141,7 @@ export function TodayContributionExplorer({
           <AttributionRow label={t("순매매", "Net trades")} value={activeRow?.tradeFlowKrw ?? null} />
         </dl>
 
-        {activeRow ? <Link href={activeRow.href} scroll={false} className={styles.textLink} data-holding-detail-trigger="summary"><T ko="종목 상세 보기 →" en="View holding details →"/></Link> : null}
+        {activeRow ? <ActionGroup label={t("선택 종목 살펴보기", "Explore selected holding")}><Link href={activeRow.href} scroll={false} data-holding-detail-trigger="summary"><ActionContent title={<T ko="종목 상세 보기" en="View holding details"/>}/></Link></ActionGroup> : null}
       </aside>
       {mobileSelectedRow ? (
         <Link
@@ -147,15 +149,15 @@ export function TodayContributionExplorer({
           href={mobileSelectedRow.href}
           prefetch={false}
           scroll={false}
-          className={interaction.mobileSummary}
+          className={guided.mobileSummary}
           data-holding-detail-trigger="summary"
           aria-label={t(`${mobileSelectedRow.name} 상세 보기`, `View ${mobileSelectedRow.name} details`)}
         >
-          <span className={interaction.summaryHeading} aria-live="polite" aria-atomic="true">
-            <span className={interaction.summaryIdentity}><small><T ko="선택한 종목" en="Selected holding"/></small><strong>{mobileSelectedRow.name}</strong></span>
-            <span className={interaction.summaryMovement}><strong className={toneClass(mobileSelectedRow.changeKrw)}><T ko={formatSignedKrw(mobileSelectedRow.changeKrw)} en={translateHomeHistory(formatSignedKrw(mobileSelectedRow.changeKrw))}/></strong><small>{formatPercent(mobileSelectedRow.returnPct, true)}</small></span>
+          <span className={guided.summaryHeading} aria-live="polite" aria-atomic="true">
+            <span className={guided.summaryIdentity}><small><T ko="선택한 종목" en="Selected holding"/></small><strong>{mobileSelectedRow.name}</strong></span>
+            <span className={guided.summaryMovement}><strong className={toneClass(mobileSelectedRow.changeKrw)}><T ko={formatSignedKrw(mobileSelectedRow.changeKrw)} en={translateHomeHistory(formatSignedKrw(mobileSelectedRow.changeKrw))}/></strong><small>{formatPercent(mobileSelectedRow.returnPct, true)}</small></span>
           </span>
-          <span className={interaction.summaryAction}><span><T ko="요약을 눌러 상세 보기" en="Tap summary for details"/></span><span aria-hidden="true">↗</span></span>
+          <span className={guided.summaryAction}><span><T ko="상세 보기" en="View details"/></span><span aria-hidden="true">↗</span></span>
         </Link>
       ) : null}
     </div>
@@ -165,7 +167,7 @@ export function TodayContributionExplorer({
 function ContributionRowContent({ row, maximum, active }: { row: TodayContributionDisplayRow; maximum: number; active: boolean }) {
   return <>
     <span className="min-w-0">
-      <span className="block truncate text-sm font-medium text-[var(--ink)]" title={row.name}>{row.name}</span>
+      <span className="block text-sm font-medium text-[var(--ink)]" title={row.name}>{row.name}</span>
       <span className="mt-0.5 block truncate text-xs text-[var(--muted)]">{row.accountLabel}{row.ticker ? ` · ${row.ticker}` : ""}</span>
     </span>
     <DotContributionBar value={row.changeKrw} maximum={maximum} active={active} />

@@ -86,10 +86,11 @@
 .explorer :global(.varda-history-chart) { flex:1; height:auto; min-height:180px; }
 .chartFoot { flex:none; padding-top:4px; }
 .chartKeyboard { flex:none; height:14px; margin:0; }
-.stageFooter { display:flex; align-items:center; justify-content:space-between; gap:16px; flex:none; min-height:48px; margin-top:12px; border-top:1px solid var(--line); }
+.historyActions { width:100%; }
+.stageFooter { display:flex;flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; flex:none; min-height:48px; margin-top:12px; border-top:1px solid var(--line); }
 .stageFooter > p { font-size:10px; color:var(--muted); }
 .stageFooter > div { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
-.stageFooter :global(.varda-presentation-detail-trigger) { border:0; background:transparent; padding:8px 0; min-height:38px; font-size:12px; }
+.stageFooter > :global(.varda-presentation-detail-trigger) { border:0; background:transparent; padding:8px 0; min-height:38px; font-size:12px; }
 @media (max-width:700px) {
   .page { gap:12px; }
   .header { align-items:start; flex-direction:column; gap:8px; min-height:0; }
@@ -106,7 +107,7 @@
   .modeControls button { min-width:62px; min-height:34px; padding:6px 10px; font-size:12px; }
   .periodControls { gap:15px; }
   .periodControls > button { min-height:34px; font-size:11px; }
-  .railNote { display:none; }
+  .railNote { font-size:12px;max-width:none; }
   .plot { flex:1; min-height:0; }
   .chartTitle { padding:0 0 6px; }
   .chartTitle h2,.chartTitle p { font-size:10px; }
@@ -114,7 +115,7 @@
   .stageFooter { margin-top:8px; padding-top:4px; min-height:40px; }
   .stageFooter > p { display:none; }
   .stageFooter > div { width:100%; justify-content:space-between; gap:10px; }
-  .stageFooter :global(.varda-presentation-detail-trigger) { font-size:11px; }
+  .stageFooter > :global(.varda-presentation-detail-trigger) { font-size:11px; }
 }
 @media (max-height:640px) {
   .page { height:auto; min-height:100%; }
@@ -151,7 +152,7 @@
   .chartKeyboard { opacity:1; height:44px; margin-top:4px; cursor:pointer; }
   .stageFooter { margin-top:20px; padding-top:16px; }
   .stageFooter > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:8px; }
-  .stageFooter :global(.varda-presentation-detail-trigger) { min-height:48px; font-size:12px; }
+  .stageFooter > :global(.varda-presentation-detail-trigger) { min-height:48px; font-size:12px; }
   .overview { grid-template-columns:1fr; gap:0; padding:0; }
   .overview > div { padding:16px 0; border-bottom:1px solid var(--line); }
   .label { min-height:0; font-size:12px; }

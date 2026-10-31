@@ -1,5 +1,19 @@
 # Presentation composition redesign
 
+## 2026-10-31: 현재 적용할 구성 원칙
+
+아래 September 8 기록의 **모든 핵심 화면을 한 viewport 안에 넣는 조건**은 현재 사용자의 요청으로 대체한다. 핵심 결과와 다음 행동을 먼저 보여주되, 글자와 버튼을 줄여 억지로 맞추지 않는다. 자연스러운 문서 스크롤을 허용한다. 과거 검증 결과는 당시 기록이다.
+
+- 첫 화면은 사용자의 질문 하나에 답한다. 홈은 현재 평가·변동과 추가 투자 진입, 히스토리는 선택 날짜의 값과 차트, 추가 투자는 입력과 배분 결과가 우선이다.
+- 관련 기능은 짧은 목적형 제목과 선택적인 한 줄 설명으로 연결한다. 공용 `ActionGroup`/`ActionContent`를 사용하고 링크는 이동, 버튼은 현재 화면의 동작으로 구분한다. 모든 화면에 일반적인 ‘다음’ 카드를 붙이지 않는다.
+- 추가 투자 계산 이후 계획 작성, 새 투자금 비교, 저장 배분안 조회는 서로 다른 목적이다. 매도·보유 현금 포함 여부를 짧게 표시하며 계산 결과가 실제 주문이나 저장으로 오해되지 않게 한다.
+- 긴 근거는 펼쳐보기로 옮긴다. 현재/저장, 실제/가상, 통화, 기준일, 부분 합계와 부족한 근거 등 결과를 해석하는 데 필요한 구분은 유지한다.
+- 모바일은 하단 주요 탭과 충분한 터치 영역을 사용한다. 화면에 보이는 순서와 키보드·스크린리더 순서를 맞추고, 상세 화면을 닫으면 이전 선택과 초점을 유지한다.
+- 모션은 열기·닫기와 선택 변화, 눌림 피드백에 쓴다. 반복적으로 주의를 빼앗는 효과를 추가하지 않는다. 시스템 및 앱의 효과 감소 설정을 따른다.
+- 이번 구현 범위는 홈·추가 투자·히스토리와 베타 공통 탐색이다. 다른 탭·폼까지 검증 완료했다는 뜻은 아니다. 후속 범위는 같은 기준으로 개별 검증한다.
+
+## 이전 구성 기록
+
 The September 8 request supersedes the scrolling page composition of the previous redesign. Keep the existing paper/ink/orange language and direct chart motion. Change the information architecture itself: one route is one composed scene, with a dominant visual, a small set of related facts, and explicit detail entry points.
 
 ## Research and decisions

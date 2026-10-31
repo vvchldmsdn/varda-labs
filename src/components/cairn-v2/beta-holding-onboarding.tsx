@@ -1,5 +1,6 @@
 'use client';
-import { Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
+import { Wallet } from 'lucide-react';
 
 import { DetailHeader } from './ui/molecules';
 
@@ -55,24 +56,20 @@ export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:Holdi
  const cancelHref=ownedManagementHref('holdings',context,store?.pendingEpoch());
  return <BetaShell context={context} setContext={navigate} readView={shell} workspace="holdings" originalPath="/portfolio/holdings/new">
   <section className={styles.workspace} id="holding-onboarding" data-holding-onboarding-read-state={state} aria-busy={blocked}>
-   <DetailHeader title="보유종목 추가" headingProps={{ref:heading,tabIndex:-1}} />
-   <CairnStatus as="p" role="status">{message}</CairnStatus>
-   <p className={styles.muted}>계좌를 선택하면 해당 계좌에서 가능한 등록 방법을 안내합니다.</p>
-   <p className={styles.muted}>{collectionEnabled?'등록 요청에 필요한 가격·환율 수집이 활성화되어 있습니다. 수집 결과를 기다려야 할 수 있습니다.':'자동 수집이 꺼져 있습니다. 저장 가격을 확인할 수 없으면 등록이 보류됩니다.'}</p>
+   <DetailHeader title="보유종목 추가" headingProps={{ref:heading,tabIndex:-1}} actions={<Link prefetch={false} href={cancelHref}>보유 목록 ↗</Link>} />
+   {(blocked||!readable)&&<CairnStatus as="p" role="status">{message}</CairnStatus>}
    {!available&&<p>이 실행 환경에서는 등록 요청을 보낼 수 없습니다.</p>}
    {!blocked&&state==='unavailable'&&<CairnButton variant="secondary" className={styles.retry} type="button" onClick={retry}>등록 자료 다시 조회</CairnButton>}
    {!blocked&&state==='unauthorized'&&<Link prefetch={false} href={onboardingHref({...context,scope:'all'},store?.pendingEpoch())}>전체 범위에서 접근 다시 확인 ↗</Link>}
-   <Link prefetch={false} href={cancelHref}>보유 목록으로 돌아가기 ↗</Link>
    <div className={styles.reused} hidden={!readable} aria-hidden={!readable} inert={!enabled} onSubmitCapture={preventBlocked} key={generation}>
-    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={action} initialAccountId={initialAccountId} nativeAccountIds={read.nativeAccountIds} persistAccountContext={false}/>:<p>먼저 보유 계좌가 필요합니다. <Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}>계좌 관리 열기 ↗</Link></p>)}
+    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={action} initialAccountId={initialAccountId} nativeAccountIds={read.nativeAccountIds} persistAccountContext={false}/>:<ActionGroup label="계좌 등록"><Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}><ActionContent icon={<Wallet size={22}/>} title="먼저 계좌를 만들어 주세요" description="내 종목을 담을 계좌 등록" /></Link></ActionGroup>)}
    </div>
-   <details className={styles.evidence}><summary>등록 기준과 지원 범위</summary>
-    <p>상단 범위는 접근·이동 문맥이며, 저장할 계좌는 폼에서 선택합니다. 본인의 활성 계좌·분석 범위를 저장 요청마다 다시 확인합니다. URL과 읽기 세대는 권한 증거가 아닙니다.</p>
-    {read.allowUnknownAverageCost&&<p>기존 분석 범위와 새 그룹 이름을 모두 비우면 원문 정책에 따라 기본 포트폴리오 그룹을 생성하거나 재사용합니다.</p>}
-    <p>표시 통화와 별개로 입력한 종목의 원통화가 저장됩니다. 증권사 표시 수익률은 검산용 근거이며 원가나 손익을 대신하지 않습니다.</p>
-    <p>{collectionEnabled?'등록 요청의 기존 정책에 따라 필요한 가격·환율 수집을 예약합니다. 자료가 준비되지 않았다면 저장 성공으로 표시하지 않습니다.':'이 환경에서는 수집을 예약하지 않습니다. 가격 근거가 없으면 안내를 확인한 뒤 현재 1좌 가격을 직접 입력하거나 다시 요청해 주세요.'} 화면 열람·조건 편집만으로는 수집하지 않습니다.</p>
-    <p>native 원장 계좌는 기존 등록 정책의 제한을 따릅니다. 거래 내역은 매수·매도 기록 화면에서 등록해 주세요.</p>
-    <p>자료를 읽은 시각 {readable?(read.readAt??'확인 전'):'확인 중'} · 저장 결과는 요청 후 상태에서 확인합니다.</p>
+   <details className={styles.evidence}><summary>등록 안내</summary>
+    <p>폼에서 선택한 계좌에 보유 기록을 추가합니다. 매수·매도는 거래 기록에서 입력해 주세요.</p>
+    {read.allowUnknownAverageCost&&<p>매입가는 나중에 추가할 수 있어요. 그룹을 선택하지 않으면 기본 그룹을 사용합니다.</p>}
+    <p>{collectionEnabled?'가격 확인에 시간이 걸릴 수 있어요. 준비되지 않은 종목은 확인 후 다시 저장해 주세요.':'자동 가격 수집이 꺼져 있어요. 저장할 가격이 없으면 현재가를 직접 입력해 주세요.'}</p>
+    <p>종목의 원통화로 저장합니다. 증권사 표시 수익률은 원가를 대신하지 않습니다.</p>
+    <p>확인 시각 {readable?(read.readAt??'확인 전'):'확인 중'}</p>
    </details>
   </section>
  </BetaShell>;

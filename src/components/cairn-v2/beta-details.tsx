@@ -1,5 +1,9 @@
 "use client";
 import Link from "next/link";
+import { ActionGroup, ActionContent } from "@/components/cairn-ui";
+import { Target } from "lucide-react";
+import { layoutPortfolioTreemap } from "@/lib/portfolio-structure-treemap";
+import structureLayout from "./structure-detail.module.css";
 import { HoldingHeatmap } from "./holding-heatmap";
 import { useLayoutEffect, useRef } from "react";
 import { ContributionDetail, TargetDetail, driftNumber, targetMessage } from "./planning-details";
@@ -40,6 +44,10 @@ function StructureDetail({
       </p>
     );
   const active = view.rows.find((r) => r.key === selected) ?? view.rows[0];
+  const mapRows = new Map(view.rows.map(row => [row.key, row]));
+  const mapRects = structureView === "map"
+    ? layoutPortfolioTreemap(view.rows.map(row => ({ key: row.key, value: row.weightPct })), 100, 100)
+    : [];
   const target =
     view.domain?.planning?.targets.state === "ready"
       ? view.domain.planning.targets.rows.find((row) => row.key === active?.key)
@@ -65,19 +73,19 @@ function StructureDetail({
           </button>
         </div>
       </div>
-      {view.domain && (
+      {view.domain && view.domain.excluded.length > 0 && (
         <p className={styles.muted}>
           확인 가능한 소계 {displayMoney(view.domain.knownSubtotalKrw, context.currency)}{" "}
           {context.currency} · 소계 내 비중 · 제외 {view.domain.excluded.length}종목
         </p>
       )}
-      {view.domain?.excluded.map((r, i) => (
+      {!!view.domain?.excluded.length && <details className={structureLayout.exclusions}><summary>제외 종목 확인</summary>{view.domain.excluded.map((r, i) => (
         <p key={i} className={styles.muted}>
           제외: {r.name} · {r.currency} · {r.reason}
         </p>
-      ))}
-      <div className={styles.structureDetail}>
-        <aside className={styles.structureSummary}>
+      ))}</details>}
+      <div className={structureLayout.layout}>
+        <aside className={structureLayout.summary}>
           <p className={styles.muted}>
             {view.domain?.excluded.length
               ? "전체 합계 확인 전"
@@ -85,7 +93,7 @@ function StructureDetail({
                 ? "전체 투자자산 평가액"
                 : "전체 자산 평가액"}
           </p>
-          <p className={styles.structureTotal}>
+          <p className={structureLayout.total}>
             {displayMoney(view.rows.length ? view.totalKrw : null, context.currency)}{" "}
             {context.currency === "KRW" ? "원" : "USD"}
           </p>
@@ -94,7 +102,7 @@ function StructureDetail({
           <p className={styles.muted}>목표비중</p>
           <p>{view.domain ? targetMessage(view) : view.rows.length ? "가상 설정됨" : "없음"}</p>
         </aside>
-        <div className={styles.detailRing}>
+        <div className={structureLayout.visual}>
           {structureView === "ring" ? (
             <PortfolioAllocationRing
               compositionOnly={!!view.domain}
@@ -109,28 +117,31 @@ function StructureDetail({
             />
           ) : (
             <div
-              className={styles.weightMap}
+              className={structureLayout.map}
               role="group"
-              aria-label="비중 지도 · 동일 높이에서 너비가 비중에 비례"
+              aria-label="비중 지도 · 면적이 비중에 비례"
             >
-              {view.rows.map((r) => (
+              {mapRects.map(rect => {
+                const r = mapRows.get(rect.key)!;
+                return (
                 <button
                   key={r.key}
-                  style={{ flexGrow: r.weightPct, background: r.color }}
+                  style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%`, background: `color-mix(in srgb, ${r.color} 18%, var(--cairn-ui-paper))` }}
                   type="button"
+                  aria-label={`${r.name} ${r.weightPct.toFixed(2)}%`}
                   aria-pressed={r.key === active?.key}
                   onClick={() => setSelected(r.key)}
                   title={`${r.ticker ?? r.name} ${r.weightPct.toFixed(2)}%`}
                 >
-                  <span>{r.ticker ?? r.name}</span>
-                  <small>{r.weightPct.toFixed(2)}%</small>
+                  {rect.width >= 15 && rect.height >= 15 && <span>{r.ticker ?? r.name}</span>}
+                  {rect.width >= 12 && rect.height >= 12 && <small>{r.weightPct.toFixed(2)}%</small>}
                 </button>
-              ))}
+              );})}
             </div>
           )}
         </div>
         <aside
-          className={`${styles.holdingDetail} ${evidence.surface} ${evidence.holdingEvidence}`}
+          className={`${structureLayout.selected} ${evidence.surface} ${evidence.holdingEvidence}`}
         >
           <CairnSelect
             label="상세 종목 선택"
@@ -185,7 +196,7 @@ function StructureDetail({
               {view.domain && (
                 <p className={evidence.holdingNote}>
                   {target
-                    ? "승인된 목표비중과 현재 보유 비중을 비교한 읽기 전용 근거입니다."
+                    ? "저장한 목표비중 기준"
                     : targetMessage(view)}
                 </p>
               )}
@@ -210,8 +221,7 @@ function StructureDetail({
         </aside>
       </div>
       {view.domain && (
-        <Link
-          className={styles.continueLink}
+        <ActionGroup label="목표비중 더 살펴보기"><Link
           prefetch={false}
           href={betaReadHref(
             betaHref("/beta", context) + "#beta-target-drift",
@@ -226,8 +236,8 @@ function StructureDetail({
               : undefined
           }
         >
-          전체 목표 편차 · 홈에서 확인 ↗
-        </Link>
+          <ActionContent icon={<Target size={22}/>} title="목표와 얼마나 달라졌을까요?" description="종목별 목표 편차 보기"/>
+        </Link></ActionGroup>
       )}
     </>
   );

@@ -44,7 +44,7 @@
 .heatmapTable th[data-highlight="true"] { color: var(--brand); }
 .instrumentName { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; white-space:normal; word-break:keep-all; overflow-wrap:anywhere; line-height:1.4; }
 .correlationCell { padding: 0; height: clamp(35px,4.1vw,58px); }
-.correlationCell button { display: block; width: 100%; height: 100%; min-height: 35px; border-radius: 6px; color: var(--ink); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; border: 1px solid transparent; transition: transform 140ms, box-shadow 140ms, opacity 140ms; animation: cell-enter 280ms ease-out backwards; animation-delay: var(--cell-delay); }
+.correlationCell button { display: block; width: 100%; height: 100%; min-height: 44px; border-radius: 6px; color: var(--ink); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; border: 1px solid transparent; transition: transform 140ms, box-shadow 140ms, opacity 140ms; animation: cell-enter 280ms ease-out backwards; animation-delay: var(--cell-delay); }
 .correlationCell button[data-diagonal="true"] { color: var(--faint); }
 .correlationCell button[aria-pressed="true"] { position: relative; z-index: 2; transform: scale(1.06); box-shadow: 0 4px 10px rgb(32 33 31 / .13); border-color: var(--ink); }
 .correlationCell button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

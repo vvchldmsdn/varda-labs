@@ -1,4 +1,10 @@
 /* A viewport is a composed scene. Long evidence belongs in an explicit detail view. */
+/* Task-first pages may scroll; navigation and primary actions keep their natural size. */
+.varda-page.varda-stage-page[data-page="home"]:has(.varda-app-navigation),
+.varda-page.varda-stage-page[data-page="additional-contribution"]:has(.varda-app-navigation),
+.varda-page.varda-stage-page[data-page="history"]:has(.varda-app-navigation),
+.varda-page.varda-stage-page:is([data-page="today"],[data-page="portfolio-structure"],[data-page="portfolio-risk"],[data-page="investment-lab"],[data-page="simulation"],[data-page="simulation-input-readiness"],[data-surface="manage"]):has(.varda-app-navigation) { height:auto; min-height:100dvh; }
+.varda-stage-page:is([data-page="home"],[data-page="additional-contribution"],[data-page="history"],[data-page="today"],[data-page="portfolio-structure"],[data-page="portfolio-risk"],[data-page="investment-lab"],[data-page="simulation"],[data-page="simulation-input-readiness"],[data-surface="manage"]) .varda-stage-content { height:auto; min-height:calc(100dvh - var(--stage-top) - var(--stage-bottom)); padding-bottom:calc(24px + var(--stage-bottom)); }
 .varda-page.varda-stage-page:has(.varda-app-navigation) {
   --stage-top: 64px;
   --stage-bottom: 0px;

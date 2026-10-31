@@ -43,6 +43,7 @@ it("renders the existing risk evidence as one section without a second portfolio
   let index = 0;
   const [view] = await importUiWithPorts(["src/components/currency-research-view.tsx"], {
     "@/components/recovery/recovery-notice": { RecoveryNotice: () => null },
+    "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
     "next/navigation": { useRouter: () => ({ replace() {}, refresh() {} }) },
     react: { ...React, useState: () => [states[index++], () => {}], useMemo: fn => fn(), useEffect: () => {}, useRef: () => ({ current: null }) },
     "@/components/i18n/locale-provider": { useI18n: () => ({ locale: "en", t: (ko, en) => en ?? ko }) },

@@ -1,0 +1,20 @@
+.panel { border-block: 1px solid var(--line); margin: 24px 0; min-width: 0; }
+.panel > summary { display: flex; align-items: center; gap: 12px; padding: 20px 2px; min-height: 64px; font-size: 16px; font-weight: 550; cursor: pointer; list-style: none; }
+.panel > summary::-webkit-details-marker { display: none; }
+.panel > summary::after { content: '+'; margin-left: auto; font-size: 24px; font-weight: 400; }
+.panel[open] > summary::after { content: '−'; }
+.panel > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.content { display: grid; gap: 18px; padding: 0 0 24px; min-width: 0; }
+.note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.content .tableInput { width: 100%; min-height: 156px; padding: 16px; background: var(--surface); border-radius: 14px; font-size: 16px; line-height: 1.6; }
+.content button { min-height: 48px; }
+.file { display: grid; gap: 10px; font-size: 14px; min-width: 0; }
+.file input { width: 100%; min-width: 0; min-height: 52px; font-size: 14px; }
+.reviewHeading { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 16px; }
+.reviewHeading span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.rows button { min-width: 0; justify-content: flex-start; gap: 10px; border-radius: 14px; padding: 14px 16px; }
+.rows button > span { min-width: 0; overflow-wrap: anywhere; text-align: left; }
+.rows small { margin-left: auto; font-size: 14px; font-variant-numeric: tabular-nums; }
+.current { margin: 0; font-size: 15px; }
+@media (max-width: 600px) { .rows { grid-template-columns: minmax(0, 1fr); } }

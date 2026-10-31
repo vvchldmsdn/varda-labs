@@ -1,6 +1,7 @@
 'use client';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowRight, ChartNoAxesCombined, History, ListChecks, RefreshCw, SlidersHorizontal, Wallet } from 'lucide-react';
 import { Button, InfoDisclosure } from '@/components/cairn-ui';
 import { useI18n } from '@/components/i18n/locale-provider';
 import { recoveryDestination, recoveryHref, recoveryKind, recoveryReturnHref, type RecoveryKind } from '@/lib/recovery-navigation';
@@ -14,12 +15,14 @@ const copy = {
   market: ['가격·환율 자료가 더 필요해요', '필요한 시점의 시세나 연속 이력이 부족합니다. 보유종목의 분석 데이터 준비 상태를 확인해 주세요. 지원되는 종목은 그 화면에서 자료 준비를 요청할 수 있어요.', '분석 데이터 준비 확인', 'More market data is needed', 'Prices, exchange rates or continuous history are missing. Review analysis data readiness for your holdings and request preparation where supported.', 'Review data readiness'],
   retry: ['자료를 다시 확인해 주세요', '조회가 완료되지 않았거나 계산 기준이 바뀌었습니다. 입력한 조건을 유지하고 다시 불러올 수 있어요.', '다시 불러오기', 'Reload the latest data', 'The read failed or its basis changed. Reload while keeping your inputs.', 'Try again'],
 } as const;
+const icons = { history: History, targets: SlidersHorizontal, holdings: Wallet, trades: ListChecks, market: ChartNoAxesCombined, retry: RefreshCw };
 export function RecoveryNotice({ reasons = [], kind, scope, beta = false, returnHref, draft, readForm, onRetry, details, allowResolve = true }: {
   reasons?: readonly string[]; kind?: RecoveryKind; scope?: string; beta?: boolean; returnHref?: string;
   draft?: Record<string, string | string[]>; readForm?: {id: string; fields: readonly string[]}; onRetry?: () => void; details?: string; allowResolve?: boolean;
 }) {
   const router = useRouter(), { t } = useI18n(), [pending, start] = useTransition();
   const selected = kind ?? recoveryKind(reasons), c = copy[selected];
+  const Icon = icons[selected];
   function source() {
     const url = new URL(returnHref ?? recoveryReturnHref(location.hash) ?? location.pathname + location.search + location.hash, location.origin);
     for (const [key, value] of Object.entries(draft ?? {})) { url.searchParams.delete(key); for (const item of Array.isArray(value) ? value : [value]) url.searchParams.append(key, item); }
@@ -37,13 +40,12 @@ export function RecoveryNotice({ reasons = [], kind, scope, beta = false, return
     if (href) start(() => router.push(href));
   }
   return <section className={styles.notice} aria-label={t('해결 방법', 'Next steps')} data-recovery-kind={selected} aria-busy={pending}>
-    <h3>{t(c[0], c[3])}</h3>
+    <div className={styles.heading}><span className={styles.icon} aria-hidden="true"><Icon size={24} /></span><h3>{t(c[0], c[3])}</h3></div>
     <div className={styles.actions}>
-      {(selected === 'retry' || allowResolve) && <Button type="button" variant="primary" disabled={pending} onClick={selected === 'retry' ? retry : resolve}>{pending ? t('확인 중…', 'Loading…') : t(c[2], c[5])}</Button>}
-      {selected !== 'retry' && <Button type="button" variant="secondary" disabled={pending} onClick={retry}>{t('다시 조회', 'Reload')}</Button>}
+      {(selected === 'retry' || allowResolve) && <Button type="button" variant="primary" disabled={pending} onClick={selected === 'retry' ? retry : resolve}>{pending ? t('확인 중…', 'Loading…') : t(c[2], c[5])}<ArrowRight size={18} aria-hidden="true" /></Button>}
+      {selected !== 'retry' && <Button type="button" variant="ghost" disabled={pending} onClick={retry}><RefreshCw size={16} aria-hidden="true" />{t('다시 조회', 'Reload')}</Button>}
     </div>
     {selected !== 'retry' && allowResolve && <small>{t('현재 입력을 유지한 채 돌아올 수 있어요.', 'Return with your current inputs preserved.')}</small>}
-    <InfoDisclosure summary={t('도움말', 'Help')}><p>{t(c[1], c[4])}</p></InfoDisclosure>
-    {(details || reasons.length > 0) && <details><summary>{t('상세 확인 사유', 'Technical details')}</summary><p>{details ?? reasons.join(' · ')}</p></details>}
+    <InfoDisclosure summary={t('확인이 필요한 이유', 'Why this needs attention')}><p>{t(c[1], c[4])}</p>{(details || reasons.length > 0) && <p className={styles.reason}>{details ?? reasons.join(' · ')}</p>}</InfoDisclosure>
   </section>;
 }

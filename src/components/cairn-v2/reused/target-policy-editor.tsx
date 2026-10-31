@@ -23,7 +23,7 @@ export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approval
  const total=parsed.some(v=>v===null)?null:parsed.reduce<number>((sum,v)=>sum+v!,0),valid=total===10000;
  const dirty=weights.some((v,i)=>v!==initial[i])||candidates.length>0||removed.length>0;
  const invalidCount=parsed.filter(value=>value===null).length,firstInvalid=parsed.findIndex(value=>value===null);
- const feedback=editedSinceSubmit?(dirty?'편집 중 · 아직 승인하지 않은 입력입니다.':'편집 시작값으로 되돌렸습니다.'):state.message??(dirty?'편집 중 · 아직 승인하지 않은 입력입니다.':'현재 승인본 또는 편집 시작값입니다.');
+ const feedback=editedSinceSubmit?(dirty?'저장 전':'입력을 되돌렸어요.'):state.message??(dirty?'저장 전':'');
  const edited=()=>{setEditedSinceSubmit(true);setSelectionNotice('')};
  const select=(instrument:OnboardingInstrument)=>{
   const account=accounts.find(a=>a.id===accountId);if(!account)return;
@@ -38,12 +38,12 @@ export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approval
   <section className={styles.total} aria-label="목표 합계와 승인 상태" data-target-summary>
    <div className={styles.totalValue}><span>목표 합계</span><strong data-valid={valid}>{total===null?'입력 확인':targetInputPercent(total)+'%'}</strong></div>
    <div className={styles.totalStatus}>
-    <p className={styles.rule}>{valid?'합계 조건 충족 · 100%':'합계는 정확히 100%여야 합니다'}</p>
+    <p className={styles.rule}>{valid?'100%로 맞춰졌어요':'합계를 100%로 맞춰 주세요'}</p>
     {invalidCount>0&&<CairnButton variant="secondary" className={styles.errorLink} type="button" disabled={pending} aria-label={'입력 오류 '+invalidCount+'개 · '+all[firstInvalid].assetName+' 입력으로 이동'} onClick={event=>{const input=event.currentTarget.form?.elements.namedItem('targetWeight:'+firstInvalid) as HTMLInputElement|null;input?.focus();}}>입력 확인 {invalidCount}종목 ↗</CairnButton>}
-    <CairnStatus as="p" className={styles.feedback} role="status" aria-live="polite" data-target-action-state={pending?'pending':editedSinceSubmit?(dirty?'dirty':'reset'):state.status!=='idle'?state.status:dirty?'dirty':'idle'}>{pending?'목표비중 승인 중…':feedback}</CairnStatus>
+    <CairnStatus as="p" className={styles.feedback} role="status" aria-live="polite" data-target-action-state={pending?'pending':editedSinceSubmit?(dirty?'dirty':'reset'):state.status!=='idle'?state.status:dirty?'dirty':'idle'}>{pending?'저장 중…':feedback}</CairnStatus>
    </div>
-   <CairnButton variant="primary" className={styles.save} type="submit" disabled={pending||!valid||all.length===removed.length}>{pending?'승인 중':'목표비중 승인 저장'}</CairnButton>
-   <p className={styles.summaryNote}>저장해도 주문은 실행되지 않습니다.</p>
+   <CairnButton variant="primary" className={styles.save} type="submit" disabled={pending||!valid||all.length===removed.length}>{pending?'저장 중':'목표비중 저장'}</CairnButton>
+
   </section>
   <div className={styles.editor}>
    <div className={styles.editorHeading}><CairnSectionTitle level="h3">종목별 목표</CairnSectionTitle><CairnButton variant="secondary" type="button" disabled={pending||!dirty} onClick={()=>{setWeights(initial);setCandidates([]);setRemoved([]);edited();}}>입력 되돌리기</CairnButton></div>
@@ -52,7 +52,7 @@ export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approval
     const hidden=i<rows.length&&removed.includes(r.assetId),buyable=r.buyability==='buyable',invalid=parsed[i]===null,id='target-weight-'+i;
     if(hidden)return <li key={r.assetId} hidden><input type="hidden" name={'targetWeight:'+i} value="0"/></li>;
     return <li className={styles.row} key={r.assetId}>
-     <div className={styles.identity}><CairnField htmlFor={id}>{r.assetName}</CairnField><p>{r.accountName} · {r.ticker??'심볼 없음'} · {r.market} · {r.currency}</p><small>{r.heldAssetId===null?'미보유 계획 종목':'보유 종목'}</small></div>
+     <div className={styles.identity}><CairnField htmlFor={id}>{r.assetName}</CairnField><p>{r.accountName}{r.ticker?' · '+r.ticker:''}</p>{r.heldAssetId===null&&<small>미보유 목표</small>}</div>
      <CairnField className={styles.weight} htmlFor={id}><span className={styles.visuallyHidden}>목표 비중</span><div><CairnInput id={id} name={'targetWeight:'+i} type="text" inputMode="decimal" autoComplete="off" value={buyable?values[i]:'0'} disabled={pending||!buyable} aria-invalid={invalid||undefined} aria-describedby={invalid?id+'-error':undefined} onChange={e=>{const value=e.target.value;if(i<rows.length)setWeights(old=>old.map((v,at)=>at===i?value:v));else setCandidates(old=>old.map((v,at)=>at===i-rows.length?{...v,weight:value}:v));edited();}}/><b>%</b></div>{!buyable&&<input type="hidden" name={'targetWeight:'+i} value="0"/>}</CairnField>
      {invalid&&<p className={styles.warning} id={id+'-error'}>0~100 사이, 소수점 둘째 자리까지 입력하세요.</p>}
      {!buyable&&<p className={styles.warning}>이 종목은 목표 0%만 설정할 수 있습니다.</p>}

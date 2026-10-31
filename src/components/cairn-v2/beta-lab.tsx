@@ -2,7 +2,9 @@
 import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
 
-import { DetailHeader } from './ui/molecules';
+import Link from 'next/link';
+import { ActionGroup, ActionContent } from '@/components/cairn-ui';
+import { betaHref, betaReadHref } from '@/lib/cairn-v2/navigation';
 import {useLayoutEffect,useState,useTransition} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {BetaShell} from './beta-shell';
@@ -28,29 +30,29 @@ export function BetaLab({read}:{read:LabRead}){
  const scopeLabel=visible.scopes.find(s=>s.key===context.scope)?.label??'현재 조회 범위';
  return <BetaShell workspace="lab" context={context} setContext={next=>startTransition(()=>router.push(labHref(next,{...p,run:undefined},freshness?.store.pendingEpoch()),{scroll:false}))} readView={shell} originalPath="/investment-lab">
  <section className={styles.workspace} id="lab-comparison" data-lab-state={dirty?'dirty':visible.state}>
-  <DetailHeader title="과거 투자 비교" eyebrow={"과거 비교 · "+scopeLabel} description="실제 기록과 가상 투자 비교" />
+  <header className={styles.heading}><h2>다른 종목에 투자했다면?</h2><p>같은 기간 · 같은 매매 금액 · KRW</p></header>
   <CairnForm className={styles.conditions} onSubmit={e=>{e.preventDefault();nav({...p,start:values.start||undefined,end:values.end||undefined,run:'1'})}}>
    <CairnField>시작일<CairnInput aria-label="과거 비교 시작일" type="date" value={values.start} onChange={e=>setDraft({...values,start:e.target.value})}/></CairnField>
    <CairnField>종료일<CairnInput aria-label="과거 비교 종료일" type="date" value={values.end} onChange={e=>setDraft({...values,end:e.target.value})}/></CairnField>
    <CairnButton variant="primary" className={styles.primary} type="submit" disabled={pending}>{pending?'비교 확인 중…':'과거 비교 실행'}</CairnButton>
    <CairnButton variant="secondary" type="button" disabled={pending} onClick={()=>{setDraft(null);nav({...p,start:undefined,end:undefined,run:undefined})}}>기본 기간 선택</CairnButton>
   </CairnForm>
-  {(dirty||visible.state!=="ready")&&<CairnStatus as="p" role="status" className={styles.status}>{dirty?'기간 변경 · 다시 실행하기 전에는 이전 결과를 표시하지 않습니다':visible.message}</CairnStatus>}
-  <p className={styles.note}>분석 기준 KRW · 표시 통화가 USD여도 환산하지 않습니다. 날짜를 비우면 원본의 기본 허용 기간을 실행 시 확인합니다.</p>
+  {(dirty||visible.state!=="ready")&&<CairnStatus as="p" role="status" className={styles.status}>{dirty?'새 기간으로 비교해 주세요.':visible.message}</CairnStatus>}
+  <p className={styles.note}>날짜를 비우면 비교 가능한 기본 기간을 사용해요. 분석 기준은 KRW입니다.</p>
   {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&<RecoveryNotice beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
   {model&&<>
-   <dl className={styles.context}>
+   <details className={styles.evidence}><summary>비교 기간과 포함 범위</summary><dl className={styles.context}>
     <div><dt>요청 기간</dt><dd className={styles.dateRange}><span>{model.period.requestedStartServiceDate??'기본'}</span> ~ <span>{model.period.requestedEndServiceDate??'기본'}</span></dd></div>
     <div><dt>허용 기간</dt><dd className={styles.dateRange}><span>{model.period.selectedStartServiceDate??(ready?c?.summary?.startServiceDate:null)??'—'}</span> ~ <span>{model.period.selectedEndServiceDate??(ready?c?.summary?.endServiceDate:null)??'—'}</span></dd></div>
     <div><dt>포함 범위</dt><dd>{scopeLabel} · {model.scopeEvidence.includedAccountCodes.length}계좌</dd></div>
     <div><dt>관측 기록</dt><dd>{model.observedHistory.coverage.admittedDateCount}일 · 제외 {model.observedHistory.coverage.skippedDateCount}일</dd></div>
-   </dl>
-   {(model.observedHistory.status!=='ready'||!ready)&&<div className={styles.caution} role="note"><strong>부분 관측 또는 비교 보류</strong><p>제외된 날짜와 계좌를 완전한 연속 이력으로 연결하지 않습니다.</p>{model.period.reason&&<p>{labPeriodReason(model.period.reason)}</p>}{!!c?.blockers.length&&<ul>{c.blockers.map(b=><li key={b}>{labBlockerLabel(b)}</li>)}</ul>}</div>}
-   {ready&&c?.rows.length?<div className={styles.chart} tabIndex={0} role="region" aria-label="KRW 과거 비교 차트 가로 탐색"><InvestmentLabComparisonChart chartId="beta-lab" rows={c.rows} title="실제 평가와 KODEX 200 과거 비교" description="동일 거래금액 기반 KRW 경로. 시세 관측 순서와 원본 지연 체결 표시를 보존합니다." scenarioLabel="KODEX 200 · 가상 과거 경로" palette={labChartPalette}/></div>:model.observedHistory.segments.length>0?<div className={styles.chart} tabIndex={0} role="region" aria-label="분절된 저장 관측 이력"><ObservedHistoryChart segments={model.observedHistory.segments}/></div>:<p className={styles.empty}>표시할 관측 이력 없음 · 값을 생성하지 않았습니다.</p>}
+   </dl></details>
+   {(model.observedHistory.status!=='ready'||!ready)&&<div className={styles.caution} role="note"><strong>일부 기록은 비교할 수 없어요</strong><p>확인된 구간만 표시합니다.</p>{model.period.reason&&<p>{labPeriodReason(model.period.reason)}</p>}{!!c?.blockers.length&&<ul>{c.blockers.map(b=><li key={b}>{labBlockerLabel(b)}</li>)}</ul>}</div>}
    {ready&&c?.summary&&<dl className={styles.summary}><div data-series="actual"><dt>실제 기말 평가 · KRW</dt><dd>{labNumber(c.summary.actualEndValueKrw)}</dd></div><div data-series="scenario"><dt>KODEX 200 가상 경로 · KRW</dt><dd>{labNumber(c.summary.scenarioEndValueKrw)}</dd></div><div><dt>가상 − 실제 차액 · KRW</dt><dd>{labNumber(c.summary.endDifferenceKrw)}</dd></div></dl>}
+   {ready&&c?.rows.length?<div className={styles.chart} tabIndex={0} role="region" aria-label="KRW 과거 비교 차트 가로 탐색"><InvestmentLabComparisonChart chartId="beta-lab" rows={c.rows} title="실제 평가와 KODEX 200 과거 비교" description="동일 거래금액 기반 KRW 경로. 시세 관측 순서와 원본 지연 체결 표시를 보존합니다." scenarioLabel="KODEX 200 · 가상 과거 경로" palette={labChartPalette}/></div>:model.observedHistory.segments.length>0?<div className={styles.chart} tabIndex={0} role="region" aria-label="분절된 저장 관측 이력"><ObservedHistoryChart segments={model.observedHistory.segments}/></div>:<p className={styles.empty}>비교할 평가 기록이 아직 없어요.</p>}
+
    <dl className={styles.funding}><div><dt>실제 자금 근거</dt><dd>{labFundingLabel(model.funding.actual.status)}</dd></div><div><dt>KODEX 200 자금 근거</dt><dd>{labFundingLabel(model.funding.kodex200.status)}</dd></div></dl>
    <p className={styles.note}>가격 기준 {c?.scenario.priceBasis==='kis_raw_close'?'KIS 원종가 · 총수익 아님':c?.scenario.priceBasis==='provider_adjusted_close'?'제공자 조정종가 · 배당·비용 별도 미관측':'근거 없음'} · 현금 제외 투자경로 · 수수료·세금·주문 실행 가능성 미평가.</p>
-   <p className={styles.note}>이 범위 밖의 평가를 합산하지 않습니다.</p>
    {!!c&&(c.coverage.pendingAtEndRows>0||c.coverage.delayedExecutionRows>0)&&<p className={styles.caution}>지연 실행 {c.coverage.delayedExecutionRows}건 · 기간 말 보류 {c.coverage.pendingAtEndRows}건 · 비교일과 가격 관측일은 근거 표에서 구분합니다.</p>}
    <details className={styles.evidence}><summary>관측·가격·자금 근거</summary>
     <p>포함 계좌 코드 {model.scopeEvidence.includedAccountCodes.join(', ')||'없음'} · 원본 계산 축 {model.scopeEvidence.engineAccount}</p>
@@ -60,5 +62,6 @@ export function BetaLab({read}:{read:LabRead}){
     <details><summary>원본 상태·출처 상세</summary><pre>{JSON.stringify({scopeEvidence:model.scopeEvidence,period:model.period,scenario:c?.scenario,coverage:c?.coverage,source:c?.sourceAuthority,blockers:c?.blockers,observed:model.observedHistory,funding:model.funding,fount:model.fount,returns:c?.returns},null,2)}</pre></details>
    </details>
   </>}
+  <ActionGroup label="다른 관점으로 살펴보기"><Link href={betaReadHref(betaHref("/beta/simulation",context),freshness?.store.pendingEpoch())}><ActionContent title="여러 시장 경로도 살펴볼까요?" description="현재 구성의 가상 시뮬레이션" /></Link></ActionGroup>
  </section></BetaShell>;
 }

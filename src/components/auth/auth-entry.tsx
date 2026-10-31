@@ -60,9 +60,9 @@ export async function AuthEntry({
           title={planSource === "quick" ? "이 자산으로 시작하세요" : signingUp ? "회원가입" : "로그인"}
           description={
             planSource === "quick" ? "입력한 자산은 가입 후 Home에 그대로 이어집니다." : signingUp ? (
-              <><AuthText>{"나의 자산, 나의 기록."}</AuthText><br /><AuthText>{"편한 방법으로 시작하세요."}</AuthText></>
+              <AuthText>{"편한 방법으로 시작하세요."}</AuthText>
             ) : (
-              <><AuthText>{"다시, 나의 자산 흐름으로."}</AuthText><br /><AuthText>{"가입한 방법으로 로그인하세요."}</AuthText></>
+              <AuthText>{"가입한 방법으로 로그인하세요."}</AuthText>
             )
           }
         />

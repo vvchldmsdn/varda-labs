@@ -88,7 +88,7 @@ it('owned research restores the local weight draft and selection while missing h
   const initial = [];
   const navigations = [];
   let index = 0;
-  const [module] = await importUiWithPorts(['src/components/currency-research-view.tsx'], { ...ports, 'next/navigation': { useRouter: () => ({ replace: href => navigations.push(href), refresh: () => navigations.push('refresh') }) }, react: { ...ports.react, useState: value => { const at = index++; initial.push(value); return [at === 1 ? result : at === 2 ? false : value, () => {}]; } } });
+  const [module] = await importUiWithPorts(['src/components/currency-research-view.tsx'], { ...ports, 'next/link': { default: ({ children, ...props }) => ports.react.createElement('a', props, children) }, 'next/navigation': { useRouter: () => ({ replace: href => navigations.push(href), refresh: () => navigations.push('refresh') }) }, react: { ...ports.react, useState: value => { const at = index++; initial.push(value); return [at === 1 ? result : at === 2 ? false : value, () => {}]; } } });
   const boundary = module.CurrencyResearchView({ evidence, surface: 'lab', recoveryScope: scope, initialView });
   const tree = boundary.type(boundary.props), notice = walk(tree).find(node => node.type === Notice);
   assert.deepEqual(initial[4], comparison); assert.deepEqual(initial[5], fields);

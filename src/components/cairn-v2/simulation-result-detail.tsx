@@ -1,5 +1,6 @@
 "use client";
-import {Status} from "@/components/cairn-ui";
+import { ActionGroup, ActionContent, Status } from "@/components/cairn-ui";
+import { ChartNoAxesCombined } from "lucide-react";
 
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { originalHref } from "@/lib/cairn-v2/navigation";
@@ -54,11 +55,9 @@ export default function SimulationResultDetail({ read, context, heading = true }
       <span>{formatNumber(pathCount, { maximumFractionDigits: 0 })}개 경로 {source.kind === "all" ? "전체 표시" : "표본 표시"}</span>
 
       <span>미래 예측 아님</span>
+      {read.state === "partial" && <StatusPill>일부 종목만 포함</StatusPill>}
+      {context.currency === "USD" && <span>분석 통화 KRW</span>}
     </div>
-
-    <section className={styles.chartSection} aria-label="전체 계산 경로">
-      <SimulationFanExplorer key={read.resultIdentity} execution={chart} large initialMode="paths" />
-    </section>
 
     <MetricGroup className={styles.metrics}>
       <Metric label="종료 수익률 중앙값" value={formatPercent(terminal.p50ReturnPct, 2, true)}
@@ -68,6 +67,10 @@ export default function SimulationResultDetail({ read, context, heading = true }
       <Metric label="최대 낙폭 중앙값 · P50" value={formatPercent(terminal.maxDrawdownP50Pct, 1)}
         note={`P90 ${formatPercent(terminal.maxDrawdownP90Pct, 1)} · 약 10% 경로는 이보다 더 하락`} />
     </MetricGroup>
+
+    <section className={styles.chartSection} aria-label="전체 계산 경로">
+      <SimulationFanExplorer key={read.resultIdentity} execution={chart} large initialMode="paths" />
+    </section>
 
     <section className={styles.coverage} aria-label="연구에 포함된 보유 범위">
       <div>
@@ -79,8 +82,8 @@ export default function SimulationResultDetail({ read, context, heading = true }
         <p className={styles.coverageCaption}><strong>{formatPercent(coverage, 1)} 포함</strong><span>{formatPercent(100 - coverage, 1)} 제외</span></p>
       </div>
       <p className={styles.coverageCopy}>{read.state === "partial"
-        ? "시세 이력이 충분한 종목만 포함했습니다. 포함 종목의 비중을 100%로 환산한 결과이며, 전체 계좌의 결과와 다릅니다."
-        : "현재 연구 대상의 보유 비중을 사용했습니다. 이후 매매나 추가 투입은 가정하지 않습니다."}</p>
+        ? "포함 종목만 100%로 환산한 부분 결과입니다."
+        : "현재 비중으로 시작하며 이후 매매·추가 투입은 가정하지 않습니다."}</p>
     </section>
 
     <details className={styles.disclosure}>
@@ -115,8 +118,8 @@ export default function SimulationResultDetail({ read, context, heading = true }
         <div><dt>계산 범위</dt><dd>{model.candidate.historicalPriceBasis === 'provider_adjusted_close' ? 'KRW 기준 제공사 조정 종가와 날짜별 환율을 사용합니다. 배당 재투자 총수익, 비용·세금은 보장하지 않습니다.' : 'KRW 기준 원가격 수익률입니다. 배당·분할 조정 총수익, 비용·세금은 반영하지 않았습니다.'}</dd></div>
       </dl>
       <p>기존 화면의 ‘경제지표 경로’는 별도 모형입니다. 여기서는 ‘과거 수익률 경로’를 사용하며, 모형과 관측 조건을 같게 놓고 비교해야 합니다.</p>
-      <a className={styles.textLink} href={historicalLink}>기존 화면에서 과거 수익률 모형 열기 ↗</a>
     </details>
     {context.currency === "USD" && <p className={styles.currencyNote}>이 연구의 분석 통화는 KRW입니다. 화면의 USD 선택으로 결과를 재환산하지 않습니다.</p>}
+    <ActionGroup label="시뮬레이션 이어서 살펴보기"><a href={historicalLink}><ActionContent icon={<ChartNoAxesCombined size={22}/>} title="같은 조건으로 더 살펴보기" description="과거 수익률 모형의 비중 실험과 검증" /></a></ActionGroup>
   </section>;
 }

@@ -209,7 +209,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await visitValuation('/history?currency=USD');
       await expect(page.locator('body')).toContainText('2,000.00');
       await page.goto(url + `/portfolio/ledger?accountId=${account}&assetId=${asset}&action=buy`);
-      await page.getByText('거래일·과거 기록 정정', { exact: true }).click();
+      await page.locator('summary').filter({ hasText: /^거래일·정정/ }).click();
       await page.getByText('과거 거래 추가·정정', { exact: true }).click();
       await page.getByLabel('시작 잔액 이후 거래를 다시 계산', { exact: true }).check();
       await fillSettledTrade(page, '1', '100');
@@ -296,7 +296,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
       await page.goto(url + '/history?scope=account%3A' + legacyAccount);
-      await page.getByRole('button', { name: '기간 요약·근거', exact: true }).click();
+      await page.getByRole('button', { name: /^기간 요약 살펴보기/ }).click();
       await expect(page.getByRole('heading', { name: '기록 리듬', exact: true })).toBeVisible();
       // The graph shows the valuation date, one day before the daily save date.
       const firstDate = page.getByRole('button', { name: /^2026\.08\.04 이전 저장점 대비/ });
@@ -311,7 +311,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await secondDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
       await page.screenshot({ path: path.join(output, 'desktop-legacy-history-heatmap.png'), fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 }); await page.reload();
-      await page.getByRole('button', { name: '기간 요약·근거', exact: true }).click();
+      await page.getByRole('button', { name: /^기간 요약 살펴보기/ }).click();
       await firstDate.click();
       await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -464,6 +464,61 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
 
       }finally{await stale.close();}
     });
+    await check('fullapp-beta-target-approved-save-reload-shared-policy',async()=>{
+      // Reuse the preceding original-screen lifecycle, including its unheld target.
+      // Only the real beta action writes; all evidence uses the disposable database.
+      await setIdentity(sessionTokens[2]);
+      await browserContext.addCookies([{name:'varda-locale',value:'ko',url}]);
+      await page.setViewportSize({width:1440,height:900});
+      const scope='account:'+legacyAccount;
+      const revisions=async()=>(await admin.query("select id,approval_revision,lifecycle_status from portfolio_target_policy_revisions where canonical_owner_user_id=$1 and scope_kind='account' and scope_account_id=$2 order by approval_revision",[legacyOwner,legacyAccount])).rows;
+      const financialState=async()=>Promise.all([
+        admin.query('select id,account_id,quantity::text from assets where canonical_owner_user_id=$1 order by id',[legacyOwner]),
+        admin.query('select id,native_state from accounts where canonical_owner_user_id=$1 order by id',[legacyOwner]),
+        admin.query('select id from event_ledger_entries where canonical_owner_user_id=$1 order by id',[legacyOwner]),
+        admin.query('select id,amount::text from transactions where canonical_owner_user_id=$1 order by id',[legacyOwner]),
+      ]).then(results=>results.map(result=>result.rows));
+      const beforeRevisions=await revisions(),beforeFinancial=await financialState();
+      const approvedBefore=beforeRevisions.filter(row=>row.lifecycle_status==='approved');
+      assert.equal(approvedBefore.length,1);
+      const nextRevision=approvedBefore[0].approval_revision+1;
+      const weights=[['Synthetic legacy holding','25'],['Synthetic second target','35'],['Synthetic unheld target','40']];
+      const editor=page.locator('[data-target-editor-state="ready"]');
+      const weight=(root,name)=>root.locator('ol > li').filter({hasText:name}).locator('input[name^="targetWeight:"]');
+      await page.goto(url+'/beta/portfolio/targets?'+new URLSearchParams({mode:'domain',scope,currency:'KRW'}));
+      await expect(editor).toBeVisible();
+      await expect(editor.locator('input[name="approvalRevision"]')).toHaveValue(String(approvedBefore[0].approval_revision));
+      for(const [name,value] of weights)await weight(editor,name).fill(value);
+      await expect(editor.getByRole('button',{name:'입력 되돌리기',exact:true})).toBeEnabled();
+      const saved=page.waitForResponse(response=>new URL(response.url()).pathname==='/beta/portfolio/targets'&&response.request().method()==='POST');
+      await editor.getByRole('button',{name:'목표비중 저장',exact:true}).click();
+      assert.equal((await saved).status(),200);
+      await expect(page).toHaveURL(current=>current.pathname==='/beta/portfolio/targets'&&current.searchParams.get('scope')===scope&&!!current.searchParams.get('_betaRead'));
+      await expect(editor.locator('input[name="approvalRevision"]')).toHaveValue(String(nextRevision));
+      await expect(editor.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible();
+      const afterRevisions=await revisions(),approvedAfter=afterRevisions.filter(row=>row.lifecycle_status==='approved');
+      assert.equal(afterRevisions.length,beforeRevisions.length+1);
+      assert.equal(approvedAfter.length,1);assert.equal(approvedAfter[0].approval_revision,nextRevision);
+      assert.equal(afterRevisions.find(row=>row.id===approvedBefore[0].id).lifecycle_status,'superseded');
+      const stored=(await admin.query('select account_id,ticker,target_weight_bps from portfolio_target_policy_rows where canonical_owner_user_id=$1 and approval_revision_id=$2 union all select account_id,ticker,target_weight_bps from portfolio_target_plan_rows where canonical_owner_user_id=$1 and approval_revision_id=$2 order by ticker',[legacyOwner,approvedAfter[0].id])).rows;
+      assert.deepEqual(stored,[{account_id:legacyAccount,ticker:'999996',target_weight_bps:4000},{account_id:legacyAccount,ticker:'999997',target_weight_bps:3500},{account_id:legacyAccount,ticker:'999998',target_weight_bps:2500}]);
+      await page.reload();
+      await expect(editor.locator('input[name="approvalRevision"]')).toHaveValue(String(nextRevision));
+      for(const [name,value] of weights)await expect(weight(editor,name)).toHaveValue(value);
+      await expect(editor.getByRole('button',{name:'입력 되돌리기',exact:true})).toBeDisabled();
+      for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:width===1440?900:844});
+        await expect(editor.getByRole('button',{name:'목표비중 저장',exact:true})).toBeVisible();
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        await page.screenshot({path:path.join(output,`beta-target-approved-${width}.png`),fullPage:true});
+      }
+      await editor.getByRole('link',{name:'기존 목표 화면 ↗',exact:true}).click();
+      await expect(page).toHaveURL(current=>current.pathname==='/portfolio/targets'&&current.searchParams.get('scope')===scope);
+      await expect(page.locator('input[name="approvalRevision"]')).toHaveValue(String(nextRevision));
+      for(const [name,value] of weights)await expect(weight(page,name)).toHaveValue(value);
+      assert.deepEqual(await financialState(),beforeFinancial,'Target approval must not create holdings, trades or cash changes');
+      assert.deepEqual(await revisions(),afterRevisions,'Reload and cross-front reads must not create another approval');
+    });
     await runUiContextCases({page,check,admin,setIdentity,legacyToken:sessionTokens[2],legacyOwner,legacyAccount,nativeToken:sessionTokens[1],nativeAccount:otherAccount,nativeAsset:otherAsset,readNativeState:async()=>(await ledger.readNativeLedger({ownerUserId:other,role:'user'},otherAccount)).accounts[0].state,url,output});
     await check('fullapp-beta-onboarding-shares-native-account-admission', async () => {
       // Follow the existing UI fixture transaction contract without changing earlier portfolio journeys.
@@ -478,11 +533,11 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await browserContext.addCookies([{ name: 'varda-locale', value: 'ko', url }]);
       await page.goto(url + `/beta/portfolio/holdings/new?mode=domain&scope=account:${otherAccount}&currency=KRW`);
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '잔고 사진 선택', exact: true })).toHaveCount(0);
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toHaveAttribute('href', `/portfolio/ledger?accountId=${otherAccount}&action=buy`);
       const admittedUrl = page.url();
       await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(balanceAccount);
-      await expect(page.getByRole('button', { name: '잔고 사진 선택 ↗', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: '잔고 사진 선택', exact: true })).toBeVisible();
       await expect(page.locator('[data-holding-onboarding-read-state]')).toHaveAttribute('data-holding-onboarding-read-state', 'ready');
       assert.equal(page.url(), admittedUrl, 'Form account changes must not invalidate the beta server read');
       await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(otherAccount);

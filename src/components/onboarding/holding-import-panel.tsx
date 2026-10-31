@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Check, FileSpreadsheet } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { InstrumentSearch, type InstrumentChoice } from "./instrument-search";
 import { parseHoldingImport, type ImportedHolding, type HoldingImportResult } from "@/lib/holding-import";
 import type { HoldingDraft } from "@/lib/holding-batch";
 import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status as CairnStatus, Textarea as CairnTextarea } from "@/components/cairn-ui";
+import styles from "./holding-import-panel.module.css";
 
 
 export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false }: {
@@ -38,27 +40,30 @@ export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false
     const next = rows.findIndex((row, index) => index !== reviewIndex && !row.instrument);
     if (next >= 0) setReviewIndex(next);
   }
-  return <details className="varda-onboarding-details">
-    <summary>{t("표 붙여넣기 / CSV로 여러 종목 가져오기", "Paste a table / import holdings from CSV")}</summary>
-    <p>{t("종목명과 수량 두 열이면 됩니다. 파일 내용은 이 브라우저에서 읽고, 종목을 확인한 뒤에만 저장합니다.", "Start with two columns: name and quantity. Files are read in this browser; holdings are saved only after review.")}</p>
-    <CairnTextarea disabled={disabled} aria-label={t("보유종목 표", "Holdings table")} rows={5} maxLength={64_000} value={text} onChange={event => { setText(event.target.value); setRows([]); }} placeholder={t("종목명,수량,평균매입가\nKODEX 200,10,\nVOO,2,", "name,quantity,averageCost\nKODEX 200,10,\nVOO,2,")} style={{ width: "100%", padding: 12, border: "1px solid var(--line)", background: "var(--surface)", borderRadius: 8, color: "var(--ink)", fontSize: 12 }} />
-    <CairnField className="varda-onboarding-text-button">{t("CSV 파일 선택", "Choose CSV")}<CairnInput disabled={disabled} type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={async event => {
+  return <details className={styles.panel}>
+    <summary><FileSpreadsheet size={22} aria-hidden="true" />{t("표·CSV로 여러 종목 가져오기", "Import a table or CSV")}</summary>
+    <div className={styles.content}>
+    <p className={styles.note}>{t("종목명·수량 두 열이면 돼요. 평균매입가는 선택이에요.", "Start with name and quantity. Average cost is optional.")}</p>
+    <CairnTextarea className={styles.tableInput} disabled={disabled} aria-label={t("보유종목 표", "Holdings table")} rows={5} maxLength={64_000} value={text} onChange={event => { setText(event.target.value); setRows([]); }} placeholder={t("종목명,수량\nKODEX 200,10\nVOO,2", "name,quantity\nKODEX 200,10\nVOO,2")} />
+    <CairnField className={styles.file}>{t("CSV 파일 선택", "Choose CSV")}<CairnInput disabled={disabled} type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={async event => {
       const file = event.target.files?.[0];
       if (!file) return;
       if (file.size > 64_000) { setError("size"); return; }
       try { setText(await file.text()); setRows([]); setError(null); } catch { setError("unreadable"); }
     }} /></CairnField>
-    <CairnButton variant="secondary" className="varda-onboarding-text-button" type="button" disabled={disabled || !text.trim() || remaining < 1} onClick={confirm}>{t("표 읽고 종목 확인", "Read table and verify instruments")}</CairnButton>
+    <CairnButton variant="secondary" type="button" disabled={disabled || !text.trim() || remaining < 1} onClick={confirm}>{t("표 읽고 종목 확인", "Read and review holdings")}</CairnButton>
     {error && <CairnStatus as="p" tone="danger" role="alert">{messages[error]}</CairnStatus>}
     {rows.length > 0 && <>
-      <p>{t("비슷한 이름의 다른 종목을 막기 위해 각 종목을 검색 결과와 연결해 주세요.", "Match each row to a search result to avoid choosing a different instrument with a similar name.")}</p>
-      <div className="flex flex-wrap gap-2">{rows.map((row, index) => <CairnButton variant="selection" type="button" key={index} disabled={disabled} className="varda-onboarding-text-button" aria-pressed={reviewIndex === index} onClick={() => setReviewIndex(index)}>{row.instrument ? "✓ " : "○ "}{row.label} · {row.quantity}</CairnButton>)}</div>
-      <p><strong>{rows[reviewIndex].label}</strong> · {t("종목 확인", "Verify instrument")}</p>
+      <div className={styles.reviewHeading}><strong>{t("검색 결과와 연결해 주세요", "Match your holdings")}</strong><span>{rows.filter(row => row.instrument).length}/{rows.length}</span></div>
+      <div className={styles.rows}>{rows.map((row, index) => <CairnButton variant="selection" type="button" key={index} disabled={disabled} aria-pressed={reviewIndex === index} onClick={() => setReviewIndex(index)}>{row.instrument && <Check size={17} aria-hidden="true" />}<span>{row.label}</span><small>{row.quantity}</small></CairnButton>)}</div>
+      <p className={styles.current}><strong>{rows[reviewIndex].label}</strong> · {t("종목 확인", "Verify instrument")}</p>
       <InstrumentSearch key={reviewIndex} initialQuery={rows[reviewIndex].label} onSelect={select} disabled={disabled} preview={preview} />
-      <CairnButton variant="secondary" className="varda-onboarding-primary" type="button" disabled={disabled || rows.some(row => !row.instrument) || rows.length > remaining} onClick={() => {
+      <CairnButton variant="primary" type="button" disabled={disabled || rows.some(row => !row.instrument) || rows.length > remaining} onClick={() => {
         const added = onAdd(rows.map(row => ({ key: crypto.randomUUID(), instrumentId: row.instrument!.id, name: row.instrument!.name, ticker: row.instrument!.ticker, market: row.instrument!.market, assetType: row.instrument!.assetType, quantity: row.quantity, averageCost: row.averageCost, currentPrice: "" })));
         if (added) { setRows([]); setText(""); setError(null); } else { setError("queue"); }
       }}>{t("확인 목록으로 가져오기", "Add to review list")}</CairnButton>
     </>}
+    <p className={styles.note}>{t("기기에서 읽기 · 확인 목록에 담은 뒤 저장해요.", "Read on this device · Save after checking your review list.")}</p>
+    </div>
   </details>;
 }

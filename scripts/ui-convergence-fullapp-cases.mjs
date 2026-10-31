@@ -40,7 +40,7 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
         await page.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
         await page.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('1');
         await page.getByRole('button',{name:'목록에 추가',exact:true}).click();
-        await page.getByText('매입가·현재가 추가 또는 수정',{exact:true}).click();
+        await page.getByText('매입가·현재가 (선택)',{exact:true}).click();
         await page.getByLabel('현재 1주 가격 (선택)',{exact:true}).fill('100');
         await page.getByRole('button',{name:'1종목 저장',exact:true}).click();
         await expect(page.getByRole('status').filter({hasText:'1종목이 포트폴리오에 담겼어요.'})).toBeVisible();
@@ -75,7 +75,7 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
       for(const action of ['buy','sell']) {
         await page.goto(`${url}/portfolio/ledger?accountId=${nativeAccount}&assetId=${nativeAsset}&action=${action}`);
         await expect(page.getByLabel(locale==='ko'?'기록 종류':'Record type',{exact:true})).toHaveValue(action);
-        await page.getByText(locale==='ko'?'거래일·과거 기록 정정':'Trade date & corrections',{exact:true}).click();
+        await page.locator('summary').filter({hasText:locale==='ko'?/^거래일·정정/:/^Date & corrections/}).click();
         await expect(page.getByLabel(locale==='ko'?'기록 날짜':'Record date',{exact:true})).toBeVisible();
         await page.getByLabel(locale==='ko'?'체결 수량':'Executed quantity',{exact:true}).fill('1');
         await page.getByLabel(locale==='ko'?'체결 단가 · KRW':'Execution price · KRW',{exact:true}).fill('10000');

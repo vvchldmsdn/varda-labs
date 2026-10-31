@@ -186,7 +186,7 @@ export function EmailVerificationForm({
             <AuthText>{pending === "verify" ? "확인 중" : pending === "send" ? "요청 중" : step === "code" ? "인증하고 계속" : "인증 코드 요청"}</AuthText>
             {pending ? <LoaderCircle size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <ArrowRight size={17} aria-hidden="true" />}
           </CairnButton>
-          {step === "email" ? <CairnButton variant="primary" type="submit" value="existing" className={styles.textLink}>
+          {step === "email" ? <CairnButton variant="ghost" type="submit" value="existing" className={styles.textLink}>
             <AuthText>{"이미 받은 코드 입력"}</AuthText>
           </CairnButton> : null}
         </CairnFieldset>

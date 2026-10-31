@@ -11,7 +11,11 @@ const account = { id:accountId, name:'Synthetic', active:true,
 const ports = {'next/link':{default:()=>null},'@/components/app-navigation':{AppNavigation:()=>null},
   '@/components/onboarding/instrument-search':{InstrumentSearch:()=>null},'@/components/native-trade-fields':{NativeTradeFields:()=>null},
   '@/components/first-visit/money-input':{MoneyInput:()=>null},
-  '@/components/i18n/locale-provider':{useI18n:()=>({t:(ko,en)=>en,locale:'en'})}};
+  '@/components/i18n/locale-provider':{useI18n:()=>({t:(ko,en)=>en,locale:'en'})},
+  '@/components/cairn-v2/reused/onboarding-instrument-search':{OnboardingInstrumentSearch:()=>null},
+  '@/components/cairn-v2/reused/native-trade-fields':{NativeTradeFields:()=>null},
+  '@/components/cairn-v2/reused/money-input':{MoneyInput:()=>null},
+  '@/components/cairn-v2/reused/native-locale':{useI18n:()=>({t:(ko,en)=>en,locale:'en'})}};
 const [ui] = await importUiWithPorts(['src/components/native-ledger-view.tsx'],ports);
 function build(at, nowMs, extra={}) { return ui.buildNativeLedgerMutation({account,kind:'buy',fields:{at,assetId,quantity:'1',inputMode:'total',total:'100'},lots:[],operationId:accountId,newAssetId:assetId,confirmed:false,nowMs,...extra}); }
 function globalValue(t,name,value) { const original=Object.getOwnPropertyDescriptor(globalThis,name); Object.defineProperty(globalThis,name,{value,configurable:true,writable:true}); t.after(()=>{if(original) Object.defineProperty(globalThis,name,original);else delete globalThis[name];}); }
@@ -45,7 +49,7 @@ function hooks() {
 }
 // Real view event handlers with only browser/network ports substituted. Remote
 // authenticated browser QA separately covers the actual provider/session/writer.
-async function harness(t,offset) {
+async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true}={}) {
   deviceClock(t,offset);let monotonic=1000,serverNow=SERVER;const sent=[];
   t.mock.method(performance,'now',()=>monotonic);
   const values=new Map();globalValue(t,'localStorage',{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
@@ -54,8 +58,8 @@ async function harness(t,offset) {
     if(options.method==='POST') {sent.push(JSON.parse(options.body));return Response.json({error:'conflict'},{status:409});}
     return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:[account],canWrite:true,ordering:[],trades:[]});
   });
-  const h=hooks();const [view]=await importUiWithPorts(['src/components/native-ledger-view.tsx'],{...ports,react:h.react});
-  const render=()=>{h.begin();return elements(view.NativeLedgerView({compact:true,initialSelection:{accountId,assetId,action:'buy'}}));};
+  const h=hooks();const [view]=await importUiWithPorts([entry],{...ports,react:h.react});
+  const render=()=>{h.begin();return elements(view.NativeLedgerView({compact,initialSelection:{accountId,assetId,action:'buy'}}));};
   render();h.effect();await new Promise(resolve=>setImmediate(resolve));
   const findTime=()=>render().find(e=>e.props?.name==='at');
   const trade=render().find(e=>typeof e.props?.edit==='function');trade.props.edit('quantity','1');trade.props.edit('price','100');
@@ -90,3 +94,25 @@ it('minute/date edits preserve retained event seconds and milliseconds',()=>{
   assert.equal(updateNativeLedgerLocalMinute('2026-09-28T11:19','2026-09-29T12:20'),'2026-09-29T12:20:00');
   assert.equal(updateNativeLedgerLocalMinute('2026-09-28T11:19:18.123',''),'2026-09-28T11:19:18.123');
 });
+
+function text(node) {if(node==null||typeof node==='boolean')return '';if(typeof node!=='object')return String(node);return Array.isArray(node)?node.map(text).join(''):text(node.props?.children);}
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) {
+  it(`${entry} shows the actual cash-event timestamp after switching from a date-only trade`,async t=>{
+    const h=await harness(t,0,{entry,compact:false});
+    const trade=h.render().find(e=>typeof e.props?.edit==='function');
+    trade.props.edit('timePrecision','date_only');trade.props.edit('tradeDate','2026-09-20');
+    const summary=()=>h.render().find(e=>e.type==='summary'&&text(e).startsWith('Date & corrections'));
+    const selectKind=kind=>h.render().find(e=>e.props?.['aria-label']==='Record type').props.onChange({target:{value:kind}});
+    for(const kind of ['buy','sell']) {selectKind(kind);assert.match(text(summary()),/2026-09-20.*Korea time/);}
+    selectKind('deposit');
+    assert.ok(text(summary()).includes(nativeLedgerLocalTime(serverMs).replace('T',' ').slice(0,16)));
+    assert.match(text(summary()),/Device time/);
+    assert.doesNotMatch(text(summary()),/2026-09-20|Korea time/);
+    h.render().find(e=>typeof e.props?.onValueChange==='function').props.onValueChange('100');
+    await h.submit();
+    assert.equal(h.sent.length,1);
+    assert.equal(h.sent[0].mutation.event.type,'deposit');
+    assert.equal(h.sent[0].mutation.event.at,SERVER);
+    assert.equal(h.sent[0].mutation.event.dateEvidence,undefined);
+  });
+}

@@ -204,14 +204,21 @@ describe("dashboard query demand and independent market reads", () => {
     for (const [initialLocale, pendingLabel, baselineLabel] of [["ko", "일일 기준 기록 준비 중", "마지막 기준일"], ["en", "Awaiting the daily baseline", "Last baseline"]]) {
       for (const component of [PortfolioDashboard, TodayMovement]) {
         const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, createElement(component, { data: home })));
-        const summary = html.match(/<section class="stageSummary"[\s\S]*?<\/section>/)?.[0];
+        const summaryTitleId = component === TodayMovement ? "today-movement-title" : "portfolio-overview-title";
+        const summary = html.match(new RegExp(`<section\\b[^>]*\\baria-labelledby="${summaryTitleId}"[^>]*>[\\s\\S]*?<\\/section>`))?.[0];
+        assert.ok(summary, `${component.name}/${initialLocale}: the movement summary is rendered`);
         const expectedLabel = component === TodayMovement
           ? (initialLocale === "ko" ? "일일 기준 기록이 없어 오늘 변동을 계산할 수 없어요." : "Today's change needs a daily baseline.")
           : pendingLabel;
-        assert.ok(summary?.replaceAll("&#x27;", "'").includes(expectedLabel), `${component.name}/${initialLocale}: cutoff evidence is missing without claiming work is running`);
+        assert.ok(summary.replaceAll("&#x27;", "'").includes(expectedLabel), `${component.name}/${initialLocale}: cutoff evidence is missing without claiming work is running`);
         assert.ok(summary.includes(baselineLabel), `${component.name}/${initialLocale}: the older date is labeled as the last baseline`);
         assert.ok(summary.includes("2026.09.08"));
         assert.ok(summary.includes("stageWarning"), "the notice uses the visible mobile and desktop warning slot");
+        if (component === PortfolioDashboard) {
+          const todayMetric = summary.match(/<dl\b[^>]*>[\s\S]*?<\/dl>/)?.[0];
+          assert.ok(todayMetric);
+          assert.doesNotMatch(todayMetric, /%/, "a stale baseline must not show a fabricated daily rate");
+        }
         assert.doesNotMatch(html, /data-holding-detail-trigger="(?:row|summary)"/, "there are no stale contribution actions");
       }
     }
@@ -277,6 +284,24 @@ describe("dashboard query demand and independent market reads", () => {
     assert.equal(home.todayMovement.scopeCurrentTotalKrw,1442000);
     assert.equal(home.todayMovement.returnPct,44.2);
     assert.equal(home.dataHealth.movementExcludedAssetCount,1);
+    const [{ PortfolioDashboard }, { LocaleProvider }] = await importUiWithPorts([
+      "src/components/portfolio-dashboard.tsx", "src/components/i18n/locale-provider.tsx",
+    ], {
+      "@/components/recovered-return-section": { RecoveredPortfolioHistoryChart: () => null },
+      "next/dynamic": { default: () => () => null },
+      "next/navigation": { usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ refresh() { throw new Error("SSR must not refresh"); } }) },
+      "next/link": { default: ({ children, ...props }) => createElement("a", Object.fromEntries(Object.entries(props).filter(([name]) => !["prefetch", "scroll"].includes(name))), children), useLinkStatus: () => ({ pending: false }) },
+      "next/image": { default: props => createElement("img", Object.fromEntries(Object.entries(props).filter(([name]) => name !== "priority"))) },
+    });
+    for (const initialLocale of ["ko", "en"]) {
+      const html = renderToStaticMarkup(createElement(LocaleProvider, { initialLocale }, createElement(PortfolioDashboard, { data: home })));
+      const summary = html.match(/<section\b[^>]*aria-labelledby="portfolio-overview-title"[^>]*>[\s\S]*?<\/section>/)?.[0];
+      const todayMetric = summary?.match(/<dl\b[^>]*>[\s\S]*?<\/dl>/)?.[0];
+      assert.ok(todayMetric, "the home summary includes today's movement metric");
+      assert.match(todayMetric, /442,000/, "the amount uses the comparable holdings' valuation movement");
+      assert.match(todayMetric, /\+44\.20%/, "the daily rate uses the same valuation baseline, not native price or lifetime return");
+      assert.match(todayMetric, /2026\.09\.07/, "the market baseline remains alongside the amount and rate");
+    }
   });
 
   it("starts quote reads after assets even while settings and then the ledger remain pending", async () => {

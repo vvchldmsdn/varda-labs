@@ -1,4 +1,5 @@
 "use client";
+
 import { Button as CairnButton } from "@/components/cairn-ui";
 
 import { useState, type CSSProperties } from "react";
@@ -39,7 +40,7 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
                 const value = raw !== null && Number.isFinite(raw) ? raw : null;
                 const isSelected = row === rowIndex && col === columnIndex;
                 return <td key={column.instrumentKey} className={styles.correlationCell}>
-                <CairnButton variant="selection" type="button" title={value === null ? "계산 근거 없음" : `원본 정밀도 ${value}`} tabIndex={isSelected ? 0 : -1} data-matrix-cell aria-label={`${instrumentName(instrument)} / ${instrumentName(column)}: ${preciseNumber(value)} · ${value === null ? "계산 근거 없음" : `원본 정밀도 ${value}`}`} aria-pressed={isSelected} data-crosshair={row === rowIndex || col === columnIndex} data-diagonal={row === col} onPointerEnter={(event) => { if (event.pointerType !== "touch")
+                <CairnButton variant="bare" type="button" title={value === null ? "계산 근거 없음" : `원본 정밀도 ${value}`} tabIndex={isSelected ? 0 : -1} data-matrix-cell aria-label={`${instrumentName(instrument)} / ${instrumentName(column)}: ${preciseNumber(value)} · ${value === null ? "계산 근거 없음" : `원본 정밀도 ${value}`}`} aria-pressed={isSelected} data-crosshair={row === rowIndex || col === columnIndex} data-diagonal={row === col} onPointerEnter={(event) => { if (event.pointerType !== "touch")
                     setSelected([row, col]); }} onFocus={() => setSelected([row, col])} onClick={() => setSelected([row, col])} onKeyDown={(event) => {
                         const steps: Record<string, [
                             number,
