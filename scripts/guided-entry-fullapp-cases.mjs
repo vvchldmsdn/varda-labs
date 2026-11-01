@@ -276,11 +276,17 @@ export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
     const href=id=>url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:'account:'+id,...(beta?{mode:'domain'}:{accountId:id})});
     if (!beta) {
       await page.goto(url+'/portfolio/risk?'+new URLSearchParams({scope:'account:'+a.account,currency:'USD'}));
-      await expect(page.getByText('분석 기준 · KRW',{exact:true})).toBeVisible();
+      const riskPage=page.locator('main[data-page="portfolio-risk"]');
+      await expect(riskPage).toBeVisible();
+      const analysisBasis=page.getByText('분석 기준 · KRW',{exact:true});
+      // The streaming loading header may coexist briefly with the resolved page.
+      await expect(analysisBasis).toHaveCount(1);
+      await expect(analysisBasis).toBeVisible();
       await expect(page.getByRole('combobox',{name:'분석 통화',exact:true})).toHaveCount(0);
-      const thirty=page.getByRole('link',{name:'30일',exact:true});
+      const thirty=riskPage.getByRole('link',{name:'30일',exact:true});
       await expect(thirty).toHaveAttribute('href',/currency=USD/);await thirty.click();
       await expect.poll(()=>new URL(page.url()).searchParams.get('currency')).toBe('USD');
+      await expect(thirty).toHaveAttribute('aria-current','page');
       await capture(page,output,'context-risk-krw-basis',390,844);
     }
 
