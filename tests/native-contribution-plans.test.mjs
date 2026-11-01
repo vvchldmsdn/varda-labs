@@ -168,33 +168,35 @@ it('loads approved targets and MA metadata without importing legacy value or cos
   evidence.nativeSequences[second]=5;
   const [loader]=await importWithPorts(['src/db/queries/native-contribution-context.ts'],{
     '@/db/queries/additional-contribution-modifiers':{readAdditionalContributionModifiers:async()=>({modifiers:{fundingBasis:'KRW',fx:{status:'unavailable',reason:'fixture'},regime:{status:'unavailable',reason:'fixture'},eventScore:{status:'unavailable',reason:'fixture'},performance:{status:'unavailable',reason:'fixture'}},rows:{}})},
-    '@/db/queries/portfolio-analysis-scopes':{getReadOnlyTenantPortfolioAnalysisScopeContext:async()=>({state:'ready',resolution:{state:'resolved',scope:{kind:'all',key:'all',label:'All'}}})},
+    '@/db/queries/portfolio-analysis-scopes':{getReadOnlyTenantPortfolioAnalysisScopeContext:async({scope})=>({state:'ready',resolution:{state:'resolved',scope:scope==='all'?{kind:'all',key:'all',label:'All'}:{kind:'account',key:scope,accountId:account,label:'Account'}}})},
     '@/db/queries/currency-tracked-portfolio':{getTrackedCurrencyEvidence:async()=>evidence},
     '@/db/queries/portfolio-target-policy':{getReadOnlyTenantPortfolioTargetPolicyModel:async()=>model},
     '@/db/queries/additional-contribution-ma120':{getReadOnlyTenantAdditionalContributionMa120Evidence:async value=>{maInput=value;return {rows:[{instrumentKey:'us:USD:TEST',priceBasis:'private_kis_raw_close',status:'below_ma',evidence:{distanceFromMaPct:-10}}]};}},
   });
-  const result=await loader.readNativeContributionContext({ownerUserId:owner},'all','USD');assert.equal(result.status,'ready');
+  assert.equal((await loader.readNativeContributionContext({ownerUserId:owner},'all','USD')).reason,'choose_account_for_funding');
+  assert.equal(maInput,undefined,'No market analysis before choosing an account');
+  const result=await loader.readNativeContributionContext({ownerUserId:owner},'account:'+account,'USD');assert.equal(result.status,'ready');
   assert.deepEqual(result.nativeSequences,{[account]:1});
   assert.equal(result.input.rows[0].value.amount,'1000');assert.equal(result.input.rows[0].cost,null);assert.deepEqual(result.input.rows[0].costLots,[lot]);assert.equal(result.input.rows[0].assetType,'etf');assert.equal(result.input.rows[0].maAssetClass,'thematic');assert.equal(result.input.rows[0].ma120Evidence.status,'below_ma');assert.equal(maInput.holdings[0].currentPrice,100);
   const candidateId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   model.rows[0].targetWeightBps=5000;
   model.rows.push({...model.rows[0],assetId:candidateId,heldAssetId:null,originAssetId:null,ticker:'CAND',assetName:'Candidate',currentValueKrw:0,targetWeightBps:5000});
-  const withCandidate=await loader.readNativeContributionContext({ownerUserId:owner},'all','USD');
+  const withCandidate=await loader.readNativeContributionContext({ownerUserId:owner},'account:'+account,'USD');
   assert.equal(withCandidate.status,'ready');assert.equal(withCandidate.input.rows.length,2);
   assert.equal(withCandidate.input.rows[1].value.amount,'0');assert.equal(withCandidate.input.rows[1].costLots,null);
   assert.equal(evidence.current.positions.length,1,'target does not mutate positions');
   // First buy binds the stable plan ID to a different actual holding ID.
   const actualId='dddddddd-dddd-4ddd-8ddd-dddddddddddd';model.rows[1].heldAssetId=actualId;
   evidence.current.positions.push({...evidence.current.positions[0],id:actualId,ticker:'CAND',observation:{...observed,quantity:'2'},costLots:[]});
-  const bought=await loader.readNativeContributionContext({ownerUserId:owner},'all','USD');
+  const bought=await loader.readNativeContributionContext({ownerUserId:owner},'account:'+account,'USD');
   assert.equal(bought.status,'ready');assert.equal(bought.input.rows[1].allocationKey,candidateId);assert.equal(bought.input.rows[1].value.amount,'200');
-  model.policyValidation.status='missing';assert.equal((await loader.readNativeContributionContext({ownerUserId:owner},'all','USD')).reason,'approved_targets_required');
+  model.policyValidation.status='missing';assert.equal((await loader.readNativeContributionContext({ownerUserId:owner},'account:'+account,'USD')).reason,'approved_targets_required');
 });
 it('renders a saved USD decision on a KRW page without changing its frozen result or making requests',async()=>{
   const saved=buildNativeContributionPlan(basis(),input()).document;
   const original=structuredClone(saved);
   let position=0;
-  const values=[{context:basis('KRW'),sessionKey:'fixture',plans:[{id:saved.request.id,createdAt:at,document:saved}]},'', 'KRW',false,{document:saved,saved:true},'',false];
+  const values=[{context:{...basis('KRW'),scopeKey:'account:'+account},sessionKey:'fixture',plans:[{id:saved.request.id,createdAt:at,document:saved}]},'', 'KRW',false,{document:saved,saved:true},'',false];
   const [ui]=await importUiWithPorts(['src/components/native-contribution-planner.tsx'],{
     react:{useState:()=>[values[position++],()=>{}],useRef:()=>({current:null}),useEffect:()=>{}},
     'next/link':{default:({href,children})=>createElement('a',{href},children)},
@@ -202,7 +204,7 @@ it('renders a saved USD decision on a KRW page without changing its frozen resul
     '@/components/i18n/locale-provider':{useI18n:()=>({locale:'en',t:(_ko,en)=>en})},
     '@/components/first-visit/money-input':{MoneyInput:()=>null},
   });
-  const html=renderToStaticMarkup(createElement(ui.NativeContributionPlanner,{scopeKey:'all',currency:'KRW'}));
+  const html=renderToStaticMarkup(createElement(ui.NativeContributionPlanner,{scopeKey:'account:'+account,currency:'KRW'}));
   assert.match(html,/<h3\b[^>]*>Saved plan · USD<\/h3>/);assert.match(html,/Profit currency.*USD/);assert.match(html,new RegExp('href="#native-plan-'+saved.request.id+'"'));
   assert.match(html,/Edit approved targets/);assert.deepEqual(saved,original);
 });

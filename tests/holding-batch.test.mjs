@@ -63,13 +63,13 @@ describe("holding batch saves", () => {
     for (const path of ["/", "/history", "/portfolio/first-look", "/portfolio/onboarding", "/portfolio/holdings/new"]) assert.ok(f.revalidated.includes(path));
   });
 
-  it("preserves successes and stops at quote readiness or authentication failure", async () => {
+  it("continues independent rows after quote readiness but stops on authentication failure", async () => {
     for (const failure of [{ status: "price_unavailable", message: "Wait", retryAfterSeconds: 42 }, { status: "unauthorized", message: "Sign in" }]) {
       const f = await fixture([success, failure]);
       const result = await f.createHoldingBatch(idle, request([draft("A"), draft("B"), draft("C")]));
       assert.equal(result.status, "partial");
-      assert.deepEqual(result.results, [{ key: "A", result: success }, { key: "B", result: failure }]);
-      assert.deepEqual(f.writes.map((row) => row.ticker), ["A", "B"]);
+      assert.deepEqual(result.results, [{ key: "A", result: success }, { key: "B", result: failure }, ...(failure.status === "price_unavailable" ? [{key:"C",result:success}] : [])]);
+      assert.deepEqual(f.writes.map((row) => row.ticker), failure.status === "price_unavailable" ? ["A", "B", "C"] : ["A", "B"]);
       assert.ok(f.revalidated.includes("/portfolio/first-look"));
     }
   });
@@ -117,6 +117,8 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
       "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
       "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
     react: {
+      useEffect() {},
+      useRef(value) { return {current:value}; },
       useState(initial) {
         const index = stateIndex++;
         if (!(index in state)) state[index] = typeof initial === "function" ? initial() : initial;
@@ -168,7 +170,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
   };
 }
 
-const waitingPrice = { status: "price_unavailable", message: "Price lookup queued" };
+const waitingPrice = { status: "price_unavailable", message: "Price lookup queued", retryAfterSeconds: 10 };
 const partialNotice = nodes => nodes.find(node => node.props?.role === "status" && node.props.className?.split(" ").includes("varda-onboarding-hint"))?.props.children;
 
 describe("holding batch completion notices", () => {
@@ -278,7 +280,7 @@ describe("holding batch completion notices", () => {
     ], { collectionState: "waiting" });
     h.add("AAPL"); h.add("MSFT");
     await h.submit();
-    const waitingGuidance = nodes => nodes.some(node => node.props?.role === "status" && typeof node.props.children === "string" && /Price lookup is still pending/.test(node.props.children));
+    const waitingGuidance = nodes => nodes.some(node => typeof node.props?.children === "string" && /Price lookup pending/.test(node.props.children));
     assert.equal(waitingGuidance(h.render()), true);
     await h.submit();
     const nodes = h.render();
@@ -287,4 +289,15 @@ describe("holding batch completion notices", () => {
     const remaining = JSON.parse(nodes.find(node => node.type === "input" && node.props.name === "holdings").props.value);
     assert.deepEqual(remaining, []);
   });
+});
+
+it('can start a new account list after hiding saved rows and cancelling the last pending row',async()=>{
+  const h=await batchFormFixture('en',[rows=>({status:'partial',results:[{key:rows[0].key,result:success},{key:rows[1].key,result:waitingPrice}]})]);
+  h.add('AAPL');h.add('MSFT');await h.submit();
+  const clear=()=>h.render().find(node=>node.type==='button'&&node.props.children?.includes?.('Clear saved rows and add more'));
+  clear().props.onClick();
+  h.render().find(node=>node.props?.['aria-label']==='Remove MSFT from list').props.onClick();
+  assert.ok(clear(),'the completed receipt must keep a visible reset action');clear().props.onClick();
+  assert.equal(h.render().find(node=>node.props?.['aria-label']==='Holding account').props.disabled,false);
+  assert.deepEqual(JSON.parse(h.render().find(node=>node.props?.name==='holdings').props.value),[]);
 });

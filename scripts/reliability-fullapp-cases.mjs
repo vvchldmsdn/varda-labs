@@ -15,6 +15,7 @@ import { runContributionUiCases, runLegacyContributionUiCase } from './reliabili
 import { fillSettledTrade } from './reliability-trade-ui-helpers.mjs';
 import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
 import { runAutoRefreshUiCases } from './reliability-auto-refresh-ui-cases.mjs';
+import { runOnboardingQaCases } from './reliability-onboarding-qa-cases.mjs';
 
 /** Neon wire transport only. The app's SQL, tenant roles, transactions and RLS are unchanged. */
 export function createSqlBridge({ worker, tenant, connectionStrings, token }) {
@@ -279,19 +280,27 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     });
     await runContributionUiCases({page,check,admin,owner:other,account:otherAccount,asset:otherAsset,url,output});
     await check('fullapp-journey-owner-refresh-clears-prior-plan-client-state', async () => {
-      const isPlanRead=r=>new URL(r.url()).pathname==='/api/native-contribution-plans'&&new URL(r.url()).searchParams.get('scope')==='all'&&r.request().method()==='GET';
+      const isPlanRead=r=>new URL(r.url()).pathname==='/api/native-contribution-plans'&&r.request().method()==='GET';
       const priorRead=page.waitForResponse(isPlanRead);
-      await page.goto(url + '/additional-contribution/plan?scope=all&currency=KRW');
+      await page.goto(url + '/additional-contribution/plan?scope=account%3A'+otherAccount+'&currency=KRW');
       const priorSession=(await (await priorRead).json()).sessionKey;
       const planner=page.getByRole('region',{name:'추가 투자 계획',exact:true});
+      let allScopeReads=0;
+      const observeRead=request=>{if(new URL(request.url()).pathname==='/api/native-contribution-plans'&&new URL(request.url()).searchParams.get('scope')==='all')allScopeReads++;};
+      page.on('request',observeRead);
+      await page.goto(url + '/additional-contribution/plan?scope=all&currency=KRW');
+      await expect(planner.getByRole('status')).toContainText('투자할 계좌 하나를 선택해 주세요.');
       await expect(planner.getByRole('navigation',{name:'투자할 계좌 선택'})).toContainText('Synthetic KRW');
       await setIdentity(sessionTokens[0]);
-      const nextRead=page.waitForResponse(isPlanRead);
       await page.evaluate(()=>window.dispatchEvent(new Event('cairn-fullapp-refresh')));
-      assert.notEqual((await (await nextRead).json()).sessionKey,priorSession,'Owner change must reload client data, not just navigation labels');
       await expect(planner.getByRole('navigation',{name:'투자할 계좌 선택'})).toContainText('Synthetic USD');
       await expect(planner.getByRole('heading',{name:'저장한 계획',exact:true})).not.toBeVisible();
       await expect(planner).not.toContainText('Synthetic KRW');
+      assert.equal(allScopeReads,0,'Choose an account before fetching plan data');
+      page.off('request',observeRead);
+      const nextRead=page.waitForResponse(isPlanRead);
+      await planner.getByRole('navigation',{name:'투자할 계좌 선택'}).getByRole('link',{name:'Synthetic USD',exact:true}).click();
+      assert.notEqual((await (await nextRead).json()).sessionKey,priorSession,'Owner change must reload client data, not just navigation labels');
     });
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
@@ -564,6 +573,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       }
     });
     await runAutoRefreshUiCases({admin,browser,owner:autoRefreshOwner,identityToken:sessionTokens[3],url,output,report});
+    await runOnboardingQaCases({page,check,admin,setIdentity,token:sessionTokens[2],owner:legacyOwner,url,output});
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
       authBoundary: 'external verified identity substituted in disposable build only; real email/OAuth and auth provider cookies NOT RUN',
       notCovered: ['Native History has no heatmap UI; tested its available saved-valuation surface separately', 'Provider collection is disabled', 'Real provider logout/login is not represented by test identity removal/return'] };

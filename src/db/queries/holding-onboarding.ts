@@ -1,4 +1,5 @@
 import "server-only";
+import { hash } from "node:crypto";
 
 import { and, asc, eq } from "drizzle-orm";
 
@@ -9,6 +10,7 @@ import type { TenantContext } from "@/lib/session-resolver-contract";
 
 export type HoldingOnboardingOptions = Readonly<{
   state: "ready";
+  draftOwnerKey?: string;
   accounts: readonly Readonly<{
     id: string;
     code: string;
@@ -50,6 +52,7 @@ export async function getHoldingOnboardingOptions(
 
     return Object.freeze({
       state: "ready",
+      draftOwnerKey: hash("sha256", `holding-draft:${tenantContext.ownerUserId}`),
       accounts: Object.freeze(ownedAccounts.map((row) => Object.freeze(row))),
       portfolioGroups: Object.freeze(
         ownedGroups.map((row) => Object.freeze(row)),

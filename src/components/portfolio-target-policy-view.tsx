@@ -12,7 +12,7 @@ import styles from "./portfolio-target-policy.module.css";
 import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
 
 
-export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, rows, universeHash, isReady, policyStatus, approvalRevision, from, amount, isDesignPreview = false, accounts = [] }: {
+export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, rows, universeHash, isReady, policyStatus, approvalId, approvalRevision, policyRevision, from, amount, isDesignPreview = false, accounts = [] }: {
   accounts?: readonly {id:string;name:string;code:string}[];
   selectedScope: PortfolioAnalysisScope;
   scopes: readonly PortfolioAnalysisScope[];
@@ -21,7 +21,9 @@ export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, 
   universeHash: string | null;
   isReady: boolean;
   policyStatus: string;
+  approvalId?: string | null;
   approvalRevision: number | null;
+  policyRevision?: number;
   from?: string | string[];
   amount?: string | string[];
   isDesignPreview?: boolean;
@@ -44,7 +46,7 @@ export function PortfolioTargetPolicyView({ selectedScope, scopes, serviceDate, 
         <span>{approved ? <T ko={`승인본 ${approvalRevision ?? "—"} 편집`} en={`Editing approved revision ${approvalRevision ?? "—"}`} /> : <T ko={needsReview ? "이전 목표 검토 필요" : "아직 승인된 목표 없음"} en={needsReview ? "Previous targets need review" : "No approved targets yet"} />}</span>
       </div>
       {!approved && isReady ? <div className={styles.notice}><strong><T ko={needsReview ? "현재 구성에 맞춰 목표를 다시 확인해 주세요." : "편집을 시작할 값을 준비했어요."} en={needsReview ? "Review targets against your current holdings." : "A starting point for your targets."} /></strong><T ko={policyStatus === "universe_mismatch" ? "기존 종목의 입력은 유지했어요. 새 종목과 합계를 확인한 뒤 저장해 주세요." : "원하는 비중으로 편집한 뒤 저장해 주세요."} en={policyStatus === "universe_mismatch" ? "Existing targets are retained. Review new holdings and the total, then save." : "Edit the shares to your preference, then save."} />{!needsReview ? <details><summary><T ko="시작값은 어떻게 정했나요?" en="Where do the starting values come from?" /></summary><p><T ko="목표 설정이 가능한 종목의 확인된 평가액 비율을 사용합니다. 평가액 합계가 없으면 같은 비중으로 나눕니다. 둘 모두 합계를 100%로 맞춘 편집용 시작값이며, 현재 비중 표시와 다를 수 있습니다." en="Eligible holdings use the proportions of available valuations. If their total value is zero, they start with equal shares. Both are rounded to total 100% for editing and may differ from the displayed current weights." /></p></details> : null}</div> : null}
-      {isReady && universeHash ? <PortfolioTargetPolicyEditor key={selectedScope.key} rows={rows} accounts={accounts} scopeKey={selectedScope.key} approvalRevision={approvalRevision} universeHash={universeHash} isDesignPreview={isDesignPreview} returnHref={navigation.returnHref} returnLabel={navigation.returnLabel} /> : <div className={styles.blocked}>
+      {isReady && universeHash ? <PortfolioTargetPolicyEditor key={selectedScope.key} rows={rows} accounts={accounts} scopeKey={selectedScope.key} approvalId={approvalId} approvalRevision={approvalRevision} policyRevision={policyRevision} universeHash={universeHash} isDesignPreview={isDesignPreview} returnHref={navigation.returnHref} returnLabel={navigation.returnLabel} /> : <div className={styles.blocked}>
         <CairnSectionTitle><T ko={rows.length === 0 ? "보유종목부터 연결해 주세요." : "보유종목 구성을 확인해 주세요."} en={rows.length === 0 ? "Start with your holdings." : "Check your holdings first."} /></CairnSectionTitle>
         <p><T ko="선택한 범위의 계좌와 보유종목 연결을 확인하면 목표비중을 설정할 수 있습니다. 현재 저장된 목표는 변경하지 않습니다." en="Check the accounts and holdings linked to this scope before setting targets. Existing targets remain unchanged." /></p>
         <RecoveryNotice kind="holdings" scope={selectedScope.key} allowResolve={!isDesignPreview} />

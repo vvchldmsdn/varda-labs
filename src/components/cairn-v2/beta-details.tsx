@@ -22,6 +22,7 @@ import { PortfolioAllocationRing } from "./portfolio-allocation-ring";
 import styles from "./beta.module.css";
 import { CairnSelect } from "./reused/cairn-select";
 import evidence from "./reused/holding-evidence.module.css";
+import { dataIssueLabel } from "@/lib/data-issue-presentation";
 
 function StructureDetail({
   view,
@@ -81,7 +82,7 @@ function StructureDetail({
       )}
       {!!view.domain?.excluded.length && <details className={structureLayout.exclusions}><summary>제외 종목 확인</summary>{view.domain.excluded.map((r, i) => (
         <p key={i} className={styles.muted}>
-          제외: {r.name} · {r.currency} · {r.reason}
+          제외: {r.name} · {r.currency} · {dataIssueLabel(r.reason)}
         </p>
       ))}</details>}
       <div className={structureLayout.layout}>

@@ -30,7 +30,7 @@ export function HoldingAnalysisDataPanelView({ result }: { result: ScopedHolding
     );
   }
 
-  const actionable = result.entries.filter((entry) => entry.readiness.canPrepare);
+  const actionable = result.entries.filter((entry) => entry.readiness.state !== "ready");
   if (actionable.length === 0) return null;
 
   return (
@@ -41,11 +41,11 @@ export function HoldingAnalysisDataPanelView({ result }: { result: ScopedHolding
       data-status="actionable"
     >
       <CairnSectionTitle className="text-base font-semibold"><ManagementText>{"부족한 과거 가격 준비"}</ManagementText></CairnSectionTitle>
-      <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><ManagementText>{"결과 전체를 숨기지 않고 준비된 범위는 그대로 보여줍니다. 아래 버튼은 선택한 종목만 KIS에서 조회하며, 임의 평균값으로 과거 가격을 만들지 않습니다."}</ManagementText></p>
+      <p className="mt-1 text-sm leading-6 text-[var(--muted)]"><ManagementText>{"현재 구성은 바로 볼 수 있어요. 과거 분석에 부족한 자료를 확인해 주세요."}</ManagementText></p>
       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {actionable.map((entry) => (
           <div
-            className="rounded-[4px] border border-[var(--line)] bg-white px-3 py-3"
+            className="border-b border-[var(--line)] py-4"
             key={entry.holdingId}
           >
             <p className="text-sm font-semibold">{entry.name}</p>

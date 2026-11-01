@@ -82,6 +82,26 @@ async function fixture(options = {}) {
 
 describe("portfolio lifecycle mutation integration", () => {
   after(async () => { await database?.close(); });
+  it("replays the same onboarding operation after response loss without another asset or evidence row", async () => {
+    const f = await fixture();
+    const data = holdingForm({ operationId: 'retry-after-refresh', market: 'us', ticker: 'VOO', quantity: '0.896567', currentPrice: '701.2638' });
+    const first = await f.holdings.writeSessionHoldingOnboarding(data);
+    assert.equal(first.status, 'success');
+    const again = await f.holdings.writeSessionHoldingOnboarding(data);
+    assert.equal(again.status, 'success'); assert.equal(again.assetId, first.assetId);
+    assert.equal(again.firstHoldingCreated, undefined);
+    assert.equal(await f.count('assets'), 1); assert.equal(await f.count('holding_onboarding_evidence'), 1);
+    assert.equal(Number((await f.pg.query('select quantity from assets')).rows[0].quantity), 0.896567);
+    data.set('quantity', '1');
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(data)).status, 'conflict');
+    assert.equal(await f.count('assets'), 1);
+  });
+  it("keeps unrelated duplicate tickers a conflict even with another operation identifier", async () => {
+    const f = await fixture();
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({operationId:'first'}))).status, 'success');
+    assert.equal((await f.holdings.writeSessionHoldingOnboarding(holdingForm({operationId:'second'}))).status, 'conflict');
+    assert.equal(await f.count('assets'), 1);
+  });
   it("marks only the first ever actual holding within the existing owner lock", async () => {
     const f = await fixture();
     const first = await f.holdings.writeSessionHoldingOnboarding(holdingForm());

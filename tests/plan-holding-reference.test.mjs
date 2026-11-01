@@ -64,7 +64,7 @@ describe("plan to holding handoff", () => {
     const [form] = await importUiWithPorts(["src/components/holding-onboarding-form.tsx"], {
       "@/components/native-ledger-notice": { NativeLedgerNotice: () => null },
       "@/db/queries/native-account-management": { readNativeManagementAccounts: async () => [] },
-      react: { useState: initial => [initial, () => {}], useActionState: (fn, initial) => { submit = fn; return [initial, () => {}, false]; } },
+      react: { useState: initial => [initial, () => {}], useRef: initial => ({current:initial}), useEffect: () => {}, useActionState: (fn, initial) => { submit = fn; return [initial, () => {}, false]; } },
       "next/link": { default: () => null },
       "next/navigation": { usePathname: () => "/portfolio/holdings/new", useSearchParams: () => new URLSearchParams(), useRouter: () => ({}) },
       "@/components/use-market-collection-polling": { useMarketCollectionPolling: () => null },

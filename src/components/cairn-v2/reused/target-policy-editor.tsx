@@ -1,5 +1,6 @@
 'use client';
 import {useActionFormReset} from '@/components/cairn-ui/client';
+import {TargetApprovalControls} from '@/components/portfolio/target-approval-controls';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 import {useActionState,useState} from 'react';
@@ -13,8 +14,8 @@ type Candidate=OnboardingInstrument&{accountId:string;accountName:string;weight:
 type Save=(previous:PortfolioTargetPolicyActionState,data:FormData)=>Promise<PortfolioTargetPolicyActionState>;
 // Limited candidate 736f display-core port: original weights/candidates/removed/revision
 // contract; current scoped presentation, no candidate locale/root/fixture/storage.
-export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approvalRevision,action:save}:{rows:readonly TargetEditorRow[];accounts:readonly {id:string;name:string;code:string}[];scopeKey:string;universeHash:string;approvalRevision:number;action:Save}){
- const [state,action,pending]=useActionState(async(previous:PortfolioTargetPolicyActionState,data:FormData)=>{const result=await save(previous,data);return {...result,approvalRevision:result.approvalRevision??previous.approvalRevision};},{status:'idle',message:null,approvalRevision} as PortfolioTargetPolicyActionState);
+export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approvalId=null,approvalRevision,policyRevision=approvalRevision,action:save}:{rows:readonly TargetEditorRow[];accounts:readonly {id:string;name:string;code:string}[];scopeKey:string;universeHash:string;approvalId?:string|null;approvalRevision:number;policyRevision?:number;action:Save}){
+ const [state,action,pending]=useActionState(async(previous:PortfolioTargetPolicyActionState,data:FormData)=>{const result=await save(previous,data);return {...result,approvalId:result.approvalId===undefined?previous.approvalId:result.approvalId,approvalRevision:result.approvalRevision??previous.approvalRevision,policyRevision:result.policyRevision??previous.policyRevision};},{status:'idle',message:null,approvalId,approvalRevision,policyRevision} as PortfolioTargetPolicyActionState);
  const {formRef: actionResetRef, onReset: actionResetOnReset} = useActionFormReset(state);
  const initial=rows.map(r=>r.buyability==='buyable'?targetInputPercent(r.editorTargetWeightBps):'0');
  const [weights,setWeights]=useState(initial),[candidates,setCandidates]=useState<Candidate[]>([]),[removed,setRemoved]=useState<string[]>([]),[accountId,setAccountId]=useState(accounts[0]?.id??''),[editedSinceSubmit,setEditedSinceSubmit]=useState(false),[selectionNotice,setSelectionNotice]=useState('');
@@ -34,7 +35,7 @@ export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approval
   setCandidates(old=>[...old,{...instrument,accountId:account.id,accountName:account.name,weight:''}]);edited();
  };
  return <CairnForm ref={actionResetRef} onReset={actionResetOnReset} action={action} className={styles.form} data-target-dirty={dirty} onSubmit={()=>setEditedSinceSubmit(false)}>
-  <input type="hidden" name="scope" value={scopeKey}/><input type="hidden" name="universeHash" value={universeHash}/><input type="hidden" name="approvalRevision" value={state.approvalRevision??approvalRevision}/><input type="hidden" name="rowCount" value={all.length}/><input type="hidden" name="candidates" value={JSON.stringify(candidates.map(r=>({accountId:r.accountId,instrumentId:r.id})))}/><input type="hidden" name="removed" value={JSON.stringify(removed)}/>
+  <input type="hidden" name="approvalId" value={state.approvalId??""}/><input type="hidden" name="policyRevision" value={state.policyRevision??policyRevision}/><input type="hidden" name="scope" value={scopeKey}/><input type="hidden" name="universeHash" value={universeHash}/><input type="hidden" name="approvalRevision" value={state.approvalRevision??approvalRevision}/><input type="hidden" name="rowCount" value={all.length}/><input type="hidden" name="candidates" value={JSON.stringify(candidates.map(r=>({accountId:r.accountId,instrumentId:r.id})))}/><input type="hidden" name="removed" value={JSON.stringify(removed)}/>
   <section className={styles.total} aria-label="목표 합계와 승인 상태" data-target-summary>
    <div className={styles.totalValue}><span>목표 합계</span><strong data-valid={valid}>{total===null?'입력 확인':targetInputPercent(total)+'%'}</strong></div>
    <div className={styles.totalStatus}>
@@ -45,6 +46,7 @@ export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approval
    <CairnButton variant="primary" className={styles.save} type="submit" disabled={pending||!valid||all.length===removed.length}>{pending?'저장 중':'목표비중 저장'}</CairnButton>
 
   </section>
+  <TargetApprovalControls revision={state.approvalRevision??approvalRevision} pending={pending}/>
   <div className={styles.editor}>
    <div className={styles.editorHeading}><CairnSectionTitle level="h3">종목별 목표</CairnSectionTitle><CairnButton variant="secondary" type="button" disabled={pending||!dirty} onClick={()=>{setWeights(initial);setCandidates([]);setRemoved([]);edited();}}>입력 되돌리기</CairnButton></div>
    <div className={styles.columns} aria-hidden="true"><span>종목 · 계좌</span><span>목표 비중</span></div>

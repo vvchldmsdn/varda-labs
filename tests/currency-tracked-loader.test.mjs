@@ -7,7 +7,7 @@ const scope = {kind:"all",key:"all",label:"All"};
 const recent = () => new Date(Date.now()-60_000);
 const asset = (extra={}) => ({id:"owned-asset",canonicalOwnerUserId:owner,accountId:"owned-account",name:"Owned ETF",assetType:"etf",market:"us",currency:"USD",ticker:"VOO",quantity:"1.123456",currentPrice:"100.1234",priceSource:"kis",priceAsOf:recent(),priceFetchedAt:recent(),priceQuoteType:"live",priceStatus:"ok",fractionalKrwValue:"0",averageCost:"90",...extra});
 const sources = (extra={}) => ({assetRows:[asset()],accountRows:[],settingsRows:[],liveQuoteRows:[],recentFxRows:[],recentPositionRows:[{snapshotDate:"2026-09-01",marketValueKrw:"999999",quantity:"1",currentPrice:"100"}],eventRows:[],...extra});
-async function load(rows) {
+async function load(rows, options = {}) {
   let passed;
   const [query] = await importWithPorts(["src/db/queries/currency-tracked-portfolio.ts"], {
     "./portfolio-dashboard": {getReadOnlyTenantPortfolioDashboardSources: async args=>{passed=args;return rows;}},
@@ -15,7 +15,7 @@ async function load(rows) {
     "@/lib/market-data/twelve-data-service": { getTwelveDataServerConfig: () => undefined, requestTwelveDataEvidence: async () => { throw new Error("unexpected_provider_request"); }, readTwelveDataEvidence: async () => { throw new Error("unexpected_provider_read"); }, requestTwelveDataHistoricalFx: async () => { throw new Error("unexpected_provider_request"); }, readTwelveDataHistoricalFx: async () => { throw new Error("unexpected_provider_read"); }, readTwelveDataSplitRisk: async () => ({ status: "disabled", actions: [] }), requestTwelveDataSplitRisk: async () => ({ status: "disabled", actions: [] }), resolveTwelveDataTarget: () => ({ status: "disabled" }) },
     "@/lib/snapshots/market-calendar":{resolveSnapshotCycle:()=>({snapshotDate:"2026-09-13"})},
   });
-  const result=await query.getTrackedCurrencyEvidence({ownerUserId:owner},scope,"USD");
+  const result=await query.getTrackedCurrencyEvidence({ownerUserId:owner},scope,"USD",options);
   return {result,passed};
 }
 it("reuses scoped source reader and keeps original native decimal amounts",async()=>{
@@ -50,4 +50,15 @@ it("rejects mixed owners before any private source data can reach client props",
     assert.equal(String(error).includes("private-other"),false);
     return true;
   });
+});
+
+it("admits a dated entered price only for current investments, never as cash-inclusive history",async()=>{
+  const rows=sources({assetRows:[asset({priceSource:'user_entered_onboarding',priceQuoteType:'manual',quantity:'0.896567'})]});
+  assert.equal((await load(rows)).result.current.positions[0].observation,null);
+  const current=(await load(rows,{investmentsOnly:true})).result;
+  assert.equal(current.current.positions[0].observation.quantity,'0.896567');
+  assert.equal(current.current.positions[0].observation.price,'100.1234');
+  assert.deepEqual(current.history,[]);assert.equal(current.trades,null);
+  rows.assetRows[0].priceAsOf=null;
+  assert.equal((await load(rows,{investmentsOnly:true})).result.current.positions[0].observation,null);
 });

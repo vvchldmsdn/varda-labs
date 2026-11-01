@@ -6,6 +6,7 @@ import { Button, InfoDisclosure } from '@/components/cairn-ui';
 import { useI18n } from '@/components/i18n/locale-provider';
 import { recoveryDestination, recoveryHref, recoveryKind, recoveryReturnHref, type RecoveryKind } from '@/lib/recovery-navigation';
 import styles from './recovery.module.css';
+import { dataIssueLabel } from '@/lib/data-issue-presentation';
 
 const copy = {
   history: ['저장 기록을 확인해 주세요', '날짜별 평가가 쌓이면 흐름을 볼 수 있어요. 매수·매도 입력이나 현재 원가 수정만으로 과거 평가와 수익률이 만들어지지는 않습니다.', '저장 기록 확인하기', 'Review your saved history', 'Your timeline grows as dated valuations are recorded. Adding trades or changing today’s cost basis does not create historical valuations or returns.', 'Review saved records'],
@@ -51,6 +52,6 @@ export function RecoveryNotice({ reasons = [], kind, scope, beta = false, return
       {selected !== 'retry' && <Button type="button" variant="ghost" disabled={pending} onClick={retry}><RefreshCw size={16} aria-hidden="true" />{t('다시 조회', 'Reload')}</Button>}
     </div>
     {selected !== 'retry' && allowResolve && <small>{t('현재 입력을 유지한 채 돌아올 수 있어요.', 'Return with your current inputs preserved.')}</small>}
-    <InfoDisclosure summary={t('확인이 필요한 이유', 'Why this needs attention')}><p>{t(c[1], c[4])}</p>{(details || reasons.length > 0) && <p className={styles.reason}>{details ?? reasons.join(' · ')}</p>}</InfoDisclosure>
+    <InfoDisclosure summary={t('확인이 필요한 이유', 'Why this needs attention')}><p>{t(c[1], c[4])}</p>{(details || reasons.length > 0) && <p className={styles.reason}>{details ?? [...new Set(reasons.map(reason => t(dataIssueLabel(reason), dataIssueLabel(reason, true))))].join(' · ')}</p>}{reasons.length > 0 && <details><summary>{t('진단 정보', 'Diagnostics')}</summary><code>{reasons.join(' · ')}</code></details>}</InfoDisclosure>
   </section>;
 }

@@ -141,7 +141,7 @@ function blockerLabel(blocker: string) {
     unallocatable_target_deficit:
       "부족 비중을 매수 가능한 종목에 배분할 수 없습니다.",
   };
-  return labels[blocker] ?? `데이터 검증 실패: ${blocker}`;
+  return labels[blocker] ?? "계산에 필요한 자료를 확인하지 못했습니다. 보유종목과 목표비중을 확인해 주세요.";
 }
 
 function formatKrw(value: number) {

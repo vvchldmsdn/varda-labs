@@ -40,13 +40,14 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
         await page.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
         await page.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('1');
         await page.getByRole('button',{name:'목록에 추가',exact:true}).click();
-        await page.getByText('매입가·현재가 (선택)',{exact:true}).click();
-        await page.getByLabel('현재 1주 가격 (선택)',{exact:true}).fill('100');
+        await page.getByText('매입가·가격 확인',{exact:true}).click();
+        await page.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
         await page.getByRole('button',{name:'1종목 저장',exact:true}).click();
         await expect(page.getByRole('status').filter({hasText:'1종목이 포트폴리오에 담겼어요.'})).toBeVisible();
         const saved=(await admin.query("select account_id,quantity from assets where canonical_owner_user_id=$1 and ticker='999995'",[legacyOwner])).rows;
         assert.equal(saved.length,1);assert.equal(saved[0].account_id,legacyAccount);assert.equal(Number(saved[0].quantity),1);
         await page.reload();
+        await page.getByRole('button',{name:'저장된 목록 접고 더 추가하기',exact:true}).click();
       }
       const selector=page.getByLabel(locale==='ko'?'보유 계좌':'Holding account',{exact:true});
       const cash=await selector.locator('option').filter({hasText:'Cash'}).getAttribute('value');

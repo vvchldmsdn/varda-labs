@@ -44,7 +44,7 @@ describe("P1/P2 hardening boundaries", () => {
       /getReadOnlyTenantHoldingAnalysisDataReadiness\(\{[\s\S]*tenantContext: options\.tenantContext/,
     );
     assert.match(panel, /HoldingAnalysisDataForm/);
-    assert.match(panel, /result\.entries\.filter\(\(entry\) => entry\.readiness\.canPrepare\)/);
+    assert.match(panel, /result\.entries\.filter\(\(entry\) => entry\.readiness\.state !== "ready"\)/);
     assert.doesNotMatch(panel, /\bfetch\s*\(|\/api\//);
     assert.match(investmentLab, /HoldingAnalysisDataPanel/);
     assert.match(simulation, /HoldingAnalysisDataPanel/);

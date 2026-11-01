@@ -46,6 +46,7 @@ export type TenantPortfolioTargetPolicyRead =
   | Readonly<{
       status: "available";
       policy: Readonly<{
+        approvalId?: string;
         approvalRevision: number;
         policyVersion: string;
         effectiveServiceDate: string;
@@ -60,6 +61,8 @@ export type TenantPortfolioTargetPolicyRead =
 type UnavailablePolicyRead = Readonly<{
   status: Exclude<PolicyReadStatus, "available">;
   policy: null;
+  explicitlyRevoked?: boolean;
+  lastRevision?: number;
 }>;
 
 export async function loadCurrentTenantLegacyTargetPolicy({
@@ -141,8 +144,15 @@ const LEGACY_TARGET_POLICY_SQL = `
 `;
 
 const PORTFOLIO_TARGET_POLICY_SQL = `
+  with scoped_revisions as materialized (
+    select * from public.portfolio_target_policy_revisions
+    where scope_kind = $1::varchar
+      and scope_account_id is not distinct from $2::uuid
+      and scope_portfolio_group_id is not distinct from $3::uuid
+  )
   select
     revision.id::text as approval_revision_id,
+    revision.lifecycle_status,
     revision.approval_revision,
     revision.policy_version,
     revision.effective_service_date::text as effective_service_date,
@@ -159,7 +169,7 @@ const PORTFOLIO_TARGET_POLICY_SQL = `
     policy_row.ticker as row_ticker,
     policy_row.buyability as row_buyability,
     policy_row.target_weight_bps as row_target_weight_bps
-  from public.portfolio_target_policy_revisions as revision
+  from scoped_revisions as revision
   left join (
     select approval_revision_id,account_id,asset_id,asset_id as origin_asset_id,null::varchar as asset_type,asset_name,market,currency,ticker,buyability,target_weight_bps
     from public.portfolio_target_policy_rows
@@ -170,7 +180,11 @@ const PORTFOLIO_TARGET_POLICY_SQL = `
   where revision.scope_kind = $1::varchar
     and revision.scope_account_id is not distinct from $2::uuid
     and revision.scope_portfolio_group_id is not distinct from $3::uuid
-    and revision.lifecycle_status = 'approved'
+    and (revision.lifecycle_status = 'approved' or (
+      revision.lifecycle_status = 'revoked'
+      and not exists (select 1 from scoped_revisions where lifecycle_status = 'approved')
+      and revision.approval_revision = (select max(approval_revision) from scoped_revisions)
+    ))
   order by
     revision.id,
     policy_row.account_id,
@@ -227,6 +241,9 @@ function projectPortfolioPolicy(
   if (revisionId === "conflict") return unavailable("conflict");
 
   const first = rows[0];
+  if (first.lifecycle_status === "revoked") {
+    return Object.freeze({ status: "missing", policy: null, explicitlyRevoked: true, lastRevision: requiredInteger(first.approval_revision) });
+  }
   const policyRows = rows.flatMap((row) => {
     if (row.row_account_id === null) {
       assertAllNull(row, [
@@ -260,6 +277,7 @@ function projectPortfolioPolicy(
   return Object.freeze({
     status: "available",
     policy: Object.freeze({
+      approvalId: requiredString(first.approval_revision_id),
       approvalRevision: requiredInteger(first.approval_revision),
       policyVersion: requiredString(first.policy_version),
       effectiveServiceDate: requiredDate(first.effective_service_date),

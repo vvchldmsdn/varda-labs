@@ -220,7 +220,7 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
       '@/db/queries/onboarding-instrument-search':{resolveOnboardingInstrumentById:async id=>id==='fixture:C'?{id,name:'Candidate C',ticker:'CANDUNIT',market:'us',currency:'USD',assetType:'stock'}:null},
       '@/lib/auth/current-tenant-context':{resolveCurrentTenantContext:async()=>({ok:true,tenantContext:{ownerUserId:owner,role:'user'}})},
       '@/db/queries/portfolio-analysis-scopes':{getReadOnlyTenantPortfolioAnalysisScopeContext:async()=>({state:'ready',resolution:{state:'resolved',scope}})},
-      '@/db/queries/portfolio-target-policy':{getReadOnlyTenantPortfolioTargetPolicyModel:async()=>({status:'ready',rows:modelRows,selectableAccounts:[{id:account,code:'brokerage',name:'Synthetic'}],universe:{...universe,rows:modelRows},currentUniverseHash:currentHash,approvedPolicy:{policy:readRevision?{approvalRevision:readRevision,policyVersion}:null}})},
+      '@/db/queries/portfolio-target-policy':{getReadOnlyTenantPortfolioTargetPolicyModel:async()=>({status:'ready',rows:modelRows,selectableAccounts:[{id:account,code:'brokerage',name:'Synthetic'}],universe:{...universe,rows:modelRows},currentUniverseHash:currentHash,approvedPolicy:{status:readRevision?'available':'missing',policy:readRevision?{approvalRevision:readRevision,policyVersion}:null}})},
     });
     const form=(revision,zeroAsset=asset)=>{const f=new FormData();f.set('scope',scope.key);f.set('rowCount','2');f.set('universeHash',hash);f.set('approvalRevision',String(revision));universe.rows.forEach((r,i)=>f.set(`targetWeight:${i}`,r.assetId===zeroAsset?'0':'100'));return f;};
     const read=ownerUserId=>reader.loadCurrentTenantPortfolioTargetPolicy({scopeKind:'account',scopeAccountId:account,scopePortfolioGroupId:null,tenantContext:{ownerUserId,role:'user'}});
@@ -258,6 +258,13 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     modelRows.forEach((r,i)=>readd.set('targetWeight:'+i,r.assetId===secondAsset?'50':'0'));readd.set('targetWeight:3','50');
     assert.equal((await writer.writeSessionPortfolioTargetPolicy(readd)).status,'success');
     assert.equal((await read(owner)).policy.rows.find(r=>r.ticker==='CANDUNIT').targetWeightBps,5000);
+    const revoke=new FormData();revoke.set('scope',scope.key);revoke.set('intent','revoke');revoke.set('approvalRevision','4');revoke.set('approvalId',(await read(owner)).policy.approvalId);
+    assert.equal((await writer.writeSessionPortfolioTargetPolicy(revoke)).status,'success');
+    assert.equal((await writer.writeSessionPortfolioTargetPolicy(revoke)).status,'success','replayed revocation is idempotent');
+    const revoked=await read(owner);assert.equal(revoked.status,'missing');assert.equal(revoked.explicitlyRevoked,true);assert.equal(revoked.lastRevision,4);
+    assert.equal((await worker.query('select count(*)::int n from portfolio_target_policy_revisions where canonical_owner_user_id=$1',[owner])).rows[0].n,4);
+    assert.equal((await worker.query('select count(*)::int n from portfolio_target_policy_lifecycle_events where canonical_owner_user_id=$1',[owner])).rows[0].n,8);
+    assert.equal((await read(randomUUID())).status,'missing');
 
   });
   await check('simulation-paired-queue-writer-query-calendar-engine-and-stale-worker',async()=>{

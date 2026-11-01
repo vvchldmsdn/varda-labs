@@ -17,7 +17,7 @@ export async function readHoldingOnboarding(params:Params,ports:HoldingOnboardin
   base={...base,context:{...context,scope:catalog.resolution.scope.key},allowUnknownAverageCost:await ports.aligned()};
   const [options,nativeAccounts]=await Promise.all([ports.options(session.tenantContext),ports.nativeAccounts(session.tenantContext)]);if(options.state!=='ready')return {...base,message:'계좌·그룹 조회 실패 · 예시로 대체하지 않습니다'};
   // The original query owns admission. Only its public form fields cross the boundary.
-  const publicOptions={state:'ready' as const,accounts:options.accounts.map(a=>({id:a.id,code:a.code,name:a.name,accountType:a.accountType})),portfolioGroups:options.portfolioGroups.map(g=>({id:g.id,name:g.name}))};
+  const publicOptions={state:'ready' as const,draftOwnerKey:options.draftOwnerKey,accounts:options.accounts.map(a=>({id:a.id,code:a.code,name:a.name,accountType:a.accountType})),portfolioGroups:options.portfolioGroups.map(g=>({id:g.id,name:g.name}))};
   const ownedIds=new Set(publicOptions.accounts.map(account=>account.id));
   return {...base,state:publicOptions.accounts.length?'ready':'empty',message:publicOptions.accounts.length?'계좌별 등록 방법 확인':'등록 가능한 소유 계좌가 없습니다',options:publicOptions,nativeAccountIds:nativeAccounts.map(account=>account.id).filter(id=>ownedIds.has(id))};
  }catch{return {...base,message:'등록 조건 조회 실패 · 다른 사용자 자료로 대체하지 않습니다'};}

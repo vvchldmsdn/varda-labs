@@ -110,7 +110,8 @@ describe("target policy tenant RLS boundary", () => {
     assert.match(legacySql, /inner join public\.accounts as account/);
     assert.match(legacySql, /left join public\.target_policy_approval_vector_rows as vector/);
     assert.match(legacySql, /account\.is_active = true/);
-    assert.match(portfolioSql, /from public\.portfolio_target_policy_revisions as revision/);
+    assert.match(portfolioSql, /with scoped_revisions as materialized[\s\S]*from public\.portfolio_target_policy_revisions/);
+    assert.match(portfolioSql, /from scoped_revisions as revision/);
     assert.match(portfolioSql, /from public\.portfolio_target_policy_rows[\s\S]*union all[\s\S]*from public\.portfolio_target_plan_rows/);
     assert.match(portfolioSql, /scope_account_id is not distinct from \$2::uuid/);
     assert.match(portfolioSql, /scope_portfolio_group_id is not distinct from \$3::uuid/);

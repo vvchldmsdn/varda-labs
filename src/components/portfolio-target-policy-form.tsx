@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionFormReset } from "@/components/cairn-ui/client";
+import { TargetApprovalControls } from "@/components/portfolio/target-approval-controls";
 
 import { InstrumentSearch, type InstrumentChoice } from "@/components/onboarding/instrument-search";
 import { RecoveryBackLink as Link } from '@/components/recovery/recovery-return';
@@ -17,14 +18,16 @@ import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as
 
 const INITIAL_STATE: PortfolioTargetPolicyActionState = Object.freeze({ status: "idle", message: null });
 
-export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approvalRevision = null, isDesignPreview = false, returnHref, returnLabel, accounts = [], onSaved, onEdited }: {
+export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approvalId = null, approvalRevision = null, policyRevision = approvalRevision ?? 0, isDesignPreview = false, returnHref, returnLabel, accounts = [], onSaved, onEdited }: {
   onSaved?: (message:string)=>void;
   onEdited?: ()=>void;
   accounts?: readonly {id:string;name:string;code:string}[];
   universeHash: string;
   rows: readonly PortfolioTargetEditorRow[];
   scopeKey: string;
+  approvalId?: string | null;
   approvalRevision?: number | null;
+  policyRevision?: number;
   isDesignPreview?: boolean;
   returnHref?: string;
   returnLabel?: { ko: string; en: string };
@@ -35,8 +38,8 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
     if(result.status === "success" && result.message) onSaved?.(result.message);
     // A failed attempt must retain the last revision saved by this draft.
     // Refreshed server props must not silently rebase unsaved inputs.
-    return { ...result, approvalRevision: result.approvalRevision ?? previous.approvalRevision };
-  }, { ...INITIAL_STATE, approvalRevision: approvalRevision ?? 0 });
+    return { ...result, approvalId: result.approvalId === undefined ? previous.approvalId : result.approvalId, approvalRevision: result.approvalRevision ?? previous.approvalRevision, policyRevision: result.policyRevision ?? previous.policyRevision };
+  }, { ...INITIAL_STATE, approvalId, approvalRevision: approvalRevision ?? 0, policyRevision });
   const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state);
   const [candidates,setCandidates]=useState<(InstrumentChoice & {accountId:string;accountName:string;weight:string})[]>([]);
   const [removed,setRemoved]=useState<string[]>([]);
@@ -64,6 +67,8 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
       else setEditedSinceSubmit(false);
     }} onReset={actionFormOnReset} ref={actionFormRef}>
       <input name="scope" type="hidden" value={scopeKey} />
+      <input name="policyRevision" type="hidden" value={state.policyRevision ?? policyRevision} />
+      <input name="approvalId" type="hidden" value={state.approvalId ?? ""} />
       <input name="approvalRevision" type="hidden" value={state.approvalRevision ?? 0} />
       <input name="rowCount" type="hidden" value={editorRows.length} />
       <input name="candidates" type="hidden" value={JSON.stringify(candidates.map(row=>({accountId:row.accountId,instrumentId:row.id})))} />
@@ -136,6 +141,7 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
           <p>{t("추가 투입과 포트폴리오 분석에 사용할 기준입니다. 저장해도 주문은 실행되지 않습니다.", "Your reference for contribution calculations and portfolio analysis. Saving does not place any orders.")}</p>
           <ul className="mt-2 grid list-disc gap-2 pl-4"><li>{t("각 비중은 0~100%, 소수점 둘째 자리까지 입력합니다.", "Each weight must be 0–100%, with up to two decimal places.")}</li><li>{t("합계는 정확히 100%여야 합니다. 0% 종목도 기록에 남습니다.", "The total must be exactly 100%. Holdings with a 0% target remain in the record.")}</li><li>{t("같은 종목이어도 계좌가 다르면 각각 설정합니다.", "The same holding in different accounts has a separate target in each account.")}</li><li>{t("저장하면 새 승인본으로 적용되며, 이전 승인본은 이력으로 보존합니다.", "Saving applies a new approved revision and preserves previous approvals in history.")}</li><li>{t("편집 중 보유종목 구성이 바뀌면 다시 확인한 뒤 저장해야 합니다.", "If holdings change while editing, review the updated list before saving.")}</li></ul>
         </InfoDisclosure>
+        <TargetApprovalControls revision={state.approvalRevision ?? 0} pending={pending} disabled={isDesignPreview} />
       </aside>
     </CairnForm>
   );

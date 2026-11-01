@@ -19,13 +19,11 @@ import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
 import {
   getKisProviderPolicy,
 } from "@/lib/market-data/providers/kis";
-import { shiftRiskDate } from "@/lib/portfolio-risk-calendar";
+import { holdingHistoryRequest } from "@/lib/holding-analysis-collection";
 import {
-  closeCalendarReferenceDateForAsset,
   resolveSnapshotCycle,
 } from "@/lib/snapshots/market-calendar";
 
-const HISTORY_WINDOW_CALENDAR_DAYS = 400;
 
 export async function prepareSessionHoldingAnalysisData(
   formData: FormData,
@@ -91,7 +89,7 @@ export async function prepareSessionHoldingAnalysisData(
     if (!providerPolicy.configured) {
       return state(
         "error",
-        "KIS 가격 조회 설정을 확인한 뒤 다시 시도해 주세요.",
+        "자동 과거 가격 수집을 사용할 수 없습니다. 서비스의 시세 연결 확인이 필요합니다.",
       );
     }
 
@@ -99,12 +97,7 @@ export async function prepareSessionHoldingAnalysisData(
     if (!ticker) {
       return state("invalid", "자동 조회에 필요한 티커가 없습니다.");
     }
-    const endDate = closeCalendarReferenceDateForAsset(target, serviceDate);
-    const startDate = shiftRiskDate(
-      endDate,
-      -(HISTORY_WINDOW_CALENDAR_DAYS - 1),
-    );
-    await enqueueMarketCollection([{ kind: "history", ticker, market: target.market, currency: target.currency, startDate, endDate }]);
+    await enqueueMarketCollection([holdingHistoryRequest({ ticker, market: target.market, currency: target.currency }, serviceDate)]);
     scheduleMarketCollection();
     return Object.freeze({ status: "queued" as const, message: "과거 가격 준비를 접수했습니다. 저장된 범위부터 분석하며 준비 상황을 자동으로 확인합니다.", retryAfterSeconds: 10 });
   } catch {

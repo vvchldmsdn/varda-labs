@@ -42,7 +42,7 @@ export function BetaTargetEditor({read}:{read:TargetEditorRead}){
    {!blocked&&read.state==='unavailable'&&<CairnButton variant="secondary" type="button" className={styles.retry} onClick={()=>refresh()}>목표 자료 다시 조회</CairnButton>}
    {!blocked&&read.state==='blocked'&&available&&<RecoveryNotice beta kind="holdings" scope={context.scope} />}
    <div key={generation} hidden={!readable} inert={!enabled} aria-hidden={!readable} onSubmitCapture={(event:FormEvent)=>{if(!enabled)event.preventDefault()}}>
-    {readable&&read.universeHash&&<TargetPolicyEditor rows={read.rows} accounts={read.accounts} scopeKey={context.scope} universeHash={read.universeHash} approvalRevision={read.approvalRevision} action={action}/>}
+    {readable&&read.universeHash&&<TargetPolicyEditor rows={read.rows} accounts={read.accounts} scopeKey={context.scope} universeHash={read.universeHash} approvalId={read.approvalId} approvalRevision={read.approvalRevision} policyRevision={read.policyRevision} action={action}/>}
    </div>
    {!blocked&&<details className={styles.evidence}><summary>승인·계산 근거</summary><p>정책 {read.policyVersion??'승인본 없음'} · 적용일 {read.effectiveDate??'—'} · 상태 {read.policyStatus}. 합계 100%, 현재 구성과 승인본 번호는 기존 v2 백엔드가 저장 시 다시 확인합니다. 이전 승인본은 이력으로 남으며 목표 승인은 거래·자산·시세를 생성하지 않습니다.</p><p>구성 기준: {read.universeHash??'—'} · 화면 갱신 {read.readAt??'—'}</p></details>}
   </section>
