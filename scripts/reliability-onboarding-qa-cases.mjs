@@ -156,7 +156,7 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       await expect.poll(()=>new URL(page.url()).searchParams.get('scope')).toBe(query.scope);
       await expect.poll(()=>new URL(page.url()).searchParams.get(beta?'cashAmountKrw':'amount')).toBe('1234567');
       await expect(page.locator('[data-recovery-kind="targets"]')).toHaveCount(0);
-      const calculation=page.locator(beta?'[data-contribution-state="ready"]':'main[data-page="additional-contribution"][data-preview-status="ready"]');
+      const calculation=beta?page.getByRole('dialog').locator('[data-contribution-state="ready"]'):page.locator('main[data-page="additional-contribution"][data-preview-status="ready"]');
       await expect(calculation).toBeVisible();
       await capture((beta?'beta-':'')+'onboarding-contribution-ready',calculation);
       await page.goto(targetsUrl);

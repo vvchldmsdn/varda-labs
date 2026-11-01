@@ -40,7 +40,9 @@
 .body .secondary{min-height:44px;padding:10px 16px;font-size:14px}
 .actions>a{padding:12px 0;color:var(--muted);font-size:14px;text-underline-offset:5px}
 @media(max-width:760px){
-  .page:not(.compact) .actions{position:sticky;bottom:calc(80px + env(safe-area-inset-bottom));z-index:2;background:var(--paper);padding:12px 0 6px;border-top:1px solid var(--line)}
+  .page:not(.compact) .actions{position:sticky;bottom:calc(80px + env(safe-area-inset-bottom));z-index:2;background:var(--paper);padding:12px 0 6px;border-top:1px solid var(--line);flex-wrap:nowrap}
+  .page:not(.compact) .actions>.primary{width:auto;flex:1}
+  .page:not(.compact) .actions>a{flex:none}
   .page:not(.compact) :is(input,select,textarea){scroll-margin-block:24px 220px}
 }
 .lots{display:grid;gap:20px}.lot{padding-top:18px;border-top:1px solid var(--line)}
