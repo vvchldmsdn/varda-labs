@@ -135,6 +135,9 @@
 .panelScroll {width:var(--cairn-v2-content-width);height:var(--cairn-v2-content-height);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
 .close {position:absolute;z-index:3;top:23px;right:30px;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;}
 .close:hover {background:#e9e9e4;}
+.paperPanel .panelScroll {margin-top:52px;height:calc(var(--cairn-v2-content-height) - 52px);}
+.paperPanel .close {top:4px;}
+.paperPanel .detailContent {padding-top:8px;}
 .detailContent {min-height:100%;padding:29px 44px 20px;display:flex;flex-direction:column;}
 .detailLoading {min-height:320px;display:grid;place-items:center;padding:32px;color:var(--cairn-v2-muted);}
 .detailHeader {padding-right:65px;}

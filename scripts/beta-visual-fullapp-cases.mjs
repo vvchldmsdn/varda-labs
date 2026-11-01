@@ -57,7 +57,11 @@ export async function runBetaVisualCases({page,check,url,output}) {
         assert.equal(sizes.length,2);assert.ok(sizes.every(size=>size>=23&&size<=32),'two mobile metrics fit at readable matched sizes');
       }
       const last=list.getByRole('button').last();await last.click();await expect(last).toHaveAttribute('aria-pressed','true');
-      await list.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,`beta-today-${width}.png`)});
+      await list.scrollIntoViewIfNeeded();
+      const closeBounds=await dialog.locator('[data-dialog-close]').boundingBox();
+      const scrollBounds=await list.evaluate(el=>{let node=el.parentElement;while(node&&getComputedStyle(node).overflowY!=='auto')node=node.parentElement;const r=node?.getBoundingClientRect();return r?{y:r.y}:null;});
+      assert.ok(closeBounds&&scrollBounds&&closeBounds.y+closeBounds.height<=scrollBounds.y,'close control must remain outside scrolling financial content');
+      await page.screenshot({path:path.join(output,`beta-today-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
       await page.getByRole('button',{name:'히스토리 확대',exact:true}).click();
       const history=dialog.locator('[data-history-plot] svg');await chartGeometry(history);await history.focus();await page.keyboard.press('Home');
