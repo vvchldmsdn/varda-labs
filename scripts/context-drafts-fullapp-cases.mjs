@@ -122,6 +122,7 @@ export async function runContextLabDraftCases({ page, check, account, url, outpu
     await page.context().addCookies([{name:'varda-locale',value:'ko',url}]);
     await page.goto(url+'/qa-context-presentation');
     const tabs=page.getByRole('tablist').getByRole('tab');
+    await expect(tabs.nth(1)).toBeVisible({timeout:15000});
     const count=await tabs.count();assert.ok(count>=2);
     await tabs.first().focus();await tabs.first().press('End');
     await expect(tabs.last()).toBeFocused();await expect(tabs.last()).toHaveAttribute('aria-selected','true');
