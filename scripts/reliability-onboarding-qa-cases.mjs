@@ -117,12 +117,14 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   await check('fullapp-current-investments-currency-parity-and-history-shortage',async()=>{
     for(const currency of ['KRW','USD']){
       await page.goto(url+'/?'+new URLSearchParams({...query,currency}));
-      await expect(page.locator('main')).toContainText('QA 보유 6');
+      const home=page.locator('main[data-page="home"], main[data-surface="home"]');
+      await expect(home).toBeVisible();
+      await expect(home).toContainText('QA 보유 6');
       if(currency==='USD'){
         await expect(page.getByText('현재 투자자산 · 현금 제외 · 과거 수익률과 별도',{exact:true})).toBeVisible();
-        await expect(page.locator('main')).not.toContainText('cash_not_observed');
+        await expect(home).not.toContainText('cash_not_observed');
       }
-      await capture('investments-'+currency,page.locator('main'));
+      await capture('investments-'+currency,home);
     }
     await page.goto(url+'/beta/simulation?'+new URLSearchParams({mode:'domain',...query}));
     await page.getByText('가격·환율 준비 상태',{exact:true}).click();
