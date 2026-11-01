@@ -19,7 +19,7 @@ import { PlanHoldingReference } from "@/components/onboarding/plan-holding-refer
 import { trackFirstVisit } from "@/lib/first-visit-events";
 import type { HoldingOnboardingOptions } from "@/db/queries/holding-onboarding";
 import { MAX_HOLDING_BATCH, validateHoldingDrafts, unresolvedHoldingKeys, type HoldingBatchState, type HoldingDraft } from "@/lib/holding-batch";
-import { Button as CairnButton, IconButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
+import { Button as CairnButton, IconButton, Field as CairnField, Fieldset as CairnFieldset, Form as CairnForm, Input as CairnInput, Radio as CairnRadio, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
 
 const INITIAL_STATE: HoldingBatchState = { status: "idle", results: [] };
@@ -214,11 +214,11 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
     {resumedAccount ? <p className="varda-onboarding-hint">{t(`${resumedAccount}의 저장 중인 목록을 이어서 확인해 주세요.`, `Resume the pending list for ${resumedAccount}.`)}</p> : null}
     <div className="varda-onboarding-account-line"><CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} disabled={pending || hasSaved || uncertain.length > 0} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField></div>
     <section hidden={step !== 0} className={motion.stage} data-direction={direction} aria-label={t("등록 방법", "Entry method")}>
-      <fieldset className="varda-entry-methods"><legend className="sr-only">{t("등록 방법 선택", "Choose an entry method")}</legend>{([
+      <CairnFieldset className="varda-entry-methods"><legend className="sr-only">{t("등록 방법 선택", "Choose an entry method")}</legend>{([
         ["photo", Camera, t("캡처로 가져오기", "From a screenshot"), t("증권 앱의 잔고 화면", "Your brokerage holdings screen")],
         ["text", FileText, t("텍스트·표 붙여넣기", "Paste text or a table"), t("종목명과 보유 수량", "Holding names and quantities")],
         ["manual", PencilLine, t("직접 입력하기", "Enter manually"), t("한 종목씩 검색해서 추가", "Search and add each holding")],
-      ] as const).map(([value, Icon, title, description]) => <label key={value} data-selected={method === value}><input type="radio" name="entryMethod" value={value} checked={method === value} onChange={() => setMethod(value)} /><Icon size={24} aria-hidden="true" /><span><strong>{title}</strong><small>{description}</small></span>{method === value ? <Check size={20} aria-hidden="true" /> : null}</label>)}</fieldset>
+      ] as const).map(([value, Icon, title, description]) => <CairnField key={value} data-selected={method === value}><CairnRadio name="entryMethod" value={value} checked={method === value} onChange={() => setMethod(value)} /><Icon size={24} aria-hidden="true" /><span><strong>{title}</strong><small>{description}</small></span>{method === value ? <Check size={20} aria-hidden="true" /> : null}</CairnField>)}</CairnFieldset>
       <div className="varda-entry-footer"><CairnButton variant="primary" type="button" className="varda-onboarding-primary" disabled={!draftLoaded} onClick={() => go(1)}>{t("자료 입력하기", "Provide details")}<ArrowRight size={18} /></CairnButton>{rows.length > 0 && <CairnButton variant="ghost" type="button" onClick={() => { setMethod("manual"); go(2); }}>{t(`담아둔 ${rows.length}종목 확인`, `Review ${rows.length} queued holdings`)}</CairnButton>}</div>
     </section>
     <div hidden={step === 0 || method !== "photo"} className={motion.stage} data-direction={direction} data-step={step}>{draftLoaded && <BalancePhotoPanel onProvide={() => go(1)} guided stage={step === 2 ? "review" : "provide"} onReview={() => go(2)} initialRows={photoDraft} onDraftChange={setPhotoDraft} onAdd={addDrafts} remaining={MAX_HOLDING_BATCH - unsaved.length} disabled={pending || step === 0 || method !== "photo"} preview={preview} />}</div>
