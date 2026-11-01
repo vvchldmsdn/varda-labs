@@ -29,7 +29,7 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
           await seed.query('COMMIT');
         } catch(error){await seed.query('ROLLBACK');throw error;} finally {seed.release();}
       }
-      const route=url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:`account:${selectedAccount}`,accountId:selectedAccount,...(beta?{mode:'domain'}:{})});
+      const route=url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:`account:${selectedAccount}`,...(beta?{mode:'domain'}:{accountId:selectedAccount})});
       await page.goto(route);
       await page.evaluate(()=>{for(const key of Object.keys(sessionStorage))if(key.startsWith('cairn:holding-draft:'))sessionStorage.removeItem(key);});
       await page.reload();await page.setViewportSize({width,height});
