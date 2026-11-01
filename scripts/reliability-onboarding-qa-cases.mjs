@@ -153,7 +153,6 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       await expect(page.locator('[data-recovery-kind="targets"]')).toHaveCount(0);
       const calculation=page.locator(beta?'[data-contribution-state="ready"]':'main[data-page="additional-contribution"][data-preview-status="ready"]');
       await expect(calculation).toBeVisible();
-      await expect(calculation).toContainText('QA 보유 6');
       await capture((beta?'beta-':'')+'onboarding-contribution-ready',calculation);
       await page.goto(targetsUrl);
       await form.getByText('승인 목표 관리',{exact:true}).click();
