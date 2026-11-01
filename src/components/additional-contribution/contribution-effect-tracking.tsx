@@ -86,7 +86,7 @@ function EffectRecord({ item, tracking, journey, selected: active = false }: { i
     </> : <Status tone="warning">{effectReason(result.reason)}</Status>}
     <details className={styles.details}><summary>실제 매수 연결 · {item.tradeIds.length}건</summary>
       <p className={styles.note}>이 투자금으로 매수한 기록만 선택하세요. 같은 거래를 여러 추적에 중복 연결할 수 없습니다. 시각을 모르는 당일 거래는 저장 전후를 구분할 수 없어 제외됩니다.</p>
-      <div className={styles.tradeChoices}>{item.candidates.map(trade => <Field key={trade.id}><Checkbox checked={selected.includes(trade.id)} onChange={event => setSelected(event.target.checked ? [...selected, trade.id] : selected.filter(id => id !== trade.id))} /><span>{trade.name}<small>{date(trade.at)} · {trade.quantity}주 × {trade.price} {trade.currency}</small></span></Field>)}</div>
+      <div className={styles.tradeChoices}>{item.candidates.map(trade => <Field key={trade.id}><Checkbox checked={selected.includes(trade.id)} onChange={event => setSelected(event.target.checked ? [...selected, trade.id] : selected.filter(id => id !== trade.id))} /><span>{trade.name}<small>{date(trade.at)} · {trade.quantity}주 · {trade.executionTotal ? `총 ${trade.executionTotal.amount} ${trade.executionTotal.currency}` : `1주 ${trade.price} ${trade.currency}`}</small></span></Field>)}</div>
       {!item.candidates.length && <p>저장 이후 연결할 수 있는 매수 기록이 없습니다.</p>}
       {item.tradeIds.some(id => !item.candidates.some(t => t.id === id)) && <Button variant="bare" onClick={() => setSelected(selected.filter(id => item.candidates.some(t => t.id === id)))}>확인할 수 없는 연결 해제</Button>}
       <Button disabled={busy} onClick={link}>{busy ? '연결 중…' : `선택한 ${selected.length}건 연결 저장`}</Button>

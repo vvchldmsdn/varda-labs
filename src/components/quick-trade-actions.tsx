@@ -3,9 +3,10 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
+import motion from "@/components/onboarding/entry-motion.module.css";
 import styles from "./quick-trade-actions.module.css";
 import { Button as CairnButton, IconButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
@@ -31,10 +32,10 @@ export function QuickTradeActions({ accountId, assetId, name, quantity = "0" }: 
   return <div className={styles.actions}>
     <CairnButton variant="secondary" type="button" onClick={event => open("buy", event.currentTarget)} aria-label={assetId ? `${name} ${t("매수", "Buy")}` : undefined}>{assetId ? t("매수", "Buy") : t("+ 새 종목 매수", "+ Buy a new holding")}</CairnButton>
     {assetId ? <CairnButton variant="secondary" type="button" disabled={Number(quantity) <= 0} onClick={event => open("sell", event.currentTarget)} aria-label={`${name} ${t("매도", "Sell")}`}>{t("매도", "Sell")}</CairnButton> : null}
-    {saved ? <CairnStatus as="span" tone="neutral" role="status">{t("기록했어요", "Recorded")}</CairnStatus> : null}
+    {saved ? <CairnStatus as="span" tone="neutral" className={motion.success} role="status"><Check size={16} aria-hidden="true" />{t("기록했어요", "Recorded")}</CairnStatus> : null}
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={title} onKeyDown={containFocus} onCancel={event => { if (busy) event.preventDefault(); }} onClick={event => { if (!busy && event.target === event.currentTarget) dialog.current?.close(); }} onClose={() => { setOpened(false); if (!pending) setAction(null); trigger.current?.focus(); }}>
       <div className={styles.shell}>
-        <header><div><CairnSectionTitle id={title}>{name ?? t("새 종목", "New holding")} · {action === "sell" ? t("매도", "Sell") : t("매수", "Buy")}</CairnSectionTitle></div><IconButton disabled={busy} onClick={() => dialog.current?.close()} label={t("닫기", "Close")} title={t("닫기", "Close")}><X size={20} /></IconButton></header>
+        <header><div><CairnSectionTitle id={title}>{name ?? t("새 종목", "New holding")} · {t("거래 기록", "Trade record")}</CairnSectionTitle></div><IconButton disabled={busy} onClick={() => dialog.current?.close()} label={t("닫기", "Close")} title={t("닫기", "Close")}><X size={20} /></IconButton></header>
         {action ? <Suspense fallback={<CairnStatus as="p" tone="neutral" role="status">{t("거래 입력을 준비하고 있어요…", "Loading trade form…")}</CairnStatus>}><Ledger key={attempt} compact onBusyChange={setBusy} onPendingChange={setPending} newInstrument={!assetId} initialSelection={{ accountId, assetId, action }} onSaved={() => { setPending(false); setBusy(false); setSaved(true); router.refresh(); dialog.current?.close(); setAction(null); }} /></Suspense> : null}
       </div>
     </dialog>

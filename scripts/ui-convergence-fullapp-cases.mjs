@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { expect } from '@playwright/test';
+import {runGuidedTradeQa} from './guided-entry-fullapp-cases.mjs';
 
 /** Actual routes and authenticated queries against the disposable PostgreSQL only. */
 export async function runUiContextCases({ page, check, admin, setIdentity, legacyToken, legacyOwner, legacyAccount, nativeToken, nativeAccount, nativeAsset, readNativeState, url, output }) {
@@ -34,12 +35,15 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
       await page.reload();
       await expect(page.getByLabel(locale==='ko'?'보유 계좌':'Holding account',{exact:true})).toHaveValue(legacyAccount);
       if(locale==='ko'&&width===1440) {
+        await page.getByRole('button',{name:'직접 입력하기',exact:false}).click();
+        await page.getByRole('button',{name:'자료 입력하기',exact:true}).click();
         await page.getByText('검색되지 않는 종목 직접 입력',{exact:true}).click();
         await page.getByLabel('티커',{exact:true}).fill('999995');
         await page.getByLabel('이름 (선택)',{exact:true}).fill('Synthetic UI holding');
         await page.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
         await page.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('1');
         await page.getByRole('button',{name:'목록에 추가',exact:true}).click();
+        await page.getByRole('button',{name:'1종목 확인하기',exact:true}).click();
         await page.getByText('매입가·가격 확인',{exact:true}).click();
         await page.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
         await page.getByRole('button',{name:'1종목 저장',exact:true}).click();
@@ -103,6 +107,7 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
       }
     });
   }
+  await runGuidedTradeQa({page,check,setIdentity,token:nativeToken,account:nativeAccount,asset:nativeAsset,readState:readNativeState,url,output});
   await check('ui-public-guest-en-320',async()=>{
     await setIdentity(null);await page.context().addCookies([{name:'varda-locale',value:'en',url}]);await page.setViewportSize({width:320,height:844});
     await page.goto(url+'/start');await expect(page.getByRole('link',{name:'Sign in',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'Sign up',exact:true})).toBeVisible();

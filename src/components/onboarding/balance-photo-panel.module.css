@@ -1,4 +1,7 @@
 .panel { border: 1px solid var(--line, #deded8); border-radius: 24px; padding: 28px; background: var(--surface, #f8f8f5); margin-bottom: 24px; color: var(--ink, #22251f); min-width: 0; }
+.panel[data-guided] { padding:0; margin:24px 0 0; border:0; border-radius:0; background:transparent; }
+.panel[data-guided] .row { padding:16px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+.panel[data-guided] .row[data-active=true] strong { color:var(--accent); }
 .intro { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
 .icon { display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 auto; background: var(--paper, #fff); border-radius: 16px; }
 .note { font-size: 13px; line-height: 1.7; color: var(--muted, #6d7169); margin: 0; }

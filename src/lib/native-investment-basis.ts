@@ -38,7 +38,7 @@ export function projectInvestmentAccount(account: InvestmentAccount, entries: re
 }
 
 export function investmentEventKey(e: NativeEvent) {
-  return e.type === "buy" || e.type === "sell" ? JSON.stringify([e.type,e.at,e.assetId,e.currency,e.quantity,e.price ?? null,e.executionUnitPrice ?? null,e.settlement ?? null,e.settlementStatus ?? null,e.fee ?? null,e.tax ?? null]) : null;
+  return e.type === "buy" || e.type === "sell" ? JSON.stringify([e.type,e.at,e.assetId,e.currency,e.quantity,e.price ?? null,e.executionUnitPrice ?? null,e.executionTotal ?? null,e.settlement ?? null,e.settlementStatus ?? null,e.fee ?? null,e.tax ?? null]) : null;
 }
 
 function sameQuantities(a: NativePortfolioState, b: NativePortfolioState) {

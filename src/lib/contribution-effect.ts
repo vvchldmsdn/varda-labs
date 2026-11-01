@@ -7,7 +7,7 @@ export type ContributionEffectDocument = {
   version: 'contribution_effect_v1'; accountId: string; capturedAt: string;
   comparison: ContributionComparison; quotes: EffectQuote[];
 };
-export type EffectTrade = { id: string; accountId: string; assetId: string; type: 'buy' | 'sell' | 'split'; at: string; quantity?: string; price?: string; currency?: Currency; dateOnly?: boolean };
+export type EffectTrade = { id: string; accountId: string; assetId: string; type: 'buy' | 'sell' | 'split'; at: string; quantity?: string; price?: string; executionTotal?: { amount: string; currency: Currency }; currency?: Currency; dateOnly?: boolean };
 export type SavedContributionEffect = { id: string; createdAt: string; revision: number; document: ContributionEffectDocument; tradeIds: string[] };
 export type EffectMarket = { asOf: string; quotes: EffectQuote[]; fx: readonly FxEvidence[]; complete: boolean; maxFxAgeMs: number };
 const blocked = (reason: string) => ({ status: 'blocked' as const, reason });
@@ -68,9 +68,10 @@ export function evaluateContributionEffect(saved: SavedContributionEffect, marke
       let spentFunding = Decimal.from(0), value = Decimal.from(0), spentKrw = Decimal.from(0);
       for (const trade of linked as EffectTrade[]) {
         if (trades.some(t => t.accountId === doc.accountId && t.assetId === trade.assetId && ['sell', 'split'].includes(t.type) && Date.parse(t.at) >= Date.parse(trade.at) && Date.parse(t.at) <= Date.parse(market.asOf))) return blocked('subsequent_disposal');
-        const quantity = Decimal.from(trade.quantity!), price = Decimal.from(trade.price!);
-        if (quantity.compare(0) <= 0 || price.compare(0) <= 0) return blocked('invalid_trade');
-        const cost = quantity.mul(price);
+        if (!trade.quantity || (!trade.price && !trade.executionTotal) || (trade.executionTotal && trade.executionTotal.currency !== trade.currency)) return blocked('invalid_trade');
+        const quantity = Decimal.from(trade.quantity);
+        const cost = trade.executionTotal ? Decimal.from(trade.executionTotal.amount) : quantity.mul(Decimal.from(trade.price!));
+        if (quantity.compare(0) <= 0 || cost.compare(0) <= 0 || (trade.price && quantity.mul(trade.price).compare(cost) !== 0)) return blocked('invalid_trade');
         const executionFx = trade.dateOnly ? market.fx.filter(rate => rate.kind === 'daily_reference') : market.fx;
         const funded = convertMoney(cost.toExactString(), trade.currency!, comparison.funding, trade.at, executionFx, market.maxFxAgeMs);
         const costKrw = convertMoney(cost.toExactString(), trade.currency!, 'KRW', trade.at, executionFx, market.maxFxAgeMs);

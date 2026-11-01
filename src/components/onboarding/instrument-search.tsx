@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { Button as CairnButton, Field as CairnField, Input as CairnInput } from "@/components/cairn-ui";
@@ -12,18 +12,23 @@ export type InstrumentChoice = {
   assetType: "etf" | "stock";
 };
 
-export function InstrumentSearch({ onSelect, disabled = false, preview = false, initialQuery = "", privateQuery = false, manualEntryAvailable = true, label }: {
+export function InstrumentSearch({ onSelect, disabled = false, preview = false, initialQuery = "", privateQuery = false, manualEntryAvailable = true, label, autoMatchExact = false, queryValue, onQueryChange }: {
   manualEntryAvailable?: boolean;
   label?: {ko:string;en:string};
+  autoMatchExact?: boolean; queryValue?: string; onQueryChange?: (value: string) => void;
   onSelect: (instrument: InstrumentChoice) => void; disabled?: boolean; preview?: boolean; initialQuery?: string; privateQuery?: boolean;
 }) {
   const { t } = useI18n();
   const id = useId();
-  const [query, setQuery] = useState(initialQuery);
+  const [localQuery, setLocalQuery] = useState(initialQuery);
+  const query = queryValue ?? localQuery;
+  const setQuery = useCallback((value: string) => { setLocalQuery(value); onQueryChange?.(value); }, [onQueryChange]);
   const [results, setResults] = useState<InstrumentChoice[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const selection = useRef(onSelect);
+  useEffect(() => { selection.current = onSelect; }, [onSelect]);
   useEffect(() => {
-    if (!query.trim()) return;
+    if (!query.trim() || disabled) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setStatus("loading");
@@ -39,11 +44,16 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
           : await fetch(`/api/instruments/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
         if (!response.ok) throw new Error("search unavailable");
         const data = await response.json();
-        if (!controller.signal.aborted) { setResults(data.instruments); setStatus("ready"); }
+        if (!controller.signal.aborted) {
+          const normalize = (value: string) => value.replace(/\s+/g, "").toLowerCase();
+          const matches = (data.instruments as InstrumentChoice[]).filter(row => normalize(row.name) === normalize(query) || normalize(row.ticker) === normalize(query));
+          if (autoMatchExact && matches.length === 1) { selection.current(matches[0]); setQuery(""); setResults([]); setStatus("idle"); }
+          else { setResults(data.instruments); setStatus("ready"); }
+        }
       } catch { if (!controller.signal.aborted) { setResults([]); setStatus("error"); } }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, preview, privateQuery]);
+  }, [query, preview, privateQuery, disabled, autoMatchExact, setQuery]);
   return <div className="varda-instrument-search">
     <CairnField htmlFor={id}>{t(label?.ko ?? "어떤 종목을 가지고 있나요?", label?.en ?? "What do you hold?")}</CairnField>
     <div className="varda-instrument-search-input"><Search size={20} aria-hidden="true" />

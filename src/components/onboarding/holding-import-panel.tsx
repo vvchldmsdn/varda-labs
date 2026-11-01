@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, FileSpreadsheet } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { InstrumentSearch, type InstrumentChoice } from "./instrument-search";
@@ -10,12 +10,16 @@ import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status
 import styles from "./holding-import-panel.module.css";
 
 
-export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false }: {
-  onAdd: (rows: HoldingDraft[]) => boolean; remaining: number; disabled: boolean; preview?: boolean;
+export type TableHoldingDraft = { text: string; rows: (ImportedHolding & { instrument?: InstrumentChoice; manualMatch?: boolean })[] };
+export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false, guided = false, initialDraft, onDraftChange, onReview, stage }: {
+  onAdd: (rows: HoldingDraft[]) => boolean; remaining: number; disabled: boolean; preview?: boolean; guided?: boolean;
+  initialDraft?: TableHoldingDraft; onDraftChange?: (draft: TableHoldingDraft) => void;
+  onReview?: () => void; stage?: "provide" | "review";
 }) {
   const { t } = useI18n();
-  const [text, setText] = useState("");
-  const [rows, setRows] = useState<(ImportedHolding & { instrument?: InstrumentChoice })[]>([]);
+  const [text, setText] = useState(initialDraft?.text ?? "");
+  const [rows, setRows] = useState<TableHoldingDraft["rows"]>(initialDraft?.rows ?? []);
+  useEffect(() => { onDraftChange?.({ text, rows }); }, [text, rows, onDraftChange]);
   const [error, setError] = useState<HoldingImportResult["error"] | "unreadable" | "queue">(null);
   const [reviewIndex, setReviewIndex] = useState(0);
   const messages = {
@@ -30,9 +34,10 @@ export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false
     queue: t("확인 목록에 같은 종목이 있거나 목록이 가득 찼습니다. 입력은 그대로 보존했습니다.", "The review list contains a duplicate or is full. Your input has been preserved."),
   };
   const confirm = () => {
+    if (rows.length) { onReview?.(); return; }
     const parsed = parseHoldingImport(text, remaining);
     if (parsed.error) { setError(parsed.error); setRows([]); return; }
-    setRows(parsed.rows); setReviewIndex(0); setError(null);
+    setRows(parsed.rows); onDraftChange?.({ text, rows: parsed.rows }); setReviewIndex(0); setError(null); onReview?.();
   };
   function select(instrument: InstrumentChoice) {
     if (rows.some((row, index) => index !== reviewIndex && row.instrument?.market === instrument.market && row.instrument?.ticker === instrument.ticker)) { setError("duplicate"); return; }
@@ -40,9 +45,10 @@ export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false
     const next = rows.findIndex((row, index) => index !== reviewIndex && !row.instrument);
     if (next >= 0) setReviewIndex(next);
   }
-  return <details className={styles.panel}>
-    <summary><FileSpreadsheet size={22} aria-hidden="true" />{t("표·CSV로 여러 종목 가져오기", "Import a table or CSV")}</summary>
+  return <details className={styles.panel} open={guided || undefined} data-guided={guided || undefined}>
+    <summary hidden={guided}><FileSpreadsheet size={22} aria-hidden="true" />{t("표·CSV로 여러 종목 가져오기", "Import a table or CSV")}</summary>
     <div className={styles.content}>
+    <div hidden={stage === "review"} className={styles.content}>
     <p className={styles.note}>{t("종목명·수량 두 열이면 돼요. 평균매입가는 선택이에요.", "Start with name and quantity. Average cost is optional.")}</p>
     <CairnTextarea className={styles.tableInput} disabled={disabled} aria-label={t("보유종목 표", "Holdings table")} rows={5} maxLength={64_000} value={text} onChange={event => { setText(event.target.value); setRows([]); }} placeholder={t("종목명,수량\nKODEX 200,10\nVOO,2", "name,quantity\nKODEX 200,10\nVOO,2")} />
     <CairnField className={styles.file}>{t("CSV 파일 선택", "Choose CSV")}<CairnInput disabled={disabled} type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={async event => {
@@ -52,12 +58,13 @@ export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false
       try { setText(await file.text()); setRows([]); setError(null); } catch { setError("unreadable"); }
     }} /></CairnField>
     <CairnButton variant="secondary" type="button" disabled={disabled || !text.trim() || remaining < 1} onClick={confirm}>{t("표 읽고 종목 확인", "Read and review holdings")}</CairnButton>
+    </div>
     {error && <CairnStatus as="p" tone="danger" role="alert">{messages[error]}</CairnStatus>}
-    {rows.length > 0 && <>
+    {rows.length > 0 && stage !== "provide" && <>
       <div className={styles.reviewHeading}><strong>{t("검색 결과와 연결해 주세요", "Match your holdings")}</strong><span>{rows.filter(row => row.instrument).length}/{rows.length}</span></div>
       <div className={styles.rows}>{rows.map((row, index) => <CairnButton variant="selection" type="button" key={index} disabled={disabled} aria-pressed={reviewIndex === index} onClick={() => setReviewIndex(index)}>{row.instrument && <Check size={17} aria-hidden="true" />}<span>{row.label}</span><small>{row.quantity}</small></CairnButton>)}</div>
-      <p className={styles.current}><strong>{rows[reviewIndex].label}</strong> · {t("종목 확인", "Verify instrument")}</p>
-      <InstrumentSearch key={reviewIndex} initialQuery={rows[reviewIndex].label} onSelect={select} disabled={disabled} preview={preview} />
+      <p className={styles.current}><strong>{rows[reviewIndex].label}</strong> · {rows[reviewIndex].instrument?.currency ?? t("종목 확인", "Verify instrument")}</p>
+      {rows[reviewIndex].instrument ? <CairnButton variant="ghost" type="button" disabled={disabled} onClick={() => setRows(previous => previous.map((row, index) => index === reviewIndex ? { ...row, instrument: undefined, manualMatch: true } : row))}>{t("종목 다시 선택", "Choose again")}</CairnButton> : <InstrumentSearch key={reviewIndex} initialQuery={rows[reviewIndex].label} privateQuery autoMatchExact={!rows[reviewIndex].manualMatch} onSelect={select} disabled={disabled} preview={preview} />}
       <CairnButton variant="primary" type="button" disabled={disabled || rows.some(row => !row.instrument) || rows.length > remaining} onClick={() => {
         const added = onAdd(rows.map(row => ({ key: crypto.randomUUID(), instrumentId: row.instrument!.id, name: row.instrument!.name, ticker: row.instrument!.ticker, market: row.instrument!.market, assetType: row.instrument!.assetType, quantity: row.quantity, averageCost: row.averageCost, currentPrice: "" })));
         if (added) { setRows([]); setText(""); setError(null); } else { setError("queue"); }

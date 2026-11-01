@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import {expect} from '@playwright/test';
+import {runGuidedHoldingsQa} from './guided-entry-fullapp-cases.mjs';
 
 // Called only by the disposable PostgreSQL/full Next application rehearsal.
 export async function runOnboardingQaCases({page,check,admin,setIdentity,token,owner,url,output}) {
@@ -34,6 +35,8 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await page.reload();
     const form=page.locator('form.varda-holding-onboarding');
     await form.getByRole('combobox',{name:'보유 계좌',exact:true}).selectOption(account);
+    await form.getByRole("button",{name:"직접 입력하기",exact:false}).click();
+    await form.getByRole("button",{name:"자료 입력하기",exact:true}).click();
     const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
     await manual.locator(':scope > summary').click();
     for(let i=0;i<6;i++){
@@ -43,11 +46,13 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       await manual.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
       await form.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill(i===5?'0.896567':'2');
       await form.getByRole('button',{name:'목록에 추가',exact:true}).click();
-      if(i!==3){
-        const row=form.locator('ol > li').filter({hasText:`QA 보유 ${i+1}`});
-        await row.locator('summary').click();
-        await row.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill(i===5?'701.2638':'100');
-      }
+    }
+    await form.getByRole("button",{name:"6종목 확인하기",exact:true}).click();
+    for(let i=0;i<6;i++){
+      if(i===3)continue;
+      const row=form.locator("ol > li").filter({hasText:`QA 보유 ${i+1}`});
+      await row.locator("summary").click();
+      await row.getByLabel("현재 1주 가격 · 자동 조회가 안 될 때",{exact:true}).fill(i===5?"701.2638":"100");
     }
     await page.reload();
     await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toHaveValue(account);
@@ -170,6 +175,8 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   await check('fullapp-cancel-remainder-after-hiding-saved-rows-unlocks-account-without-deleting-assets',async()=>{
     await page.goto(url+'/portfolio/holdings/new?'+new URLSearchParams({accountId:alternate,scope:'account:'+alternate}));
     const form=page.locator('form.varda-holding-onboarding');
+    await form.getByRole("button",{name:"직접 입력하기",exact:false}).click();
+    await form.getByRole("button",{name:"자료 입력하기",exact:true}).click();
     const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
     await manual.locator(':scope > summary').click();
     for(let index=0;index<2;index++){
@@ -178,8 +185,11 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       await manual.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
       await form.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('2');
       await form.getByRole('button',{name:'목록에 추가',exact:true}).click();
-      if(index===0){const row=form.locator('ol > li').filter({hasText:'QA 취소 0'});await row.locator('summary').click();await row.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');}
     }
+    await form.getByRole("button",{name:"2종목 확인하기",exact:true}).click();
+    const firstRow=form.locator("ol > li").filter({hasText:"QA 취소 0"});
+    await firstRow.locator("summary").click();
+    await firstRow.getByLabel("현재 1주 가격 · 자동 조회가 안 될 때",{exact:true}).fill("100");
     await form.getByRole('button',{name:'2종목 저장',exact:true}).click();
     await expect(form.locator('li[data-saved="true"]')).toHaveCount(1);
     await form.getByRole('button',{name:'저장된 목록 접고 더 추가하기',exact:true}).click();
@@ -192,4 +202,5 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await expect(form.locator('ol > li')).toHaveCount(0);
     await capture('onboarding-cancelled-remainder',form.getByRole('combobox',{name:'보유 계좌',exact:true}));
   });
+  await runGuidedHoldingsQa({page,check,admin,owner,account:alternate,url,output});
 }

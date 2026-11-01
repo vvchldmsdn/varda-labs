@@ -1,17 +1,37 @@
 .varda-holding-add-page { min-height:100dvh; padding-left:var(--sidebar-width,0px); background:var(--paper); color:var(--ink); }
-.varda-holding-add-content { width:min(1120px,calc(100% - 64px)); margin:32px auto 88px; }
+.varda-holding-add-content { width:min(720px,calc(100% - 64px)); margin:24px auto 88px; }
 .varda-holding-add-back { display:inline-flex; align-items:center; gap:8px; min-height:48px; color:var(--muted); font-size:14px; }
-.varda-holding-add-heading { padding:24px 0 32px; max-width:690px; }
-.varda-holding-add-heading h1 { font-size:clamp(30px,4vw,46px); font-weight:550; letter-spacing:-.055em; line-height:1.25; margin:15px 0; }
+.varda-holding-add-heading { padding:12px 0; max-width:690px; }
+.varda-holding-add-heading h1 { font-size:16px; font-weight:550; letter-spacing:-.025em; line-height:1.4; margin:0; }
 .varda-holding-add-heading>p:last-child { font-size:14px; line-height:1.7; color:var(--muted); }
 .varda-onboarding-eyebrow { margin:0; color:var(--ink); font-size:20px; letter-spacing:-.035em; font-weight:550; line-height:1.4; }
 .varda-holding-add-heading>.varda-onboarding-eyebrow { color:var(--muted); font-size:13px; }
 .varda-holding-onboarding { min-width:0; }
 .varda-onboarding-account-line { padding:0 0 28px; border-bottom:1px solid var(--line); }
 .varda-onboarding-account-line label { display:grid; gap:8px; max-width:400px; color:var(--muted); font-size:13px; }
-.varda-onboarding-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.9fr); gap:40px; align-items:start; padding-top:32px; }
+.varda-onboarding-workspace { padding-top:24px; }
 .varda-onboarding-compose,.varda-onboarding-review { min-width:0; }
-.varda-onboarding-review { padding:28px; border-radius:24px; background:var(--wash); }
+.varda-onboarding-review { padding:0; background:transparent; }
+.varda-holding-onboarding [hidden] { display:none !important; }
+.varda-entry-heading { padding:20px 0 28px; }
+.varda-entry-heading h2 { font-size:clamp(28px,4vw,36px); font-weight:550; letter-spacing:-.045em; line-height:1.35; margin:24px 0 12px; text-wrap:balance; outline:none; }
+.varda-entry-heading p { color:var(--muted); font-size:14px; line-height:1.6; margin:0; }
+.varda-entry-progress { display:flex; gap:16px; color:var(--muted); font-size:12px; }
+.varda-entry-progress span { display:flex; align-items:center; gap:6px; }
+.varda-entry-progress i { width:6px; height:6px; border-radius:50%; background:var(--line); }
+.varda-entry-progress [aria-current=step] { color:var(--ink); }
+.varda-entry-progress [aria-current=step] i { background:var(--accent); }
+.varda-entry-methods { display:grid; gap:4px; padding:12px 0; }
+.varda-entry-methods button[data-cairn-button] { min-height:90px; display:flex; gap:18px; justify-content:flex-start; text-align:left; padding:20px 16px; border:0; border-radius:12px; box-shadow:none; background:transparent; color:var(--ink); }
+.varda-entry-methods button[data-cairn-button][aria-pressed=true] { background:var(--wash); }
+.varda-entry-methods button>span { flex:1; }
+.varda-entry-methods strong { display:block; font-size:18px; font-weight:550; }
+.varda-entry-methods small { display:block; color:var(--muted); font-size:13px; margin-top:5px; }
+.varda-entry-methods button>svg:last-child { color:var(--accent); }
+.varda-entry-footer { display:flex; flex-direction:column; gap:12px; padding-top:28px; padding-bottom:env(safe-area-inset-bottom); }
+.varda-entry-footer>button { min-height:48px; }
+.varda-entry-footer>p { margin:0; }
+.varda-onboarding-queue input { scroll-margin-block:100px; }
 .varda-holding-onboarding input[data-cairn-control]:not([type=hidden]):not([type=checkbox]):not([type=radio]),.varda-holding-onboarding select[data-cairn-control],.varda-holding-onboarding textarea[data-cairn-control] { min-height:54px; font-size:16px; }
 .varda-holding-onboarding input:focus-visible,.varda-holding-onboarding select:focus-visible,.varda-holding-onboarding textarea:focus-visible,.varda-holding-onboarding button:focus-visible,.varda-holding-onboarding a:focus-visible,.varda-holding-onboarding summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .varda-instrument-search { margin-top:28px; }
@@ -76,10 +96,10 @@
 @media(max-width:760px) {
   .varda-holding-add-page { padding-bottom:calc(106px + env(safe-area-inset-bottom)); }
   .varda-holding-add-content { width:calc(100% - 40px); margin:16px auto 0; }
-  .varda-holding-add-heading { padding:20px 0 28px; }
-  .varda-holding-add-heading h1 { font-size:32px; }
-  .varda-onboarding-workspace { grid-template-columns:minmax(0,1fr); gap:32px; padding-top:28px; }
-  .varda-onboarding-review { padding:24px 20px; border-radius:20px; }
+  .varda-holding-add-heading { padding:8px 0; }
+  .varda-holding-add-heading h1 { font-size:16px; }
+  .varda-onboarding-workspace { padding-top:20px; }
+  .varda-onboarding-review { padding:0; }
   .varda-onboarding-start-note { padding:24px 0 12px; }
   .varda-onboarding-fields { grid-template-columns:minmax(0,1fr); gap:0; }
   .varda-onboarding-row-quantity { flex-wrap:wrap; gap:8px; }

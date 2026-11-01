@@ -15,8 +15,8 @@ function amount(value: string | undefined, unit?: Currency, positive = true) {
 export function tradeInputFromFields(kind: "buy" | "sell", fields: Record<string, string>, unit: Currency, assetId: string): NativeTradeInput {
   // Older correction forms use "price" for the same per-share mode.
   const mode = fields.inputMode === "price" ? "unit" : fields.inputMode ?? "execution";
-  if (!["execution", "unit", "total", "net"].includes(mode)) throw new Error("invalid_input");
-  const cashUnit = mode === "unit" || mode === "execution" ? unit : fields.settlementCurrency ?? unit;
+  if (!["execution", "execution_total", "unit", "total", "net"].includes(mode)) throw new Error("invalid_input");
+  const cashUnit = mode === "unit" || mode === "execution" || mode === "execution_total" ? unit : fields.settlementCurrency ?? unit;
   if (!isCurrency(cashUnit)) throw new Error("invalid_currency");
   if (mode === "net" && (!fields.fee || !fields.tax)) throw new Error("net_costs_required");
   const fee = fields.fee ? amount(fields.fee, cashUnit, false) : null;
@@ -30,8 +30,9 @@ export function tradeInputFromFields(kind: "buy" | "sell", fields: Record<string
   } else if (mode === "total") gross = amount(fields.total, cashUnit);
   const event: NativeTradeInput = {
     type: kind, assetId, currency: unit, quantity: amount(fields.quantity).toExactString(),
-    ...(mode === "execution" ? { settlementStatus: "unconfirmed" as const } : {}),
-    ...(gross ? { settlement: { amount: gross.toExactString(), currency: cashUnit } } : { price: amount(fields.price).toExactString() }),
+    ...(mode === "execution" || mode === "execution_total" ? { settlementStatus: "unconfirmed" as const } : {}),
+    ...(fields.memo?.trim() ? { memo: fields.memo.trim() } : {}),
+    ...(mode === "execution_total" ? { executionTotal: { amount: amount(fields.executionTotal).toExactString(), currency: unit } } : gross ? { settlement: { amount: gross.toExactString(), currency: cashUnit } } : { price: amount(fields.price).toExactString() }),
     // For cross-currency settlement the engine can preserve a reported price
     // without inventing an FX rate or demanding equality across currencies.
     ...((mode === "total" || mode === "net") && cashUnit !== unit && fields.price ? { executionUnitPrice: { amount: amount(fields.price).toExactString(), currency: unit } } : {}),
