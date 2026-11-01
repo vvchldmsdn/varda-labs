@@ -75,6 +75,7 @@ type FxFreshnessState = "missing" | "fresh" | "stale";
 export type DashboardHolding = {
   id: string;
   legacyBase44Id: string | null;
+  accountId?: string | null;
   name: string;
   ticker: string | null;
   assetType: string | null;
@@ -701,6 +702,7 @@ function buildHolding({
   return {
     id: asset.id,
     legacyBase44Id: asset.legacyBase44Id,
+    accountId: asset.accountId,
     name: asset.name,
     ticker: asset.ticker,
     assetType: asset.assetType,

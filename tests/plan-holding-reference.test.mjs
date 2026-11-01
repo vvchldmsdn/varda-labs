@@ -79,14 +79,14 @@ describe("plan to holding handoff", () => {
     });
     const options = { accounts: [{ id: "fixture", name: "Fixture" }], portfolioGroups: [] };
     const data = new FormData(); data.set("holdings", "[]");
-    form.HoldingOnboardingForm({ options });
+    form.HoldingOnboardingWorkspace({ options });
     await submit({}, data);
     assert.deepEqual(events, [["first_holding_created", "saved-id"]]);
     result = { status: "partial", results: [{ key: "row", result: { status: "error", firstHoldingCreated: true, assetId: "error" } }] };
     await submit({}, data);
     result = { status: "complete", results: [{ key: "row", result: { status: "success", assetId: "second" } }] };
     await submit({}, data);
-    form.HoldingOnboardingForm({ options, preview: true });
+    form.HoldingOnboardingWorkspace({ options, preview: true });
     result.results[0].result.firstHoldingCreated = true;
     await submit({}, data);
     assert.equal(events.length, 1);

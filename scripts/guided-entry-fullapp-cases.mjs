@@ -35,8 +35,15 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await page.reload();await page.setViewportSize({width,height});
       const form=page.locator('form.varda-holding-onboarding');
       await expect(form).toHaveAttribute('data-entry-step','0');
+      const photoMethod=form.getByRole('radio',{name:/캡처로 가져오기/});
+      await photoMethod.focus();await page.keyboard.press('ArrowDown');
+      await expect(form.getByRole('radio',{name:/텍스트·표 붙여넣기/})).toBeChecked();
+      await photoMethod.check();
       await capture(page,output,'guided-method-'+beta,width,height);
-      await form.getByRole('button',{name:'텍스트·표 붙여넣기',exact:false}).click();
+      const primary=form.getByRole('button',{name:'자료 입력하기',exact:true});
+      await expect(primary).toBeInViewport({ratio:1});
+      assert.equal(await primary.evaluate(button=>{const r=button.getBoundingClientRect();return button.contains(document.elementFromPoint(r.x+r.width/2,r.bottom-2));}),true,'primary action must not sit behind mobile navigation');
+      await form.getByRole('radio',{name:'텍스트·표 붙여넣기',exact:false}).click();
       await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
       await expect(form.locator('h2')).toBeFocused();
       await form.getByLabel('보유종목 표',{exact:true}).fill('종목명,수량,통화,평균매입가\nQA 보유 6,0.896567,KRW,10');
@@ -78,7 +85,7 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       assert.deepEqual((await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,selectedAccount])).rows,before);
       await form.getByRole('button',{name:'QA 보유 6 목록에서 제거',exact:true}).click();
       await form.getByRole('button',{name:'종목 더 추가하기',exact:true}).click();
-      await form.getByRole('button',{name:'캡처로 가져오기',exact:false}).click();
+      await form.getByRole('radio',{name:'캡처로 가져오기',exact:false}).click();
       await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
       await capture(page,output,'guided-photo-'+beta,width,height);
       const uploaded=[];const record=request=>{if(request.method()==='POST'&&/image|multipart/.test(request.headers()['content-type']??''))uploaded.push(request.url());};
@@ -115,10 +122,26 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
         await expect(row.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
         await row.locator('summary').click();
         await row.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('701.2638');
-        await form.getByRole('button',{name:'1종목 저장',exact:true}).click();
+        await form.getByRole('button',{name:'종목 더 추가하기',exact:true}).click();
+        await form.getByRole('radio',{name:/직접 입력하기/}).check();await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
+        const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
+        await manual.locator(':scope > summary').click();
+        await manual.getByLabel('상장 시장',{exact:true}).selectOption('us');
+        await manual.getByLabel('티커',{exact:true}).fill(beta?'QRTRYB':'QRTRYA');
+        await manual.getByLabel('이름 (선택)',{exact:true}).fill('QA OCR 재시도');
+        await manual.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
+        await form.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('1');await form.getByRole('button',{name:'목록에 추가',exact:true}).click();
+        await form.getByRole('button',{name:'2종목 확인하기',exact:true}).click();
+        await form.getByRole('button',{name:'2종목 저장',exact:true}).click();
+        await expect(row).toHaveAttribute('data-saved','true');
+        const retry=form.locator('ol > li').filter({hasText:'QA OCR 재시도'});
+        await expect(retry).toContainText('가격 입력 필요');
+        await capture(page,output,'guided-ocr-partial-'+beta,width,height);
+        await retry.locator('summary').click();await retry.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
+        await retry.getByRole('button',{name:'이 종목 다시 저장',exact:true}).click();
         const readSaved=async()=>(await admin.query("select quantity::text,average_cost::text,currency from assets where canonical_owner_user_id=$1 and account_id=$2 and ticker='QAFUND'",[owner,selectedAccount])).rows;
         await expect.poll(readSaved).toEqual([{quantity:'0.896567',average_cost:null,currency:'USD'}]);
-        assert.deepEqual((await admin.query("select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 and ticker<>'QAFUND' order by id",[owner,selectedAccount])).rows,before,'registration must preserve existing holdings');
+        assert.deepEqual((await admin.query("select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 and ticker not in ('QAFUND','QRTRYA','QRTRYB') order by id",[owner,selectedAccount])).rows,before,'registration must preserve existing holdings');
         if(beta)await expect.poll(()=>new URL(page.url()).pathname).toBe('/beta/portfolio/holdings/manage');
         else await expect(form.locator('h2')).toHaveText('보유종목을 등록했어요');
         await capture(page,output,'guided-photo-saved-'+beta,width,height);
@@ -173,4 +196,82 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await page.emulateMedia({reducedMotion:'no-preference'});
     });
   }
+}
+
+export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
+  const makeAccount=async(label,{archived=false}={})=>{
+    const account=randomUUID(),asset=randomUUID(),ticker='R'+randomUUID().replaceAll('-','').slice(0,8).toUpperCase();
+    const client=await admin.connect();
+    try {
+      await client.query('BEGIN');await client.query("select set_config('app.trade_reliability_version','0059',true)");
+      await client.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,$3,$3,'brokerage','KRW')",[account,owner,label]);
+      await client.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,category,quantity,current_price,price_source,price_status,price_quote_type,price_as_of,price_fetched_at,archived_at) values($1,$2,$3,$4,$4,$5,'korea','KRW','etf','국내주식',2,100,'user_entered_onboarding','ok','manual',now(),now(),$6)",[asset,owner,account,label,ticker,archived?new Date().toISOString():null]);
+      await client.query('COMMIT');
+    } catch(error) {await client.query('ROLLBACK');throw error;} finally{client.release();}
+    return {account,asset,ticker};
+  };
+  for(const beta of [false,true]) await check(`guided-recovery-archived-retry-scope-${beta}`,async()=>{
+    const a=await makeAccount('QA 종료 '+beta,{archived:true}),b=await makeAccount('QA 빈초안 '+beta);
+    const href=id=>url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:'account:'+id,...(beta?{mode:'domain'}:{accountId:id})});
+    await page.goto(href(a.account));
+    const form=page.locator('form.varda-holding-onboarding');
+    await form.getByRole('radio',{name:/직접 입력하기/}).check();await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
+    const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
+    await manual.locator(':scope > summary').click();
+    for(const [ticker,name] of [[a.ticker,'QA 종료 종목'],['F'+a.ticker,'QA 나머지 1'],['S'+a.ticker,'QA 나머지 2']]) {
+      await manual.getByLabel('티커',{exact:true}).fill(ticker);await manual.getByLabel('이름 (선택)',{exact:true}).fill(name);
+      await manual.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
+      await form.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('0.896567');await form.getByRole('button',{name:'목록에 추가',exact:true}).click();
+    }
+    await form.getByRole('button',{name:'3종목 확인하기',exact:true}).click();
+    await page.goto(href(b.account));await expect(form.locator('ol > li')).toHaveCount(0);
+    await page.goto(href(a.account));await expect(form.locator('ol > li')).toHaveCount(3);
+    const archived=form.locator('ol > li').filter({hasText:'QA 종료 종목'});
+    await archived.locator('summary').click();await archived.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
+    await form.getByRole('button',{name:'3종목 저장',exact:true}).click();
+    await expect(archived).toContainText('종료된 보유 기록');
+    await expect(archived.getByRole('link',{name:'기존 보유 기록 확인',exact:true})).toHaveAttribute('href',new RegExp(a.account));
+    assert.equal(Number((await admin.query('select count(*)::int n from assets where account_id=$1',[a.account])).rows[0].n),1);
+    await archived.getByRole('button',{name:'QA 종료 종목 목록에서 제거',exact:true}).click();
+    const first=form.locator('ol > li').filter({hasText:'QA 나머지 1'}),second=form.locator('ol > li').filter({hasText:'QA 나머지 2'});
+    await first.locator('summary').click();await first.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
+    await first.getByRole('button',{name:'이 종목 다시 저장',exact:true}).click();
+    await expect(first).toHaveAttribute('data-saved','true');await expect(second).toContainText('가격 입력 필요');
+    await page.reload();await expect(first).toHaveAttribute('data-saved','true');await expect(second).toContainText('가격 입력 필요');
+    await second.locator('summary').click();await second.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
+    await second.getByRole('button',{name:'이 종목 다시 저장',exact:true}).click();
+    if(beta)await expect.poll(()=>new URL(page.url()).pathname).toBe('/beta/portfolio/holdings/manage');
+    else await expect(form.locator('h2')).toHaveText('보유종목을 등록했어요');
+    await page.goto(href(b.account));await expect(form.locator('ol > li')).toHaveCount(0);
+    await page.goto(href(a.account));await expect(form.locator('li[data-saved="true"]')).toHaveCount(2);
+    assert.equal(Number((await admin.query('select count(*)::int n from assets where account_id=$1',[a.account])).rows[0].n),3);
+    const old=(await admin.query('select quantity::text,archived_at from assets where id=$1',[a.asset])).rows[0];
+    assert.equal(Decimal.from(old.quantity).compare('2'),0);assert.ok(old.archived_at);
+    await capture(page,output,'guided-recovery-'+beta,beta?360:390,beta?800:844);
+  });
+  await check('guided-home-opening-refresh-keeps-dialog-and-investment-value',async()=>{
+    const {account,asset}=await makeAccount('QA 연속 기록');
+    const href=url+'/?'+new URLSearchParams({scope:'account:'+account,currency:'KRW'});
+    await page.goto(href);await page.setViewportSize({width:390,height:844});
+    await page.getByRole('button',{name:'QA 연속 기록 매수',exact:true}).click();
+    const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
+    await dialog.getByLabel('원화 현금 잔액 KRW',{exact:true}).fill('0');
+    await dialog.getByLabel('달러 현금 잔액 USD',{exact:true}).fill('0');
+    await dialog.getByRole('checkbox',{name:'현재 보유 수량과 현금 잔액을 확인했어요.',exact:true}).check();
+    await dialog.getByRole('button',{name:'잔액 확인 후 계속',exact:true}).click();
+    await expect(dialog.getByLabel('체결 수량',{exact:true})).toBeVisible();
+    await dialog.getByLabel('체결 수량',{exact:true}).fill('0.896567');
+    await dialog.getByLabel('체결 단가 · KRW',{exact:true}).fill('100');
+    await page.evaluate(()=>window.dispatchEvent(new Event('cairn-fullapp-refresh')));
+    await expect(page.getByRole('region',{name:'현재 평가'})).toContainText('투자자산 평가액');
+    await expect(dialog).toBeVisible();await expect(dialog.getByLabel('체결 수량',{exact:true})).toHaveValue('0.896567');
+    const state=async()=>(await admin.query('select native_state from accounts where id=$1',[account])).rows[0].native_state;
+    assert.equal((await state()).positions.find(row=>row.assetId===asset).quantity,'2');
+    await dialog.getByRole('button',{name:'매수 기록 저장',exact:true}).click();await expect(dialog).not.toBeVisible();
+    await expect.poll(async()=>(await state()).positions.find(row=>row.assetId===asset).quantity).toBe('2.896567');
+    assert.deepEqual((await state()).cash,{KRW:'0',USD:'0'});
+    await expect(page.getByRole('region',{name:'현재 평가'})).toContainText('투자자산 평가액 · 현금 제외');
+    await expect(page.getByRole('region',{name:'현재 평가'})).not.toContainText('확인 가능한 자산의 소계');
+    await capture(page,output,'guided-home-after-opening',390,844);
+  });
 }

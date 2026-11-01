@@ -202,7 +202,7 @@ export function PortfolioDashboard({
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
           <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
-          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{row.name}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions assetId={row.id} name={row.name} quantity={String(row.quantity)} /></div>)}
+          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{row.name}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={row.name} quantity={String(row.quantity)} /></div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}
       </div>

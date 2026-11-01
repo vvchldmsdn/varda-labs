@@ -12,25 +12,25 @@ export async function createHoldingBatch(
   formData: FormData,
 ): Promise<HoldingBatchState> {
   const raw = formData.get("holdings");
-  if (typeof raw !== "string" || raw.length > 32_000) return { status: "invalid", results: [] };
+  if (typeof raw !== "string" || raw.length > 32_000) return { status: "invalid", attemptedKeys: [], results: [] };
   let rows: unknown;
-  try { rows = JSON.parse(raw); } catch { return { status: "invalid", results: [] }; }
-  if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_HOLDING_BATCH) return { status: "invalid", results: [] };
+  try { rows = JSON.parse(raw); } catch { return { status: "invalid", attemptedKeys: [], results: [] }; }
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_HOLDING_BATCH) return { status: "invalid", attemptedKeys: [], results: [] };
   const prepared: { key: string; data: FormData }[] = [];
   const identities = new Set<string>();
   for (const row of rows) {
-    if (!row || typeof row !== "object" || typeof row.key !== "string" || !row.key.trim() || row.key.length > 60 || prepared.some(item => item.key === row.key)) return { status: "invalid", results: [] };
+    if (!row || typeof row !== "object" || typeof row.key !== "string" || !row.key.trim() || row.key.length > 60 || prepared.some(item => item.key === row.key)) return { status: "invalid", attemptedKeys: [], results: [] };
     const data = new FormData();
     data.set("operationId", row.key);
     for (const field of ["accountId", "portfolioGroupId", "newPortfolioGroupName"]) data.set(field, formData.get(field) ?? "");
     for (const field of ["instrumentId", "ticker", "name", "market", "assetType", "quantity", "averageCost", "currentPrice"]) {
-      if (typeof row[field] !== "string") return { status: "invalid", results: [] };
+      if (typeof row[field] !== "string") return { status: "invalid", attemptedKeys: [], results: [] };
       data.set(field, row[field]);
     }
     const parsed = parseHoldingOnboardingInput(data);
-    if (!parsed.ok) return { status: "invalid", results: [{ key: row.key, result: { status: "invalid", message: parsed.message } }] };
+    if (!parsed.ok) return { status: "invalid", attemptedKeys: [], results: [{ key: row.key, result: { status: "invalid", message: parsed.message } }] };
     const identity = `${parsed.input.market}|${parsed.input.currency}|${parsed.input.ticker}`;
-    if (identities.has(identity)) return { status: "invalid", results: [] };
+    if (identities.has(identity)) return { status: "invalid", attemptedKeys: [], results: [] };
     identities.add(identity);
     prepared.push({ key: row.key, data });
   }
@@ -50,7 +50,7 @@ export async function createHoldingBatch(
     if (result.status === "unauthorized" || result.status === "error") break;
   }
   if (results.some(row => row.result.status === "success")) revalidateHoldingPages();
-  return { status: results.length === prepared.length && results.every(row => row.result.status === "success") ? "complete" : "partial", results };
+  return { status: results.length === prepared.length && results.every(row => row.result.status === "success") ? "complete" : "partial", attemptedKeys: results.map(row => row.key), results };
 }
 
 export async function createHoldingOnboarding(

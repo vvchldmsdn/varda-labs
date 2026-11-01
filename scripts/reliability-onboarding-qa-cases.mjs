@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import {expect} from '@playwright/test';
-import {runGuidedHoldingsQa} from './guided-entry-fullapp-cases.mjs';
+import {runGuidedHoldingsQa, runGuidedRecoveryQa} from './guided-entry-fullapp-cases.mjs';
 
 // Called only by the disposable PostgreSQL/full Next application rehearsal.
 export async function runOnboardingQaCases({page,check,admin,setIdentity,token,owner,url,output}) {
@@ -35,7 +35,7 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await page.reload();
     const form=page.locator('form.varda-holding-onboarding');
     await form.getByRole('combobox',{name:'보유 계좌',exact:true}).selectOption(account);
-    await form.getByRole("button",{name:"직접 입력하기",exact:false}).click();
+    await form.getByRole("radio",{name:"직접 입력하기",exact:false}).click();
     await form.getByRole("button",{name:"자료 입력하기",exact:true}).click();
     const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
     await manual.locator(':scope > summary').click();
@@ -58,6 +58,13 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toHaveValue(account);
     await expect(form.locator('ol > li')).toHaveCount(6);
     await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
+    // Invalid quantity must stop all writes without locking a valid fractional row.
+    await form.getByLabel('QA 보유 1 보유 수량',{exact:true}).fill('-1');
+    await form.getByRole('button',{name:'6종목 저장',exact:true}).click();
+    await expect(form.locator('.varda-onboarding-error').filter({hasText:'수량'})).toBeVisible();
+    assert.equal(await count(),0);
+    await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toBeEnabled();
+    await form.getByLabel('QA 보유 1 보유 수량',{exact:true}).fill('2');
     await form.getByRole('button',{name:'6종목 저장',exact:true}).click();
     await expect(form.locator('li[data-saved="true"]')).toHaveCount(5);
     assert.equal(await count(),5,'a missing quote must not defer later independent holdings');
@@ -100,8 +107,17 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   await check('fullapp-completed-batch-does-not-lock-a-different-account',async()=>{
     await page.goto(url+'/beta/portfolio/holdings/new?'+new URLSearchParams({mode:'domain',scope:'account:'+alternate}));
     const form=page.locator('form.varda-holding-onboarding');
-    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toHaveValue(alternate);
-    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toBeEnabled();
+    await expect(form.locator('input[name="accountId"]')).toHaveValue(alternate);
+    await expect(form.getByRole('button',{name:'자료 입력하기',exact:true})).toBeEnabled();
+    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toHaveCount(0);
+    await expect(form.locator('ol > li')).toHaveCount(0);assert.equal(await count(),6);
+    await page.getByRole('button',{name:'QA 다른계좌',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:/QA 일괄등록/}).click();
+    await expect(form.locator('input[name="accountId"]')).toHaveValue(account);
+    await expect(form.locator('li[data-saved="true"]')).toHaveCount(6);
+    await page.getByRole('button',{name:'QA 일괄등록',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:/QA 다른계좌/}).click();
+    await expect(form.locator('input[name="accountId"]')).toHaveValue(alternate);
     await expect(form.locator('ol > li')).toHaveCount(0);assert.equal(await count(),6);
   });
 
@@ -178,7 +194,7 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   await check('fullapp-cancel-remainder-after-hiding-saved-rows-unlocks-account-without-deleting-assets',async()=>{
     await page.goto(url+'/portfolio/holdings/new?'+new URLSearchParams({accountId:alternate,scope:'account:'+alternate}));
     const form=page.locator('form.varda-holding-onboarding');
-    await form.getByRole("button",{name:"직접 입력하기",exact:false}).click();
+    await form.getByRole("radio",{name:"직접 입력하기",exact:false}).click();
     await form.getByRole("button",{name:"자료 입력하기",exact:true}).click();
     const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
     await manual.locator(':scope > summary').click();
@@ -202,8 +218,9 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await form.getByRole('combobox',{name:'보유 계좌',exact:true}).selectOption(account);
     assert.equal(await count(),6);
     assert.equal(Number((await admin.query('select count(*)::int n from assets where canonical_owner_user_id=$1 and account_id=$2',[owner,alternate])).rows[0].n),1);
-    await expect(form.locator('ol > li')).toHaveCount(0);
+    await expect(form.locator('li[data-saved="true"]')).toHaveCount(6);
     await capture('onboarding-cancelled-remainder',form.getByRole('combobox',{name:'보유 계좌',exact:true}));
   });
+  await runGuidedRecoveryQa({page,check,admin,owner,url,output});
   await runGuidedHoldingsQa({page,check,admin,owner,account:alternate,url,output});
 }

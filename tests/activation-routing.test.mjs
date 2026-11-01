@@ -51,6 +51,7 @@ describe("state-based activation routing", () => {
     let resolution = { ok: true, tenantContext: tenant }, drafts = [saved], withAccounts = false, hasAssetHistory = false, historyUnavailable = false;
     const dashboard = { holdings: [], nonInvestmentAssets: [{ name: "Existing deposit", value: 4000000 }] };
     const [page] = await importUiWithPorts(["src/app/page.tsx"], {
+      "@/components/quick-trade-actions": { QuickTradeWorkspace: named("QuickTradeWorkspace") },
       "@/db/queries/native-portfolio-ledger": { requiresNativePortfolioSurface: async () => false },
       "@/db/queries/currency-tracked-portfolio": { getTrackedCurrencyEvidence: async () => { throw new Error("unexpected native read"); } },
       "@/components/currency-portfolio-surface": { CurrencyPortfolioSurface: named("CurrencyPortfolioSurface") },
@@ -72,7 +73,10 @@ describe("state-based activation routing", () => {
       "@/components/portfolio-analysis-scope-boundary": { PortfolioAnalysisScopeBoundary: named("ScopeBoundary") },
       "@/components/portfolio-dashboard-access-boundary": { PortfolioDashboardAccessBoundary: named("AccessBoundary") },
     });
-    const run = () => page.default({ searchParams: Promise.resolve({}) });
+    const run = async () => {
+      const tree = await page.default({ searchParams: Promise.resolve({}) });
+      return tree.type.name === "QuickTradeWorkspace" ? tree.props.children : tree;
+    };
     const shell = (await run()).props.children;
     const home = await shell.type(shell.props);
     assert.equal(home.type.name, "QuickHome");

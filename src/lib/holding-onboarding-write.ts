@@ -140,6 +140,18 @@ export async function writeSessionHoldingOnboarding(
         const replay = await readOnboardingReplay(ownerUserId, assetId, parsed.input).catch(() => null);
         if (replay) return replay;
       }
+      const existing = await runPortfolioMutation(ownerUserId, `
+        select id, archived_at is not null as archived from assets
+        where canonical_owner_user_id=$1::uuid and account_id=$2::uuid
+          and lower(btrim(market))=$3::varchar and upper(btrim(currency))=$4::varchar and upper(btrim(ticker))=$5::varchar
+        limit 1
+      `, [ownerUserId, parsed.input.accountId, parsed.input.market, parsed.input.currency, parsed.input.ticker]).catch(() => []);
+      if (existing.length) return {
+        status: "conflict", conflictReason: existing[0].archived === true ? "archived_holding" : "existing_holding",
+        message: existing[0].archived === true
+          ? "이 계좌에 종료된 보유 기록이 있어요. 보유 관리에서 기존 기록을 확인하고 복원해 주세요."
+          : "이 계좌에 이미 등록된 종목이에요. 보유 관리에서 수량을 확인해 주세요. 새로 매수했다면 거래 기록에 남겨 주세요.",
+      };
       return state(
         "conflict",
         "같은 종목이나 분석 범위가 먼저 등록되었습니다. 화면을 새로고침해 주세요.",

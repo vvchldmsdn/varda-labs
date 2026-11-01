@@ -18,8 +18,8 @@ import { QuickHoldingReference } from "@/components/first-visit/quick-holding-re
 import { PlanHoldingReference } from "@/components/onboarding/plan-holding-reference";
 import { trackFirstVisit } from "@/lib/first-visit-events";
 import type { HoldingOnboardingOptions } from "@/db/queries/holding-onboarding";
-import { MAX_HOLDING_BATCH, type HoldingBatchState, type HoldingDraft } from "@/lib/holding-batch";
-import { Button as CairnButton, IconButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
+import { MAX_HOLDING_BATCH, validateHoldingDrafts, unresolvedHoldingKeys, type HoldingBatchState, type HoldingDraft } from "@/lib/holding-batch";
+import { Button as CairnButton, IconButton, Field as CairnField, Fieldset as CairnFieldset, Form as CairnForm, Input as CairnInput, Radio as CairnRadio, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
 
 const INITIAL_STATE: HoldingBatchState = { status: "idle", results: [] };
@@ -27,7 +27,14 @@ const identity = (row: Pick<HoldingDraft, "market" | "ticker">) => `${row.market
 const positive = (value: string, precision: number) => /^\d+(?:\.\d+)?$/.test(value) && Number(value) > 0 && Number.isFinite(Number(value)) && (value.split(".")[1]?.length ?? 0) <= precision;
 type EntryMethod = "photo" | "text" | "manual";
 
-export function HoldingOnboardingForm({ options, initialAccountId, nativeAccountIds = [], persistAccountContext = true, preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch }: { options: HoldingOnboardingOptions; initialAccountId?: string; nativeAccountIds?: readonly string[]; persistAccountContext?: boolean; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean; action?: typeof createHoldingBatch }) {
+type HoldingFormProps = { options: HoldingOnboardingOptions; initialAccountId?: string; accountSelectionProvided?: boolean; nativeAccountIds?: readonly string[]; persistAccountContext?: boolean; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean; action?: typeof createHoldingBatch; onComplete?: (accountId: string) => void };
+export function HoldingOnboardingForm(props: HoldingFormProps) {
+  const scope = `${props.options.draftOwnerKey ?? "preview"}:${props.initialAccountId ?? ""}`;
+  const [selection, setSelection] = useState({ scope, account: props.initialAccountId ?? props.options.accounts[0]?.id ?? "" });
+  const account = selection.scope === scope ? selection.account : props.initialAccountId ?? props.options.accounts[0]?.id ?? "";
+  return <HoldingOnboardingWorkspace {...props} key={`${props.options.draftOwnerKey ?? "preview"}:${account}`} accountSelectionProvided={props.accountSelectionProvided && account === props.initialAccountId} initialAccountId={account} onAccountChange={next => setSelection({ scope, account: next })} />;
+}
+export function HoldingOnboardingWorkspace({ options, initialAccountId, accountSelectionProvided = false, nativeAccountIds = [], persistAccountContext = true, preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch, onAccountChange, onComplete }: HoldingFormProps & { onAccountChange?: (account: string) => void }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<HoldingDraft[]>([]);
   const [saved, setSaved] = useState<Record<string, string>>({});
@@ -52,6 +59,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [photoDraft, setPhotoDraft] = useState<BalanceReviewRow[]>([]);
   const [tableDraft, setTableDraft] = useState<TableHoldingDraft>({ text: "", rows: [] });
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const needsFocus = useRef(false);
   function go(next: 0 | 1 | 2) {
@@ -65,36 +73,45 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
     stepHeading.current?.focus({ preventScroll: true });
     stepHeading.current?.scrollIntoView({ block: "nearest" });
   }, [step]);
-  const draftKey = !preview && options.draftOwnerKey ? `cairn:holding-draft:v1:${options.draftOwnerKey}` : null;
+  const draftKey = !preview && options.draftOwnerKey ? `cairn:holding-draft:v2:${options.draftOwnerKey}:${accountId}` : null;
   const hydratedKey = useRef<string | null>(null);
-  function retainDraft(inFlight = uncertain) {
+  function retainDraft(inFlight = uncertain, completed?: { saved: typeof saved; results: typeof rowResults }, submitted = hasSubmitted) {
     if (!draftKey) return true;
-    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, saved, accountId, groupId, groupName, results: rowResults, uncertain: inFlight, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); return true; }
+    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, hasSubmitted: submitted, saved: completed?.saved ?? saved, accountId, groupId, groupName, results: completed?.results ?? rowResults, uncertain: inFlight, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); return true; }
     catch { setDraftUnavailable(true); return false; }
   }
   const [state, action, pending] = useActionState(async (previous: HoldingBatchState, data: FormData) => {
-    const submitted: HoldingDraft[] = JSON.parse(String(data.get("holdings")));
+    setHasSubmitted(true);
+    const allRows: HoldingDraft[] = JSON.parse(String(data.get("holdings")));
+    const submitted = data.get("retryKey") ? allRows.filter(row => row.key === data.get("retryKey")) : allRows;
+    data.set("holdings", JSON.stringify(submitted));
+    const invalid = validateHoldingDrafts(submitted, data);
+    if (invalid.length) {
+      setRowResults(current => [...current.filter(item => !invalid.some(row => row.key === item.key)), ...invalid]);
+      return { status: "invalid", attemptedKeys: [], results: invalid } as HoldingBatchState;
+    }
     // Persist the immutable submission before any request can reach the server.
-    if (!retainDraft(submitted.map(row => row.key))) return previous;
-    setUncertain(submitted.map(row => row.key));
+    if (!retainDraft([...new Set([...uncertain, ...submitted.map(row => row.key)])], undefined, true)) return previous;
+    setUncertain([...new Set([...uncertain, ...submitted.map(row => row.key)])]);
     let result: HoldingBatchState;
     try { result = await submitBatch(previous, data); }
     catch { result = { status: "partial", results: submitted.map(row => ({ key: row.key, result: { status: "error", message: "저장 응답을 받지 못했어요. 같은 목록으로 다시 확인하면 중복 저장하지 않습니다." } })) }; }
-    setUncertain(submitted.filter(row => !result.results.some(item => item.key === row.key && item.result.status !== "error")).map(row => row.key));
+    const nextUncertain = [...uncertain.filter(key => !submitted.some(row => row.key === key)), ...unresolvedHoldingKeys(submitted, result)];
+    setUncertain(nextUncertain);
     setRowResults(current => [...current.filter(item => !result.results.some(next => next.key === item.key)), ...result.results]);
     if (!preview) for (const item of result.results) {
       if (item.result.status === "success" && item.result.firstHoldingCreated === true && item.result.assetId) {
         trackFirstVisit("first_holding_created", item.result.assetId);
       }
     }
-    setSaved(previousSaved => {
-      const next = { ...previousSaved };
-      for (const item of result.results) if (item.result.status === "success") {
-        const row = submitted.find(candidate => candidate.key === item.key);
-        if (row) next[item.key] = identity(row);
-      }
-      return next;
-    });
+    const nextSaved = { ...saved };
+    for (const item of result.results) if (item.result.status === "success") {
+      const row = submitted.find(candidate => candidate.key === item.key);
+      if (row) nextSaved[item.key] = identity(row);
+    }
+    setSaved(nextSaved);
+    retainDraft(nextUncertain, { saved: nextSaved, results: [...rowResults.filter(item => !result.results.some(next => next.key === item.key)), ...result.results] }, true);
+    if (rows.length > 0 && rows.every(row => nextSaved[row.key])) onComplete?.(accountId);
     return result;
   }, INITIAL_STATE);
   const awaitingPrice = rowResults.some(item => !saved[item.key] && item.result.status === "price_unavailable");
@@ -106,16 +123,13 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
     if (!current) return;
     hydratedKey.current = draftKey;
     if (draftKey) try {
-      const text = sessionStorage.getItem(draftKey);
+      const text = sessionStorage.getItem(draftKey) ?? sessionStorage.getItem(`cairn:holding-draft:v1:${options.draftOwnerKey}`);
       const draft = text ? JSON.parse(text) : null;
-      if (draft && Number.isFinite(draft.at) && options.accounts.some(account => account.id === draft.accountId) && Array.isArray(draft.rows) && draft.rows.every((row: HoldingDraft) => typeof row.key === "string" && typeof row.ticker === "string" && typeof row.quantity === "string")) {
-        const unfinished = draft.rows.some((row: HoldingDraft) => !draft.saved?.[row.key]) || draft.uncertain?.length > 0 || draft.workspace?.searchQuery || draft.workspace?.manualTicker || draft.workspace?.selected || draft.workspace?.photoDraft?.length || draft.workspace?.tableDraft?.text;
-        // A finished batch must not override an explicit new-account entry.
-        if (initialAccountId && initialAccountId !== draft.accountId && !unfinished) { setDraftLoaded(true); return; }
-        setRows(draft.rows); setSaved(draft.saved ?? {}); setAccountId(draft.accountId);
-        if (initialAccountId && initialAccountId !== draft.accountId) setResumedAccount(options.accounts.find(account => account.id === draft.accountId)?.name ?? null);
+      if (draft && Number.isFinite(draft.at) && draft.accountId === accountId && options.accounts.some(account => account.id === draft.accountId) && Array.isArray(draft.rows) && draft.rows.every((row: HoldingDraft) => typeof row.key === "string" && typeof row.ticker === "string" && typeof row.quantity === "string")) {
+        setRows(draft.rows); setSaved(draft.saved ?? {});
         setGroupId(draft.groupId ?? ""); setGroupName(draft.groupName ?? "");
         setRowResults(draft.results ?? []); setUncertain(draft.uncertain ?? []);
+        setHasSubmitted(draft.hasSubmitted === true || Object.keys(draft.saved ?? {}).length > 0 || (draft.results?.length ?? 0) > 0 || (draft.uncertain?.length ?? 0) > 0);
         const workspace = draft.workspace;
         setStep(workspace && [0, 1, 2].includes(workspace.step) ? workspace.step : draft.rows.length ? 2 : 0);
         if (workspace) {
@@ -132,12 +146,12 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
     setDraftLoaded(true);
     });
     return () => { current = false; };
-  }, [draftKey, options.accounts, initialAccountId]);
+  }, [draftKey, options.accounts, options.draftOwnerKey, accountId]);
   useEffect(() => {
     if (!draftLoaded || !draftKey) return;
-    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, saved, accountId, groupId, groupName, results: rowResults, uncertain, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); }
+    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, hasSubmitted, saved, accountId, groupId, groupName, results: rowResults, uncertain, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); }
     catch { queueMicrotask(() => setDraftUnavailable(true)); }
-  }, [draftLoaded, draftKey, rows, saved, accountId, groupId, groupName, rowResults, uncertain, step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft]);
+  }, [draftLoaded, draftKey, rows, saved, accountId, groupId, groupName, rowResults, uncertain, hasSubmitted, step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft]);
   const unsaved = rows.filter(row => !saved[row.key]);
   const hasSaved = Object.keys(saved).length > 0;
   const allSaved = rows.length > 0 && hasSaved && unsaved.length === 0;
@@ -149,6 +163,8 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
     : error === "ticker" ? t("티커를 확인해 주세요. 영문, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다.", "Check the ticker. Use letters, numbers, dots, underscores or hyphens.") : null;
 
   function selectAccount(next: string) {
+    if (!retainDraft()) return;
+    onAccountChange?.(next);
     setAccountId(next);
     // Embedded readers own their route scope; keep their form selection local.
     // Standalone pages persist account context without remounting queued inputs.
@@ -178,9 +194,10 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
   function editRow(key: string, field: "quantity" | "averageCost" | "currentPrice", value: string) {
     if (uncertain.includes(key)) return;
     setRows(previous => previous.map(row => row.key === key ? { ...row, [field]: value } : row));
+    setRowResults(previous => previous.filter(row => row.key !== key));
   }
 
-  const completion = hasSaved ? <CairnStatus as="div" tone="success" className={`varda-onboarding-success ${motion.success}`} role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href={`/portfolio/first-look?${new URLSearchParams({scope: `account:${accountId}`})}`}>{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{hasSaved ? <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" onClick={() => { setRows(previous => previous.filter(row => !saved[row.key])); if (unsaved.length === 0 && uncertain.length === 0) { setSaved({}); setRowResults([]); setResumedAccount(null); go(0); } }} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></CairnButton> : null}</CairnStatus> : null;
+  const completion = hasSaved ? <CairnStatus as="div" tone="success" className={`varda-onboarding-success ${motion.success}`} role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href={`/portfolio/first-look?${new URLSearchParams({scope: `account:${accountId}`})}`}>{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{hasSaved ? <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" onClick={() => { setRows(previous => previous.filter(row => !saved[row.key])); if (unsaved.length === 0 && uncertain.length === 0) { setSaved({}); setRowResults([]); setHasSubmitted(false); setResumedAccount(null); go(0); } }} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></CairnButton> : null}</CairnStatus> : null;
 
   if (nativeAccountIds.includes(accountId)) return <div className="varda-holding-onboarding">
     <CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} aria-label={t("보유 계좌", "Holding account")}>{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField>
@@ -198,13 +215,13 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
       <p>{step === 2 ? t("현재 보유잔고를 등록해요. 새 매매는 거래 기록에서 입력해 주세요.", "Register your current holdings. Record new buys and sells separately.") : t("매입가를 몰라도 시작할 수 있어요.", "You can start without your purchase prices.")}</p>
     </header>
     {resumedAccount ? <p className="varda-onboarding-hint">{t(`${resumedAccount}의 저장 중인 목록을 이어서 확인해 주세요.`, `Resume the pending list for ${resumedAccount}.`)}</p> : null}
-    <div className="varda-onboarding-account-line"><CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} disabled={pending || hasSaved || uncertain.length > 0} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField></div>
+    <div className="varda-onboarding-account-line" hidden={accountSelectionProvided && Boolean(accountId)}><CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} disabled={pending || hasSaved || uncertain.length > 0} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField></div>
     <section hidden={step !== 0} className={motion.stage} data-direction={direction} aria-label={t("등록 방법", "Entry method")}>
-      <div className="varda-entry-methods">{([
+      <CairnFieldset className="varda-entry-methods"><legend className="sr-only">{t("등록 방법 선택", "Choose an entry method")}</legend>{([
         ["photo", Camera, t("캡처로 가져오기", "From a screenshot"), t("증권 앱의 잔고 화면", "Your brokerage holdings screen")],
         ["text", FileText, t("텍스트·표 붙여넣기", "Paste text or a table"), t("종목명과 보유 수량", "Holding names and quantities")],
         ["manual", PencilLine, t("직접 입력하기", "Enter manually"), t("한 종목씩 검색해서 추가", "Search and add each holding")],
-      ] as const).map(([value, Icon, title, description]) => <CairnButton key={value} variant="selection" type="button" aria-pressed={method === value} onClick={() => setMethod(value)}><Icon size={24} aria-hidden="true" /><span><strong>{title}</strong><small>{description}</small></span>{method === value ? <Check size={20} aria-hidden="true" /> : null}</CairnButton>)}</div>
+      ] as const).map(([value, Icon, title, description]) => <CairnField key={value} data-selected={method === value}><CairnRadio name="entryMethod" value={value} checked={method === value} onChange={() => setMethod(value)} /><Icon size={24} aria-hidden="true" /><span><strong>{title}</strong><small>{description}</small></span>{method === value ? <Check size={20} aria-hidden="true" /> : null}</CairnField>)}</CairnFieldset>
       <div className="varda-entry-footer"><CairnButton variant="primary" type="button" className="varda-onboarding-primary" disabled={!draftLoaded} onClick={() => go(1)}>{t("자료 입력하기", "Provide details")}<ArrowRight size={18} /></CairnButton>{rows.length > 0 && <CairnButton variant="ghost" type="button" onClick={() => { setMethod("manual"); go(2); }}>{t(`담아둔 ${rows.length}종목 확인`, `Review ${rows.length} queued holdings`)}</CairnButton>}</div>
     </section>
     <div hidden={step === 0 || method !== "photo"} className={motion.stage} data-direction={direction} data-step={step}>{draftLoaded && <BalancePhotoPanel onProvide={() => go(1)} guided stage={step === 2 ? "review" : "provide"} onReview={() => go(2)} initialRows={photoDraft} onDraftChange={setPhotoDraft} onAdd={addDrafts} remaining={MAX_HOLDING_BATCH - unsaved.length} disabled={pending || step === 0 || method !== "photo"} preview={preview} />}</div>
@@ -252,6 +269,8 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
             <CairnField className="varda-onboarding-row-quantity">{t("보유 수량", "Quantity")}<CairnInput type="number" inputMode="decimal" min="0.000001" step="0.000001" value={row.quantity} required disabled={locked} onChange={event => editRow(row.key, "quantity", event.target.value)} aria-label={t(`${row.name} 보유 수량`, `${row.name} quantity`)} /></CairnField>
             {!isSaved ? <details className="varda-onboarding-disclosure"><summary>{t("매입가·가격 확인", "Cost & price lookup")}</summary><div className="varda-onboarding-fields"><CairnField>{t("평균 매입가 (선택)", "Average cost (optional)")}<CairnInput type="number" inputMode="decimal" min="0.0001" step="0.0001" value={row.averageCost} disabled={locked} onChange={event => editRow(row.key, "averageCost", event.target.value)} /></CairnField><CairnField>{t("현재 1주 가격 · 자동 조회가 안 될 때", "Current price if lookup is unavailable")}<CairnInput type="number" inputMode="decimal" min="0.0001" step="0.0001" value={row.currentPrice} disabled={locked} onChange={event => editRow(row.key, "currentPrice", event.target.value)} /></CairnField></div><p>{t("저장하려면 자동 조회 가격 또는 직접 입력한 현재가가 필요해요. 매입가는 비워도 됩니다.", "We look up the current price. If unavailable, you can enter it here.")}</p></details> : null}
             {!isSaved ? <span className="varda-onboarding-hint">{uncertain.includes(row.key) ? t("저장 확인 필요", "Confirm save") : result?.status === "price_unavailable" ? result.retryAfterSeconds ? t("시세 조회 대기", "Price lookup pending") : t("가격 입력 필요", "Price required") : result && result.status !== "success" ? t("저장 실패 · 다시 확인", "Save failed · review") : t("저장 대기", "Ready to save")}</span> : null}
+            {!isSaved && (hasSubmitted || uncertain.includes(row.key)) && <CairnButton variant="secondary" type="submit" name="retryKey" value={row.key} disabled={pending || preview || !draftLoaded}>{uncertain.includes(row.key) ? t("저장 여부 확인·재시도", "Check save & retry") : t("이 종목 다시 저장", "Retry this holding")}</CairnButton>}
+            {result?.conflictReason && <Link href={`${typeof window !== "undefined" && window.location.pathname.startsWith("/beta") ? "/beta/portfolio/holdings/manage" : "/portfolio/holdings"}?scope=account:${accountId}`}>{t("기존 보유 기록 확인", "Review existing holding")}</Link>}
             {result && !isSaved && result.message ? <CairnStatus as="p" tone="neutral" role="status" className="varda-onboarding-error"><ManagementText>{result.message}</ManagementText></CairnStatus> : null}
           </li>;
         })}</ol>}</details>
