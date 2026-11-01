@@ -51,7 +51,8 @@ describe("reporting currency on existing owned routes", () => {
   it("uses the same owner-scoped native surface for both currencies and all seven routes", async () => {
     for (const currency of ["KRW", "USD"]) for (const path of paths) {
       const { Page, calls } = await route(path);
-      const tree = await Page({ searchParams: Promise.resolve({ currency, model: "bootstrap" }) });
+      const root = await Page({ searchParams: Promise.resolve({ currency, model: "bootstrap" }) });
+      const tree = path === "" ? root.props.children : root;
       assert.equal(tree.type, Surface, path);
       assert.equal(tree.props.evidence?.reporting ?? tree.props.reporting, currency, path);
       assert.ok(calls.includes(`${["investment-lab/", "simulation/"].includes(path) ? "research" : "valuation"}:${currency}`), path);

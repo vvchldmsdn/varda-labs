@@ -1,4 +1,5 @@
 import { QuickTradeWorkspace } from "@/components/quick-trade-actions";
+import { presentationOwnerKey } from "@/lib/server/presentation-owner-key";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { CurrencyPortfolioSurface } from "@/components/currency-portfolio-surface";
 import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
@@ -106,7 +107,7 @@ export default async function Home({ searchParams }: HomeProps) {
       getTrackedCurrencyEvidence(resolution.tenantContext, scopeContext.resolution.scope, params.currency === "USD" ? "USD" : "KRW", { asOf }),
       getTrackedCurrencyEvidence(resolution.tenantContext, scopeContext.resolution.scope, params.currency === "USD" ? "USD" : "KRW", { asOf, collect: false, investmentsOnly: true }),
     ]);
-    return <QuickTradeWorkspace key={resolution.tenantContext.ownerUserId}><CurrencyPortfolioSurface surface="home" evidence={evidence} investmentEvidence={investmentEvidence} scopes={scopeContext.catalog.scopes} selectedScope={scopeContext.resolution.scope} /></QuickTradeWorkspace>;
+    return <QuickTradeWorkspace key={presentationOwnerKey(resolution.tenantContext)}><CurrencyPortfolioSurface surface="home" evidence={evidence} investmentEvidence={investmentEvidence} scopes={scopeContext.catalog.scopes} selectedScope={scopeContext.resolution.scope} /></QuickTradeWorkspace>;
   }
   const dashboardPromise = getPortfolioDashboard({
     analysisScopes: scopeContext.catalog.scopes,
@@ -115,7 +116,7 @@ export default async function Home({ searchParams }: HomeProps) {
   });
 
   return (
-    <QuickTradeWorkspace key={resolution.tenantContext.ownerUserId}><Suspense fallback={<DashboardSkeleton />}>
+    <QuickTradeWorkspace key={presentationOwnerKey(resolution.tenantContext)}><Suspense fallback={<DashboardSkeleton />}>
       <DashboardContent dashboardPromise={dashboardPromise} tenant={resolution.tenantContext} allScope={scopeContext.resolution.scope.kind === "all"} welcome={params.welcome === "1"} usd={params.currency === "USD"} scopes={scopeContext.catalog.scopes} selectedScope={scopeContext.resolution.scope} />
     </Suspense></QuickTradeWorkspace>
   );

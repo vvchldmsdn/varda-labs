@@ -210,7 +210,7 @@ export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
   };
   for(const beta of [false,true]) await check(`guided-recovery-archived-retry-scope-${beta}`,async()=>{
     const a=await makeAccount('QA 종료 '+beta,{archived:true}),b=await makeAccount('QA 빈초안 '+beta);
-    const href=id=>url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:'account:'+id,accountId:id,...(beta?{mode:'domain'}:{})});
+    const href=id=>url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:'account:'+id,...(beta?{mode:'domain'}:{accountId:id})});
     await page.goto(href(a.account));
     const form=page.locator('form.varda-holding-onboarding');
     await form.getByRole('radio',{name:/직접 입력하기/}).check();await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
