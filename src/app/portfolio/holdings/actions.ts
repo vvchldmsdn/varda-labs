@@ -1,6 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { readSessionHoldingAnalysisProgress } from "@/lib/holding-analysis-data-progress";
+import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { getReadOnlyTenantHoldingAnalysisDataReadinessForScope } from "@/db/queries/holding-analysis-data-readiness";
+import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+
+export async function readHoldingAnalysisProgress(holdingId: string) {
+  return readSessionHoldingAnalysisProgress(holdingId);
+}
+
+export async function readHoldingAnalysisScope(scopeKey: string) {
+  const unavailable = { state: 'unavailable' as const };
+  try {
+    const session = await resolveCurrentTenantContext();
+    if (!session.ok || typeof scopeKey !== 'string' || scopeKey.length > 80) return unavailable;
+    const context = await getReadOnlyTenantPortfolioAnalysisScopeContext({ tenantContext: session.tenantContext, scope: scopeKey });
+    if (context.state !== 'ready' || context.resolution.state !== 'resolved') return unavailable;
+    return await getReadOnlyTenantHoldingAnalysisDataReadinessForScope({ tenantContext: session.tenantContext, scope: context.resolution.scope, serviceDate: resolveSnapshotCycle(new Date()).snapshotDate });
+  } catch { return unavailable; }
+}
 
 import type {
   HoldingAnalysisDataPreparationActionState,

@@ -1,5 +1,7 @@
 import {
   admitSharedKisRawTrendEvidenceRows,
+  admitAdjustedHistoricalPriceRows,
+  type AdjustedHistoricalPriceConsumerEvidenceRow,
   type RawHistoricalPriceConsumerEvidenceRow,
 } from "./market-data/asset-price-consumer-admission.ts";
 import {
@@ -35,6 +37,7 @@ export type HoldingAnalysisDataCandidate = Readonly<{
 }>;
 
 export type HoldingAnalysisDataReadiness = Readonly<{
+  missingInputs?: readonly ("prices" | "adjusted_prices" | "historical_fx")[];
   holdingId: string;
   state: "ready" | "limited" | "missing" | "blocked" | "unsupported";
   reason:
@@ -82,7 +85,7 @@ export function buildHoldingAnalysisDataReadiness(input: {
   requireAdjusted?: boolean;
   holding: HoldingAnalysisDataCandidate;
   serviceDate: string;
-  priceRows: readonly RawHistoricalPriceConsumerEvidenceRow[];
+  priceRows: readonly (RawHistoricalPriceConsumerEvidenceRow & Partial<AdjustedHistoricalPriceConsumerEvidenceRow>)[];
   fxRows: readonly SimulationReturnMatrixFxInput[];
 }): HoldingAnalysisDataReadiness {
   const classification = classifyHolding(input.holding);
@@ -144,6 +147,16 @@ export function buildHoldingAnalysisDataReadiness(input: {
     fxRows: input.fxRows,
   });
   const simulationReady = history.status === "ready";
+  const missingInputs: ("prices" | "adjusted_prices" | "historical_fx")[] = [];
+  if (observationCount < HOLDING_ANALYSIS_DATA_READINESS_POLICY.simulationObservationCount) missingInputs.push("prices");
+  if (!simulationReady && normalizeCurrency(input.holding.currency) === "USD" &&
+      (input.fxRows.filter(row => row.status === "ok" && Number(row.usdKrw) > 0).length < HOLDING_ANALYSIS_DATA_READINESS_POLICY.simulationObservationCount || history.instruments.some(row => row.admissionStatus === "fx_incomplete"))) missingInputs.push("historical_fx");
+  const adjusted = admitAdjustedHistoricalPriceRows(matchingRows.map(row => ({ ...row,
+    adjustedClosePrice: row.adjustedClosePrice ?? null, adjustedCloseBasis: row.adjustedCloseBasis ?? null,
+    adjustedCloseProvider: row.adjustedCloseProvider ?? null, adjustedCloseSource: row.adjustedCloseSource ?? null,
+    adjustedCloseFetchedAt: row.adjustedCloseFetchedAt ?? null,
+  })));
+  if (!simulationReady && input.requireAdjusted && adjusted.rows.length < HOLDING_ANALYSIS_DATA_READINESS_POLICY.simulationObservationCount) missingInputs.push("adjusted_prices");
   const fresh =
     freshnessDays !== null &&
     freshnessDays <=
@@ -159,6 +172,7 @@ export function buildHoldingAnalysisDataReadiness(input: {
 
   return Object.freeze({
     holdingId: input.holding.holdingId,
+    missingInputs: Object.freeze(missingInputs),
     state,
     reason,
     observationCount,

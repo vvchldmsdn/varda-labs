@@ -63,7 +63,7 @@ export function targetFingerprint(model: TargetModel) {
   const policy = model.approvedPolicy.policy;
   // This is an observation-coherence check, not a database snapshot/transaction guarantee.
   return JSON.stringify([model.scope.key, model.serviceDate, model.status, model.policyValidation.status, model.startingWeightSource,
-    model.targetPlanRead ?? null, model.exactPolicyUniverse, model.currentUniverseHash, policy && [policy.approvalRevision, policy.policyVersion, policy.effectiveServiceDate, policy.universeHash, policy.vectorHash],
+    model.approvedPolicy.status !== "available" && model.approvedPolicy.explicitlyRevoked === true, model.targetPlanRead ?? null, model.exactPolicyUniverse, model.currentUniverseHash, policy && [policy.approvalRevision, policy.policyVersion, policy.effectiveServiceDate, policy.universeHash, policy.vectorHash],
     model.rows.map(row => [row.accountId, row.assetId, row.market, row.currency, row.ticker, row.targetWeightBps, row.currentValueKrw, row.costBasisKrw, row.maAssetClass, row.maRuleEnabled, row.assetType, row.accountCode]), model.plannedTargetRows ?? [], model.plannedMaRows ?? [], valuationVector(model.structure), model.structure.exclusions]);
 }
 export function legacyFingerprint(read: TenantApprovedTargetPolicyReadResult | null) {
@@ -155,7 +155,7 @@ export function adaptContribution({ preview, before, after, legacyBefore, legacy
     if (JSON.stringify(expected) !== JSON.stringify(actual)) return blocked("계산 종목·목표·평가 근거 불일치", ["planning_vector_mismatch"]);
   } else {
     const policy = legacyBefore?.status === "available" ? legacyBefore.policy : null;
-    if (before.policyValidation.status !== "missing" || !policy || policy.policyVersion !== preview.policyVersion || policy.effectiveServiceDate !== preview.effectiveServiceDate || policy.effectiveServiceDate > serviceDate) return blocked("구형 계좌 정책 근거 확인 필요", ["legacy_policy_mismatch"]);
+    if (before.policyValidation.status !== "missing" || (before.approvedPolicy.status !== "available" && before.approvedPolicy.explicitlyRevoked) || !policy || policy.policyVersion !== preview.policyVersion || policy.effectiveServiceDate !== preview.effectiveServiceDate || policy.effectiveServiceDate > serviceDate) return blocked("구형 계좌 정책 근거 확인 필요", ["legacy_policy_mismatch"]);
     const vector = policy.vector.map(row => [row.market, row.currency, row.ticker, row.targetWeightBps / 100]).sort();
     const actual = preview.rows.map(row => [row.market, row.currency, row.ticker, row.targetWeightPct]).sort();
     if (JSON.stringify(vector) !== JSON.stringify(actual)) return blocked("구형 계좌 정책 벡터 불일치", ["legacy_vector_mismatch"]);

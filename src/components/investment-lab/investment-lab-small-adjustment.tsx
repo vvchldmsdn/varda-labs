@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/i18n/locale-provider";
 import { LabText } from "./lab-text";
 import { labEnglish } from "./lab-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
@@ -22,6 +23,8 @@ export function InvestmentLabSmallAdjustment({
 }: {
   model: InvestmentLabSmallAdjustmentModel;
 }) {
+  const { t } = useI18n();
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [accountCode, setAccountCode] =
     useState<InvestmentLabSmallAdjustmentAccount>(
       model.accounts[0]?.account ?? "",
@@ -55,6 +58,7 @@ export function InvestmentLabSmallAdjustment({
   }, [result]);
 
   function resetCalculation() {
+    setAmountError(null);
     setSourceKey("");
     setDestinationKey("");
     setAmount("");
@@ -64,6 +68,12 @@ export function InvestmentLabSmallAdjustment({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedAccount) return;
+    const value = Number(amount.replaceAll(",", ""));
+    if (!Number.isSafeInteger(value) || value <= 0 || (source && value > Math.floor(source.currentValueKrw))) {
+      setAmountError(source ? t(`1원부터 ${formatKrw(Math.floor(source.currentValueKrw))}까지 입력해 주세요.`, `Enter between KRW 1 and ${formatKrw(Math.floor(source.currentValueKrw))}.`) : t("줄일 보유자산을 먼저 선택해 주세요.", "Choose a source holding first."));
+      setResult(null); return;
+    }
+    setAmountError(null);
     setResult(
       calculateInvestmentLabSmallAdjustment({
         account: selectedAccount,
@@ -94,14 +104,14 @@ export function InvestmentLabSmallAdjustment({
               id="investment-lab-small-adjustment-title"
               className="mt-3 text-lg font-medium sm:text-xl"
             ><LabText value=" 작은 조정 영향 실험 " /></CairnSectionTitle>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 같은 계정의 두 보유자산 사이에서 지정 금액만 옮긴 가정입니다. 외부 현금, 목표비중, 추천, 주문은 반영하지 않습니다. " /></p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 두 보유자산 사이에서 금액을 옮겨보는 가상 실험입니다. " /></p>
           </div>
           <p className="text-sm font-semibold text-[var(--muted)]"><LabText value=" 계산 가능 계정 " />{readyAccountCount}/{model.accounts.length}
           </p>
         </div>
       </header>
 
-      <div className="rounded-[4px] border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-6">
+      <div className="border-b border-[var(--line)] py-5">
         <LocalizedElement as="div"
           aria-label="조정 계정"
           className="flex max-w-full gap-7 overflow-x-auto border-b border-[var(--line)]"
@@ -129,12 +139,12 @@ export function InvestmentLabSmallAdjustment({
         {!selectedAccount || selectedAccount.status !== "ready" ? (
           <AccountUnavailable account={selectedAccount} />
         ) : (
-          <CairnForm className="mt-4 space-y-4" onSubmit={submit}>
+          <CairnForm className="mt-4 space-y-4" onSubmit={submit} noValidate>
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_220px_auto] lg:items-end">
               <CairnField className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 줄일 보유자산 " /><CairnSelect
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal text-[var(--ink)]"
                   onChange={(event) => {
-                    setSourceKey(event.target.value);
+                    setSourceKey(event.target.value); setAmountError(null);
                     setResult(null);
                   }}
                   value={sourceKey}
@@ -173,11 +183,13 @@ export function InvestmentLabSmallAdjustment({
 
               <CairnField className="grid gap-1.5 text-sm font-semibold text-[var(--ink)]"><LabText value=" 이동 금액 " /><CairnInput
                   className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 font-normal tabular-nums text-[var(--ink)]"
+                  aria-invalid={Boolean(amountError)}
+                  aria-describedby="adjustment-amount-help"
                   inputMode="numeric"
                   max={source ? Math.floor(source.currentValueKrw) : undefined}
                   min="1"
                   onChange={(event) => {
-                    setAmount(event.target.value);
+                    setAmount(event.target.value); setAmountError(null);
                     setResult(null);
                   }}
                   placeholder="0"
@@ -185,6 +197,7 @@ export function InvestmentLabSmallAdjustment({
                   type="number"
                   value={amount}
                 />
+                <span id="adjustment-amount-help" role={amountError ? "alert" : undefined} className="text-xs font-normal text-[var(--warning)]">{amountError ?? (source ? t(`최대 ${formatKrw(Math.floor(source.currentValueKrw))}`, `Maximum ${formatKrw(Math.floor(source.currentValueKrw))}`) : "")}</span>
               </CairnField>
 
               <CairnButton variant="primary"

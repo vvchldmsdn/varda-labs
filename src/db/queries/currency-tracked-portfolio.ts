@@ -8,13 +8,14 @@ import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { resolveAdditionalContributionPolicyParameters } from "@/lib/additional-contribution-policy-input";
 import { readNativeLedger } from "./native-portfolio-ledger";
 import { attachNativeLedgerEvidence } from "@/lib/native-portfolio-projection";
+import { currentInvestmentEvidence } from "@/lib/contribution-investment-evidence";
 import { resolveNativeGroupSelection } from "@/lib/native-group-scope";
 import { loadTenantPortfolioGroupMemberships } from "./tenant-group-reads";
 import { fxFactor } from "@/lib/currency-valuation";
 import { getTwelveDataServerConfig, requestTwelveDataEvidence, readTwelveDataEvidence, resolveTwelveDataTarget, requestTwelveDataHistoricalFx, readTwelveDataHistoricalFx, readTwelveDataSplitRisk, requestTwelveDataSplitRisk } from "@/lib/market-data/twelve-data-service";
 
 /** Preserve native decimal quantities/prices. Existing account/asset ownership predicates remain authoritative. */
-export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: PortfolioAnalysisScope, reporting: Currency, options: { asOf?: Date; collect?: boolean } = {}): Promise<TrackedPortfolioEvidence & { contributionPolicy: ReturnType<typeof resolveAdditionalContributionPolicyParameters> }> {
+export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: PortfolioAnalysisScope, reporting: Currency, options: { asOf?: Date; collect?: boolean; investmentsOnly?: boolean } = {}): Promise<TrackedPortfolioEvidence & { contributionPolicy: ReturnType<typeof resolveAdditionalContributionPolicyParameters> }> {
   const now = options.asOf ?? new Date();
   if (!Number.isFinite(now.getTime()) || now.getTime() > Date.now()) throw new Error("currency_valuation_time_invalid");
   const providerEvidence = options.collect === false ? readTwelveDataEvidence : requestTwelveDataEvidence;
@@ -36,7 +37,8 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
     const status = quote?.status ?? asset.priceStatus;
     const quoteType = quote?.quoteType ?? asset.priceQuoteType;
     // Do not admit a new provider without the matching licensing/admission path.
-    if (!source?.startsWith("kis") || !observedAt || !fetchedAt || observedAt > now || fetchedAt > now || observedAt > fetchedAt || status !== "ok" || !["live", "close"].includes(quoteType ?? "")) return base;
+    const enteredCurrentPrice = options.investmentsOnly && source === "user_entered_onboarding" && quoteType === "manual";
+    if ((!enteredCurrentPrice && (!source?.startsWith("kis") || !["live", "close"].includes(quoteType ?? ""))) || !source || !observedAt || !fetchedAt || observedAt > now || fetchedAt > now || observedAt > fetchedAt || status !== "ok") return base;
     return { ...base, observation: { quantity: asset.quantity, price: quote?.price ?? asset.currentPrice, currency: asset.currency, at, priceObservedAt: observedAt.toISOString(), priceFetchedAt: fetchedAt.toISOString(), basis: "raw", source } };
   });
   const evidence: TrackedPortfolioEvidence = { ownerId: tenant.ownerUserId, reporting, asOf: at,
@@ -128,7 +130,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
       if (cached) projected.fx = [...projected.fx, ...cached.fx.map(rate => ({ base: rate.baseCurrency, quote: rate.quoteCurrency, rate: rate.rate, observedAt: rate.observedAt, fetchedAt: rate.fetchedAt, source: rate.source, kind: rate.kind, requestedAt: rate.requestedAt }))];
     }
   }
-  return { ...projected, contributionPolicy: resolveAdditionalContributionPolicyParameters(sources.settingsRows[0]) };
+  return { ...(options.investmentsOnly ? currentInvestmentEvidence(projected, ledger, sources.assetRows, selection) : projected), contributionPolicy: resolveAdditionalContributionPolicyParameters(sources.settingsRows[0]) };
 }
 
 function usExchangeDate(at: string) {

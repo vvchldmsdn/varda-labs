@@ -27,6 +27,7 @@ export type PortfolioTargetPolicyActionState = Readonly<{
   status: "idle" | "success" | "invalid" | "unauthorized" | "conflict" | "error";
   message: string | null;
   approvalRevision?: number;
+  policyRevision?: number;
 }>;
 
 export async function writeSessionPortfolioTargetPolicy(
@@ -54,6 +55,15 @@ export async function writeSessionPortfolioTargetPolicy(
 
   const serviceDate = resolveSnapshotCycle(new Date()).snapshotDate;
   const scope = scopeContext.resolution.scope;
+  const intent = formData.get("intent") ?? "approve";
+  if (intent !== "approve" && intent !== "revoke") return state("invalid", "목표 변경 방법을 확인해 주세요.");
+  if (intent === "revoke") {
+    const revision = formData.get("approvalRevision");
+    if (typeof revision !== "string" || !/^[1-9]\d*$/.test(revision) || !Number.isSafeInteger(Number(revision))) {
+      return state("invalid", "해제할 승인 목표를 확인해 주세요.");
+    }
+    return revokePortfolioTargetPolicy(resolution.tenantContext.ownerUserId, scope, Number(revision));
+  }
   const model = await getReadOnlyTenantPortfolioTargetPolicyModel({
     scope,
     serviceDate,
@@ -67,6 +77,12 @@ export async function writeSessionPortfolioTargetPolicy(
   const submittedRevision = typeof revisionInput === "string" && /^(0|[1-9]\d*)$/.test(revisionInput)
     ? Number(revisionInput) : null;
   const currentRevision = model.approvedPolicy.policy?.approvalRevision ?? 0;
+  const currentPolicyRevision = model.approvedPolicy.status === "available" ? currentRevision : model.approvedPolicy.lastRevision ?? 0;
+  const policyRevisionInput = formData.get("policyRevision") ?? revisionInput;
+  const policyRevision = typeof policyRevisionInput === "string" && /^(0|[1-9]\d*)$/.test(policyRevisionInput) ? Number(policyRevisionInput) : null;
+  if (policyRevision === null || !Number.isSafeInteger(policyRevision) || policyRevision !== currentPolicyRevision) {
+    return state("conflict", "다른 저장이 먼저 완료되었습니다. 다시 조회한 뒤 확인해 주세요.");
+  }
   if (submittedRevision === null || !Number.isSafeInteger(submittedRevision) || submittedRevision !== currentRevision) {
     return state("conflict", "다른 저장이 먼저 완료되었습니다. 화면을 새로고침해 확인해 주세요.");
   }
@@ -155,12 +171,12 @@ export async function writeSessionPortfolioTargetPolicy(
       ownerUserId,
       record,
       scope,
-      expectedRevision: submittedRevision,
+      expectedRevision: policyRevision,
     });
     if (!writeResult) {
       return state("error", "목표비중 저장 결과를 확인하지 못했습니다.");
     }
-    return Object.freeze({ ...state("success", "이 범위의 목표비중을 저장했습니다."), approvalRevision: writeResult });
+    return Object.freeze({ ...state("success", "이 범위의 목표비중을 저장했습니다."), approvalRevision: writeResult, policyRevision: writeResult });
   } catch (error) {
     if (["23505", "22012"].includes(databaseErrorCode(error) ?? "")) {
       return state(
@@ -196,6 +212,7 @@ async function recordPortfolioTargetPolicy({
   const results = await sqlClient.transaction((transaction) => [
     transaction.query("set local lock_timeout = '2s'"),
     transaction.query("set local statement_timeout = '8s'"),
+    transaction.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [lockName]),
     transaction.query(record.policyVersion===TARGET_PLAN_VERSION ? ATOMIC_REPLACE_V2_QUERY : ATOMIC_REPLACE_QUERY, [
       lockName,
       ownerUserId,
@@ -212,8 +229,8 @@ async function recordPortfolioTargetPolicy({
       rowsJson,
       expectedRevision,
     ]),
-  ]);
-  const result = results[2]?.[0] as
+  ], { isolationLevel: "ReadCommitted" });
+  const result = results[3]?.[0] as
     | {
         approval_revision?: string | number;
         revision_count?: string | number;
@@ -228,6 +245,56 @@ async function recordPortfolioTargetPolicy({
     Number(result?.event_count) <= 2
   ) ? Number(result?.approval_revision) : null;
 }
+
+async function revokePortfolioTargetPolicy(ownerUserId: string, scope: Parameters<typeof portfolioTargetScopeColumns>[0], expectedRevision: number): Promise<PortfolioTargetPolicyActionState> {
+  const context = prepareTenantWriteContext({ mode: "active", source: "session", targetClassification: "user_owned", canonicalOwnerUserId: ownerUserId, canonicalOwnerStatus: "active", canonicalOwnerVerified: true });
+  assertActiveTenantWriteAllowed({ context, operation: "update", referencedOwnerUserIds: [ownerUserId] });
+  const columns = portfolioTargetScopeColumns(scope);
+  try {
+    const results = await sqlClient.transaction(transaction => [
+      transaction.query("set local lock_timeout = '2s'"),
+      transaction.query("set local statement_timeout = '8s'"),
+      transaction.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [["varda.portfolio_target_policy.v1", ownerUserId, scope.key].join(":")]),
+      transaction.query(ATOMIC_REVOKE_QUERY, [
+        ["varda.portfolio_target_policy.v1", ownerUserId, scope.key].join(":"), ownerUserId,
+        columns.scopeKind, columns.scopeAccountId, columns.scopePortfolioGroupId, expectedRevision, new Date().toISOString(),
+      ]),
+    ], { isolationLevel: "ReadCommitted" });
+    if (Number(results[3]?.[0]?.accepted_count) !== 1) return state("conflict", "승인 목표가 변경되었습니다. 다시 조회한 뒤 확인해 주세요.");
+    return { ...state("success", "목표 승인을 해제했습니다. 이전 승인 기록은 보존됩니다."), approvalRevision: 0, policyRevision: expectedRevision };
+  } catch {
+    return state("error", "승인 해제 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
+  }
+}
+
+// Revocation is a terminal lifecycle event, never a deletion or a zero-weight policy.
+// A repeated request is accepted only for the same revoked revision with no newer approval.
+const ATOMIC_REVOKE_QUERY = `
+with lock_acquired as materialized (
+  select pg_advisory_xact_lock(hashtextextended($1, 0))
+), scoped as materialized (
+  select r.id, r.approval_revision, r.lifecycle_status
+  from portfolio_target_policy_revisions r cross join lock_acquired
+  where r.canonical_owner_user_id = $2::uuid and r.scope_kind = $3::varchar
+    and r.scope_account_id is not distinct from $4::uuid
+    and r.scope_portfolio_group_id is not distinct from $5::uuid
+  for update of r
+), revoked as (
+  update portfolio_target_policy_revisions r set lifecycle_status = 'revoked', terminal_at = $7::timestamptz
+  from scoped s where r.id = s.id and s.approval_revision = $6::integer and s.lifecycle_status = 'approved'
+  returning r.id
+), event as (
+  insert into portfolio_target_policy_lifecycle_events (
+    id, canonical_owner_user_id, approval_revision_id, event_sequence, audit_version,
+    transition_kind, previous_status, resulting_status, transitioned_at, replacement_revision_id
+  ) select gen_random_uuid(), $2::uuid, id, 2, 'portfolio_target_policy_audit_v1',
+    'revocation', 'approved', 'revoked', $7::timestamptz, null from revoked returning id
+)
+select (select count(*) from event) + (select count(*) from scoped
+  where approval_revision = $6::integer and lifecycle_status = 'revoked'
+    and approval_revision = (select max(approval_revision) from scoped)
+    and not exists (select 1 from scoped where lifecycle_status = 'approved')) as accepted_count
+`;
 
 const ATOMIC_REPLACE_QUERY = `
 with lock_acquired as materialized (
@@ -251,7 +318,7 @@ with lock_acquired as materialized (
     and r.scope_account_id is not distinct from $4::uuid
     and r.scope_portfolio_group_id is not distinct from $5::uuid
 ), revision_guard as materialized (
-  select 1 / case when coalesce((select approval_revision from current_revision), 0) = $14::integer then 1 else 0 end as valid
+  select 1 / case when (select value - 1 from next_revision) = $14::integer then 1 else 0 end as valid
 ), superseded as (
   update portfolio_target_policy_revisions r
   set lifecycle_status = 'superseded', terminal_at = $12::timestamptz

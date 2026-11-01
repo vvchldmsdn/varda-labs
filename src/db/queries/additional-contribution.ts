@@ -154,6 +154,7 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
 
   if (
     model.policyValidation.status === "missing" &&
+    !(model.approvedPolicy.status === "missing" && model.approvedPolicy.explicitlyRevoked) &&
     scope.kind === "account" &&
     LEGACY_TARGET_POLICY_ACCOUNTS.has(scope.accountCode.toLowerCase())
   ) {

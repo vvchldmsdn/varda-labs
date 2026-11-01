@@ -19,6 +19,7 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
   const scoped = await getReadOnlyTenantPortfolioAnalysisScopeContext({ tenantContext: tenant, scope: scopeKey });
   if (scoped.state !== "ready" || scoped.resolution.state !== "resolved") return { status: "blocked", reason: "scope_unavailable" };
   const scope = scoped.resolution.scope;
+  if (scope.kind !== "account") return { status: "blocked", reason: "choose_account_for_funding" };
   const now = new Date(), serviceDate = resolveSnapshotCycle(now).snapshotDate;
   const [rawEvidence, model, comparisonLedger] = await Promise.all([
     getTrackedCurrencyEvidence(tenant, scope, reporting, { asOf: now }),

@@ -21,6 +21,7 @@ export async function createHoldingBatch(
   for (const row of rows) {
     if (!row || typeof row !== "object" || typeof row.key !== "string" || !row.key.trim() || row.key.length > 60 || prepared.some(item => item.key === row.key)) return { status: "invalid", results: [] };
     const data = new FormData();
+    data.set("operationId", row.key);
     for (const field of ["accountId", "portfolioGroupId", "newPortfolioGroupName"]) data.set(field, formData.get(field) ?? "");
     for (const field of ["instrumentId", "ticker", "name", "market", "assetType", "quantity", "averageCost", "currentPrice"]) {
       if (typeof row[field] !== "string") return { status: "invalid", results: [] };
@@ -46,7 +47,7 @@ export async function createHoldingBatch(
       break;
     }
     results.push({ key: row.key, result });
-    if (result.status === "unauthorized" || result.status === "price_unavailable") break;
+    if (result.status === "unauthorized" || result.status === "error") break;
   }
   if (results.some(row => row.result.status === "success")) revalidateHoldingPages();
   return { status: results.length === prepared.length && results.every(row => row.result.status === "success") ? "complete" : "partial", results };
@@ -81,6 +82,7 @@ function revalidateHoldingPages() {
       "/portfolio/targets",
       "/investment-lab",
       "/simulation",
+      "/beta",
   ]) {
     revalidatePath(path);
   }

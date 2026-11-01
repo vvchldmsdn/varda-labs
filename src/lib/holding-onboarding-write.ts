@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
@@ -52,6 +52,14 @@ export async function writeSessionHoldingOnboarding(
   if (!parsed.ok) return state("invalid", parsed.message);
 
   const ownerUserId = resolution.tenantContext.ownerUserId;
+  const operationId = formData.get("operationId");
+  if (operationId !== null && (typeof operationId !== "string" || !operationId.trim() || operationId.length > 60)) {
+    return state("invalid", "저장할 목록을 다시 확인해 주세요.");
+  }
+  // A retry keeps its identity even after a lost response or page reload. The
+  // owner namespace prevents one user's request from claiming another's row.
+  const operationHash = operationId === null ? null : createHash("sha256").update(`${ownerUserId}:holding-onboarding:${operationId}`).digest("hex");
+  const assetId = operationHash ? `${operationHash.slice(0,8)}-${operationHash.slice(8,12)}-4${operationHash.slice(13,16)}-a${operationHash.slice(17,20)}-${operationHash.slice(20,32)}` : randomUUID();
 
   try {
     // Verify the destination before spending a shared provider request. The
@@ -61,6 +69,10 @@ export async function writeSessionHoldingOnboarding(
     ).limit(1);
     if (ownedAccounts.length !== 1) return state("conflict", "보유 계좌를 다시 확인해 주세요.");
     if (ownedAccounts[0].nativeState != null) return state("conflict", NATIVE_LEDGER_REQUIRED_MESSAGE);
+    if (operationId !== null) {
+      const replay = await readOnboardingReplay(ownerUserId, assetId, parsed.input);
+      if (replay) return replay;
+    }
 
     let input = parsed.input;
     if (input.instrumentId) {
@@ -97,7 +109,6 @@ export async function writeSessionHoldingOnboarding(
     });
 
     const recordedAt = new Date();
-    const assetId = randomUUID();
     // The owner lock is acquired before the transaction rechecks account/group
     // ownership and lifecycle. Price preparation above touches only shared market
     // evidence; it never mutates another user's holdings.
@@ -125,6 +136,10 @@ export async function writeSessionHoldingOnboarding(
       });
     }
     if (isUniqueViolation(error)) {
+      if (operationId !== null) {
+        const replay = await readOnboardingReplay(ownerUserId, assetId, parsed.input).catch(() => null);
+        if (replay) return replay;
+      }
       return state(
         "conflict",
         "같은 종목이나 분석 범위가 먼저 등록되었습니다. 화면을 새로고침해 주세요.",
@@ -140,6 +155,28 @@ export async function writeSessionHoldingOnboarding(
       "보유종목을 저장하지 못했습니다. 잠시 후 다시 확인해 주세요.",
     );
   }
+}
+
+async function readOnboardingReplay(owner: string, assetId: string, input: HoldingOnboardingInput): Promise<HoldingOnboardingActionState | null> {
+  const rows = await runPortfolioMutation(owner, `
+    select exists (
+      select 1 from holding_onboarding_evidence e
+      join portfolio_group_asset_memberships m on m.asset_id=e.asset_id and m.canonical_owner_user_id=e.canonical_owner_user_id
+      join portfolio_groups g on g.id=m.portfolio_group_id and g.canonical_owner_user_id=e.canonical_owner_user_id
+      where e.asset_id=a.id and e.canonical_owner_user_id=$1::uuid
+        and e.account_id=$3::uuid and e.quantity=$7::numeric
+        and e.average_cost is not distinct from $8::numeric
+        and e.reported_return_pct is not distinct from $9::numeric
+        and ($10::numeric is null or (e.current_price=$10::numeric and e.price_source='user_entered_onboarding'))
+        and (g.id=$11::uuid or ($11::uuid is null and lower(g.name)=lower(coalesce($12::varchar, '${DEFAULT_HOLDING_PORTFOLIO_GROUP_NAME}'))))
+    ) and a.account_id=$3::uuid and a.market=$4::varchar and a.currency=$5::varchar
+      and a.ticker=$6::varchar and a.asset_type=$13::varchar as matches
+    from assets a where a.id=$2::uuid and a.canonical_owner_user_id=$1::uuid
+  `, [owner, assetId, input.accountId, input.market, input.currency, input.ticker, input.quantity, input.averageCost, input.reportedReturnPct, input.currentPrice, input.portfolioGroupId, input.newPortfolioGroupName, input.assetType]);
+  if (!rows.length) return null;
+  return rows[0].matches === true
+    ? state("success", "이미 저장한 종목을 확인했습니다.", assetId)
+    : state("conflict", "이 목록은 이미 저장되었습니다. 보유 관리에서 변경해 주세요.");
 }
 
 async function resolveAssetName(input: HoldingOnboardingInput) {
@@ -178,7 +215,7 @@ async function resolvePriceEvidence(
   const cached = await readCurrentPriceEvidence(input, now);
   if (cached) return cached;
   if (!getKisProviderPolicy().configured) {
-    throw new OnboardingPriceUnavailableError("자동 가격 조회가 준비되지 않았습니다. 현재 1좌 가격을 입력하거나 잠시 후 다시 저장해 주세요.");
+    throw new OnboardingPriceUnavailableError("자동 가격 조회를 사용할 수 없습니다. 현재 1주 가격을 직접 입력해 주세요.");
   }
 
   await enqueueMarketCollection([{ kind: "live", ticker: input.ticker, market: input.market, currency: input.currency }]);

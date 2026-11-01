@@ -13,6 +13,7 @@ export async function savePortfolioTargetPolicy(
 ): Promise<PortfolioTargetPolicyActionState> {
   const result = await writeSessionPortfolioTargetPolicy(formData);
   if (result.status === "success") {
+    revalidatePath('/beta', 'layout');
     for (const path of [
       "/portfolio/targets",
       "/portfolio/structure",

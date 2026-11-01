@@ -141,7 +141,7 @@ async function DashboardContent({
     }
   }
   if (usd) {
-    const evidence = await getTrackedCurrencyEvidence(tenant, selectedScope, "USD");
+    const evidence = await getTrackedCurrencyEvidence(tenant, selectedScope, "USD", { investmentsOnly: true });
     return <CurrencyPortfolioSurface surface="home" evidence={evidence} scopes={scopes} selectedScope={selectedScope} />;
   }
   return <>{welcome ? <CairnStatus as="p" tone="neutral" role="status" className="px-6 py-3 text-sm">입력한 자산을 저장했어요. <Link href="/plans" className="underline">저장한 구성 보기</Link></CairnStatus> : null}<PortfolioDashboard data={dashboard} liveSyncEnabled /></>;
