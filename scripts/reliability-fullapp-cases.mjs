@@ -151,7 +151,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.clock.install({ time: new Date(Date.now() + 60_000) });
       await visitValuation('/?currency=USD');
       await expect(page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true })).toBeVisible();
-      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,000.00');
+      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('1,000.00');
       await page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true }).click();
       const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
       await fillSettledTrade(dialog, '2', '200');
@@ -167,7 +167,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await dialog.getByRole('button', { name: '매도 기록 저장', exact: true }).click();
       assert.equal((await sellResponse).status(), 201, 'Slow device clock must not reject the default trade time');
       await expect(dialog).not.toBeVisible(); assert.equal((await readState()).positions[0].quantity, '11'); assert.equal((await readState()).cash.USD, '910');
-      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,010.00');
+      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('1,100.00');
       await page.screenshot({ path: path.join(output, 'desktop-home.png'), fullPage: true });
       await page.clock.setSystemTime(new Date());
     });
@@ -256,7 +256,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await setIdentity(sessionTokens[1]); await visitValuation('/?currency=KRW');
       await expect(page.getByRole('button', { name: 'Synthetic KRW holding 매수', exact: true })).toBeVisible();
       await expect(page.locator('body')).not.toContainText('Synthetic USD');
-      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('200,000');
+      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('100,000');
       await page.setViewportSize({ width: 390, height: 844 }); await page.reload();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.getByRole('button', { name: 'Synthetic KRW holding 매수', exact: true }).click();
@@ -270,7 +270,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await dialog.getByRole('button', { name: '매도 기록 저장', exact: true }).click(); await expect(dialog).not.toBeVisible();
       const otherState = (await ledger.readNativeLedger({ ownerUserId: other, role: 'user' }, otherAccount)).accounts[0].state;
       assert.equal(otherState.positions[0].quantity, '10'); assert.equal(otherState.cash.KRW, '101000');
-      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('201,000');
+      await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('100,000');
       await page.setViewportSize({ width: 320, height: 844 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.screenshot({ path: path.join(output, 'mobile-320-home.png'), fullPage: true });
       await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '소유 계정 이벤트' })).toBeVisible(); await expect(page.locator('body')).toContainText('Synthetic KRW');

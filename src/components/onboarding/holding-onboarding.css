@@ -21,13 +21,13 @@
 .varda-entry-progress i { width:6px; height:6px; border-radius:50%; background:var(--line); }
 .varda-entry-progress [aria-current=step] { color:var(--ink); }
 .varda-entry-progress [aria-current=step] i { background:var(--accent); }
-.varda-entry-methods { display:grid; gap:4px; padding:12px 0; }
-.varda-entry-methods button[data-cairn-button] { min-height:90px; display:flex; gap:18px; justify-content:flex-start; text-align:left; padding:20px 16px; border:0; border-radius:12px; box-shadow:none; background:transparent; color:var(--ink); }
-.varda-entry-methods button[data-cairn-button][aria-pressed=true] { background:var(--wash); }
-.varda-entry-methods button>span { flex:1; }
+.varda-entry-methods { display:grid; gap:4px; padding:8px 0; margin:0; border:0; min-width:0; }
+.varda-entry-methods label { min-height:90px; display:flex; gap:18px; justify-content:flex-start; text-align:left; padding:20px 16px; border:0; border-radius:12px; box-shadow:none; background:transparent; color:var(--ink); }
+.varda-entry-methods label[data-selected=true] { background:var(--wash); }
+.varda-entry-methods label>span { flex:1; }
 .varda-entry-methods strong { display:block; font-size:18px; font-weight:550; }
 .varda-entry-methods small { display:block; color:var(--muted); font-size:13px; margin-top:5px; }
-.varda-entry-methods button>svg:last-child { color:var(--accent); }
+.varda-entry-methods label>svg:last-child { color:var(--accent); }
 .varda-entry-footer { display:flex; flex-direction:column; gap:12px; padding-top:28px; padding-bottom:env(safe-area-inset-bottom); }
 .varda-entry-footer>button { min-height:48px; }
 .varda-entry-footer>p { margin:0; }
@@ -111,3 +111,18 @@
 }
 @media(prefers-reduced-motion:reduce) { .varda-onboarding-selected,.varda-onboarding-queue>li { animation:none; }.varda-instrument-results button { transition:none; } }
 [data-reduced=true] .varda-onboarding-selected,[data-reduced=true] .varda-onboarding-queue>li { animation:none; }
+
+.varda-entry-methods label { position:relative; cursor:pointer; }
+.varda-entry-methods input[type=radio] { position:absolute; width:1px; height:1px; opacity:0; }
+.varda-entry-methods label:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
+@media(max-width:600px) {
+  .varda-holding-add-content { margin-top:8px; }
+  .varda-entry-heading { padding:8px 0 16px; }
+  .varda-entry-heading h2 { font-size:26px; margin:12px 0 8px; }
+  .varda-onboarding-account-line { padding-bottom:12px; }
+  .varda-entry-methods label { min-height:64px; padding:10px 12px; gap:12px; }
+  .varda-entry-methods strong { font-size:16px; }
+  .varda-entry-methods small { font-size:12px; margin-top:3px; }
+  .varda-entry-footer { padding-top:16px; }
+  .varda-holding-onboarding[data-entry-step="0"] .varda-onboarding-workspace { padding:0; }
+}

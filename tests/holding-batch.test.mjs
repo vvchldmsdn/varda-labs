@@ -33,7 +33,9 @@ describe("holding batch saves", () => {
   it("rejects malformed or oversized payloads and more than twelve rows before any write", async () => {
     const f = await fixture();
     for (const rows of ["{broken", " ".repeat(32_001), {}, [], Array.from({ length: 13 }, (_, i) => draft(`A${i}`))]) {
-      assert.equal((await f.createHoldingBatch(idle, request(rows))).status, "invalid");
+      const result = await f.createHoldingBatch(idle, request(rows));
+      assert.equal(result.status, "invalid");
+      assert.deepEqual(result.attemptedKeys, []);
     }
     assert.equal(f.writes.length, 0);
     assert.deepEqual(f.revalidated, []);
@@ -42,14 +44,31 @@ describe("holding batch saves", () => {
   it("validates all rows before writing even when only a later row is invalid", async () => {
     const f = await fixture();
     for (const bad of [draft("B", { quantity: "-1" }), draft("B", { averageCost: "0" }), draft("B", { quantity: 2 }), draft(""), draft("A")]) {
-      assert.equal((await f.createHoldingBatch(idle, request([draft("A"), bad]))).status, "invalid");
+      const result = await f.createHoldingBatch(idle, request([draft("A"), bad]));
+      assert.equal(result.status, "invalid");
+      assert.deepEqual(result.attemptedKeys, []);
     }
     assert.equal(f.writes.length, 0);
   });
 
+  it("marks neither row attempted when a negative KODEX quantity rejects a batch containing valid fractional VOO", async () => {
+    const f = await fixture();
+    const result = await f.createHoldingBatch(idle, request([
+      draft("kodex", { ticker: "069500", name: "KODEX 200", market: "korea", assetType: "etf", quantity: "-1" }),
+      draft("voo", { ticker: "VOO", assetType: "etf", quantity: "0.896567" }),
+    ]));
+    assert.equal(result.status, "invalid");
+    assert.deepEqual(result.attemptedKeys, []);
+    assert.equal(result.results.find(row => row.key === "kodex")?.result.status, "invalid");
+    assert.equal(f.writes.length, 0);
+    assert.deepEqual(f.revalidated, []);
+  });
+
   it("rejects duplicate canonical instruments regardless of row key or ticker case", async () => {
     const f = await fixture();
-    assert.equal((await f.createHoldingBatch(idle, request([draft("one", { ticker: " aapl " }), draft("two", { ticker: "AAPL" })]))).status, "invalid");
+    const result = await f.createHoldingBatch(idle, request([draft("one", { ticker: " aapl " }), draft("two", { ticker: "AAPL" })]));
+    assert.equal(result.status, "invalid");
+    assert.deepEqual(result.attemptedKeys, []);
     assert.equal(f.writes.length, 0);
   });
 
@@ -59,6 +78,7 @@ describe("holding batch saves", () => {
     assert.equal(result.status, "complete");
     assert.equal(f.writes.length, 12);
     assert.equal(result.results.length, 12);
+    assert.deepEqual(result.attemptedKeys, Array.from({ length: 12 }, (_, i) => `A${i}`));
     assert.equal(new Set(f.revalidated).size, f.revalidated.length);
     for (const path of ["/", "/history", "/portfolio/first-look", "/portfolio/onboarding", "/portfolio/holdings/new"]) assert.ok(f.revalidated.includes(path));
   });
@@ -70,6 +90,7 @@ describe("holding batch saves", () => {
       assert.equal(result.status, "partial");
       assert.deepEqual(result.results, [{ key: "A", result: success }, { key: "B", result: failure }, ...(failure.status === "price_unavailable" ? [{key:"C",result:success}] : [])]);
       assert.deepEqual(f.writes.map((row) => row.ticker), failure.status === "price_unavailable" ? ["A", "B", "C"] : ["A", "B"]);
+      assert.deepEqual(result.attemptedKeys, failure.status === "price_unavailable" ? ["A", "B", "C"] : ["A", "B"]);
       assert.ok(f.revalidated.includes("/portfolio/first-look"));
     }
   });
@@ -77,7 +98,9 @@ describe("holding batch saves", () => {
   it("writes only submitted retry rows and does not trust success claims in previous client state", async () => {
     const f = await fixture();
     const previous = { status: "partial", results: [{ key: "A", result: success }, { key: "B", result: success }] };
-    assert.equal((await f.createHoldingBatch(previous, request([draft("B")]))).status, "complete");
+    const result = await f.createHoldingBatch(previous, request([draft("B")]));
+    assert.equal(result.status, "complete");
+    assert.deepEqual(result.attemptedKeys, ["B"]);
     assert.deepEqual(f.writes.map((row) => row.ticker), ["B"]);
   });
 
@@ -87,6 +110,7 @@ describe("holding batch saves", () => {
     const result = await f.createHoldingBatch(idle, request([draft("A")]));
     assert.equal(result.status, "partial");
     assert.deepEqual(result.results, [{ key: "A", result: conflict }]);
+    assert.deepEqual(result.attemptedKeys, ["A"]);
     assert.deepEqual(f.revalidated, []);
   });
 
@@ -96,8 +120,21 @@ describe("holding batch saves", () => {
     assert.equal(result.status, "partial");
     assert.equal(result.results[0].result.status, "success");
     assert.equal(result.results[1].result.status, "error");
+    assert.deepEqual(result.attemptedKeys, ["A", "B"]);
+    assert.equal(result.results.some(row => row.key === "C"), false, "the unattempted row has no writer result");
     assert.equal(f.writes.length, 2);
     assert.ok(f.revalidated.includes("/portfolio/holdings"));
+  });
+
+  it("distinguishes a writer-returned error from the later row that never reached the writer", async () => {
+    const error = { status: "error", message: "Save result unknown" };
+    const f = await fixture([error]);
+    const result = await f.createHoldingBatch(idle, request([draft("A"), draft("B")]));
+    assert.equal(result.status, "partial");
+    assert.deepEqual(result.attemptedKeys, ["A"]);
+    assert.deepEqual(result.results, [{ key: "A", result: error }]);
+    assert.deepEqual(f.writes.map(row => row.ticker), ["A"]);
+    assert.deepEqual(f.revalidated, []);
   });
 });
 
@@ -150,7 +187,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
   });
   function render() {
     stateIndex = 0;
-    return elements(component.HoldingOnboardingForm({ initialAccountId, persistAccountContext, options: {
+    return elements(component.HoldingOnboardingWorkspace({ initialAccountId, persistAccountContext, options: {
       state: "ready", accounts, portfolioGroups: [],
     } }));
   }
@@ -163,9 +200,10 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
       render().find(node => node.type === "button" && node.props.className?.split(" ").includes("varda-onboarding-secondary")).props.onClick();
       render().find(node => node.type === "button" && node.props.children?.[0]?.includes?.(locale === "ko" ? "종목 확인하기" : "Review ")).props.onClick();
     },
-    async submit() {
+    async submit(retryKey) {
       const data = new FormData();
       for (const node of render()) if (node.type === "input" && node.props.type === "hidden") data.set(node.props.name, node.props.value);
+      if (retryKey) data.set("retryKey", retryKey);
       await action(data);
     },
   };
@@ -301,4 +339,29 @@ it('can start a new account list after hiding saved rows and cancelling the last
   assert.ok(clear(),'the completed receipt must keep a visible reset action');clear().props.onClick();
   assert.equal(h.render().find(node=>node.props?.['aria-label']==='Holding account').props.disabled,false);
   assert.deepEqual(JSON.parse(h.render().find(node=>node.props?.name==='holdings').props.value),[]);
+});
+
+
+it('client prevalidation leaves unattempted valid rows editable and saves only after correction',async()=>{
+  const h=await batchFormFixture('en',[rows=>({status:'complete',attemptedKeys:rows.map(row=>row.key),results:rows.map(row=>({key:row.key,result:success}))})]);
+  h.add('KODEX');h.add('VOO');
+  h.render().find(node=>node.props?.['aria-label']==='KODEX quantity').props.onChange({target:{value:'-1'}});
+  h.render().find(node=>node.props?.['aria-label']==='VOO quantity').props.onChange({target:{value:'0.896567'}});
+  await h.submit();assert.equal(h.submissions.length,0);
+  assert.equal(h.render().find(node=>node.props?.['aria-label']==='VOO quantity').props.disabled,false);
+  h.render().find(node=>node.props?.['aria-label']==='KODEX quantity').props.onChange({target:{value:'22'}});
+  await h.submit();assert.deepEqual(h.submissions[0].map(row=>row.quantity),['22','0.896567']);
+});
+it('writer error locks only attempted rows and allows an independent row retry',async()=>{
+  const h=await batchFormFixture('en',[
+    rows=>({status:'partial',attemptedKeys:[rows[0].key],results:[{key:rows[0].key,result:{status:'error',message:'Unknown'}}]}),
+    rows=>({status:'complete',attemptedKeys:rows.map(row=>row.key),results:rows.map(row=>({key:row.key,result:success}))})
+  ]);
+  h.add('AAPL');h.add('VOO');await h.submit();
+  assert.equal(h.render().find(node=>node.props?.['aria-label']==='AAPL quantity').props.disabled,true);
+  assert.equal(h.render().find(node=>node.props?.['aria-label']==='VOO quantity').props.disabled,false);
+  const voo=h.submissions[0][1];await h.submit(voo.key);
+  assert.deepEqual(h.submissions[1].map(row=>row.ticker),['VOO']);
+  assert.equal(h.render().find(node=>node.props?.['aria-label']==='AAPL quantity').props.disabled,true);
+  assert.deepEqual(JSON.parse(h.render().find(node=>node.props?.name==='holdings').props.value).map(row=>row.ticker),['AAPL']);
 });

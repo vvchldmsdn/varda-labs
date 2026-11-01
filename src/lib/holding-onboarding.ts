@@ -53,6 +53,7 @@ export type HoldingOnboardingActionState = Readonly<{
   assetId?: string;
   firstHoldingCreated?: true;
   retryAfterSeconds?: number;
+  conflictReason?: "archived_holding" | "existing_holding";
 }>;
 
 export type HoldingOnboardingParseResult =
