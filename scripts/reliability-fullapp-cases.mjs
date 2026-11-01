@@ -103,7 +103,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
   await writeFile(transportFile, JSON.stringify({ bridge: bridgeUrl, connectionStrings, token }), { mode: 0o600 });
   const environment = { ...childEnvironment(process.env, stage, 'browser-journeys', browserCache), NODE_ENV: 'production',
     DATABASE_URL: connectionStrings[0], DATABASE_URL_UNPOOLED: connectionStrings[0], TENANT_DATABASE_URL: connectionStrings[1],
-    CAIRN_FULLAPP_IDENTITIES: JSON.stringify(identities), CAIRN_FULLAPP_TRANSPORT_FILE: transportFile, NATIVE_LEDGER_ROLLOUT: 'qa', NATIVE_LEDGER_QA_OWNERS: `${owner},${other}` };
+    CAIRN_FULLAPP_IDENTITIES: JSON.stringify(identities), CAIRN_FULLAPP_TRANSPORT_FILE: transportFile, NATIVE_LEDGER_ROLLOUT: 'qa', NATIVE_LEDGER_QA_OWNERS: `${owner},${other},${legacyOwner}` };
   environment.NODE_OPTIONS += ` --import=${pathToFileURL(path.join(stage, 'scripts/reliability-fullapp-preload.mjs')).href}`;
   // Next normalizes loopback Request.url to localhost. Keep browser Origin equal
   // to the actual route origin so the unchanged same-origin guard is exercised.
