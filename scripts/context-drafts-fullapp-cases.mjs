@@ -68,9 +68,13 @@ export async function runContextComparisonDraftCases({ page, check, admin, accou
       await page.goForward();
       await comparisonValues(page);
       await capture(page, output, `context-comparison-${beta ? 'beta' : 'original'}`);
-      await page.getByRole('link', { name: /추가투입으로 돌아가기/ }).click();
+      const back = page.getByRole('link', { name: /추가투입으로 돌아가기/ });
+      assert.equal(new URL(await back.getAttribute('href'), url).searchParams.has('cashAmountKrw'), false, 'USD draft must never populate the KRW planner');
+      await back.click();
       await expect(page).toHaveURL(current => current.pathname === (beta ? '/beta' : '/additional-contribution'));
-      assert.equal(new URL(page.url()).searchParams.has('cashAmountKrw'), false, 'USD funding must not become beta KRW');
+      // The beta home canonicalizer independently supplies its default KRW budget.
+      if (beta) assert.equal(new URL(page.url()).searchParams.get('cashAmountKrw'), '1000000');
+      else assert.equal(new URL(page.url()).searchParams.has('cashAmountKrw'), false);
       await page.getByRole('button', { name: '입력 유지하고 돌아가기', exact: true }).click();
       await comparisonValues(page);
     });
