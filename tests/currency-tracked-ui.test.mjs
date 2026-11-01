@@ -52,12 +52,54 @@ describe("owned portfolio currency view", () => {
     assert.match(textOf(tree), /does not adjust for portfolio-wide/);
     assert.ok(walk(tree).some(node => node.type === ring));
   });
+  it("keeps investment-only current value separate from full-account cash and period return", async () => {
+    const View = await importView();
+    const evidence = { ...trackedCurrencyFixture(), ledgerComplete: true, cashFlows: [], realizedTrades: [], realizedTradesComplete: true };
+    const investmentReports = buildTrackedCurrencyReports(evidence);
+    for (const frame of [evidence.current, ...evidence.history]) frame.positions.push({
+      id: "cash-usd", ownerId: evidence.ownerId, kind: "cash", name: "USD cash",
+      observation: { quantity: "900", price: "1", currency: "USD", at: frame.at, basis: "raw", source: "synthetic_fixture" },
+    });
+    const reports = buildTrackedCurrencyReports(evidence);
+    assert.equal(reports.USD.current.total, "2000");
+    assert.ok(Math.abs(reports.USD.performanceReturn.totalReturn - 100 / 1900) < 1e-12);
+    const tree = View({ evidence, reports, investmentReports, surface: "home" });
+    const value = walk(tree).find(node => node.props?.["aria-label"] === "Current valuation");
+    assert.match(textOf(value), /Investment value · excluding cash\$1,100.00/);
+    assert.match(textOf(value), /Account period return · including cash5.26%/);
+    assert.doesNotMatch(textOf(value), /\$2,000.00/);
+    evidence.current.positions[1].observation = null;
+    const incomplete = buildTrackedCurrencyReports(evidence);
+    assert.equal(incomplete.USD.current.complete, false);
+    const changed = View({ evidence, reports: incomplete, investmentReports, surface: "home" });
+    assert.match(textOf(changed), /Investment value · excluding cash\$1,100.00/);
+    assert.match(textOf(changed), /Account period return · including cash—/);
+    assert.doesNotMatch(textOf(changed), /Account period return · including cash5.26%/);
+    const grouped = { ...evidence, groupEvidence: { policy: "current_membership_whole_cash_direct_holdings", stableSince: evidence.history[0].at, reason: null } };
+    const groupTree = View({ evidence: grouped, reports: incomplete, investmentReports, surface: "home" });
+    assert.match(textOf(groupTree), /Period return in the selected scope/);
+    assert.doesNotMatch(textOf(groupTree), /Account (?:period return|value change|changes) · including cash/);
+  });
   it("recalculates native USD values in KRW and renders a loss although USD rose", async () => {
     const View = await importView();
     const tree = View({ evidence: { ...trackedCurrencyFixture(), reporting: "KRW" } });
     assert.match(textOf(tree), /1,386,000/);
     assert.match(textOf(tree), /-₩14,000/);
     assert.match(textOf(tree), /Example US asset/);
+  });
+  it("uses the current investment evidence for details and quick recording even if full-account pricing is unavailable", async () => {
+    const QuickTrade = () => null;
+    const View = await importView({ "@/components/quick-trade-actions": { QuickTradeActions: QuickTrade } });
+    const investmentEvidence = trackedCurrencyFixture();
+    investmentEvidence.current.source = "owned_investments_current_only";
+    Object.assign(investmentEvidence.current.positions[0], { kind: "holding", accountId: "owned-account" });
+    const evidence = structuredClone(investmentEvidence);
+    evidence.current.positions[0].observation = null;
+    const tree = View({ evidence, investmentEvidence, investmentReports: buildTrackedCurrencyReports(investmentEvidence), surface: "home" });
+    const trigger = walk(tree).find(node => node.type === QuickTrade && node.props.assetId === "example");
+    assert.equal(trigger.props.quantity, "1");
+    assert.equal(trigger.props.accountId, "owned-account");
+    assert.match(textOf(tree), /1 × \$1,100.00/);
   });
   it("draws no normalized ring and permits no allocation form when scope or FX is incomplete", async () => {
     const View = await importView();

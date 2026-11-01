@@ -35,7 +35,7 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
       await page.reload();
       await expect(page.getByLabel(locale==='ko'?'보유 계좌':'Holding account',{exact:true})).toHaveValue(legacyAccount);
       if(locale==='ko'&&width===1440) {
-        await page.getByRole('button',{name:'직접 입력하기',exact:false}).click();
+        await page.getByRole('radio',{name:'직접 입력하기',exact:false}).check();
         await page.getByRole('button',{name:'자료 입력하기',exact:true}).click();
         await page.getByText('검색되지 않는 종목 직접 입력',{exact:true}).click();
         await page.getByLabel('티커',{exact:true}).fill('999995');
