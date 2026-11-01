@@ -32,7 +32,7 @@ export function HoldingOnboardingForm(props: HoldingFormProps) {
   const scope = `${props.options.draftOwnerKey ?? "preview"}:${props.initialAccountId ?? ""}`;
   const [selection, setSelection] = useState({ scope, account: props.initialAccountId ?? props.options.accounts[0]?.id ?? "" });
   const account = selection.scope === scope ? selection.account : props.initialAccountId ?? props.options.accounts[0]?.id ?? "";
-  return <HoldingOnboardingWorkspace {...props} key={`${props.options.draftOwnerKey ?? "preview"}:${account}`} initialAccountId={account} onAccountChange={next => setSelection({ scope, account: next })} />;
+  return <HoldingOnboardingWorkspace {...props} key={`${props.options.draftOwnerKey ?? "preview"}:${account}`} accountSelectionProvided={props.accountSelectionProvided && account === props.initialAccountId} initialAccountId={account} onAccountChange={next => setSelection({ scope, account: next })} />;
 }
 export function HoldingOnboardingWorkspace({ options, initialAccountId, accountSelectionProvided = false, nativeAccountIds = [], persistAccountContext = true, preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch, onAccountChange, onComplete }: HoldingFormProps & { onAccountChange?: (account: string) => void }) {
   const { t } = useI18n();
