@@ -70,7 +70,6 @@ export default function Page(){return <main style={{padding:20,maxWidth:1200,mar
   await mkdir(path.join(stage,visualRoute));
   await writeFile(path.join(stage,visualRoute,'fixture.json'),JSON.stringify({context,view,returns:returnVisualFixture}));
   await writeFile(path.join(stage,visualRoute,'page.tsx'), `
-import {useSearchParams} from 'next/navigation';
 import {BetaProvider} from '@/components/cairn-v2/beta-provider';
 import {BetaHome} from '@/components/cairn-v2/beta-home';
 import {ReturnTimelineChart} from '@/components/return-timeline-chart';
