@@ -40,7 +40,9 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await expect(form.getByRole('radio',{name:/텍스트·표 붙여넣기/})).toBeChecked();
       await photoMethod.check();
       await capture(page,output,'guided-method-'+beta,width,height);
-      await expect(form.getByRole('button',{name:'자료 입력하기',exact:true})).toBeInViewport();
+      const primary=form.getByRole('button',{name:'자료 입력하기',exact:true});
+      await expect(primary).toBeInViewport({ratio:1});
+      assert.equal(await primary.evaluate(button=>{const r=button.getBoundingClientRect();return button.contains(document.elementFromPoint(r.x+r.width/2,r.bottom-2));}),true,'primary action must not sit behind mobile navigation');
       await form.getByRole('radio',{name:'텍스트·표 붙여넣기',exact:false}).click();
       await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
       await expect(form.locator('h2')).toBeFocused();

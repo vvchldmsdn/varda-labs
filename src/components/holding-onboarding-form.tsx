@@ -27,14 +27,14 @@ const identity = (row: Pick<HoldingDraft, "market" | "ticker">) => `${row.market
 const positive = (value: string, precision: number) => /^\d+(?:\.\d+)?$/.test(value) && Number(value) > 0 && Number.isFinite(Number(value)) && (value.split(".")[1]?.length ?? 0) <= precision;
 type EntryMethod = "photo" | "text" | "manual";
 
-type HoldingFormProps = { options: HoldingOnboardingOptions; initialAccountId?: string; nativeAccountIds?: readonly string[]; persistAccountContext?: boolean; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean; action?: typeof createHoldingBatch; onComplete?: (accountId: string) => void };
+type HoldingFormProps = { options: HoldingOnboardingOptions; initialAccountId?: string; accountSelectionProvided?: boolean; nativeAccountIds?: readonly string[]; persistAccountContext?: boolean; preview?: boolean; fromPlan?: boolean; fromQuick?: boolean; action?: typeof createHoldingBatch; onComplete?: (accountId: string) => void };
 export function HoldingOnboardingForm(props: HoldingFormProps) {
   const scope = `${props.options.draftOwnerKey ?? "preview"}:${props.initialAccountId ?? ""}`;
   const [selection, setSelection] = useState({ scope, account: props.initialAccountId ?? props.options.accounts[0]?.id ?? "" });
   const account = selection.scope === scope ? selection.account : props.initialAccountId ?? props.options.accounts[0]?.id ?? "";
   return <HoldingOnboardingWorkspace {...props} key={`${props.options.draftOwnerKey ?? "preview"}:${account}`} initialAccountId={account} onAccountChange={next => setSelection({ scope, account: next })} />;
 }
-export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAccountIds = [], persistAccountContext = true, preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch, onAccountChange, onComplete }: HoldingFormProps & { onAccountChange?: (account: string) => void }) {
+export function HoldingOnboardingWorkspace({ options, initialAccountId, accountSelectionProvided = false, nativeAccountIds = [], persistAccountContext = true, preview = false, fromPlan = false, fromQuick = false, action: submitBatch = createHoldingBatch, onAccountChange, onComplete }: HoldingFormProps & { onAccountChange?: (account: string) => void }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<HoldingDraft[]>([]);
   const [saved, setSaved] = useState<Record<string, string>>({});
@@ -215,7 +215,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
       <p>{step === 2 ? t("현재 보유잔고를 등록해요. 새 매매는 거래 기록에서 입력해 주세요.", "Register your current holdings. Record new buys and sells separately.") : t("매입가를 몰라도 시작할 수 있어요.", "You can start without your purchase prices.")}</p>
     </header>
     {resumedAccount ? <p className="varda-onboarding-hint">{t(`${resumedAccount}의 저장 중인 목록을 이어서 확인해 주세요.`, `Resume the pending list for ${resumedAccount}.`)}</p> : null}
-    <div className="varda-onboarding-account-line"><CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} disabled={pending || hasSaved || uncertain.length > 0} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField></div>
+    <div className="varda-onboarding-account-line" hidden={accountSelectionProvided && Boolean(accountId)}><CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} disabled={pending || hasSaved || uncertain.length > 0} aria-label={t("보유 계좌", "Holding account")}>{!accountId ? <option value="">{t("보유 계좌를 선택해 주세요.", "Choose a holding account.")}</option> : null}{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField></div>
     <section hidden={step !== 0} className={motion.stage} data-direction={direction} aria-label={t("등록 방법", "Entry method")}>
       <CairnFieldset className="varda-entry-methods"><legend className="sr-only">{t("등록 방법 선택", "Choose an entry method")}</legend>{([
         ["photo", Camera, t("캡처로 가져오기", "From a screenshot"), t("증권 앱의 잔고 화면", "Your brokerage holdings screen")],

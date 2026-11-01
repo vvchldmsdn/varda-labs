@@ -1,6 +1,4 @@
 .workspace{min-width:0;width:100%;max-width:720px;margin-inline:auto;padding:28px 0;color:var(--cairn-v2-ink)}
-.workspace>[data-cairn-detail-header] [data-cairn-heading]{margin:0;font-size:16px;font-weight:500;letter-spacing:-.04em}
-.workspace>[data-cairn-detail-header]{align-items:center;padding-right:0;margin-bottom:12px}
 .workspace>a{display:inline-flex;align-items:center;min-height:48px;font-size:14px;text-decoration:underline;text-underline-offset:4px}
 .muted,.evidence{font-size:13px;color:var(--cairn-v2-muted)}
 .retry{min-height:48px}

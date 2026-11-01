@@ -2,8 +2,6 @@
 import { ActionGroup, ActionContent, Button as CairnButton, Status as CairnStatus } from "@/components/cairn-ui";
 import { Wallet } from 'lucide-react';
 
-import { DetailHeader } from './ui/molecules';
-
 import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
 import { carryRecoveryFragment } from '@/lib/recovery-navigation';
 import {useCallback,useLayoutEffect,useMemo,useRef,useTransition,type FormEvent} from 'react';
@@ -22,7 +20,7 @@ import styles from './onboarding.module.css';
 export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:HoldingOnboardingRead;collectionEnabled?:boolean}){
  const search=useSearchParams(),router=useRouter(),query=search.toString();
  const context=useMemo(()=>domainQueryContext(query),[query]),freshness=useBetaReadFreshness(),available=useBetaExistingCrudAvailable();
- const [pending,startTransition]=useTransition(),heading=useRef<HTMLHeadingElement>(null),previousReceipt=useRef(read.readReceipt);
+ const [pending,startTransition]=useTransition(),heading=useRef<HTMLAnchorElement>(null),previousReceipt=useRef(read.readReceipt);
  const observed=freshness?.observed,epoch=freshness?.epoch,store=freshness?.store;
  useLayoutEffect(()=>{observed?.(read.readReceipt,read.readEpoch)},[read.readReceipt,read.readEpoch,observed,epoch]);
  const blocked=pending||onboardingKey(context)!==read.queryKey||!!store?.blocked(read.readReceipt,read.readEpoch);
@@ -46,13 +44,13 @@ export function BetaHoldingOnboarding({read,collectionEnabled=false}:{read:Holdi
  const cancelHref=ownedManagementHref('holdings',context,store?.pendingEpoch());
  return <BetaShell context={context} setContext={navigate} readView={shell} workspace="holdings" originalPath="/portfolio/holdings/new">
   <section className={styles.workspace} id="holding-onboarding" data-holding-onboarding-read-state={state} aria-busy={blocked}>
-   <DetailHeader title="보유종목 추가" headingProps={{ref:heading,tabIndex:-1}} actions={<Link prefetch={false} href={cancelHref}>보유 목록 ↗</Link>} />
+   <Link ref={heading} prefetch={false} href={cancelHref}>← 보유 목록</Link>
    {(blocked||!readable)&&<CairnStatus as="p" role="status">{message}</CairnStatus>}
    {!available&&<p>이 실행 환경에서는 등록 요청을 보낼 수 없습니다.</p>}
    {!blocked&&state==='unavailable'&&<CairnButton variant="secondary" className={styles.retry} type="button" onClick={retry}>등록 자료 다시 조회</CairnButton>}
    {!blocked&&state==='unauthorized'&&<Link prefetch={false} href={onboardingHref({...context,scope:'all'},store?.pendingEpoch())}>전체 범위에서 접근 다시 확인 ↗</Link>}
    <div className={styles.reused} hidden={!readable} aria-hidden={!readable} inert={!enabled} onSubmitCapture={preventBlocked} key={generation}>
-    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={createBetaHoldingBatch} onComplete={afterSuccess} initialAccountId={initialAccountId} nativeAccountIds={read.nativeAccountIds} persistAccountContext={false}/>:<ActionGroup label="계좌 등록"><Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}><ActionContent icon={<Wallet size={22}/>} title="먼저 계좌를 만들어 주세요" description="내 종목을 담을 계좌 등록" /></Link></ActionGroup>)}
+    {readable&&(read.options&&read.options.accounts.length>0?<HoldingOnboardingForm options={read.options} action={createBetaHoldingBatch} onComplete={afterSuccess} initialAccountId={initialAccountId} accountSelectionProvided={Boolean(initialAccountId)} nativeAccountIds={read.nativeAccountIds} persistAccountContext={false}/>:<ActionGroup label="계좌 등록"><Link prefetch={false} href={managementHref(context,store?.pendingEpoch())}><ActionContent icon={<Wallet size={22}/>} title="먼저 계좌를 만들어 주세요" description="내 종목을 담을 계좌 등록" /></Link></ActionGroup>)}
    </div>
    <details className={styles.evidence}><summary>등록 안내</summary>
     <p>폼에서 선택한 계좌에 보유 기록을 추가합니다. 매수·매도는 거래 기록에서 입력해 주세요.</p>
