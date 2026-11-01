@@ -1,20 +1,27 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {randomUUID} from 'node:crypto';
 import {Decimal} from '../src/lib/money.ts';
 import {expect} from '@playwright/test';
 
 async function capture(page,output,name,width,height) {
   await page.setViewportSize({width,height});
+  await expect(page.getByText('화면을 준비하고 있어요',{exact:true})).toBeHidden();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name}: horizontal overflow`);
-  await page.screenshot({path:path.join(output,`${name}-${width}.png`),fullPage:true});
-  await page.screenshot({path:path.join(output,`${name}-${width}-viewport.png`)});
+  await page.screenshot({path:path.join(output,`${name}-${width}.png`),fullPage:true,animations:'disabled'});
+  await page.screenshot({path:path.join(output,`${name}-${width}-viewport.png`),animations:'disabled'});
 }
 
 // Only called inside the disposable PostgreSQL + actual Next route rehearsal.
 export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,output}) {
+  // Manual holdings are private observations, not a public security catalog.
+  // Seed the synthetic catalog separately so exact matching uses the real search query.
+  await admin.query("insert into etf_masters(id,ticker,name,market,currency,is_active,is_sample,data_source) values($1,'QAFUND','QA 보유 6','us','USD',true,false,'isolated-guided-qa')",[randomUUID()]);
   for(const [beta,width,height] of [[false,390,844],[true,360,800]]) {
     await check(`guided-holdings-${beta?'beta':'original'}-${width}`,async()=>{
-      const route=url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:`account:${account}`,accountId:account,...(beta?{mode:'domain'}:{})});
+      const selectedAccount=beta?randomUUID():account;
+      if(beta)await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'qa_guided_photo','QA 사진등록','brokerage','KRW')",[selectedAccount,owner]);
+      const route=url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:`account:${selectedAccount}`,accountId:selectedAccount,...(beta?{mode:'domain'}:{})});
       await page.goto(route);
       await page.evaluate(()=>{for(const key of Object.keys(sessionStorage))if(key.startsWith('cairn:holding-draft:'))sessionStorage.removeItem(key);});
       await page.reload();await page.setViewportSize({width,height});
@@ -57,10 +64,11 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await expect(form).toContainText('매입가가 없는 종목은 평가액만 표시해요.');
       await capture(page,output,'guided-final-review-'+beta,width,height);
       // Leaving the screen is not a write, and returning restores the reviewed draft.
-      const before=(await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,account])).rows;
+      const before=(await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,selectedAccount])).rows;
       await page.goto(url+'/portfolio/manage');await page.goBack();
       await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
-      assert.deepEqual((await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,account])).rows,before);
+      assert.deepEqual((await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,selectedAccount])).rows,before);
+      await form.getByRole('button',{name:'QA 보유 6 목록에서 제거',exact:true}).click();
       await form.getByRole('button',{name:'종목 더 추가하기',exact:true}).click();
       await form.getByRole('button',{name:'캡처로 가져오기',exact:false}).click();
       await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
@@ -93,6 +101,19 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
         await form.getByRole('button',{name:'읽어둔 내용 확인',exact:true}).click();
         await expect(form.getByLabel('보유 수량',{exact:true})).toHaveValue('0.896567');
         assert.equal(uploaded.length,0,'photo must not upload to a server');
+        await form.getByRole('checkbox',{name:'사진의 종목과 수량을 확인했어요.',exact:true}).check();
+        await form.getByRole('button',{name:'1종목 확인 목록에 담기',exact:true}).click();
+        const row=form.locator('ol > li').filter({hasText:'QA 보유 6'});
+        await expect(row.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
+        await row.locator('summary').click();
+        await row.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('701.2638');
+        await form.getByRole('button',{name:'1종목 저장',exact:true}).click();
+        const readSaved=async()=>(await admin.query("select quantity::text,average_cost::text,currency from assets where canonical_owner_user_id=$1 and account_id=$2 and ticker='QAFUND'",[owner,selectedAccount])).rows;
+        await expect.poll(readSaved).toEqual([{quantity:'0.896567',average_cost:null,currency:'USD'}]);
+        assert.deepEqual((await admin.query("select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 and ticker<>'QAFUND' order by id",[owner,selectedAccount])).rows,before,'registration must preserve existing holdings');
+        if(beta)await expect.poll(()=>new URL(page.url()).pathname).toBe('/beta/portfolio/holdings/manage');
+        else await expect(form.locator('h2')).toHaveText('보유종목을 등록했어요');
+        await capture(page,output,'guided-photo-saved-'+beta,width,height);
       } finally {page.off('request',record);}
     });
   }

@@ -2,7 +2,7 @@
 .varda-holding-add-content { width:min(720px,calc(100% - 64px)); margin:24px auto 88px; }
 .varda-holding-add-back { display:inline-flex; align-items:center; gap:8px; min-height:48px; color:var(--muted); font-size:14px; }
 .varda-holding-add-heading { padding:12px 0; max-width:690px; }
-.varda-holding-add-heading h1 { font-size:16px; font-weight:550; letter-spacing:-.025em; line-height:1.4; margin:0; }
+.varda-holding-add-heading h1[data-cairn-page-title] { font-size:16px; font-weight:550; letter-spacing:-.025em; line-height:1.4; margin:0; }
 .varda-holding-add-heading>p:last-child { font-size:14px; line-height:1.7; color:var(--muted); }
 .varda-onboarding-eyebrow { margin:0; color:var(--ink); font-size:20px; letter-spacing:-.035em; font-weight:550; line-height:1.4; }
 .varda-holding-add-heading>.varda-onboarding-eyebrow { color:var(--muted); font-size:13px; }
@@ -94,6 +94,8 @@
 .varda-onboarding-success>svg { color:var(--accent); }
 .varda-onboarding-success strong { font-size:18px; font-weight:550; }
 .varda-onboarding-success a { display:inline-flex; align-items:center; gap:10px; min-height:48px; color:var(--accent); font-size:14px; }
+.varda-holding-onboarding .varda-onboarding-success[data-cairn-status] { border:0; border-radius:0; background:transparent; color:var(--ink); padding:0; }
+.varda-onboarding-success a { justify-content:space-between; min-height:56px; padding:14px 20px; border-radius:var(--cairn-ui-radius-button,999px); background:var(--cairn-ui-ink,var(--ink)); color:var(--cairn-ui-paper,var(--paper)); text-decoration:none; font-weight:550; }
 @keyframes varda-onboarding-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @media(max-width:760px) {
   .varda-holding-add-page { padding-bottom:calc(106px + env(safe-area-inset-bottom)); }
