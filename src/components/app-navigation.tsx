@@ -182,7 +182,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           </a> : null}
           <div className="varda-menu-language"><LanguageSwitch /></div>
           <Link className="varda-menu-account" href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
-          {!preview ? <TradeRecordLinks variant="menu" accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
+          {!preview ? <TradeRecordLinks variant="menu" reportingCurrency={params.get("currency") === "USD" ? "USD" : "KRW"} accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
           <Link className="varda-menu-account" href={hrefFor("/plans")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
           {!preview ? <Link className="varda-menu-account" href="/portfolio/reporting" onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>

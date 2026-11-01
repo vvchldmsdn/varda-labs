@@ -49,13 +49,13 @@ function hooks() {
 }
 // Real view event handlers with only browser/network ports substituted. Remote
 // authenticated browser QA separately covers the actual provider/session/writer.
-async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[]}={}) {
+async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[],loseResponse=false}={}) {
   deviceClock(t,offset);let monotonic=1000,serverNow=SERVER;const sent=[];
   t.mock.method(performance,'now',()=>monotonic);
   const values=new Map();globalValue(t,'localStorage',{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
   globalValue(t,'navigator',{locks:{request:async(_name,callback)=>callback()}});
   t.mock.method(globalThis,'fetch',async(_url,options)=>{
-    if(options.method==='POST') {sent.push(JSON.parse(options.body));return Response.json({error:'conflict'},{status:409});}
+    if(options.method==='POST') {const request=JSON.parse(options.body);sent.push(request);if(loseResponse){if(request.mutation)throw new Error('lost_response');return Response.json({status:'committed'});}return Response.json({error:'conflict'},{status:409});}
     return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:[account],canWrite:true,ordering:[],trades});
   });
   const h=hooks();const [view]=await importUiWithPorts([entry],{...ports,react:h.react});
@@ -134,4 +134,15 @@ for (const entry of ['src/components/native-ledger-view.tsx','src/components/cai
   assert.equal(input().props.fields.replaces,undefined);assert.equal(input().props.fields.notInOpening,undefined);
   input().props.edit('historyMode','');await h.submit();
   assert.equal(h.sent.length,1);assert.equal(h.sent[0].mutation.history,undefined);assert.equal(h.sent[0].mutation.event.quantity,'0.896567');assert.equal(h.sent[0].mutation.event.memo,'new draft');
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' restores a new draft after an uncertain correction is confirmed without duplicate saving',async t=>{
+ const id='22222222-2222-4222-8222-222222222222',event={type:'buy',assetId,quantity:'2',currency:'USD',executionUnitPrice:{amount:'1',currency:'USD'},settlementStatus:'unconfirmed',memo:'old trade',at:'2026-09-26T07:00:00Z'};
+ const h=await harness(t,0,{entry,compact:false,trades:[{id,accountId,event}],loseResponse:true});
+ const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+ for(const [key,value] of Object.entries({quantity:'0.896567',price:'701.263896',memo:'new draft',historyMode:'yes'}))input().props.edit(key,value);
+ h.render().find(e=>e.type==='select'&&elements(e).some(child=>child.type==='option'&&child.props.value===id)).props.onChange({target:{value:id}});
+ input().props.edit('notInOpening','yes');input().props.edit('reason','correction');
+ await h.submit();await h.submit();assert.equal(h.sent.length,2);assert.equal(h.sent[1].mutation,undefined);
+ assert.equal(input().props.fields.quantity,'0.896567');assert.equal(input().props.fields.memo,'new draft');assert.equal(input().props.fields.replaces,undefined);
 });
