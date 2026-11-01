@@ -69,7 +69,7 @@ export async function runContextComparisonDraftCases({ page, check, admin, accou
       await comparisonValues(page);
       await capture(page, output, `context-comparison-${beta ? 'beta' : 'original'}`);
       const back = page.getByRole('link', { name: /추가투입으로 돌아가기/ });
-      assert.equal(new URL(await back.getAttribute('href'), url).searchParams.has('cashAmountKrw'), false, 'USD draft must never populate the KRW planner');
+      assert.equal(new URL(await back.getAttribute('href'), url).searchParams.get('cashAmountKrw'), beta ? '1000000' : null, 'USD draft must never populate the KRW planner; beta has its own default');
       await back.click();
       await expect(page).toHaveURL(current => current.pathname === (beta ? '/beta' : '/additional-contribution'));
       // The beta home canonicalizer independently supplies its default KRW budget.

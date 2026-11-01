@@ -17,7 +17,7 @@ test('comparison tracking, targets and back links retain exact inputs, without t
     assert.deepEqual(returned, state.comparison);
     const back = new URL(journey.contributionBackHref(state), tracking);
     assert.equal(back.searchParams.get('currency'), 'USD');
-    assert.equal(back.searchParams.has('cashAmountKrw'), false);
+    assert.equal(back.searchParams.get('cashAmountKrw'), beta ? '1000000' : null);
     assert.equal(back.searchParams.get('amount'), beta ? null : '240.25');
     const compare = new URL(recovery.recoveryReturnHref(back.hash), tracking);
     assert.equal(compare.searchParams.get('amount'), '240.25');

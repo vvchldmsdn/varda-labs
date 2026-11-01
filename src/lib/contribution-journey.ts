@@ -73,6 +73,10 @@ export function contributionBackHref(journey: ContributionJourney): string {
   if (journey.beta) query.set('mode', 'domain');
   // Beta's home planner takes KRW, regardless of its display currency.
   if (journey.amount !== undefined && (!journey.beta || journey.currency !== 'USD')) query.set(journey.beta ? 'cashAmountKrw' : 'amount', journey.amount);
+  // Supply the home's independent KRW default before attaching the continuation.
+  // Its server redirect cannot retain a browser-only fragment. This is never a
+  // conversion of the comparison's USD input, which stays in the return address.
+  if (journey.beta && !query.has('cashAmountKrw')) query.set('cashAmountKrw', '1000000');
   const destination = `${journey.beta ? '/beta' : '/additional-contribution'}?${query}`;
   return recoveryHref(destination, contributionJourneyHref('compare', journey)) ?? destination;
 }
