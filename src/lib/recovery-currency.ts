@@ -1,5 +1,5 @@
 import type { Currency } from './money';
-import type { RecoveryKind } from './recovery-navigation';
+import { marketEvidenceNeedsReview, type RecoveryKind } from './recovery-navigation.ts';
 
 /** UI hints only. Never used as valuation, ownership, transaction or market evidence. */
 export type NativeViewDraft = {
@@ -30,9 +30,13 @@ export function parseNativeViewDraft(values: readonly string[], scope: string, v
 export function currencyRecoveryKind(reasons: readonly string[]): RecoveryKind | null {
   if (!reasons.length) return null;
   if (reasons.some(reason => /owner_scope_mismatch|unauthorized/.test(reason))) return null;
+  if (reasons.some(reason => /fetch_failed|query_failed/.test(reason))) return 'retry';
+  if (reasons.includes('corporate_action_ledger_mismatch')) return 'trades';
+  if (marketEvidenceNeedsReview(reasons)) return 'market_review';
   if (reasons.some(reason => /fetch_failed|query_failed|conflict|duplicate|invalid|mismatch|future_valuation/.test(reason) && reason !== 'comparison_weights_invalid')) return 'retry';
+  if (reasons.includes('cash_not_observed')) return 'cash';
   if (reasons.some(reason => /trade|ledger|quantity|cash_flow|group_income/.test(reason))) return 'trades';
   if (reasons.some(reason => /price|quote|fx|history_missing|insufficient_history|history_stale|corporate_action.*(missing|pending|provisional)|future_evidence/.test(reason))) return 'market';
-  if (reasons.some(reason => /valuation_incomplete|portfolio_scope_incomplete|instrument_unidentified|manual_gold|fractional_value_not_dated|cash_not_observed/.test(reason))) return 'holdings';
+  if (reasons.some(reason => /valuation_incomplete|portfolio_scope_incomplete|instrument_unidentified|manual_gold|fractional_value_not_dated/.test(reason))) return 'holdings';
   return null;
 }

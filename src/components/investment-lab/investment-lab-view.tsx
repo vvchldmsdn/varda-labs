@@ -329,7 +329,7 @@ function BlockedView({
           <li key={blocker}><LabText value={blockerLabel(blocker)} /></li>
         ))}
       </ul>
-      <RecoveryNotice reasons={model.blockers} scope={scopeKey} readForm={{id:'investment-lab-period-filter',fields:['start','end']}} />
+      <RecoveryNotice source="current" reasons={model.blockers} scope={scopeKey} readForm={{id:'investment-lab-period-filter',fields:['start','end']}} />
     </section>
   );
 }

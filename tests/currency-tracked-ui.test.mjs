@@ -25,6 +25,20 @@ const importView = async (ports = {}) => {
 const contributionPolicy = { trimDriftThresholdPct: 12, minimumExecutionRatioPct: 85 };
 
 describe("owned portfolio currency view", () => {
+  it("declares whether cash participates in structure without hiding unknown cash or changing totals", async () => {
+    const View = await importView();
+    const evidence = trackedCurrencyFixture();
+    for (const reporting of ['KRW','USD']) {
+      const only = { ...evidence, reporting };
+      assert.match(textOf(View({ evidence: only, surface: 'structure' })), /1 investments · Cash excluded/);
+      const withCash = structuredClone(only);
+      withCash.current.positions.push({ id:'cash',ownerId:evidence.ownerId,kind:'cash',name:'Cash',observation:null,unsupportedReason:'cash_not_observed' });
+      const html = textOf(View({ evidence: withCash, surface: 'structure' }));
+      assert.match(html,/1 investments · Includes 1 cash entries · Cash balance needs verification/);
+      assert.match(html,/Subtotal with evidence/);
+      assert.equal(buildTrackedCurrencyPortfolio(withCash).current.complete,false);
+    }
+  });
   it("labels an official close by its session date and a receipt by collection time", async () => {
     const View = await importView();
     const evidence = trackedCurrencyFixture();

@@ -56,7 +56,7 @@ function StructureDetail({
   return (
     <>
       <div className={styles.structureHeading}>
-        <h3>자산 배분</h3>
+        <div><h3>자산 배분</h3><p className={styles.muted}>등록한 종목 기준 · 현금 잔액 별도</p></div>
         <div className={styles.textTabs} role="group" aria-label="포트 구조 보기">
           <button
             type="button"

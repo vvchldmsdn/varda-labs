@@ -6,6 +6,8 @@ export function correctionDraft(id: string, trade: NativeTradeInput & { at: stri
   return { kind: trade.type, fields: {
     currency: trade.currency, assetId: trade.assetId, quantity: trade.quantity,
     inputMode: settlementOnly ? "total" : trade.settlementStatus === "unconfirmed" ? trade.executionTotal ? "execution_total" : "execution" : trade.settlement ? "total" : "price",
+    executionInputMode: trade.executionTotal ? "execution_total" : "execution",
+    settlementMode: settlementOnly || trade.settlement ? "total" : "none",
     total: trade.settlement?.amount ?? "", settlementCurrency: trade.settlement?.currency ?? trade.currency,
     price: trade.executionUnitPrice?.amount ?? trade.price ?? "", executionTotal: trade.executionTotal?.amount ?? "",
     memo: trade.memo ?? "", fee: trade.fee?.amount ?? "", tax: trade.tax?.amount ?? "",

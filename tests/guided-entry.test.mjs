@@ -4,10 +4,45 @@ import {importWithPorts} from './helpers/import-with-ports.mjs';
 import {createNativePortfolioState,applyNativeEvent,projectNativeInvestmentEvent,resolveNativeTrade,nativeCostAmounts} from '../src/lib/native-portfolio-ledger.ts';
 import {investmentEventKey} from '../src/lib/native-investment-basis.ts';
 import {tradeEntryKey,saveTradeEntry,readTradeEntry,clearTradeEntry} from '../src/lib/trade-entry-draft.ts';
+import {editLedgerDraft,freshLedgerKindDraft} from '../src/lib/ledger-form-draft.ts';
 const [input] = await importWithPorts(['src/components/native-trade-input.ts'],{});
 const at='2026-10-01T00:00:00Z';
 const opening=()=>createNativePortfolioState({accountId:'account',at,cash:{KRW:'0',USD:'0'},positions:[]}).state;
 const fill=(type,quantity,total)=>({id:'fill',sequence:1,at:'2026-10-02T00:00:00Z',source:'synthetic',...input.tradeInputFromFields(type,{inputMode:'execution_total',quantity,executionTotal:total,memo:'실제 체결 확인'},'USD','asset')});
+
+test('settlement controls return to the explicit execution total without using a retained per-share price',()=>{
+  const original={inputMode:'execution_total',quantity:'0.896567',executionTotal:'628.91',price:'10',memo:'retained'};
+  let fields=editLedgerDraft(original,'buy','inputMode','net','USD');
+  fields=editLedgerDraft(fields,'buy','inputMode','total','USD');
+  fields=editLedgerDraft(fields,'buy','settlementMode','none','USD');
+  assert.equal(fields.inputMode,'execution_total');assert.equal(fields.executionTotal,'628.91');
+  const event=input.tradeInputFromFields('buy',fields,'USD','asset');
+  assert.equal(event.executionTotal.amount,'628.91');assert.equal(event.price,undefined);assert.equal(event.settlement,undefined);
+  fields=editLedgerDraft(fields,'buy','inputMode','execution','USD');
+  fields=editLedgerDraft(fields,'buy','inputMode','net','USD');
+  fields=editLedgerDraft(fields,'buy','settlementMode','none','USD');
+  assert.equal(fields.inputMode,'execution');assert.equal(fields.price,'10');
+});
+
+test('exchange direction swaps amounts in their currencies and discards a fee in the old debit currency',()=>{
+  const original={currency:'USD',amount:'12.34',credit:'17000',fee:'0.12'};
+  const changed=editLedgerDraft(original,'exchange','currency','KRW','USD');
+  assert.equal(changed.amount,'17000');assert.equal(changed.credit,'12.34');assert.equal(changed.fee,'');
+  const back=editLedgerDraft(changed,'exchange','currency','USD','USD');
+  assert.equal(back.amount,'12.34');assert.equal(back.credit,'17000');
+  assert.equal(original.fee,'0.12');
+});
+
+test('trade fee currency changes require new costs and new record types do not inherit amounts or corrections',()=>{
+  const original={currency:'USD',inputMode:'execution_total',quantity:'0.896567',executionTotal:'628.91',fee:'2',tax:'1',assetId:'asset',at,historyMode:'yes',notInOpening:'yes',replaces:'old'};
+  let fields=editLedgerDraft(original,'buy','settlementCurrency','KRW','USD');
+  fields=editLedgerDraft(fields,'buy','inputMode','total','USD');
+  assert.equal(fields.fee,'');assert.equal(fields.tax,'');assert.equal(fields.quantity,original.quantity);
+  fields=editLedgerDraft({...fields,fee:'100'},'buy','settlementMode','none','USD');assert.equal(fields.fee,'');
+  const exchange=freshLedgerKindDraft(original,'exchange');
+  for(const key of ['fee','quantity','executionTotal','historyMode','notInOpening','replaces','assetId'])assert.equal(exchange[key],undefined);
+  assert.equal(exchange.at,at);assert.equal(exchange.currency,'USD');
+});
 test('total-only fractional execution preserves exact consideration without price or cash fabrication',()=>{
   const event=fill('buy','0.896567','628.91');
   assert.equal(event.price,undefined);assert.equal(event.settlement,undefined);assert.equal(event.settlementStatus,'unconfirmed');

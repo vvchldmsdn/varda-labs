@@ -8,7 +8,7 @@ test('both beta research screens discard recovery reads during owner refresh and
   let blocked=false;
   const Recovery=()=>null;
   const ports={
-    react:{useState:initial=>[typeof initial==='function'?initial():initial,()=>{}],useTransition:()=>[false,()=>{}],useLayoutEffect:()=>{}},
+    react:{useState:initial=>[typeof initial==='function'?initial():initial,()=>{}],useTransition:()=>[false,()=>{}],useLayoutEffect:()=>{},useMemo:fn=>fn(),useSyncExternalStore:(_subscribe,_snapshot,server)=>server()},
     'next/navigation':{useRouter:()=>({}),useSearchParams:()=>new URLSearchParams(context)},
     'next/link':{default:()=>null},
     '@/components/holding-analysis-recovery':{HoldingAnalysisRecovery:Recovery},

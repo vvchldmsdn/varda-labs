@@ -11,6 +11,7 @@ import {useBetaContext} from './use-beta-context';
 import {useBetaExistingCrudAvailable,useBetaReadFreshness} from './beta-provider';
 import {RecoveryNotice} from '@/components/recovery/recovery-notice';
 import {riskRecoveryKind} from '@/lib/recovery-risk';
+import {RiskUniverseNote} from '@/components/portfolio-risk/risk-universe-note';
 import {analysisKey,blankAnalysis,type AnalysisRead} from '@/lib/cairn-v2/analysis-contract';
 import {blankDomainView} from '@/lib/cairn-v2/read-contract';
 import styles from './analysis.module.css';
@@ -44,6 +45,7 @@ export function BetaAnalysis({read}:{read:AnalysisRead}) {
   {showRecovery&&<RecoveryNotice kind={recoveryKind!} scope={context.scope} beta onRetry={()=>router.refresh()} reasons={model?[model.calculation.reason,...model.inputHealth.blockers.map(row=>row.reason)].filter((reason):reason is NonNullable<typeof reason>=>reason!==null):[visible.state]} />}
   {context.analysis!=='holdings'&&<div className={styles.toolbar}><div role="group" aria-label="상관 관측 기준"><CairnButton variant="selection" type="button" aria-pressed={!down} onClick={()=>setDown(false)}>전체 관측일</CairnButton><CairnButton variant="selection" type="button" aria-pressed={down} onClick={()=>setDown(true)}>하락일</CairnButton></div><CairnField>분석 기간<CairnNativeSelect aria-label="분석 관측 수" value={typeof context.window==='string'?context.window:'90'} onChange={e=>setContext({...context,window:e.target.value})}>{[30,90,252].map(w=><option key={w} value={w}>{w}개 관측</option>)}</CairnNativeSelect></CairnField></div>}
   {model&&<>
+   <RiskUniverseNote model={model}/>
    {p&&<dl className={styles.summary} aria-label="위험 핵심 지표"><div><dt>연환산 변동성</dt><dd>{percent(p.volatilityAnnualized)}</dd></div><div><dt>위험 기여 ENB</dt><dd>{number(p.riskContributionEnb.value)}</dd></div><div><dt>Sharpe · 무위험금리 0% 가정</dt><dd>{number(p.sharpe.value)}</dd><small>{p.sharpe.reason?'계산 제한 · 상세 근거 확인':'시장 무위험금리 자료 사용 아님'}</small></div><div><dt>분산 효과</dt><dd title={p.diversificationBenefitPct.value==null?undefined:String(p.diversificationBenefitPct.value)+"% · 원본 정밀도"}>{p.diversificationBenefitPct.value==null?'—':number(p.diversificationBenefitPct.value)+'%'}</dd></div></dl>}
    <details className={styles.evidence}><summary>분석 기간과 포함 범위</summary><dl className={styles.basis} aria-label="위험 분석 기준"><div><dt>관측 기간</dt><dd>{model.provenance.firstServiceDate??'—'} ~ {model.provenance.lastServiceDate??'—'}</dd></div><div><dt>유효 공동 관측</dt><dd>{model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}</dd></div><div><dt>포함 범위</dt><dd>종목 {model.provenance.includedInstrumentCount} · 제외 보유 {model.provenance.excludedHoldingCount}</dd></div><div><dt>분석 통화</dt><dd>KRW</dd></div></dl></details>
    <section className={styles.correlation} aria-label="상관관계">

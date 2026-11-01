@@ -193,6 +193,9 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await page.reload();await expect(qty).toHaveValue('');assert.equal(dropped,true);
       assert.equal(await page.evaluate(()=>Object.keys(sessionStorage).filter(key=>key.startsWith('cairn:trade-entry:v1:')).map(key=>JSON.parse(sessionStorage.getItem(key))).some(draft=>!draft.fields.quantity&&!draft.fields.price&&!draft.fields.memo)),false,'loading an empty form must not freeze a new default timestamp');
       assert.deepEqual(await readState(),after,'reload must not replay the already saved trade');
+      const records=page.getByRole('region',{name:'직접 기록한 거래',exact:true});
+      await expect(records.getByRole('listitem').filter({hasText:'합성 검증 메모'}).first()).toContainText('0.896567');
+      await capture(page,output,'context-records-'+beta,width,height);
       // A correction is a different draft; switching back must never create a new trade from the old fill.
       await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
       await page.getByRole('combobox',{name:/^종목/}).selectOption(asset);
@@ -211,6 +214,23 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await expect(page.getByLabel('정정할 기록',{exact:true})).toHaveCount(0);
       await capture(page,output,'context-correction-restored-'+beta,width,height);
       assert.deepEqual(await readState(),after,'editing and cancelling a correction must not mutate the ledger');
+      await page.getByRole('button',{name:'총 체결금액',exact:true}).click();
+      await page.getByLabel('총 체결금액 · KRW',{exact:true}).fill('123');
+      await page.getByRole('button',{name:/^정산 금액/}).click();
+      await page.getByRole('button',{name:'정산액 없이 체결만 기록',exact:true}).click();
+      await expect(page.getByLabel('총 체결금액 · KRW',{exact:true})).toHaveValue('123');
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('exchange');
+      const currency=page.getByRole('combobox',{name:/^통화/});
+      await currency.selectOption('USD');
+      await page.getByRole('textbox',{name:'환전할 금액 USD',exact:true}).fill('12.34');
+      await page.getByRole('textbox',{name:'실제로 받은 금액 KRW',exact:true}).fill('17000');
+      await currency.selectOption('KRW');
+      await expect(page.getByRole('textbox',{name:'환전할 금액 KRW',exact:true})).toHaveValue('17,000');
+      await expect(page.getByRole('textbox',{name:'실제로 받은 금액 USD',exact:true})).toHaveValue('12.34');
+      await capture(page,output,'context-exchange-swapped-'+beta,width,height);
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
+      await expect(page.getByLabel('총 체결금액 · KRW',{exact:true})).toHaveValue('123');
+      assert.deepEqual(await readState(),after,'switching form modes and record types must not mutate the ledger');
       await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('cairn:trade-entry:v1:')).forEach(k=>sessionStorage.removeItem(k)));
 
       await page.emulateMedia({reducedMotion:'no-preference'});

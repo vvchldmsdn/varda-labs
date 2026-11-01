@@ -14,6 +14,8 @@ import {useBetaReadFreshness} from './beta-provider';
 import {EventTable,EventEvidence} from './event-table';
 import {continueEventHref,historyReturnHref} from '@/lib/cairn-v2/history-return';
 import styles from './events.module.css';
+import {nativeLedgerRecordsHref,NATIVE_RECORD_ID} from '@/lib/native-ledger-records';
+import {T} from '@/components/i18n/localized-text';
 export function BetaEvents({read}:{read:EventRead}){
  const search=useSearchParams(),router=useRouter(),freshness=useBetaReadFreshness();const context=domainQueryContext(search.toString()),dates=search.getAll('date'),date=dates.length===1?dates[0]:dates.length?dates:undefined;
  const [pending,startTransition]=useTransition();const observed=freshness?.observed,epoch=freshness?.epoch;
@@ -22,8 +24,10 @@ export function BetaEvents({read}:{read:EventRead}){
  const [draft,setDraft]=useState<{query:string,value:string}|null>(null);const query=search.toString(),input=draft?.query===query?draft.value:typeof date==='string'?date:'';
  const navigate=(next:BetaContext,nextDate:string|string[]|undefined)=>startTransition(()=>router.push(continueEventHref(next,nextDate,freshness?.store.pendingEpoch(),new URLSearchParams(search.toString())),{scroll:false}));
  const shell=blankDomainView(visible.state==='loading'?'loading':visible.state==='unauthorized'?'unauthorized':'ready',visible.message);shell.domain!.scopes=visible.scopes;
+ const recordAccount=context.scope.startsWith('account:')?context.scope.slice(8):undefined;
  return <BetaShell context={context} setContext={next=>navigate(next,date)} readView={shell} workspace="history" originalPath="/history"><section className={styles.workspace} id="date-events" data-events-state={visible.state}>
  <DetailHeader title="날짜별 거래·이벤트 근거" actions={<Link prefetch={false} href={historyReturnHref(context,date,freshness?.store.pendingEpoch(),new URLSearchParams(search.toString()))}>히스토리로 돌아가기 ↗</Link>} />
+ {context.mode==='domain'&&visible.scopes.some(scope=>scope.key===context.scope)&&(context.scope==='all'||recordAccount&&NATIVE_RECORD_ID.test(recordAccount))&&<p><Link prefetch={false} href={nativeLedgerRecordsHref(recordAccount,context.currency,true)}><T ko="직접 기록한 거래 보기" en="View recorded transactions" /> ↗</Link></p>}
  <CairnForm className={styles.filter} onSubmit={e=>{e.preventDefault();navigate(context,input)}}><CairnField>기록 날짜 <CairnInput aria-label="이벤트 날짜" type="date" value={input} onChange={e=>setDraft({query,value:e.target.value})}/></CairnField><CairnButton variant="primary" type="submit">날짜 조회</CairnButton></CairnForm>
  {visible.state!=='ready'&&<CairnStatus as="p" role="status">{visible.message}</CairnStatus>}<p className={styles.muted}>저장 KRW · 소유 계좌의 최신 최대 100개 · 전체 거래 이력 아님{context.currency==='USD'?' · USD로 환산하지 않음':''}</p>
  {visible.rows.length>0&&<><p className={styles.summary}>선택 날짜 확인 기록 {visible.rows.length}건 · 매수/매도 {visible.rows.filter(r=>r.eventKind==='trade').length} · 자산 상태 {visible.rows.filter(r=>r.eventKind==='lifecycle').length}</p><EventTable rows={visible.rows}/></>}

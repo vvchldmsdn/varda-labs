@@ -1,6 +1,7 @@
 "use client";
 import { HoldingAnalysisRecovery } from "@/components/holding-analysis-recovery";
 import { RecoveryNotice } from '@/components/recovery/recovery-notice';
+import { simulationRecoveryReasons } from '@/lib/cairn-v2/simulation-recovery';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Select as CairnSelect } from "@/components/cairn-ui";
 
 
@@ -70,7 +71,7 @@ export function BetaSimulation({ read }: { read: SimulationRead }) {
           description={visible.model?.historyRecovery?'최근 조정 종가에 확인이 필요한 날짜가 있습니다. 요청한 기준일은 바꾸지 않았습니다.':visible.message}
           action={visible.model?.historyRecovery?<a href={betaHref('/beta/simulation',{...context,end:visible.model.historyRecovery.verifiedEndServiceDate,run:'1'})}>검증된 {visible.model.historyRecovery.verifiedEndServiceDate} 기준으로 보기 ↗</a>:undefined} />}
       {!ready && crudAvailable && visible === read && !['loading','unauthorized','invalid'].includes(visible.state) && <HoldingAnalysisRecovery key={`${context.scope}:${read.readReceipt}:${read.readEpoch}`} scope={context.scope} />}
-      {!ready && crudAvailable && ['unavailable','partial','blocked'].includes(visible.state) && <RecoveryNotice beta scope={context.scope} reasons={visible.model?.execution.reason ? [visible.model.execution.reason] : []} kind={!visible.model ? 'retry' : undefined} />}
+      {!ready && crudAvailable && ['unavailable','partial','blocked'].includes(visible.state) && <RecoveryNotice beta source="current" scope={context.scope} reasons={simulationRecoveryReasons(visible.model)} kind={!visible.model ? 'retry' : undefined} />}
     </section>
   </BetaShell>;
 }
