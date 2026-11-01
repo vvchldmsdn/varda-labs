@@ -10,7 +10,7 @@ import { balanceQuantity, type BalancePhotoRow } from "@/lib/balance-photo";
 import type { HoldingDraft } from "@/lib/holding-batch";
 import styles from "./balance-photo-panel.module.css";
 
-export type BalanceReviewRow = BalancePhotoRow & { key: string; instrument?: InstrumentChoice; manualMatch?: boolean; verified: boolean };
+export type BalanceReviewRow = BalancePhotoRow & { key: string; instrument?: InstrumentChoice; manualMatch?: boolean; searchQuery?: string; verified: boolean };
 export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false, guided = false, initialRows = [], onDraftChange, onReview, onProvide, stage }: {
   onAdd: (rows: HoldingDraft[]) => boolean; remaining: number; disabled: boolean; preview?: boolean; guided?: boolean;
   initialRows?: BalanceReviewRow[]; onDraftChange?: (rows: BalanceReviewRow[]) => void;
@@ -71,7 +71,7 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
       </div>)}</div>
       {current && <div className={styles.editor} key={current.key}>
         <strong>{current.label}</strong>
-        {current.instrument ? <><p className={styles.note}>{current.instrument.name} · {current.instrument.ticker} · {current.instrument.currency}</p><Button variant="ghost" type="button" disabled={busy} onClick={() => update(current.key, { instrument: undefined, manualMatch: true })}>{t("종목 다시 선택", "Choose again")}</Button></> : <InstrumentSearch initialQuery={current.label} privateQuery autoMatchExact={!current.manualMatch} preview={preview} disabled={busy} manualEntryAvailable={false} onSelect={instrument => {
+        {current.instrument ? <><p className={styles.note}>{current.instrument.name} · {current.instrument.ticker} · {current.instrument.currency}</p><Button variant="ghost" type="button" disabled={busy} onClick={() => update(current.key, { instrument: undefined, manualMatch: true })}>{t("종목 다시 선택", "Choose again")}</Button></> : <InstrumentSearch queryValue={current.searchQuery ?? current.label} onQueryChange={searchQuery => update(current.key, { searchQuery })} privateQuery autoMatchExact={!current.manualMatch} preview={preview} disabled={busy} manualEntryAvailable={false} onSelect={instrument => {
           if (rows.some(row => row.key !== current.key && row.instrument?.market === instrument.market && row.instrument.ticker === instrument.ticker)) { setError(t("같은 종목이 있어요. 사진이 겹쳤는지 확인하고, 합산하려면 목록에서 수량을 직접 수정해 주세요.", "This holding already exists. Check for overlapping photos. To combine holdings, edit the quantity in the review list.")); return; }
           update(current.key, { instrument });
         }} />}

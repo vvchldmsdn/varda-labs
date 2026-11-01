@@ -215,7 +215,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
       rejectChangedIdentity(response,result);
       if(!response.ok||!["committed","cancelled"].includes(result.status)) throw new Error(result.error??"unavailable");
       forgetTrade(localStorage,data.sessionKey,expiredOperation);
-      setPendingOperation(null);setExpiredOperation("");setUncertain(false);onPendingChange?.(false);setSuccess(result.status==="committed");await load();
+      setPendingOperation(null);setExpiredOperation("");setUncertain(false);onPendingChange?.(false);clearTradeEntry(tradeEntryStorage(), entryKey);setFields(previous => fieldsAfterLedgerSave(previous, false, localNow()));setLots([{amount:"",currency:"USD",at:""}]);setSuccess(result.status==="committed");await load();
     } catch(cause) {setError(cause instanceof Error?cause.message:"unavailable");}
     finally {setBusy(false);}
   }
@@ -239,7 +239,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
         const status=await lookup.json();
         rejectChangedIdentity(lookup,status);
         if (!lookup.ok) throw new Error(status.error ?? "unavailable");
-        if (["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId); setPendingOperation(null); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); await load(); return; }
+        if (["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId); setPendingOperation(null); setUncertain(false); onPendingChange?.(false); clearTradeEntry(tradeEntryStorage(), entryKey); setFields(previous => ({...fieldsAfterLedgerSave(previous, !account.state, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); setLots([{amount:"",currency:"USD",at:""}]); setSuccess(status.status==="committed"); await load(); if (status.status==="committed" && account.state) onSaved?.(); return; }
       }
       lock.current = true; setBusy(true); onBusyChange?.(true); onPendingChange?.(true); dispatched = true;
       const response = await fetch("/api/portfolio/ledger", { method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(30_000), headers: { "Content-Type": "application/json" }, body: JSON.stringify(pending.current) });

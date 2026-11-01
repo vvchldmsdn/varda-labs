@@ -39,6 +39,11 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await form.getByRole('button',{name:'종목 다시 선택',exact:true}).click();
       const search=form.getByLabel('어떤 종목을 가지고 있나요?',{exact:true}).filter({visible:true});
       await expect(search).toBeVisible();
+      await search.fill('QAFU');
+      await form.getByRole('button',{name:'자료 입력으로',exact:true}).click();
+      await page.reload();
+      await form.getByRole('button',{name:'표 읽고 종목 확인',exact:true}).click();
+      await expect(search).toHaveValue('QAFU');
       await form.getByRole('button',{name:/QA 보유 6.*QAFUND/}).click();
       await form.getByRole('button',{name:'확인 목록으로 가져오기',exact:true}).click();
       await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
@@ -103,11 +108,20 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await optional.click();await expect(page.getByLabel('메모 · 선택',{exact:true})).toHaveValue('합성 검증 메모');
       await expect(page.getByLabel('기록 날짜',{exact:true})).toBeVisible();
       await capture(page,output,'guided-trade-'+beta,width,height);
+      let dropped=false;
+      const loseResponse=async route=>{
+        if(route.request().method()!=='POST'||dropped||!route.request().postDataJSON()?.mutation)return route.continue();
+        dropped=true;await route.fetch();await route.abort('failed');
+      };
+      await page.route('**/api/portfolio/ledger',loseResponse);
       await page.getByRole('button',{name:'매도 기록 저장',exact:true}).click();
+      await expect(page.getByRole('button',{name:'저장 여부 확인·재시도',exact:true})).toBeVisible();
+      await page.unroute('**/api/portfolio/ledger',loseResponse);
+      await page.getByRole('button',{name:'저장 여부 확인·재시도',exact:true}).click();
       await expect(page.getByRole('status').filter({hasText:'기록했어요.'})).toBeVisible();
       const after=await readState();assert.deepEqual(after.cash,before.cash);
       assert.equal(after.positions.find(row=>row.assetId===asset).quantity,Decimal.from(beforeQuantity).sub("0.896567").toExactString());
-      await page.reload();await expect(qty).toHaveValue('');
+      await page.reload();await expect(qty).toHaveValue('');assert.equal(dropped,true);
       assert.deepEqual(await readState(),after,'reload must not replay the already saved trade');
       await page.emulateMedia({reducedMotion:'no-preference'});
     });

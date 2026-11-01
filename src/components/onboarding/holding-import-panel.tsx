@@ -10,7 +10,7 @@ import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status
 import styles from "./holding-import-panel.module.css";
 
 
-export type TableHoldingDraft = { text: string; rows: (ImportedHolding & { instrument?: InstrumentChoice; manualMatch?: boolean })[] };
+export type TableHoldingDraft = { text: string; rows: (ImportedHolding & { instrument?: InstrumentChoice; manualMatch?: boolean; searchQuery?: string })[] };
 export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false, guided = false, initialDraft, onDraftChange, onReview, stage }: {
   onAdd: (rows: HoldingDraft[]) => boolean; remaining: number; disabled: boolean; preview?: boolean; guided?: boolean;
   initialDraft?: TableHoldingDraft; onDraftChange?: (draft: TableHoldingDraft) => void;
@@ -64,7 +64,7 @@ export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false
       <div className={styles.reviewHeading}><strong>{t("검색 결과와 연결해 주세요", "Match your holdings")}</strong><span>{rows.filter(row => row.instrument).length}/{rows.length}</span></div>
       <div className={styles.rows}>{rows.map((row, index) => <CairnButton variant="selection" type="button" key={index} disabled={disabled} aria-pressed={reviewIndex === index} onClick={() => setReviewIndex(index)}>{row.instrument && <Check size={17} aria-hidden="true" />}<span>{row.label}</span><small>{row.quantity}</small></CairnButton>)}</div>
       <p className={styles.current}><strong>{rows[reviewIndex].label}</strong> · {rows[reviewIndex].instrument?.currency ?? t("종목 확인", "Verify instrument")}</p>
-      {rows[reviewIndex].instrument ? <CairnButton variant="ghost" type="button" disabled={disabled} onClick={() => setRows(previous => previous.map((row, index) => index === reviewIndex ? { ...row, instrument: undefined, manualMatch: true } : row))}>{t("종목 다시 선택", "Choose again")}</CairnButton> : <InstrumentSearch key={reviewIndex} initialQuery={rows[reviewIndex].label} privateQuery autoMatchExact={!rows[reviewIndex].manualMatch} onSelect={select} disabled={disabled} preview={preview} />}
+      {rows[reviewIndex].instrument ? <CairnButton variant="ghost" type="button" disabled={disabled} onClick={() => setRows(previous => previous.map((row, index) => index === reviewIndex ? { ...row, instrument: undefined, manualMatch: true } : row))}>{t("종목 다시 선택", "Choose again")}</CairnButton> : <InstrumentSearch key={reviewIndex} queryValue={rows[reviewIndex].searchQuery ?? rows[reviewIndex].label} onQueryChange={searchQuery => setRows(previous => previous.map((row, index) => index === reviewIndex ? { ...row, searchQuery } : row))} privateQuery autoMatchExact={!rows[reviewIndex].manualMatch} onSelect={select} disabled={disabled} preview={preview} />}
       <CairnButton variant="primary" type="button" disabled={disabled || rows.some(row => !row.instrument) || rows.length > remaining} onClick={() => {
         const added = onAdd(rows.map(row => ({ key: crypto.randomUUID(), instrumentId: row.instrument!.id, name: row.instrument!.name, ticker: row.instrument!.ticker, market: row.instrument!.market, assetType: row.instrument!.assetType, quantity: row.quantity, averageCost: row.averageCost, currentPrice: "" })));
         if (added) { setRows([]); setText(""); setError(null); } else { setError("queue"); }
