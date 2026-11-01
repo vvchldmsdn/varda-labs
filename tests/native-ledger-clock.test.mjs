@@ -49,20 +49,27 @@ function hooks() {
 }
 // Real view event handlers with only browser/network ports substituted. Remote
 // authenticated browser QA separately covers the actual provider/session/writer.
-async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[],loseResponse=false}={}) {
+async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[],loseResponse=false,pendingOther=false}={}) {
   deviceClock(t,offset);let monotonic=1000,serverNow=SERVER;const sent=[];
   t.mock.method(performance,'now',()=>monotonic);
   const values=new Map();globalValue(t,'localStorage',{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
+  if(pendingOther){
+    const otherId='33333333-3333-4333-8333-333333333333',sid='a'.repeat(64);
+    const draft={at:Date.now(),accountId,kind:'buy',fields:{currency:'USD',assetId,quantity:'2',price:'1',inputMode:'execution',historyMode:'yes',replaces:'old',at:'2026-09-26T07:00:00Z'},suspended:{kind:'buy',fields:{currency:'USD',assetId:'new',name:'New A instrument',ticker:'NEWA',quantity:'0.896567',price:'100',inputMode:'execution',at:'2026-09-26T07:00:00Z'}}};
+    const drafts=new Map([['cairn:trade-entry:v1:'+sid+':'+accountId+':'+assetId+':buy',JSON.stringify(draft)]]);
+    globalValue(t,'sessionStorage',{getItem:k=>drafts.get(k)??null,setItem:(k,v)=>drafts.set(k,v),removeItem:k=>drafts.delete(k)});
+    values.set('cairn:pending-trade:v1:'+sid,JSON.stringify({sessionKey:sid,mutation:{accountId:otherId,operationId:'77777777-7777-4777-8777-777777777777',expectedSequence:0,event:{type:'deposit',currency:'USD',amount:'1',at:'2026-09-26T07:00:00Z'}},savedAt:Date.now()}));
+  }
   globalValue(t,'navigator',{locks:{request:async(_name,callback)=>callback()}});
   t.mock.method(globalThis,'fetch',async(_url,options)=>{
-    if(options.method==='POST') {const request=JSON.parse(options.body);sent.push(request);if(loseResponse){if(request.mutation)throw new Error('lost_response');return Response.json({status:'committed'});}return Response.json({error:'conflict'},{status:409});}
-    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:[account],canWrite:true,ordering:[],trades});
+    if(options.method==='POST') {const request=JSON.parse(options.body);sent.push(request);if(pendingOther)return Response.json({status:request.mutation?'created':'committed'});if(loseResponse){if(request.mutation)throw new Error('lost_response');return Response.json({status:'committed'});}return Response.json({error:'conflict'},{status:409});}
+    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:pendingOther?[account,{...account,id:"33333333-3333-4333-8333-333333333333",assets:[],state:{...account.state,positions:[]}}]:[account],canWrite:true,ordering:[],trades});
   });
   const h=hooks();const [view]=await importUiWithPorts([entry],{...ports,react:h.react});
   const render=()=>{h.begin();return elements(view.NativeLedgerView({compact,initialSelection:{accountId,assetId,action:'buy'}}));};
   render();h.effect();await new Promise(resolve=>setImmediate(resolve));
   const findTime=()=>render().find(e=>e.props?.name==='at');
-  const trade=render().find(e=>typeof e.props?.edit==='function');trade.props.edit('quantity','1');trade.props.edit('price','100');
+  const trade=render().find(e=>typeof e.props?.edit==='function');if(!pendingOther){trade.props.edit('quantity','1');trade.props.edit('price','100');}
   return {render,findTime,sent,advance(){monotonic+=5000;serverNow='2026-09-27T07:16:53.000Z';},
     submit:async()=>{render().find(e=>e.type==='form').props.onSubmit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));}};
 }
@@ -145,4 +152,12 @@ for(const entry of ['src/components/native-ledger-view.tsx','src/components/cair
  input().props.edit('notInOpening','yes');input().props.edit('reason','correction');
  await h.submit();await h.submit();assert.equal(h.sent.length,2);assert.equal(h.sent[1].mutation,undefined);
  assert.equal(input().props.fields.quantity,'0.896567');assert.equal(input().props.fields.memo,'new draft');assert.equal(input().props.fields.replaces,undefined);
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' restores the account together with its draft after recovering another account pending operation',async t=>{
+ const h=await harness(t,0,{entry,compact:false,pendingOther:true});
+ const fields=h.render().find(e=>typeof e.props?.edit==='function').props.fields;
+ assert.equal(fields.quantity,'0.896567');assert.equal(fields.ticker,'NEWA');
+ await h.submit();const mutation=h.sent.find(row=>row.mutation)?.mutation;
+ assert.equal(mutation.accountId,accountId);assert.equal(mutation.newAsset.ticker,'NEWA');assert.equal(mutation.event.quantity,'0.896567');assert.equal(mutation.history,undefined);
 });

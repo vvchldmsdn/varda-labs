@@ -18,6 +18,6 @@ export function correctionDraft(id: string, trade: NativeTradeInput & { at: stri
 export function newTradeDraft(draft: TradeDraftInput): TradeDraftInput {
   const fields = { ...draft.fields };
   // Old drafts may have retained a target after unchecking history mode.
-  for (const key of ["replaces", "reason", "notInOpening", "afterEventId"]) delete fields[key];
+  if (fields.replaces) for (const key of ["replaces", "reason", "notInOpening", "afterEventId"]) delete fields[key];
   return { kind: draft.kind, fields };
 }

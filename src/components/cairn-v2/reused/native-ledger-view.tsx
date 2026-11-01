@@ -111,7 +111,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
   const session = useRef<string | null>(null), pending = useRef<PendingOperation | null>(null), lock = useRef(false);
   const clock = useRef<NativeLedgerClock | null>(null);
   const [entryEdited, setEntryEdited] = useState(false);
-  const suspendedEntry = useRef<TradeDraftInput | null>(null);
+  const suspendedEntry = useRef<(TradeDraftInput & { accountId: string }) | null>(null);
   function setPendingOperation(operation:PendingOperation|null){pending.current=operation;setPendingPreview(operation?.mutation.event??null);}
   const entryKey = data ? tradeEntryKey(data.sessionKey, initialSelection) : null;
   const localNow = () => nativeLedgerLocalTime(nativeLedgerNow(clock.current));
@@ -181,7 +181,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
         const draftAccount = draft && body.accounts.find((row: Account) => row.id === draft.accountId && row.active !== false);
         if (draft && draftAccount && (!initialSelection.accountId || draft.accountId === initialSelection.accountId) && (!initialSelection.assetId || draft.fields.assetId === initialSelection.assetId || draft.suspended?.fields.assetId === initialSelection.assetId) && (draft.fields.assetId === "new" || draftAccount.assets.some((row: Account["assets"][number]) => row.id === draft.fields.assetId))) {
           setEntryEdited(true);
-          setAccountId(draft.accountId); setKind(draft.kind); setFields(draft.fields); suspendedEntry.current = draft.suspended ?? null;
+          setAccountId(draft.accountId); setKind(draft.kind); setFields(draft.fields); suspendedEntry.current = draft.suspended ? { ...draft.suspended, accountId: draft.accountId } : null;
         }
       }
       session.current = body.sessionKey; setData(body); setSignedOut(false);
@@ -269,13 +269,17 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
   }
   function restoreNewEntry() {
     const draft = suspendedEntry.current ?? newTradeDraft({ kind: kind === "sell" ? "sell" : "buy", fields: { currency: fields.currency ?? "USD", at: localNow(), inputMode: "execution" } });
+    const restoredAccountId = suspendedEntry.current?.accountId ?? accountId;
+    setAccountId(restoredAccountId);
+    const retained = saveTradeEntry(tradeEntryStorage(), tradeEntryKey(session.current ?? "", initialSelection), { at: Date.now(), accountId: restoredAccountId, kind: draft.kind, fields: draft.fields });
+    setDraftWarning(!retained);
     suspendedEntry.current = null;
     setKind(draft.kind); setFields(draft.fields); setEntryEdited(true); setConfirmed(false);
     setPendingOperation(null); setError(""); setSuccess(false);
   }
   function startCorrection(row: NonNullable<LedgerData["trades"]>[number], settlementOnly = false) {
     if (busy || uncertain || row.accountId !== account?.id || (row.event.type !== "buy" && row.event.type !== "sell")) return;
-    if (!fields.replaces && (kind === "buy" || kind === "sell")) suspendedEntry.current = newTradeDraft({ kind, fields });
+    if (!fields.replaces && (kind === "buy" || kind === "sell")) suspendedEntry.current = { ...newTradeDraft({ kind, fields }), accountId: account.id };
     const draft = correctionDraft(row.id, row.event, settlementOnly);
     setEntryEdited(true); setKind(draft.kind); setFields(draft.fields); setConfirmed(false);
     setPendingOperation(null); setError(""); setSuccess(false);
