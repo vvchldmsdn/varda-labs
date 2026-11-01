@@ -161,6 +161,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
       const quantity = render().find(node => node.props?.className?.split(" ").includes("varda-onboarding-quantity"));
       elements(quantity).find(node => node.type === "input").props.onChange({ target: { value: "1" } });
       render().find(node => node.type === "button" && node.props.className?.split(" ").includes("varda-onboarding-secondary")).props.onClick();
+      render().find(node => node.type === "button" && node.props.children?.[0]?.includes?.(locale === "ko" ? "종목 확인하기" : "Review ")).props.onClick();
     },
     async submit() {
       const data = new FormData();

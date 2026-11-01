@@ -51,7 +51,7 @@ function ledgerTrades(ledger: Awaited<ReturnType<typeof readNativeLedger>>): Eff
     const event = row.data.event;
     if (event.type !== 'buy' && event.type !== 'sell' && event.type !== 'split') return [];
     return [{ id: row.id, accountId: row.accountId, assetId: event.assetId, type: event.type as EffectTrade['type'], at: event.at,
-      ...('quantity' in event ? { quantity: event.quantity, price: event.price, currency: event.currency, dateOnly: !!event.dateEvidence } : {}) }];
+      ...('quantity' in event ? { quantity: event.quantity, price: event.price, executionTotal: event.executionTotal, currency: event.currency, dateOnly: !!event.dateEvidence } : {}) }];
   });
 }
 

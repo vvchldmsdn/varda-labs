@@ -1,11 +1,12 @@
-.workspace{min-width:0;max-width:1120px;padding:28px 0;color:var(--cairn-v2-ink)}
-.workspace h2{margin:22px 0;font-size:28px;font-weight:500;letter-spacing:-.04em}
+.workspace{min-width:0;width:100%;max-width:720px;margin-inline:auto;padding:28px 0;color:var(--cairn-v2-ink)}
+.workspace>[data-cairn-detail-header] [data-cairn-heading]{margin:0;font-size:16px;font-weight:500;letter-spacing:-.04em}
+.workspace>[data-cairn-detail-header]{align-items:center;padding-right:0;margin-bottom:12px}
 .workspace>a{display:inline-flex;align-items:center;min-height:48px;font-size:14px;text-decoration:underline;text-underline-offset:4px}
 .muted,.evidence{font-size:13px;color:var(--cairn-v2-muted)}
 .retry{min-height:48px}
-.reused{min-width:0;margin-top:28px}
+.reused{min-width:0;margin-top:12px}
 .evidence{margin-top:32px;border-top:1px solid var(--cairn-v2-line)}
 .evidence summary{display:flex;align-items:center;min-height:48px;cursor:pointer}
 .evidence p{margin:12px 0;line-height:1.7}
 .workspace :focus-visible{outline:2px solid var(--cairn-v2-brand);outline-offset:3px}
-@media(max-width:700px){.workspace{padding:18px 0}.workspace h2{font-size:24px}.reused{margin-top:20px}}
+@media(max-width:700px){.workspace{padding:18px 0}.reused{margin-top:8px}}

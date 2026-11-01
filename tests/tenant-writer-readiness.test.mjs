@@ -62,6 +62,7 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
   "scripts/reliability-fullapp-cases.mjs", // Actual Next app against the isolated cluster through a loopback-only SQL bridge.
   "scripts/reliability-auto-refresh-ui-cases.mjs", // Injected disposable cluster only; synthetic automatic-refresh UI fixtures.
   "scripts/reliability-onboarding-qa-cases.mjs", // Same injected disposable cluster; synthetic holdings/FX fixtures, never a product writer.
+  "scripts/guided-entry-fullapp-cases.mjs", // Same injected disposable cluster; synthetic catalog/account fixtures for guided registration.
   "scripts/ui-convergence-fullapp-cases.mjs", // Same injected disposable cluster; synthetic UI fixtures only.
   "scripts/reliability-limit-cases.mjs", // Bounded synthetic replay fixtures on injected isolated pools.
   "scripts/reliability-browser-cases.mjs", // Browser fixture uses the same isolated DB and synthetic identity ports.

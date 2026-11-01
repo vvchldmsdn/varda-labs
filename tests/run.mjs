@@ -423,3 +423,5 @@ import './preview-release-catalog.test.mjs';
 
 import "./holding-analysis-progress.test.mjs";
 import "./target-revocation-integration.test.mjs";
+
+import './guided-entry.test.mjs';

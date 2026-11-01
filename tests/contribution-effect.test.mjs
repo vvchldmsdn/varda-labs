@@ -20,6 +20,16 @@ test('unchanged prices: a purchase is principal, never profit', () => {
   assert.equal(result.actual.status, 'ready'); assert.equal(result.actual.profit, 0);
   assert.equal(result.actual.total, 1000); assert.equal(result.actual.remainingBudgetValue, 500);
 });
+test('total-only fractional executions preserve exact cost in effect tracking', () => {
+  const { saved, market, trades } = fixture();
+  const trade = { ...trades[0], quantity: '0.896567', price: undefined, executionTotal: { amount: '89.6567', currency: 'KRW' } };
+  const actual = evaluateContributionEffect(saved, market, [trade]).actual;
+  assert.equal(actual.status, 'ready'); assert.equal(actual.profit, 0); assert.equal(actual.executionCost, 89.6567);
+  for (const executionTotal of [{ amount:'89.6567',currency:'USD' },{amount:'0',currency:'KRW'}]) {
+    assert.equal(evaluateContributionEffect(saved,market,[{...trade,executionTotal}]).actual.reason,'invalid_trade');
+  }
+  assert.equal(evaluateContributionEffect(saved,market,[{...trade,price:'101'}]).actual.reason,'invalid_trade');
+});
 test('down/up markets count withheld budget, never promise an advantage', () => {
   const { saved, market, trades } = fixture();
   for (const [price, gap, profit] of [['80',100,-100],['120',-100,100]]) {

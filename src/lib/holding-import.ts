@@ -1,5 +1,5 @@
-export type ImportedHolding = { label: string; quantity: string; averageCost: string };
-export type HoldingImportResult = { rows: ImportedHolding[]; error: "size" | "format" | "headers" | "cost_unit" | "rows" | "number" | "duplicate" | null };
+export type ImportedHolding = { label: string; quantity: string; averageCost: string; currency?: "KRW" | "USD" };
+export type HoldingImportResult = { rows: ImportedHolding[]; error: "size" | "format" | "headers" | "cost_unit" | "currency" | "rows" | "number" | "duplicate" | null };
 const fail = (error: HoldingImportResult["error"]): HoldingImportResult => ({ rows: [], error });
 
 /** Text stays local to the review UI. No formulas, numeric coercion or inferred cost. */
@@ -28,6 +28,7 @@ export function parseHoldingImport(text: string, maximumRows = 12): HoldingImpor
   const labelColumn = column(["종목", "종목명", "티커", "name", "ticker", "symbol"]);
   const quantityColumn = column(["수량", "보유수량", "quantity", "shares", "units"]);
   const costColumn = column(["평균매입가", "매입평균가", "평균매입가격", "averagecost", "averagepurchaseprice", "costperunit"]);
+  const currencyColumn = column(["통화", "currency"]);
   if (costColumn < 0 && column(["원가", "매입금액", "costbasis", "totalcost", "cost"]) >= 0) return fail("cost_unit");
   if (labelColumn < 0 || quantityColumn < 0 || new Set(header).size !== header.length) return fail("headers");
   if (table.length - 1 > maximumRows) return fail("rows");
@@ -37,11 +38,14 @@ export function parseHoldingImport(text: string, maximumRows = 12): HoldingImpor
   for (const values of table.slice(1)) {
     if (values.length !== header.length) return fail("format");
     const label = values[labelColumn], quantity = values[quantityColumn], averageCost = costColumn < 0 ? "" : values[costColumn];
+    const rawCurrency = currencyColumn < 0 ? "" : values[currencyColumn].toUpperCase();
+    const currency = ["KRW", "원", "원화"].includes(rawCurrency) ? "KRW" : ["USD", "달러"].includes(rawCurrency) ? "USD" : undefined;
+    if (rawCurrency && !currency) return fail("currency");
     if (!label || label.length > 80 || /[\u0000-\u001f\u007f]/.test(label)) return fail("format");
     if (!decimal(quantity, 6) || (averageCost !== "" && !decimal(averageCost, 4))) return fail("number");
     const key = label.toLowerCase();
     if (seen.has(key)) return fail("duplicate");
-    seen.add(key); result.push({ label, quantity, averageCost });
+    seen.add(key); result.push({ label, quantity, averageCost, ...(currency ? { currency } : {}) });
   }
   return { rows: result, error: null };
 }

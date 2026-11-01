@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { balanceQuantity, parseBalancePhoto } from '../src/lib/balance-photo.ts';
 import { parseHoldingOnboardingInput } from '../src/lib/holding-onboarding.ts';
 const line = (text, x, y, w = 110, h = 25) => ({text, confidence:95, bbox:{x0:x,y0:y,x1:x+w,y1:y+h}});
+test('recently viewed and suggested sections are excluded from the holdings column',()=>{
+ const result=parseBalancePhoto([line('보유수량',800,300),line('VOO',60,440),line('0.896567',790,480),line('최근 조회 종목',60,600),line('AMZN',60,700),line('15',825,740,40)],1000,2000);
+ assert.deepEqual(result.rows.map(row=>[row.label,row.quantity]),[['VOO','0.896567']]);
+});
 test('fractional quantity preserves six decimals and rejects guessed numeric substitutions',()=>{
  assert.equal(balanceQuantity('1,234.010709주'),'1234.010709');
  for(const value of ['1,23','0','-1','O.10709','1e4','3%','1.1234567','=1+2']) assert.equal(balanceQuantity(value),null);

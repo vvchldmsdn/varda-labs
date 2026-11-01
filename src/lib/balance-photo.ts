@@ -20,10 +20,12 @@ export function parseBalancePhoto(lines: readonly BalanceTextLine[], width: numb
   const center = (header.bbox.x0 + header.bbox.x1) / 2;
   // Locate only the explicitly labelled holdings column, never price/cost columns.
   const tolerance = Math.max(header.bbox.x1 - header.bbox.x0, width * .13) * .72;
-  const numbers = safe.map(line => ({ ...line, quantity: balanceQuantity(compact(line.text)) }))
+  // Recommendations / recently viewed rows below a balance table are not holdings.
+  const sectionEnd = Math.min(height, ...safe.filter(line => line.bbox.y0 > header.bbox.y1 && /최근조회|최근본종목|관심종목|추천종목|인기종목/.test(compact(line.text))).map(line => line.bbox.y0));
+  const numbers = safe.filter(line => line.bbox.y0 < sectionEnd).map(line => ({ ...line, quantity: balanceQuantity(compact(line.text)) }))
     .filter(line => line.quantity && line.bbox.y0 > header.bbox.y1 && Math.abs((line.bbox.x0 + line.bbox.x1) / 2 - center) < tolerance);
   const lastQuantityY = Math.max(header.bbox.y1, ...numbers.map(line => line.bbox.y1));
-  const names = safe.filter(line => line.bbox.y0 > header.bbox.y1 && line.bbox.y0 < lastQuantityY && line.bbox.x1 < center - tolerance
+  const names = safe.filter(line => line.bbox.y0 > header.bbox.y1 && line.bbox.y0 < Math.min(lastQuantityY, sectionEnd) && line.bbox.x1 < center - tolerance
     && line.bbox.x0 < width * .3 && /[가-힣A-Za-z]/.test(line.text)
     && !/수수료|평가금액|포함|매도가능|보유종목|기본예탁금/.test(compact(line.text)))
     .sort((a, b) => a.bbox.y0 - b.bbox.y0);

@@ -8,7 +8,7 @@ export type NativeUnsettledTrade = { id: string; assetId: string; type: "buy" | 
 export type NativePortfolioState = { version: 1; accountId: string; startedAt: string; at: string; sequence: number; cash: { KRW: string; USD: string }; positions: NativePosition[]; unsettledTrades?: NativeUnsettledTrade[] };
 export type NativeMoney = { amount: string; currency: Currency };
 type EventBase = { id: string; sequence: number; at: string; source: string; dateEvidence?: NativeDateEvidence };
-export type NativeTradeInput = { type: "buy" | "sell"; assetId: string; quantity: string; currency: Currency; price?: string; settlement?: NativeMoney; settlementStatus?: "unconfirmed"; executionUnitPrice?: NativeMoney; orderUnitPrice?: NativeMoney; fee?: NativeMoney | null; tax?: NativeMoney | null };
+export type NativeTradeInput = { type: "buy" | "sell"; assetId: string; quantity: string; currency: Currency; price?: string; executionTotal?: NativeMoney; memo?: string; settlement?: NativeMoney; settlementStatus?: "unconfirmed"; executionUnitPrice?: NativeMoney; orderUnitPrice?: NativeMoney; fee?: NativeMoney | null; tax?: NativeMoney | null };
 export type NativeEvent = EventBase & (
   | { type: "deposit" | "withdraw" | "dividend" | "fee"; amount: string; currency: Currency; assetId?: string }
   | NativeTradeInput
@@ -35,6 +35,8 @@ export function validateNativeDateEvidence(at: string, evidence?: NativeDateEvid
 export function resolveNativeTrade(event: NativeTradeInput) {
   if (!isCurrency(event.currency)) fail("invalid_currency");
   const q = quantity(event.quantity, true);
+  if (event.memo !== undefined && (typeof event.memo !== "string" || event.memo.length > 300)) fail("invalid_memo");
+  if (event.executionTotal && (event.settlementStatus !== "unconfirmed" || event.executionTotal.currency !== event.currency)) fail("execution_currency_mismatch");
   const unit = event.executionUnitPrice ?? (event.price !== undefined ? { amount: event.price, currency: event.currency } : undefined);
   if (event.executionUnitPrice && event.price !== undefined && (event.executionUnitPrice.currency !== event.currency || positivePrice(event.price).compare(positivePrice(event.executionUnitPrice.amount)) !== 0)) fail("execution_evidence_conflict");
   if (unit && (!isCurrency(unit.currency) || unit.currency !== event.currency)) fail("execution_currency_mismatch");
@@ -44,12 +46,14 @@ export function resolveNativeTrade(event: NativeTradeInput) {
     positivePrice(event.orderUnitPrice.amount);
   }
   if (event.settlementStatus !== undefined) {
-    if (event.settlementStatus !== "unconfirmed" || event.settlement !== undefined || !unit || !price) fail("invalid_settlement_status");
+    if (event.settlementStatus !== "unconfirmed" || event.settlement !== undefined || (!price && !event.executionTotal)) fail("invalid_settlement_status");
+    const total = event.executionTotal ? positivePrice(event.executionTotal.amount) : q.mul(price!);
+    if (price && event.executionTotal && q.mul(price).compare(total) !== 0) fail("execution_evidence_conflict");
     for (const cost of [event.fee, event.tax]) if (cost) money(cost.amount, cost.currency, false);
     // Execution evidence is not a bank settlement. Preserve all price digits;
     // the product is reference consideration, never a rounded cash debit/credit.
-    return { settlement: null, average: null, executionUnitPrice: unit, fee: event.fee ?? null, tax: event.tax ?? null,
-      settlementStatus: "unconfirmed" as const, calculatedConsideration: { amount: q.mul(price).toExactString(), currency: event.currency } };
+    return { settlement: null, average: null, executionUnitPrice: unit ?? null, fee: event.fee ?? null, tax: event.tax ?? null,
+      settlementStatus: "unconfirmed" as const, calculatedConsideration: { amount: total.toExactString(), currency: event.currency } };
   }
   if (!event.settlement && !unit) fail("settlement_required");
   const settlement = event.settlement ?? { amount: q.mul(price!).toExactString(), currency: event.currency };

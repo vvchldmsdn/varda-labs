@@ -546,6 +546,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await expect(page.getByRole('link', { name: '거래·현금 원장에서 계속하기', exact: true })).toHaveAttribute('href', `/portfolio/ledger?accountId=${otherAccount}&action=buy`);
       const admittedUrl = page.url();
       await page.getByRole('combobox', { name: '보유 계좌', exact: true }).selectOption(balanceAccount);
+      await page.getByRole('button', { name: '자료 입력하기', exact: true }).click();
       await expect(page.getByRole('button', { name: '잔고 사진 선택', exact: true })).toBeVisible();
       await expect(page.locator('[data-holding-onboarding-read-state]')).toHaveAttribute('data-holding-onboarding-read-state', 'ready');
       assert.equal(page.url(), admittedUrl, 'Form account changes must not invalidate the beta server read');
