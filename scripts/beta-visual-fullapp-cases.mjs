@@ -45,7 +45,11 @@ export async function runBetaVisualCases({page,check,url,output}) {
       const list=dialog.getByLabel('종목별 변동 기여 목록',{exact:true});await expect(list.getByRole('button')).toHaveCount(8);
       const boxes=await list.getByRole('button').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,bottom:r.bottom};}));
       if(width>1000){assert.ok(Math.abs(boxes[0].y-boxes[1].y)<1&&boxes[1].x>boxes[0].x,'desktop shows two columns');assert.ok(boxes.filter(r=>r.bottom<height-40).length>=6,'six holdings must fit without scrolling');}
-      else assert.ok(boxes[1].y>boxes[0].y&&Math.abs(boxes[1].x-boxes[0].x)<1,'mobile retains readable single column');
+      else {
+        assert.ok(boxes[1].y>boxes[0].y&&Math.abs(boxes[1].x-boxes[0].x)<1,'mobile retains readable single column');
+        const sizes=await dialog.locator('header [data-cairn-metric] > dd:first-of-type').evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));
+        assert.equal(sizes.length,2);assert.ok(sizes.every(size=>size>=23&&size<=32),'two mobile metrics fit at readable matched sizes');
+      }
       const last=list.getByRole('button').last();await last.click();await expect(last).toHaveAttribute('aria-pressed','true');
       await list.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,`beta-today-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);

@@ -9,7 +9,7 @@
 .selected dl {display:grid;gap:15px;}
 .selected dl>div {display:block;}
 .selected dl dd {text-align:left;margin-top:6px;}
-@media(max-width:600px) {.primaryMetrics {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}.primaryMetrics dd {font-size:clamp(23px,7vw,32px);overflow-wrap:anywhere;}.movementBridge {padding:18px 16px;}.movementBridge>dl {grid-template-columns:1fr;gap:18px;}.coverage>span:last-child {font-size:11px;}.selected dl>div {display:block;}.selected dl dd {text-align:left;}}
+@media(max-width:600px) {.primaryMetrics {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}.detail .primaryMetrics [data-cairn-metric] > dd:first-of-type {font-size:clamp(23px,7vw,32px);overflow-wrap:anywhere;}.movementBridge {padding:18px 16px;}.movementBridge>dl {grid-template-columns:1fr;gap:18px;}.coverage>span:last-child {font-size:11px;}.selected dl>div {display:block;}.selected dl dd {text-align:left;}}
 
 .movementBridge summary { min-height:44px; cursor:pointer; font-size:14px; color:var(--cairn-v2-ink); }
 .movementBridge[open] > dl { margin-top:20px; }
