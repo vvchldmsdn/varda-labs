@@ -173,9 +173,11 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await expect(page.getByLabel('기록 날짜',{exact:true})).toBeVisible();
       await optional.click();await page.evaluate(()=>scrollTo(0,0));
       await capture(page,output,'guided-trade-'+beta,width,height);
-      await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
       const save=page.getByRole('button',{name:'매도 기록 저장',exact:true});
-      const unobscured=await save.evaluate(button=>{const rect=button.getBoundingClientRect();return rect.bottom<innerHeight-60&&button.contains(document.elementFromPoint(rect.x+rect.width/2,rect.bottom-2));});
+      // The read-only history follows the form. Test the save action at the form,
+      // rather than the end of the history where the form is outside the viewport.
+      await save.scrollIntoViewIfNeeded();
+      const unobscured=await save.evaluate(button=>{const rect=button.getBoundingClientRect();return rect.top>=0&&rect.bottom<innerHeight-60&&button.contains(document.elementFromPoint(rect.x+rect.width/2,rect.bottom-2));});
       assert.equal(unobscured,true,'save button must stay above mobile navigation');
       let dropped=false;
       const loseResponse=async route=>{
