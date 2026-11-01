@@ -56,14 +56,17 @@ export async function main(args) {
     const browserCache = path.dirname(path.dirname(path.dirname(chromium.executablePath())));
     const environment = childEnvironment(process.env, stage, 'production-build', browserCache);
     const log = createWriteStream(path.join(output, 'build.log'));
-    const code = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build', '--webpack'],
+    // Exercise the same local OCR assets as npm prebuild; never substitute an OCR response.
+    for (const command of [['scripts/prepare-balance-ocr.mjs'], ['scripts/verify-shared-domains.mjs'], ['node_modules/next/dist/bin/next', 'build', '--webpack']]) {
+      const code = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, command,
         { cwd: stage, env: environment, windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
       child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
       child.once('error', reject); child.once('close', resolve);
-    });
+      });
+      if (code !== 0) { await new Promise(resolve => log.end(resolve)); throw new Error('Full-app isolated production build failed; inspect build.log'); }
+    }
     await new Promise(resolve => log.end(resolve));
-    assert.equal(code, 0, 'Full-app isolated production build failed; inspect build.log');
     report.build = 'PASS';
     const runner = await import(pathToFileURL(path.join(stage, 'scripts/krw-usd-rc-rehearsal.mjs')).href);
     const result = await runner.rehearseReliabilityFullApp(['--execute-local', '--pg-bin', args[1]], output, stage, browserCache);
