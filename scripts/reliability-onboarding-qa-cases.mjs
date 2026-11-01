@@ -18,9 +18,15 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   }
   await setIdentity(token);
   await page.context().addCookies([{name:'varda-locale',value:'ko',url}]);
-  await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$3,'qa_batch_a','QA 일괄등록','brokerage','KRW'),($2,$3,'qa_batch_b','QA 다른계좌','brokerage','KRW')",[account,alternate,owner]);
   const observed=new Date(Date.now()-60000).toISOString();
-  await admin.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values($1,1400,'synthetic','ok',$2,$2,'spot')",[observed.slice(0,10),observed]);
+  const seed=await admin.connect();
+  try {
+    await seed.query('BEGIN');
+    await seed.query("select set_config('app.trade_reliability_version','0059',true)");
+    await seed.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$3,'qa_batch_a','QA 일괄등록','brokerage','KRW'),($2,$3,'qa_batch_b','QA 다른계좌','brokerage','KRW')",[account,alternate,owner]);
+    await seed.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values($1,1400,'synthetic','ok',$2,$2,'spot')",[observed.slice(0,10),observed]);
+    await seed.query('COMMIT');
+  } catch(error) { await seed.query('ROLLBACK'); throw error; } finally { seed.release(); }
 
   await check('fullapp-onboarding-six-independent-rows-partial-reload-and-lost-response-replay',async()=>{
     await page.goto(url+'/portfolio/holdings/new?'+new URLSearchParams({accountId:alternate,scope:`account:${alternate}`}));
