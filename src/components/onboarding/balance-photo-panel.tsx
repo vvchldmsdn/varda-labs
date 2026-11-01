@@ -33,6 +33,7 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
   function update(key: string, change: Partial<BalanceReviewRow>) { setRows(previous => previous.map(row => row.key === key ? { ...row, verified: false, ...change } : row)); setError(""); }
   function clearPreview() { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); previewUrl.current = undefined; setPhoto(undefined); }
   function clear() { clearPreview(); setRows([]); setActive(""); setReplacing(false); }
+  function remove(key: string) { const next = rows.filter(row => row.key !== key); setRows(next); if (active === key) setActive(next[0]?.key ?? ""); if (!next.length) onProvide?.(); }
   async function recognize(file: File) {
     const request = ++generation.current; task.current?.abort(); const controller = new AbortController(); task.current = controller;
     setError(""); setMessage(""); setProgress(0);
@@ -65,15 +66,15 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
     {message && rows.length > 0 && <Status as="p" role="status">{message}</Status>}
     {error && <Status as="p" tone="danger" role="alert">{error}</Status>}
     {rows.length > 0 && stage !== "provide" && <div className={styles.review}>
-      <div className={styles.reviewHeading}><strong>{t("종목·수량 확인", "Review holdings and quantities")}</strong><span>{verifiedCount}/{rows.length}</span></div>
+      {rows.length > 1 && <div className={styles.reviewHeading}><strong>{t("종목·수량 확인", "Review holdings and quantities")}</strong><span>{verifiedCount}/{rows.length}</span></div>}
       <InfoDisclosure summary={t("선택한 사진 보기", "View selected photo")}>{/* Keep the local blob on this device; never send it to the optimizer. */}{photo && <Image unoptimized width={945} height={2048} src={photo} className={styles.photo} alt={t("선택한 잔고 사진, 저장 전 수량 대조용", "Selected balance photo for quantity verification")} />}</InfoDisclosure>
-      <div className={styles.rows}>{rows.map(row => <div className={styles.row} key={row.key} data-active={active === row.key}>
+      {rows.length > 1 && <div className={styles.rows}>{rows.map(row => <div className={styles.row} key={row.key} data-active={active === row.key}>
         <div><strong>{row.instrument?.name ?? row.label}</strong><small>{row.quantity ? t(`${row.quantity}주`, `${row.quantity} shares`) : t("수량 확인 필요", "Quantity needed")} · {row.verified ? t("확인 완료", "Verified") : t("확인 필요", "Review needed")}</small></div>
-        <div className={styles.actions}><Button variant="secondary" type="button" disabled={busy} aria-pressed={active === row.key} onClick={() => setActive(row.key)}>{row.verified && <Check size={16} aria-hidden="true" />}{t("확인", "Review")}</Button><Button variant="ghost" type="button" disabled={busy} aria-label={t(`${row.label} 제외`, `Remove ${row.label}`)} onClick={() => { const next = rows.filter(item => item.key !== row.key); setRows(next); if (active === row.key) setActive(next[0]?.key ?? ""); if (!next.length) onProvide?.(); }}>{t("제외", "Remove")}</Button></div>
-      </div>)}</div>
+        <div className={styles.actions}><Button variant="secondary" type="button" disabled={busy} aria-pressed={active === row.key} onClick={() => setActive(row.key)}>{row.verified && <Check size={16} aria-hidden="true" />}{t("확인", "Review")}</Button><Button variant="ghost" type="button" disabled={busy} aria-label={t(`${row.label} 제외`, `Remove ${row.label}`)} onClick={() => remove(row.key)}>{t("제외", "Remove")}</Button></div>
+      </div>)}</div>}
       {current && <div className={styles.editor} key={current.key}>
-        <strong>{current.label}</strong>
-        {current.instrument ? <><p className={styles.note}>{current.instrument.name} · {current.instrument.ticker} · {current.instrument.currency}</p><Button variant="ghost" type="button" disabled={busy} onClick={() => update(current.key, { instrument: undefined, manualMatch: true })}>{t("종목 다시 선택", "Choose again")}</Button></> : <InstrumentSearch queryValue={current.searchQuery ?? current.label} onQueryChange={searchQuery => update(current.key, { searchQuery })} privateQuery autoMatchExact={!current.manualMatch} preview={preview} disabled={busy} manualEntryAvailable={false} onSelect={instrument => {
+        <div className={styles.editorHeading}><strong>{current.instrument?.name ?? current.label}</strong>{rows.length === 1 && <Button variant="ghost" type="button" disabled={busy} aria-label={t(`${current.label} 제외`, `Remove ${current.label}`)} onClick={() => remove(current.key)}>{t("제외", "Remove")}</Button>}</div>
+        {current.instrument ? <><p className={styles.note}>{current.instrument.ticker} · {current.instrument.currency}</p><Button variant="ghost" type="button" disabled={busy} onClick={() => update(current.key, { instrument: undefined, manualMatch: true })}>{t("종목 다시 선택", "Choose again")}</Button></> : <InstrumentSearch queryValue={current.searchQuery ?? current.label} onQueryChange={searchQuery => update(current.key, { searchQuery })} privateQuery autoMatchExact={!current.manualMatch} preview={preview} disabled={busy} manualEntryAvailable={false} onSelect={instrument => {
           if (rows.some(row => row.key !== current.key && row.instrument?.market === instrument.market && row.instrument.ticker === instrument.ticker)) { setError(t("같은 종목이 있어요. 사진이 겹쳤는지 확인하고, 합산하려면 목록에서 수량을 직접 수정해 주세요.", "This holding already exists. Check for overlapping photos. To combine holdings, edit the quantity in the review list.")); return; }
           update(current.key, { instrument });
         }} />}

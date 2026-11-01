@@ -20,7 +20,15 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
   for(const [beta,width,height] of [[false,390,844],[true,360,800]]) {
     await check(`guided-holdings-${beta?'beta':'original'}-${width}`,async()=>{
       const selectedAccount=beta?randomUUID():account;
-      if(beta)await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'qa_guided_photo','QA 사진등록','brokerage','KRW')",[selectedAccount,owner]);
+      if(beta){
+        const seed=await admin.connect();
+        try {
+          await seed.query('BEGIN');
+          await seed.query("select set_config('app.trade_reliability_version','0059',true)");
+          await seed.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'qa_guided_photo','QA 사진등록','brokerage','KRW')",[selectedAccount,owner]);
+          await seed.query('COMMIT');
+        } catch(error){await seed.query('ROLLBACK');throw error;} finally {seed.release();}
+      }
       const route=url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:`account:${selectedAccount}`,accountId:selectedAccount,...(beta?{mode:'domain'}:{})});
       await page.goto(route);
       await page.evaluate(()=>{for(const key of Object.keys(sessionStorage))if(key.startsWith('cairn:holding-draft:'))sessionStorage.removeItem(key);});
