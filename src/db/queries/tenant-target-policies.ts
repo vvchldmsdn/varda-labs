@@ -46,6 +46,7 @@ export type TenantPortfolioTargetPolicyRead =
   | Readonly<{
       status: "available";
       policy: Readonly<{
+        approvalId?: string;
         approvalRevision: number;
         policyVersion: string;
         effectiveServiceDate: string;
@@ -276,6 +277,7 @@ function projectPortfolioPolicy(
   return Object.freeze({
     status: "available",
     policy: Object.freeze({
+      approvalId: requiredString(first.approval_revision_id),
       approvalRevision: requiredInteger(first.approval_revision),
       policyVersion: requiredString(first.policy_version),
       effectiveServiceDate: requiredDate(first.effective_service_date),

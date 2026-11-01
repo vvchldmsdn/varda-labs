@@ -15,9 +15,10 @@ describe("target-weight editing and navigation", () => {
   it("keeps the draft revision through success, transient rejection and retry without adopting refreshed props", async () => {
     let reducer, persistedState;
     const responses = [
-      { status: "success", message: "saved", approvalRevision: 2 },
+      { status: "success", message: "saved", approvalRevision: 2, approvalId: "approval-two" },
       { status: "invalid", message: "retry" },
-      { status: "success", message: "saved", approvalRevision: 3 },
+      { status: "success", message: "saved", approvalRevision: 3, approvalId: "approval-three" },
+      { status: "success", message: "revoked", approvalRevision: 0, approvalId: null },
     ];
     const [{ PortfolioTargetPolicyForm }] = await importUiWithPorts(["src/components/portfolio-target-policy-form.tsx"], {
       "next/navigation": targetNavigationPort,
@@ -45,8 +46,13 @@ describe("target-weight editing and navigation", () => {
     persistedState = await reducer(persistedState,new FormData());
     assert.equal(persistedState.status,"invalid");
     assert.equal(persistedState.approvalRevision,2,"failure must not revert the successful revision");
+    assert.equal(persistedState.approvalId,"approval-two","retries retain the immutable approval identity");
     persistedState = await reducer(persistedState,new FormData());
     assert.equal(persistedState.approvalRevision,3);
+    assert.equal(persistedState.approvalId,"approval-three");
+    persistedState = await reducer(persistedState,new FormData());
+    assert.equal(persistedState.approvalRevision,0);
+    assert.equal(persistedState.approvalId,null,"revocation must clear the old approval identity");
   });
 
   it("offers target setup only for missing or changed target policies, never data failures", async () => {

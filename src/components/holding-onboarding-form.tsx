@@ -205,7 +205,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
         <div className="varda-onboarding-save">
           {state.results.some(item => item.result.message === NATIVE_LEDGER_REQUIRED_MESSAGE) ? <NativeLedgerNotice accountId={accountId} action="buy" /> : null}
           {state.status === "invalid" && state.results.length === 0 ? <CairnStatus as="p" tone="danger" role="alert" className="varda-onboarding-error">{t("입력한 목록을 확인한 뒤 다시 저장해 주세요.", "Check the holding list and try saving again.")}</CairnStatus> : null}
-          {state.status === "partial" ? <CairnStatus as="p" tone="neutral" role="status" className="varda-onboarding-hint">{hasSaved
+          {state.status === "partial" && rowResults.length > 0 && unsaved.length > 0 ? <CairnStatus as="p" tone="neutral" role="status" className="varda-onboarding-hint">{hasSaved
             ? t("저장된 종목은 유지됩니다. 나머지만 확인한 뒤 다시 저장하세요.", "Saved holdings are kept. Review and retry only the remaining holdings.")
             : awaitingPrice
               ? t("아직 저장된 종목이 없습니다. 가격 확인 후 다시 저장하거나 현재가를 직접 입력해 주세요.", "No holdings have been saved yet. Save again after prices are available, or enter current prices yourself.")

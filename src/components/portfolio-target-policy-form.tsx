@@ -18,13 +18,14 @@ import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as
 
 const INITIAL_STATE: PortfolioTargetPolicyActionState = Object.freeze({ status: "idle", message: null });
 
-export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approvalRevision = null, policyRevision = approvalRevision ?? 0, isDesignPreview = false, returnHref, returnLabel, accounts = [], onSaved, onEdited }: {
+export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approvalId = null, approvalRevision = null, policyRevision = approvalRevision ?? 0, isDesignPreview = false, returnHref, returnLabel, accounts = [], onSaved, onEdited }: {
   onSaved?: (message:string)=>void;
   onEdited?: ()=>void;
   accounts?: readonly {id:string;name:string;code:string}[];
   universeHash: string;
   rows: readonly PortfolioTargetEditorRow[];
   scopeKey: string;
+  approvalId?: string | null;
   approvalRevision?: number | null;
   policyRevision?: number;
   isDesignPreview?: boolean;
@@ -37,8 +38,8 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
     if(result.status === "success" && result.message) onSaved?.(result.message);
     // A failed attempt must retain the last revision saved by this draft.
     // Refreshed server props must not silently rebase unsaved inputs.
-    return { ...result, approvalRevision: result.approvalRevision ?? previous.approvalRevision, policyRevision: result.policyRevision ?? previous.policyRevision };
-  }, { ...INITIAL_STATE, approvalRevision: approvalRevision ?? 0, policyRevision });
+    return { ...result, approvalId: result.approvalId === undefined ? previous.approvalId : result.approvalId, approvalRevision: result.approvalRevision ?? previous.approvalRevision, policyRevision: result.policyRevision ?? previous.policyRevision };
+  }, { ...INITIAL_STATE, approvalId, approvalRevision: approvalRevision ?? 0, policyRevision });
   const {formRef: actionFormRef, onReset: actionFormOnReset} = useActionFormReset(state);
   const [candidates,setCandidates]=useState<(InstrumentChoice & {accountId:string;accountName:string;weight:string})[]>([]);
   const [removed,setRemoved]=useState<string[]>([]);
@@ -67,6 +68,7 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
     }} onReset={actionFormOnReset} ref={actionFormRef}>
       <input name="scope" type="hidden" value={scopeKey} />
       <input name="policyRevision" type="hidden" value={state.policyRevision ?? policyRevision} />
+      <input name="approvalId" type="hidden" value={state.approvalId ?? ""} />
       <input name="approvalRevision" type="hidden" value={state.approvalRevision ?? 0} />
       <input name="rowCount" type="hidden" value={editorRows.length} />
       <input name="candidates" type="hidden" value={JSON.stringify(candidates.map(row=>({accountId:row.accountId,instrumentId:row.id})))} />

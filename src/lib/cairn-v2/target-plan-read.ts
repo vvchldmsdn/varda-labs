@@ -41,7 +41,7 @@ export function projectTargetPlanRead(raw:readonly Record<string,unknown>[]): Ta
  if(new Set(raw.map(row=>text(row.revision_id))).size!==1||raw.length>64)return {status:"conflict",policy:null};
  const first=raw[0],date=text(first.effective_service_date),approvedAt=new Date(text(first.approved_at));
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(approvedAt.getTime()))throw Error("Invalid target plan date");
- return {status:"available",policy:{approvalRevision:integer(first.approval_revision),policyVersion:text(first.policy_version),
+ return {status:"available",policy:{approvalId:text(first.revision_id),approvalRevision:integer(first.approval_revision),policyVersion:text(first.policy_version),
   effectiveServiceDate:date,universeHash:text(first.universe_hash),vectorHash:text(first.vector_hash),approvedAt,
   rows:raw.flatMap(row=>row.account_id===null?[]:[{accountId:text(row.account_id),assetId:text(row.plan_row_id),
    assetName:text(row.asset_name),market:text(row.market),currency:text(row.currency),ticker:row.ticker===null?null:text(row.ticker),

@@ -132,6 +132,9 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       await page.goto(url+(beta?'/beta/portfolio/targets':'/portfolio/targets')+'?'+new URLSearchParams({...query,...(beta?{mode:'domain',cashAmountKrw:'1234567'}:{from:'contribution',amount:'1234567'})}));
       const form=page.locator('form').filter({has:page.locator('input[name="universeHash"]')});
       await expect(form.locator('input[name="approvalRevision"]')).toBeAttached();
+      const targetWeights=form.locator('input[name^="targetWeight:"]');
+      await expect(targetWeights).toHaveCount(6);
+      for(let index=0;index<6;index++)await targetWeights.nth(index).fill(index<4?'20':'10');
       await form.getByRole('button',{name:'목표비중 저장',exact:true}).click();
       await expect(page.getByRole('status').filter({hasText:'이 범위의 목표비중을 저장했습니다.'})).toBeVisible();
       const targetsUrl=page.url();
@@ -150,5 +153,31 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       assert.ok(lifecycle.length>0);assert.ok(lifecycle.every(row=>row.lifecycle_status==='revoked'));
       assert.deepEqual(await financial(),before);
     }
+  });
+
+  await check('fullapp-cancel-remainder-after-hiding-saved-rows-unlocks-account-without-deleting-assets',async()=>{
+    await page.goto(url+'/portfolio/holdings/new?'+new URLSearchParams({accountId:alternate,scope:'account:'+alternate}));
+    const form=page.locator('form.varda-holding-onboarding');
+    const manual=form.locator('details').filter({has:page.locator('summary').filter({hasText:'검색되지 않는 종목 직접 입력'})});
+    await manual.locator(':scope > summary').click();
+    for(let index=0;index<2;index++){
+      await manual.getByLabel('티커',{exact:true}).fill(`90020${index}`);
+      await manual.getByLabel('이름 (선택)',{exact:true}).fill(`QA 취소 ${index}`);
+      await manual.getByRole('button',{name:'이 종목의 수량 입력',exact:true}).click();
+      await form.getByLabel('몇 주 가지고 있나요?',{exact:true}).fill('2');
+      await form.getByRole('button',{name:'목록에 추가',exact:true}).click();
+      if(index===0){const row=form.locator('ol > li').filter({hasText:'QA 취소 0'});await row.locator('summary').click();await row.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');}
+    }
+    await form.getByRole('button',{name:'2종목 저장',exact:true}).click();
+    await expect(form.locator('li[data-saved="true"]')).toHaveCount(1);
+    await form.getByRole('button',{name:'저장된 목록 접고 더 추가하기',exact:true}).click();
+    await form.getByRole('button',{name:'QA 취소 1 목록에서 제거',exact:true}).click();
+    await form.getByRole('button',{name:'저장된 목록 접고 더 추가하기',exact:true}).click();
+    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toBeEnabled();
+    await form.getByRole('combobox',{name:'보유 계좌',exact:true}).selectOption(account);
+    assert.equal(await count(),6);
+    assert.equal(Number((await admin.query('select count(*)::int n from assets where canonical_owner_user_id=$1 and account_id=$2',[owner,alternate])).rows[0].n),1);
+    await expect(form.locator('ol > li')).toHaveCount(0);
+    await capture('onboarding-cancelled-remainder',form.getByRole('combobox',{name:'보유 계좌',exact:true}));
   });
 }

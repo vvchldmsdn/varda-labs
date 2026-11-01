@@ -258,7 +258,7 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     modelRows.forEach((r,i)=>readd.set('targetWeight:'+i,r.assetId===secondAsset?'50':'0'));readd.set('targetWeight:3','50');
     assert.equal((await writer.writeSessionPortfolioTargetPolicy(readd)).status,'success');
     assert.equal((await read(owner)).policy.rows.find(r=>r.ticker==='CANDUNIT').targetWeightBps,5000);
-    const revoke=new FormData();revoke.set('scope',scope.key);revoke.set('intent','revoke');revoke.set('approvalRevision','4');
+    const revoke=new FormData();revoke.set('scope',scope.key);revoke.set('intent','revoke');revoke.set('approvalRevision','4');revoke.set('approvalId',(await read(owner)).policy.approvalId);
     assert.equal((await writer.writeSessionPortfolioTargetPolicy(revoke)).status,'success');
     assert.equal((await writer.writeSessionPortfolioTargetPolicy(revoke)).status,'success','replayed revocation is idempotent');
     const revoked=await read(owner);assert.equal(revoked.status,'missing');assert.equal(revoked.explicitlyRevoked,true);assert.equal(revoked.lastRevision,4);

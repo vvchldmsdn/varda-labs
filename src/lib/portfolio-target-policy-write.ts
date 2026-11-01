@@ -27,6 +27,7 @@ export type PortfolioTargetPolicyActionState = Readonly<{
   status: "idle" | "success" | "invalid" | "unauthorized" | "conflict" | "error";
   message: string | null;
   approvalRevision?: number;
+  approvalId?: string | null;
   policyRevision?: number;
 }>;
 
@@ -59,10 +60,14 @@ export async function writeSessionPortfolioTargetPolicy(
   if (intent !== "approve" && intent !== "revoke") return state("invalid", "목표 변경 방법을 확인해 주세요.");
   if (intent === "revoke") {
     const revision = formData.get("approvalRevision");
+    const approvalId = formData.get("approvalId");
+    if (typeof approvalId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(approvalId)) {
+      return state("conflict", "승인 목표를 다시 조회한 뒤 해제해 주세요.");
+    }
     if (typeof revision !== "string" || !/^[1-9]\d*$/.test(revision) || !Number.isSafeInteger(Number(revision))) {
       return state("invalid", "해제할 승인 목표를 확인해 주세요.");
     }
-    return revokePortfolioTargetPolicy(resolution.tenantContext.ownerUserId, scope, Number(revision));
+    return revokePortfolioTargetPolicy(resolution.tenantContext.ownerUserId, scope, Number(revision), approvalId);
   }
   const model = await getReadOnlyTenantPortfolioTargetPolicyModel({
     scope,
@@ -176,7 +181,7 @@ export async function writeSessionPortfolioTargetPolicy(
     if (!writeResult) {
       return state("error", "목표비중 저장 결과를 확인하지 못했습니다.");
     }
-    return Object.freeze({ ...state("success", "이 범위의 목표비중을 저장했습니다."), approvalRevision: writeResult, policyRevision: writeResult });
+    return Object.freeze({ ...state("success", "이 범위의 목표비중을 저장했습니다."), approvalRevision: writeResult.revision, policyRevision: writeResult.revision, approvalId: writeResult.id });
   } catch (error) {
     if (["23505", "22012"].includes(databaseErrorCode(error) ?? "")) {
       return state(
@@ -243,10 +248,10 @@ async function recordPortfolioTargetPolicy({
     Number(result?.row_count) === record.rows.length &&
     Number(result?.event_count) >= 1 &&
     Number(result?.event_count) <= 2
-  ) ? Number(result?.approval_revision) : null;
+  ) ? { revision: Number(result?.approval_revision), id: revisionId } : null;
 }
 
-async function revokePortfolioTargetPolicy(ownerUserId: string, scope: Parameters<typeof portfolioTargetScopeColumns>[0], expectedRevision: number): Promise<PortfolioTargetPolicyActionState> {
+async function revokePortfolioTargetPolicy(ownerUserId: string, scope: Parameters<typeof portfolioTargetScopeColumns>[0], expectedRevision: number, approvalId: string): Promise<PortfolioTargetPolicyActionState> {
   const context = prepareTenantWriteContext({ mode: "active", source: "session", targetClassification: "user_owned", canonicalOwnerUserId: ownerUserId, canonicalOwnerStatus: "active", canonicalOwnerVerified: true });
   assertActiveTenantWriteAllowed({ context, operation: "update", referencedOwnerUserIds: [ownerUserId] });
   const columns = portfolioTargetScopeColumns(scope);
@@ -257,11 +262,11 @@ async function revokePortfolioTargetPolicy(ownerUserId: string, scope: Parameter
       transaction.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [["varda.portfolio_target_policy.v1", ownerUserId, scope.key].join(":")]),
       transaction.query(ATOMIC_REVOKE_QUERY, [
         ["varda.portfolio_target_policy.v1", ownerUserId, scope.key].join(":"), ownerUserId,
-        columns.scopeKind, columns.scopeAccountId, columns.scopePortfolioGroupId, expectedRevision, new Date().toISOString(),
+        columns.scopeKind, columns.scopeAccountId, columns.scopePortfolioGroupId, expectedRevision, new Date().toISOString(), approvalId,
       ]),
     ], { isolationLevel: "ReadCommitted" });
     if (Number(results[3]?.[0]?.accepted_count) !== 1) return state("conflict", "승인 목표가 변경되었습니다. 다시 조회한 뒤 확인해 주세요.");
-    return { ...state("success", "목표 승인을 해제했습니다. 이전 승인 기록은 보존됩니다."), approvalRevision: 0, policyRevision: expectedRevision };
+    return { ...state("success", "목표 승인을 해제했습니다. 이전 승인 기록은 보존됩니다."), approvalRevision: 0, policyRevision: expectedRevision, approvalId: null };
   } catch {
     return state("error", "승인 해제 결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요.");
   }
@@ -281,7 +286,7 @@ with lock_acquired as materialized (
   for update of r
 ), revoked as (
   update portfolio_target_policy_revisions r set lifecycle_status = 'revoked', terminal_at = $7::timestamptz
-  from scoped s where r.id = s.id and s.approval_revision = $6::integer and s.lifecycle_status = 'approved'
+  from scoped s where r.id = s.id and s.id = $8::uuid and s.approval_revision = $6::integer and s.lifecycle_status = 'approved'
   returning r.id
 ), event as (
   insert into portfolio_target_policy_lifecycle_events (
@@ -291,7 +296,7 @@ with lock_acquired as materialized (
     'revocation', 'approved', 'revoked', $7::timestamptz, null from revoked returning id
 )
 select (select count(*) from event) + (select count(*) from scoped
-  where approval_revision = $6::integer and lifecycle_status = 'revoked'
+  where id = $8::uuid and approval_revision = $6::integer and lifecycle_status = 'revoked'
     and approval_revision = (select max(approval_revision) from scoped)
     and not exists (select 1 from scoped where lifecycle_status = 'approved')) as accepted_count
 `;

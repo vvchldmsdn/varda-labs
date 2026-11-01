@@ -41,7 +41,7 @@ export function BetaLab({read}:{read:LabRead}){
   {(dirty||visible.state!=="ready")&&<CairnStatus as="p" role="status" className={styles.status}>{dirty?'새 기간으로 비교해 주세요.':visible.message}</CairnStatus>}
   <p className={styles.note}>날짜를 비우면 비교 가능한 기본 기간을 사용해요. 분석 기준은 KRW입니다.</p>
   {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&<RecoveryNotice beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
-  {crudAvailable && !ready && <HoldingAnalysisRecovery key={context.scope} scope={context.scope} />}
+  {crudAvailable && !ready && visible === read && !['loading','unauthorized','invalid'].includes(visible.state) && <HoldingAnalysisRecovery key={`${context.scope}:${read.readReceipt}:${read.readEpoch}`} scope={context.scope} />}
   {model&&<>
    <details className={styles.evidence}><summary>비교 기간과 포함 범위</summary><dl className={styles.context}>
     <div><dt>요청 기간</dt><dd className={styles.dateRange}><span>{model.period.requestedStartServiceDate??'기본'}</span> ~ <span>{model.period.requestedEndServiceDate??'기본'}</span></dd></div>
