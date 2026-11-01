@@ -56,6 +56,7 @@ export function HoldingOnboardingForm({ options, initialAccountId, nativeAccount
   const needsFocus = useRef(false);
   function go(next: 0 | 1 | 2) {
     if (pending) return;
+    if (next === step) { queueMicrotask(() => { stepHeading.current?.focus({ preventScroll: true }); stepHeading.current?.scrollIntoView({ block: "nearest" }); }); return; }
     setDirection(next < step ? "back" : "forward"); setStep(next); needsFocus.current = true;
   }
   useEffect(() => {

@@ -187,7 +187,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
         const status = await result.json();
         rejectChangedIdentity(result,status);
         if(!result.ok) throw new Error(status.error??"unavailable");
-        if (result.ok && ["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,body.sessionKey,"mutation" in saved ? saved.mutation.operationId : saved.operationId); setPendingOperation(null); setExpiredOperation(""); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); clearTradeEntry(tradeEntryStorage(), tradeEntryKey(body.sessionKey, initialSelection)); setFields(previous => fieldsAfterLedgerSave(previous, false, localNow())); }
+        if (result.ok && ["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,body.sessionKey,"mutation" in saved ? saved.mutation.operationId : saved.operationId); setPendingOperation(null); setExpiredOperation(""); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); clearTradeEntry(tradeEntryStorage(), tradeEntryKey(body.sessionKey, initialSelection)); setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); }
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "unavailable"); }
     finally { setLoading(false); setChecking(false); }
@@ -215,7 +215,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
       rejectChangedIdentity(response,result);
       if(!response.ok||!["committed","cancelled"].includes(result.status)) throw new Error(result.error??"unavailable");
       forgetTrade(localStorage,data.sessionKey,expiredOperation);
-      setPendingOperation(null);setExpiredOperation("");setUncertain(false);onPendingChange?.(false);clearTradeEntry(tradeEntryStorage(), entryKey);setFields(previous => fieldsAfterLedgerSave(previous, false, localNow()));setLots([{amount:"",currency:"USD",at:""}]);setSuccess(result.status==="committed");await load();
+      setPendingOperation(null);setExpiredOperation("");setUncertain(false);onPendingChange?.(false);clearTradeEntry(tradeEntryStorage(), entryKey);setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})}));setLots([{amount:"",currency:"USD",at:""}]);setSuccess(result.status==="committed");await load();
     } catch(cause) {setError(cause instanceof Error?cause.message:"unavailable");}
     finally {setBusy(false);}
   }
