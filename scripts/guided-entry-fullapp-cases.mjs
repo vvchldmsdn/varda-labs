@@ -243,7 +243,7 @@ export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
     await page.goto(href(a.account));await expect(form.locator('li[data-saved="true"]')).toHaveCount(2);
     assert.equal(Number((await admin.query('select count(*)::int n from assets where account_id=$1',[a.account])).rows[0].n),3);
     const old=(await admin.query('select quantity::text,archived_at from assets where id=$1',[a.asset])).rows[0];
-    assert.equal(old.quantity,'2');assert.ok(old.archived_at);
+    assert.equal(Decimal.from(old.quantity).compare('2'),0);assert.ok(old.archived_at);
     await capture(page,output,'guided-recovery-'+beta,beta?360:390,beta?800:844);
   });
   await check('guided-home-opening-refresh-keeps-dialog-and-investment-value',async()=>{
