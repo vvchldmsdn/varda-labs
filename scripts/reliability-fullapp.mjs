@@ -60,6 +60,24 @@ const event={eventDate:'2026-09-18',recordedAt:'2026-09-18T10:00:00.123Z',accoun
 const model={state:'ready',snapshotDate:'2026-09-18',source:'synthetic',expectedAccounts:['synthetic'],coveredAccounts:['synthetic'],missingAccounts:[],excludedPositionCount:0,linkedPositionCount:1,historicalOnlyPositionCount:0,positions:[{accountCode:'synthetic',accountName:'QA account',assetName:'QA ETF',ticker:'VOO',assetType:'etf',market:'us',currency:'USD',quantity:'0.896567',storedPrice:'701.263896',storedPriceKind:'current_price',marketValueKrw:'123.456789',currentWeight:'100',targetWeight:null,belowMa:false,priceSource:'synthetic',priceBasis:'manual_current',assetLinkStatus:'linked'}]} satisfies Parameters<typeof PositionSnapshotTable>[0]['model'];
 export default function Page(){return <main style={{padding:20,maxWidth:1200,margin:'auto'}}><LanguageSwitch/><p>Synthetic presentation fixture — no account writes</p><section aria-label="Record presentation"><EventTable rows={[event]}/><PositionSnapshotTable model={model}/><details><summary>Source details</summary><EventEvidence rows={[event]}/><SnapshotEvidence model={model}/></details></section><OwnerOutcomeCandidateExplorer account="all" {...data as Omit<Parameters<typeof OwnerOutcomeCandidateExplorer>[0],'account'>}/></main>}
 `);
+  const visualRoute='src/app/qa-beta-visual';
+  await assert.rejects(access(path.join(ROOT,visualRoute)),{code:'ENOENT'});
+  const {importUiWithPorts}=await import('../tests/helpers/import-ui-with-ports.mjs');
+  const [fixtures,contract]=await importUiWithPorts(['src/lib/cairn-v2/fixtures.ts','src/lib/cairn-v2/read-contract.ts'],{});
+  const {betaVisualFixture,returnVisualFixture}=await import('../tests/support/beta-visual-fixture.mjs');
+  const context={mode:'domain',scope:'all',currency:'KRW',fixture:'standard'};
+  const view=betaVisualFixture(fixtures.getFixtureView(context),contract.blankDomainView('ready',''));
+  await mkdir(path.join(stage,visualRoute));
+  await writeFile(path.join(stage,visualRoute,'fixture.json'),JSON.stringify({context,view,returns:returnVisualFixture}));
+  await writeFile(path.join(stage,visualRoute,'page.tsx'), `
+import {BetaProvider} from '@/components/cairn-v2/beta-provider';
+import {BetaHome} from '@/components/cairn-v2/beta-home';
+import {ReturnTimelineChart} from '@/components/return-timeline-chart';
+import type {DomainRead} from '@/lib/cairn-v2/read-contract';
+import type {RecoveredReturnCurve} from '@/lib/period-return-recovery';
+import data from './fixture.json';
+export default async function Page({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){const search=await searchParams;const read={...data,context:{...data.context,currency:search.currency==='USD'?'USD':'KRW'}} as DomainRead;return <BetaProvider><BetaHome initialContext={read.context} read={read}/><section aria-label="Synthetic recovered history" style={{maxWidth:1000,margin:'40px auto',padding:20}}><ReturnTimelineChart stored={data.returns.stored} curve={data.returns.curve as RecoveredReturnCurve}/></section></BetaProvider>}
+`);
   return { identityBoundary: 'external verified session subject substituted only in disposable build',
     sourceIdentitySha256: createHash('sha256').update(await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'))).digest('hex') };
 }
@@ -106,6 +124,7 @@ export async function main(args) {
     assert.ok(!originalIdentity.toString().includes('cairn_fullapp_identity'), 'Production identity source cannot contain the test fixture');
     assert.ok(!(await readFile(path.join(ROOT,'src/app/layout.tsx'),'utf8')).includes('FullAppRefreshControl'), 'Refresh control must stay in disposable builds');
     await assert.rejects(access(path.join(ROOT,'src/app/qa-context-presentation')), { code: 'ENOENT' });
+    await assert.rejects(access(path.join(ROOT,'src/app/qa-beta-visual')), { code: 'ENOENT' });
 
   }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2));

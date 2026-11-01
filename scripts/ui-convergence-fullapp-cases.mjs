@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { expect } from '@playwright/test';
 import {runGuidedTradeQa} from './guided-entry-fullapp-cases.mjs';
+import {runBetaVisualCases} from './beta-visual-fullapp-cases.mjs';
 
 /** Actual routes and authenticated queries against the disposable PostgreSQL only. */
 export async function runUiContextCases({ page, check, admin, setIdentity, legacyToken, legacyOwner, legacyAccount, nativeToken, nativeAccount, nativeAsset, readNativeState, url, output }) {
@@ -108,6 +109,7 @@ export async function runUiContextCases({ page, check, admin, setIdentity, legac
     });
   }
   await runGuidedTradeQa({page,check,setIdentity,token:nativeToken,account:nativeAccount,asset:nativeAsset,readState:readNativeState,url,output});
+  await runBetaVisualCases({page,check,url,output});
   await check('ui-public-guest-en-320',async()=>{
     await setIdentity(null);await page.context().addCookies([{name:'varda-locale',value:'en',url}]);await page.setViewportSize({width:320,height:844});
     await page.goto(url+'/start');await expect(page.getByRole('link',{name:'Sign in',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'Sign up',exact:true})).toBeVisible();

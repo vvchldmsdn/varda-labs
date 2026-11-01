@@ -1,6 +1,6 @@
 "use client";
 import { Button as CairnButton, Status as CairnStatus, ActionGroup, ActionContent } from "@/components/cairn-ui";
-import { Grid2X2, ChartNoAxesCombined, ArrowRight } from 'lucide-react';
+import { Grid2X2, ChartNoAxesCombined } from 'lucide-react';
 
 import { HomeSimulation, HomeSimulationPending } from "./home-simulation";
 import type { SimulationRead } from "@/lib/cairn-v2/simulation-contract";
@@ -68,9 +68,6 @@ export function BetaHome({
   const contributionTotal = view.contribution.length
     ? view.contribution.reduce((sum, r) => sum + r.amountKrw, 0)
     : null;
-  const contributionNeedsReview = !view.rows.length ||
-    view.domain?.planning?.contribution?.state === 'blocked' ||
-    view.domain?.planning?.contribution?.state === 'unavailable';
   return (
     <BetaShell context={context} setContext={setContext} readView={view}>
       <div className={home.dashboard}>
@@ -153,7 +150,6 @@ export function BetaHome({
                 </div>
               </div>
             )}
-            <CairnButton className={home.calculate} variant="primary" type="button" onClick={event => open('contribution', event.currentTarget)}>{contributionNeedsReview ? '계산 준비 확인하기' : '추가 투자 계산하기'} <ArrowRight size={18} aria-hidden="true" /></CairnButton>
           </Card>
           <div className={home.history}>
             <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>

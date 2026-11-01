@@ -1,6 +1,9 @@
 .body {min-width:0;display:flex;flex-direction:column;gap:5px;padding-top:16px;}
-.label,.note {font-size:10px;color:var(--cairn-v2-muted);line-height:1.55;}
+.note {font-size:12px;color:var(--cairn-v2-muted);line-height:1.55;}
 .headline {font-size:clamp(28px,2.8vw,38px);line-height:1.2;letter-spacing:-.045em;font-weight:400;font-variant-numeric:tabular-nums;}
-.amount {font-size:13px;font-variant-numeric:tabular-nums;}
+.amount {display:flex;flex-wrap:wrap;align-items:baseline;gap:5px;font-size:clamp(22px,2vw,28px);line-height:1.3;letter-spacing:-.035em;font-variant-numeric:tabular-nums;}
+.amount small {font-size:13px;letter-spacing:0;color:var(--cairn-v2-muted);}
+.amount[data-tone=positive] {color:var(--cairn-v2-brand);}
+.amount[data-tone=negative] {color:var(--cairn-ui-negative,#3568ae);}
 .note {margin-top:5px!important;}
 @media(max-width:699px) {.body {padding-top:12px;}.headline {font-size:36px;}}
