@@ -195,7 +195,7 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       assert.deepEqual(await readState(),after,'reload must not replay the already saved trade');
       // A correction is a different draft; switching back must never create a new trade from the old fill.
       await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
-      await page.getByLabel('종목',{exact:true}).selectOption(asset);
+      await page.getByRole('combobox',{name:/^종목/}).selectOption(asset);
       await qty.fill('0.000002');await page.getByLabel('체결 단가 · KRW',{exact:true}).fill('2');
       await optional.click();await page.getByLabel('메모 · 선택',{exact:true}).fill('새 거래 초안');
       await page.locator('summary').filter({hasText:'계좌 현금'}).click();
