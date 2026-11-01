@@ -193,6 +193,26 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await page.reload();await expect(qty).toHaveValue('');assert.equal(dropped,true);
       assert.equal(await page.evaluate(()=>Object.keys(sessionStorage).filter(key=>key.startsWith('cairn:trade-entry:v1:')).map(key=>JSON.parse(sessionStorage.getItem(key))).some(draft=>!draft.fields.quantity&&!draft.fields.price&&!draft.fields.memo)),false,'loading an empty form must not freeze a new default timestamp');
       assert.deepEqual(await readState(),after,'reload must not replay the already saved trade');
+      // A correction is a different draft; switching back must never create a new trade from the old fill.
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
+      await page.getByLabel('종목',{exact:true}).selectOption(asset);
+      await qty.fill('0.000002');await page.getByLabel('체결 단가 · KRW',{exact:true}).fill('2');
+      await optional.click();await page.getByLabel('메모 · 선택',{exact:true}).fill('새 거래 초안');
+      await page.locator('summary').filter({hasText:'계좌 현금'}).click();
+      const pendingLedger=await (await page.request.get(url+'/api/portfolio/ledger')).json();
+      const pendingFill=pendingLedger.trades.find(row=>row.accountId===account&&row.event.settlementStatus==='unconfirmed');
+      await page.getByRole('button',{name:'정산 보완',exact:true}).click();
+      await expect(qty).toHaveValue(pendingFill.event.quantity);
+      await expect(page.getByLabel('시작 잔액에 이미 포함된 거래가 아닙니다.',{exact:true})).not.toBeChecked();
+      await page.reload();
+      await page.getByRole('button',{name:'새 거래 초안으로 돌아가기',exact:true}).click();
+      await expect(qty).toHaveValue('0.000002');await expect(page.getByLabel('체결 단가 · KRW',{exact:true})).toHaveValue('2');
+      await optional.click();await expect(page.getByLabel('메모 · 선택',{exact:true})).toHaveValue('새 거래 초안');
+      await expect(page.getByLabel('정정할 기록',{exact:true})).toHaveCount(0);
+      await capture(page,output,'context-correction-restored-'+beta,width,height);
+      assert.deepEqual(await readState(),after,'editing and cancelling a correction must not mutate the ledger');
+      await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('cairn:trade-entry:v1:')).forEach(k=>sessionStorage.removeItem(k)));
+
       await page.emulateMedia({reducedMotion:'no-preference'});
     });
   }
@@ -213,6 +233,16 @@ export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
   for(const beta of [false,true]) await check(`guided-recovery-archived-retry-scope-${beta}`,async()=>{
     const a=await makeAccount('QA 종료 '+beta,{archived:true}),b=await makeAccount('QA 빈초안 '+beta);
     const href=id=>url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:'account:'+id,...(beta?{mode:'domain'}:{accountId:id})});
+    if (!beta) {
+      await page.goto(url+'/portfolio/risk?'+new URLSearchParams({scope:'account:'+a.account,currency:'USD'}));
+      await expect(page.getByText('분석 기준 · KRW',{exact:true})).toBeVisible();
+      await expect(page.getByRole('combobox',{name:'분석 통화',exact:true})).toHaveCount(0);
+      const thirty=page.getByRole('link',{name:'30일',exact:true});
+      await expect(thirty).toHaveAttribute('href',/currency=USD/);await thirty.click();
+      await expect.poll(()=>new URL(page.url()).searchParams.get('currency')).toBe('USD');
+      await capture(page,output,'context-risk-krw-basis',390,844);
+    }
+
     await page.goto(href(a.account));
     const form=page.locator('form.varda-holding-onboarding');
     await form.getByRole('radio',{name:/직접 입력하기/}).check();await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();

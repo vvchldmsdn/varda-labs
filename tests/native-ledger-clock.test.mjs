@@ -49,14 +49,14 @@ function hooks() {
 }
 // Real view event handlers with only browser/network ports substituted. Remote
 // authenticated browser QA separately covers the actual provider/session/writer.
-async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true}={}) {
+async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[]}={}) {
   deviceClock(t,offset);let monotonic=1000,serverNow=SERVER;const sent=[];
   t.mock.method(performance,'now',()=>monotonic);
   const values=new Map();globalValue(t,'localStorage',{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
   globalValue(t,'navigator',{locks:{request:async(_name,callback)=>callback()}});
   t.mock.method(globalThis,'fetch',async(_url,options)=>{
     if(options.method==='POST') {sent.push(JSON.parse(options.body));return Response.json({error:'conflict'},{status:409});}
-    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:[account],canWrite:true,ordering:[],trades:[]});
+    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:[account],canWrite:true,ordering:[],trades});
   });
   const h=hooks();const [view]=await importUiWithPorts([entry],{...ports,react:h.react});
   const render=()=>{h.begin();return elements(view.NativeLedgerView({compact,initialSelection:{accountId,assetId,action:'buy'}}));};
@@ -116,3 +116,22 @@ for(const entry of ['src/components/native-ledger-view.tsx','src/components/cair
     assert.equal(h.sent[0].mutation.event.dateEvidence,undefined);
   });
 }
+
+for (const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) it(entry+' separates correction target from new trade fields and restores original input',async t=>{
+  const id='22222222-2222-4222-8222-222222222222';
+  const event={type:'buy',assetId,quantity:'2',currency:'USD',executionUnitPrice:{amount:'1',currency:'USD'},settlementStatus:'unconfirmed',memo:'old trade',at:'2026-09-26T07:00:00Z'};
+  const h=await harness(t,0,{entry,compact:false,trades:[{id,accountId,event}]});
+  const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+  input().props.edit('quantity','0.896567');input().props.edit('price','701.263896');input().props.edit('memo','new draft');
+  const before={...input().props.fields};
+  input().props.edit('historyMode','yes');
+  const selector=()=>h.render().find(e=>e.type==='select'&&elements(e).some(child=>child.type==='option'&&child.props.value===id));
+  selector().props.onChange({target:{value:id}});
+  assert.equal(input().props.fields.quantity,'2');assert.equal(input().props.fields.memo,'old trade');
+  assert.equal(input().props.fields.notInOpening,'');
+  selector().props.onChange({target:{value:''}});
+  assert.equal(input().props.fields.quantity,before.quantity);assert.equal(input().props.fields.price,before.price);assert.equal(input().props.fields.memo,before.memo);
+  assert.equal(input().props.fields.replaces,undefined);assert.equal(input().props.fields.notInOpening,undefined);
+  input().props.edit('historyMode','');await h.submit();
+  assert.equal(h.sent.length,1);assert.equal(h.sent[0].mutation.history,undefined);assert.equal(h.sent[0].mutation.event.quantity,'0.896567');assert.equal(h.sent[0].mutation.event.memo,'new draft');
+});

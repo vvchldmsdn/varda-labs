@@ -27,3 +27,5 @@ it("retains a selected new instrument through the opening step", () => {
   const result=m.fieldsAfterLedgerSave({assetId:"new",name:"Example",ticker:"EXAMPLE",currency:"USD",assetType:"stock",inputMode:"total",cashUsd:"100"},true,"time");
   assert.equal(result.name,"Example");assert.equal(result.ticker,"EXAMPLE");assert.equal(result.inputMode,"total");assert.equal(result.cashUsd,undefined);
 });
+
+it('preserves account and reporting currency without using execution currency for return navigation',async()=>{const {accountContextHref}=await import('../src/lib/portfolio-navigation-context.ts');assert.equal(accountContextHref('/',accountId,'USD'),'/?scope=account%3A'+accountId+'&currency=USD');const href=new URL(accountContextHref('/beta?mode=domain&currency=USD&scope=all',accountId),'https://test.invalid');assert.equal(href.searchParams.get('currency'),'USD');assert.equal(href.searchParams.get('mode'),'domain');assert.equal(href.searchParams.get('scope'),'account:'+accountId);});

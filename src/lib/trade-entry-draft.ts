@@ -1,5 +1,5 @@
 /** Unsubmitted input only. Pending operations use the separate immutable recovery log. */
-export type TradeEntryDraft = { at: number; accountId: string; kind: "buy" | "sell"; fields: Record<string, string> };
+export type TradeEntryDraft = { at: number; accountId: string; kind: "buy" | "sell"; fields: Record<string, string>; suspended?: { kind: "buy" | "sell"; fields: Record<string, string> } };
 type StoragePort = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 const prefix = "cairn:trade-entry:v1:";
 export function tradeEntryStorage(): StoragePort | null { try { return typeof sessionStorage === "undefined" ? null : sessionStorage; } catch { return null; } }
@@ -13,6 +13,7 @@ export function readTradeEntry(storage: StoragePort | null, key: string | null, 
     const draft = JSON.parse(storage.getItem(key) ?? "null");
     if (!draft) return null;
     if (!Number.isFinite(draft.at) || now < draft.at || now - draft.at > 86400000 || !["buy", "sell"].includes(draft.kind) || typeof draft.accountId !== "string" || !draft.fields || typeof draft.fields !== "object" || Array.isArray(draft.fields) || Object.values(draft.fields).some(value => typeof value !== "string") || JSON.stringify(draft).length > 16000) { storage.removeItem(key); return null; }
+    if (draft.suspended && (!["buy", "sell"].includes(draft.suspended.kind) || !draft.suspended.fields || typeof draft.suspended.fields !== "object" || Array.isArray(draft.suspended.fields) || Object.values(draft.suspended.fields).some(value => typeof value !== "string") || draft.suspended.fields.replaces)) { storage.removeItem(key); return null; }
     return draft;
   } catch { return null; }
 }

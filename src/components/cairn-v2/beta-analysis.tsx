@@ -36,7 +36,7 @@ export function BetaAnalysis({read}:{read:AnalysisRead}) {
  const recoveryKind=model?riskRecoveryKind(model):direct&&visible.state!=='ready'?'holdings':visible.state==='unavailable'?'retry':visible.state==='empty'?'holdings':null;
  const showRecovery=context.mode==='domain'&&visible.state!=='loading'&&visible.state!=='unauthorized'&&recoveryKind&&(recoveryKind==='retry'||managementAvailable);
 
- return <BetaShell context={context} setContext={setContext} readView={shell} workspace="analysis" originalPath={context.analysis==='holdings'?'/portfolio/structure':'/portfolio/risk'}>
+ return <BetaShell fixedAnalysisCurrency={context.analysis === "holdings" ? undefined : "KRW"} context={context} setContext={setContext} readView={shell} workspace="analysis" originalPath={context.analysis==='holdings'?'/portfolio/structure':'/portfolio/risk'}>
  <section className={styles.workspace} data-analysis-state={visible.state} data-analysis-kind={context.analysis??'risk'}>
   <nav className={styles.mobileNav} aria-label="분석 작업 화면"><CairnButton variant="selection" aria-pressed={context.analysis!=='holdings'} onClick={()=>setContext({...context,analysis:'risk'})}>위험·분산</CairnButton><CairnButton variant="selection" aria-pressed={context.analysis==='holdings'} onClick={()=>setContext({...context,analysis:'holdings'})}>집중·통화</CairnButton></nav>
   <p className={styles.intro}>{context.analysis==='holdings'?'직접 보유 기준 · ETF 내부 구성 미포함':'현재 보유 비중 · KRW 기준'}</p>

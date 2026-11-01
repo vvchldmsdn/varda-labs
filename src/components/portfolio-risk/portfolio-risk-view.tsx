@@ -21,11 +21,12 @@ import { RecoveryNotice } from "@/components/recovery/recovery-notice";
 import { riskRecoveryKind } from "@/lib/recovery-risk";
 
 
-export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=false}:{
+export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=false,contextCurrency="KRW"}:{
   model:PortfolioRiskReadModel;
   scopes:readonly PortfolioAnalysisScope[];
   selectedScope:PortfolioAnalysisScope;
   isDesignPreview?:boolean;
+  contextCurrency?: "KRW" | "USD";
 }) {
   const portfolio=model.calculation.portfolio;
   const recoveryKind = riskRecoveryKind(model);
@@ -34,8 +35,8 @@ export function PortfolioRiskView({model,scopes,selectedScope,isDesignPreview=fa
   return <main data-page="portfolio-risk" className="varda-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]">
     <PortfolioPrimaryNavigation activePath="/portfolio/structure" generatedAt={new Date().toISOString()} selectedScopeKey={selectedScope.key}/>
     <div className={`varda-content varda-stage-content ${styles.page}`}>
-      <header className={styles.header}><div className={styles.title}><CairnPageTitle><PortfolioText ko="위험과 분산" en="Risk and diversification" /></CairnPageTitle>{isDesignPreview?<LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 90일 분석 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 90일 분석 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement>:null}</div><div className={styles.controls}><PortfolioRiskControls scopes={scopes} selectedScope={selectedScope} selection={model.selection} isDesignPreview={isDesignPreview}/></div><Link className={styles.headerLink} href={`/portfolio/structure?scope=${encodeURIComponent(selectedScope.key)}${isDesignPreview?"&preview=design":""}`}><ArrowLeft size={13} aria-hidden="true"/><PortfolioText ko={"포트 구조"} /></Link></header>
-      <div className={styles.statusLine}><strong><PortfolioText ko={calculationStatusLabel(model.calculation.calculationStatus)} /></strong><span><PortfolioText ko={"관측"} />{" "}{model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}<PortfolioText ko={"일"} /></span><span><PortfolioText ko={"분석 종목"} />{" "}{model.provenance.includedInstrumentCount}<PortfolioText ko={"개"} /></span></div>
+      <header className={styles.header}><div className={styles.title}><CairnPageTitle><PortfolioText ko="위험과 분산" en="Risk and diversification" /></CairnPageTitle>{isDesignPreview?<LocalizedElement className={styles.previewNote} title="실제 보유자산과 연결되지 않은 90일 분석 미리보기입니다." as="span" en={{"title": portfolioEnglish("실제 보유자산과 연결되지 않은 90일 분석 미리보기입니다.")}}><PortfolioText ko={"예시 데이터"} /></LocalizedElement>:null}</div><div className={styles.controls}><PortfolioRiskControls scopes={scopes} selectedScope={selectedScope} selection={model.selection} contextCurrency={contextCurrency} isDesignPreview={isDesignPreview}/></div><Link className={styles.headerLink} href={`/portfolio/structure?scope=${encodeURIComponent(selectedScope.key)}&currency=${contextCurrency}${isDesignPreview?"&preview=design":""}`}><ArrowLeft size={13} aria-hidden="true"/><PortfolioText ko={"포트 구조"} /></Link></header>
+      <div className={styles.statusLine}><span><PortfolioText ko="KRW 기준 분석" en="KRW-based analysis" /></span><strong><PortfolioText ko={calculationStatusLabel(model.calculation.calculationStatus)} /></strong><span><PortfolioText ko={"관측"} />{" "}{model.provenance.usableReturnObservations}/{model.provenance.requestedReturnObservations}<PortfolioText ko={"일"} /></span><span><PortfolioText ko={"분석 종목"} />{" "}{model.provenance.includedInstrumentCount}<PortfolioText ko={"개"} /></span></div>
       <div className={styles.notice}><RiskCalculationNotice model={model}/></div>
       {!isDesignPreview && recoveryKind && <RecoveryNotice kind={recoveryKind} scope={selectedScope.key} reasons={[model.calculation.reason, ...model.inputHealth.blockers.map(row => row.reason)].filter((reason): reason is NonNullable<typeof reason> => reason !== null)} />}
       {portfolio?<div className={styles.riskStage}>

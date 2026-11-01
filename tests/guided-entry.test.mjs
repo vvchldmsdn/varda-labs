@@ -50,3 +50,5 @@ test('unsubmitted drafts resume exact inputs only for their subject and scope, a
   saveTradeEntry(storage,key,draft);clearTradeEntry(storage,key);assert.equal(map.size,0);
   assert.equal(saveTradeEntry(null,key,draft),false);
 });
+
+test('correction draft retains a separate owner-scoped original through reload',()=>{const map=new Map(),storage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};const key=tradeEntryKey('a'.repeat(64),{accountId:'A',action:'buy'});const draft={at:1000,accountId:'A',kind:'sell',fields:{replaces:'old',quantity:'1'},suspended:{kind:'buy',fields:{quantity:'0.896567',price:'701.263896',memo:'new'}}};assert.equal(saveTradeEntry(storage,key,draft),true);assert.deepEqual(readTradeEntry(storage,key,1001),draft);assert.equal(readTradeEntry(storage,tradeEntryKey('b'.repeat(64),{accountId:'A',action:'buy'}),1001),null);draft.suspended.fields.replaces='bad';saveTradeEntry(storage,key,draft);assert.equal(readTradeEntry(storage,key,1001),null);});

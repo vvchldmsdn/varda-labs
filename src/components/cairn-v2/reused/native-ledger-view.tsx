@@ -20,6 +20,8 @@ import { rememberTrade, pendingTrade, forgetTrade } from "../../../lib/trade-ope
 import { observeNativeLedgerClock, nativeLedgerNow, nativeLedgerLocalTime, type NativeLedgerClock } from "../../../lib/native-ledger-clock";
 
 import { readTradeEntry, saveTradeEntry, clearTradeEntry, tradeEntryKey, tradeEntryStorage } from "@/lib/trade-entry-draft";
+import { correctionDraft, newTradeDraft, type TradeDraftInput } from "@/lib/trade-correction-draft";
+import { accountContextHref } from "@/lib/portfolio-navigation-context";
 import entryMotion from "@/components/onboarding/entry-motion.module.css";
 
 type EventKind = NonNullable<NativeMutation["event"]>["type"];
@@ -46,6 +48,7 @@ export function buildNativeLedgerMutation({ account, kind, fields, lots, operati
     if (!confirmed) throw new Error("opening_confirmation_required");
     return { ...base, opening: { at, cash: { KRW: exact(fields.cashKrw ?? "", "KRW", false), USD: exact(fields.cashUsd ?? "", "USD", false) }, positions: account.assets.filter(row => !row.archived).map(row => ({ assetId: row.id, currency: currency(row.currency), quantity: exact(row.quantity, undefined, false), costLots: null })) } };
   }
+  if (fields.replaces && !fields.historyMode) throw new Error("invalid_input");
   const asset = account.assets.find(row => row.id === fields.assetId);
   const position = account.state.positions.find(row => row.assetId === fields.assetId);
   if (["sell", "split", "cost_basis"].includes(kind) && !position) throw new Error("holding_required");
@@ -108,6 +111,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
   const session = useRef<string | null>(null), pending = useRef<PendingOperation | null>(null), lock = useRef(false);
   const clock = useRef<NativeLedgerClock | null>(null);
   const [entryEdited, setEntryEdited] = useState(false);
+  const suspendedEntry = useRef<TradeDraftInput | null>(null);
   function setPendingOperation(operation:PendingOperation|null){pending.current=operation;setPendingPreview(operation?.mutation.event??null);}
   const entryKey = data ? tradeEntryKey(data.sessionKey, initialSelection) : null;
   const localNow = () => nativeLedgerLocalTime(nativeLedgerNow(clock.current));
@@ -149,6 +153,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
   function forgetEntry(key: string | null) { setEntryEdited(false); clearTradeEntry(tradeEntryStorage(), key); }
   function clearVisibleIdentity() {
     setEntryEdited(false);
+    suspendedEntry.current = null;
     setSignedOut(true); setData(null); session.current=null; setPendingOperation(null);
     setUncertain(false); setExpiredOperation(""); setSuccess(false); setConflict(false); setChecking(false);
     clock.current=null; setFields({currency:"USD"}); setLots([{amount:"",currency:"USD",at:""}]);
@@ -164,7 +169,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
       const body = await response.json();
       if (!response.ok || typeof body.sessionKey !== "string" || !Array.isArray(body.accounts)) { rejectChangedIdentity(response,body); throw new Error(body.error ?? "unavailable"); }
       clock.current = observeNativeLedgerClock(body.serverNow);
-      if (session.current && session.current !== body.sessionKey) { setPendingOperation(null); onPendingChange?.(false); setUncertain(false); setFields({ currency: "USD", at: localNow() }); setLots([{ amount: "", currency: "USD", at: "" }]); setConfirmed(false); setAccountId(""); setError("account_changed"); setExpiredOperation(""); setChecking(false); setConflict(false); setSuccess(false); }
+      if (session.current && session.current !== body.sessionKey) { suspendedEntry.current = null; setPendingOperation(null); onPendingChange?.(false); setUncertain(false); setFields({ currency: "USD", at: localNow() }); setLots([{ amount: "", currency: "USD", at: "" }]); setConfirmed(false); setAccountId(""); setError("account_changed"); setExpiredOperation(""); setChecking(false); setConflict(false); setSuccess(false); }
       const selection = resolveNativeLedgerSelection(body.accounts, { ...initialSelection, accountId: initialSelection.accountId ?? body.accounts.find((row: Account) => row.assets.some(asset => asset.id === initialSelection.assetId))?.id });
       if (compact && ((initialSelection.accountId && selection.accountId !== initialSelection.accountId) || (initialSelection.assetId && selection.assetId !== initialSelection.assetId) || !["buy", "sell"].includes(selection.action))) {
         setData({ ...body, canWrite: false }); setError("holding_changed"); return;
@@ -174,9 +179,9 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
         setFields(previous => ({ ...previous, inputMode: "execution", assetId: newInstrument ? "new" : selection.assetId }));
         const draft = readTradeEntry(tradeEntryStorage(), tradeEntryKey(body.sessionKey, initialSelection));
         const draftAccount = draft && body.accounts.find((row: Account) => row.id === draft.accountId && row.active !== false);
-        if (draft && draftAccount && (!initialSelection.accountId || draft.accountId === initialSelection.accountId) && (!initialSelection.assetId || draft.fields.assetId === initialSelection.assetId) && (draft.fields.assetId === "new" || draftAccount.assets.some((row: Account["assets"][number]) => row.id === draft.fields.assetId))) {
+        if (draft && draftAccount && (!initialSelection.accountId || draft.accountId === initialSelection.accountId) && (!initialSelection.assetId || draft.fields.assetId === initialSelection.assetId || draft.suspended?.fields.assetId === initialSelection.assetId) && (draft.fields.assetId === "new" || draftAccount.assets.some((row: Account["assets"][number]) => row.id === draft.fields.assetId))) {
           setEntryEdited(true);
-          setAccountId(draft.accountId); setKind(draft.kind); setFields(draft.fields);
+          setAccountId(draft.accountId); setKind(draft.kind); setFields(draft.fields); suspendedEntry.current = draft.suspended ?? null;
         }
       }
       session.current = body.sessionKey; setData(body); setSignedOut(false);
@@ -191,7 +196,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
         const status = await result.json();
         rejectChangedIdentity(result,status);
         if(!result.ok) throw new Error(status.error??"unavailable");
-        if (result.ok && ["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,body.sessionKey,"mutation" in saved ? saved.mutation.operationId : saved.operationId); setPendingOperation(null); setExpiredOperation(""); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); forgetEntry(tradeEntryKey(body.sessionKey, initialSelection)); setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); }
+        if (result.ok && ["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,body.sessionKey,"mutation" in saved ? saved.mutation.operationId : saved.operationId); setPendingOperation(null); setExpiredOperation(""); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); forgetEntry(tradeEntryKey(body.sessionKey, initialSelection)); setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); if (suspendedEntry.current) restoreNewEntry(); }
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "unavailable"); }
     finally { setLoading(false); setChecking(false); }
@@ -209,7 +214,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
     if (!data || loading || uncertain || !accountId || !["buy", "sell"].includes(kind)) return;
     // Loading or completing a record must not turn its default time into a new draft.
     if (!entryEdited) { clearTradeEntry(tradeEntryStorage(), entryKey); return; }
-    const saved = saveTradeEntry(tradeEntryStorage(), entryKey, { at: Date.now(), accountId, kind: kind as "buy" | "sell", fields });
+    const saved = saveTradeEntry(tradeEntryStorage(), entryKey, { at: Date.now(), accountId, kind: kind as "buy" | "sell", fields, ...(suspendedEntry.current ? { suspended: suspendedEntry.current } : {}) });
     queueMicrotask(() => setDraftWarning(!saved));
   }, [data, loading, uncertain, entryEdited, entryKey, accountId, kind, fields]);
   async function retireExpiredOperation() {
@@ -255,29 +260,36 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
       forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId);
       setEntryEdited(false);
       setPendingOperation(null); onPendingChange?.(false); setUncertain(false); forgetEntry(entryKey); setSuccess(true); setSavedOpening(!account.state); setConfirmed(false); setFields(previous => ({...fieldsAfterLedgerSave(previous, !account.state, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); setLots([{ amount: "", currency: "USD", at: "" }]);
+      const resumeNewEntry = !!suspendedEntry.current;
+      if (resumeNewEntry) restoreNewEntry();
       await load();
-      if (account.state) onSaved?.();
+      if (!resumeNewEntry && account.state) onSaved?.();
     } catch (cause) { if (dispatched && pending.current) setUncertain(true); if(cause instanceof Error && cause.message==="recovery_pending") {setPendingOperation(null);await load();} setError(cause instanceof Error ? cause.message : "unavailable"); }
     finally { lock.current = false; setBusy(false); onBusyChange?.(false); }
   }
+  function restoreNewEntry() {
+    const draft = suspendedEntry.current ?? newTradeDraft({ kind: kind === "sell" ? "sell" : "buy", fields: { currency: fields.currency ?? "USD", at: localNow(), inputMode: "execution" } });
+    suspendedEntry.current = null;
+    setKind(draft.kind); setFields(draft.fields); setEntryEdited(true); setConfirmed(false);
+    setPendingOperation(null); setError(""); setSuccess(false);
+  }
+  function startCorrection(row: NonNullable<LedgerData["trades"]>[number], settlementOnly = false) {
+    if (busy || uncertain || row.accountId !== account?.id || (row.event.type !== "buy" && row.event.type !== "sell")) return;
+    if (!fields.replaces && (kind === "buy" || kind === "sell")) suspendedEntry.current = newTradeDraft({ kind, fields });
+    const draft = correctionDraft(row.id, row.event, settlementOnly);
+    setEntryEdited(true); setKind(draft.kind); setFields(draft.fields); setConfirmed(false);
+    setPendingOperation(null); setError(""); setSuccess(false);
+  }
   function completeSettlement() {
     const row = data?.trades?.find(row => row.accountId === account?.id && (row.event.type === "buy" || row.event.type === "sell") && row.event.settlementStatus === "unconfirmed" && (!compact || row.event.assetId === fields.assetId));
-    if (!row || (row.event.type !== "buy" && row.event.type !== "sell")) return;
-    setEntryEdited(true);
-    const trade = row.event;
-    setPendingOperation(null); setError(""); setSuccess(false); setKind(trade.type);
-    setFields({ currency: trade.currency, assetId: trade.assetId, quantity: trade.quantity,
-      price: trade.executionUnitPrice?.amount ?? trade.price ?? "", inputMode: "total", total: "", settlementCurrency: trade.currency,
-      fee: trade.fee?.amount ?? "", tax: trade.tax?.amount ?? "", memo: trade.memo ?? "", historyMode: "yes", replaces: row.id,
-      reason: "체결 기록의 정산 정보 보완", notInOpening: "yes", timePrecision: trade.dateEvidence?.precision ?? "exact",
-      tradeDate: trade.dateEvidence?.reportedDate ?? "", at: new Date(Date.parse(trade.at)-new Date(trade.at).getTimezoneOffset()*60000).toISOString().slice(0,-1) });
+    if (row) startCorrection(row, true);
   }
   const label = (ko: string, en: string, name: string, type = "text") => type === "datetime-local" ? <NativeLedgerTimestamp label={t(ko,en)} name={name} value={fields[name] ?? ""} onChange={value=>edit(name,value)} /> : <CairnField>{t(ko, en)}<CairnInput name={name} type={type} step={type === "datetime-local" ? "0.001" : undefined} value={fields[name] ?? ""} onChange={event => edit(name, event.target.value)} required /></CairnField>;
   const money = (ko: string, en: string, name: string, inCurrency: Currency, required = true) => <CairnField>{t(ko, en)} · {inCurrency}<MoneyInput aria-label={`${t(ko, en)} ${inCurrency}`} value={fields[name] ?? ""} onValueChange={value => edit(name, value)} allowDecimals={inCurrency === "USD"} required={required} placeholder="0" /></CairnField>;
   const currencySelect = <CairnField>{t("통화", "Currency")}<CairnSelect className="cairn-form-select" value={fields.currency ?? "USD"} onChange={event => edit("currency", event.target.value)}><option>USD</option><option>KRW</option></CairnSelect></CairnField>;
   const accountName = (row: Account) => row.name;
   return <div className={(compact ? styles.compact : styles.page) + (embedded ? " " + styles.embedded : "")}><section id={compact ? undefined : "varda-main-content"} className={styles.body}>
-    {!compact && !embedded ? <div className={styles.heading}><CairnPageTitle>{t("매매·현금 기록", "Trades & cash")}</CairnPageTitle><Link href={homeHref ?? `/?currency=${fields.currency === "KRW" ? "KRW" : "USD"}`}>{t("홈으로 →", "Home →")}</Link></div> : null}
+    {!compact && !embedded ? <div className={styles.heading}><CairnPageTitle>{t("매매·현금 기록", "Trades & cash")}</CairnPageTitle><Link href={accountContextHref(homeHref ?? "/beta?currency=KRW", account?.id ?? initialSelection.accountId)}>{t("홈으로 →", "Home →")}</Link></div> : null}
     <p className={styles.note}>{t("증권사에서 체결한 내역을 기록해요.", "Record an executed brokerage trade.")}</p>
     {draftWarning && <CairnStatus as="p" role="status">{t("이 브라우저에서는 입력 중인 내용을 보관할 수 없어요. 창을 닫기 전에 기록을 마쳐 주세요.", "This browser cannot retain your draft. Finish the record before closing.")}</CairnStatus>}
     {loading ? <CairnStatus as="p" role="status" className={styles.note}>{checking ? t("저장 여부 확인 중…", "Checking whether the record was saved…") : t("보유 정보를 확인하고 있어요…", "Loading your holdings…")}</CairnStatus> : null}
@@ -288,7 +300,8 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
     {data && !data.canWrite && !error ? <CairnStatus as="p" role="status" className={styles.note}>{errorMessage("temporarily_unavailable")}</CairnStatus> : null}
     {!signedOut && data && uncertain && pendingPreview ? <CairnStatus as="p" role="status" className={styles.note}>{t("확인 중인 기록", "Pending record")}: {pendingPreview.at.slice(0,10)} · {pendingPreview.type} · {"quantity" in pendingPreview ? pendingPreview.quantity : ""}</CairnStatus> : null}
     {account && data?.canWrite ? <><CairnForm onSubmit={event=>{void submit(event,Date.now)}} className={styles.form} noValidate><CairnFieldset className={styles.entryFields} disabled={busy || uncertain}>
-      {compact && (initialSelection.accountId === account.id || !!initialSelection.assetId && initialSelection.assetId === fields.assetId) ? <p className={styles.selectedAccount}>{accountName(account)}{initialSelection.assetId ? ` · ${account.assets.find(row => row.id === fields.assetId)?.ticker ?? ""}` : ""}</p> : <CairnField>{t("계좌", "Account")}<CairnSelect className="cairn-form-select" value={account.id} onChange={event => { setAccountId(event.target.value); setPendingOperation(null); setConfirmed(false); setConflict(false); setError(""); setSuccess(false); setFields({ currency: "USD", at: localNow(), assetType: "etf", inputMode: "execution", ...(newInstrument ? { assetId: "new" } : {}) }); }}>{activeAccounts.map(row => <option key={row.id} value={row.id}>{accountName(row)}</option>)}</CairnSelect></CairnField>}
+      {compact && (initialSelection.accountId === account.id || !!initialSelection.assetId && initialSelection.assetId === fields.assetId) ? <p className={styles.selectedAccount}>{accountName(account)}{initialSelection.assetId ? ` · ${account.assets.find(row => row.id === fields.assetId)?.ticker ?? ""}` : ""}</p> : <CairnField>{t("계좌", "Account")}<CairnSelect className="cairn-form-select" value={account.id} onChange={event => { suspendedEntry.current = null; setAccountId(event.target.value); setPendingOperation(null); setConfirmed(false); setConflict(false); setError(""); setSuccess(false); setFields({ currency: "USD", at: localNow(), assetType: "etf", inputMode: "execution", ...(newInstrument ? { assetId: "new" } : {}) }); }}>{activeAccounts.map(row => <option key={row.id} value={row.id}>{accountName(row)}</option>)}</CairnSelect></CairnField>}
+      {fields.replaces && <CairnStatus as="div" role="status">{t("기존 거래 정정 중", "Correcting an existing trade")} <CairnButton type="button" variant="secondary" onClick={restoreNewEntry}>{t("새 거래 초안으로 돌아가기", "Return to new trade draft")}</CairnButton></CairnStatus>}
       {account.state ? <details open={compact || kind === "buy" || kind === "sell" ? undefined : true} className={styles.cashDetails}><summary>{t("계좌 현금", "Account cash")}{cashUnconfirmed ? <span>{t("정산 미확인", "Settlement pending")}</span> : null}</summary>{cashUnconfirmed ? <CairnStatus as="p" role="status" className={styles.note}>{t("체결금액은 반영됐어요. 현금 정산은 선택이에요.", "Execution consideration is recorded. Cash settlement is optional.")} {data.trades?.some(row => row.accountId === account.id && (row.event.type === "buy" || row.event.type === "sell") && row.event.settlementStatus === "unconfirmed" && (!compact || row.event.assetId === fields.assetId)) ? <CairnButton variant="secondary" type="button" className={styles.secondary} onClick={completeSettlement}>{t("정산 보완", "Complete settlement")}</CairnButton> : <span>{t("과거 거래에서 정산을 보완할 수 있어요.", "Complete settlement in the earlier trade record.")}</span>}</CairnStatus> : null}<div className={styles.cash}>{(["KRW", "USD"] as const).map(value => <span key={value}>{t("현금", "Cash")} · {value}<strong>{cashUnconfirmed ? t("정산 미확인", "Settlement unconfirmed") : formatMoney(Number(account.state!.cash[value]), value, locale === "en" ? "en-US" : "ko-KR")}</strong></span>)}</div></details> : <><p className={styles.note}>{t("처음 한 번, 현재 수량과 현금 잔액을 확인해 주세요.", "First, confirm your current shares and cash balances.")}</p><div className={styles.grid}>{money("원화 현금 잔액", "KRW cash balance", "cashKrw", "KRW")}{money("달러 현금 잔액", "USD cash balance", "cashUsd", "USD")}</div><details><summary>{t("현재 보유종목 확인", "Review current holdings")}</summary><div className={styles.holdings}>{account.assets.filter(row => !row.archived).map(row => <div key={row.id}><span>{row.name ?? row.ticker ?? t("보유 종목", "Holding")}</span><span>{row.quantity} · {row.currency}</span></div>)}</div><p className={styles.note}>{t("매입원가는 나중에 보완할 수 있어요.", "Acquisition costs can be added later.")}</p></details><CairnField className={styles.confirm}><CairnCheckbox checked={confirmed} onChange={event => { setConfirmed(event.target.checked); setPendingOperation(null); }} />{t("현재 보유 수량과 현금 잔액을 확인했어요.", "I have checked the current quantities and cash balances.")}</CairnField></>}
       {account.state ? <>{compact && !newInstrument && !fields.historyMode ? <div className={styles.tradeKinds} role="group" aria-label={t("매매 종류", "Trade side")}>{(["buy", "sell"] as const).map(side => <CairnButton key={side} variant="selection" type="button" aria-pressed={kind === side} onClick={() => { setKind(side); setPendingOperation(null); setError(""); }}>{side === "buy" ? t("매수", "Buy") : t("매도", "Sell")}</CairnButton>)}</div> : null}{!compact ? <CairnField>{t("기록 종류", "Record type")}<CairnSelect aria-label={t("기록 종류", "Record type")} className="cairn-form-select" value={kind} onChange={event => { setKind(event.target.value as EventKind); setPendingOperation(null); setError(""); setSuccess(false); }}>{EVENTS.map(([value, ko, en]) => <option key={value} value={value}>{t(ko, en)}</option>)}</CairnSelect></CairnField> : null}
         {(!compact || (!initialSelection.assetId && !newInstrument)) && ["buy", "sell", "split", "cost_basis"].includes(kind) ? <CairnField>{t("종목", "Holding")}<CairnSelect className="cairn-form-select" value={fields.assetId ?? ""} onChange={event => edit("assetId", event.target.value)}><option value="">{t("선택하세요", "Choose a holding")}</option>{account.assets.filter(row => kind === "buy" || !!fields.historyMode && kind === "sell" || account.state!.positions.some(p => p.assetId === row.id && Decimal.from(p.quantity).compare(0) > 0 && (kind !== "cost_basis" || p.costLots === null))).map(row => <option key={row.id} value={row.id}>{row.name ?? row.ticker ?? t("보유 종목", "Holding")} · {row.currency}</option>)}{kind === "buy" ? <option value="new">{t("새 종목 추가", "Add a new instrument")}</option> : null}</CairnSelect></CairnField> : null}
@@ -309,11 +322,10 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
       <details className={styles.options} open={fields.historyMode ? true : undefined}><summary>{t("거래일·정정", "Date & corrections")}<span>{dateOnlyTrade ? fields.tradeDate || "—" : fields.at?.replace("T", " ").slice(0, 16) || "—"} · {dateOnlyTrade ? t("한국시간", "Korea time") : t("기기 시간", "Device time")}</span></summary>
       {account.state && (kind === "buy" || kind === "sell") ? <CairnField>{t("거래 시간", "Trade timing")}<CairnSelect className="cairn-form-select" value={fields.timePrecision ?? "exact"} onChange={event => edit("timePrecision", event.target.value)}><option value="exact">{t("날짜와 시각", "Date and time")}</option><option value="date_only">{t("과거 거래일만 알아요 · 한국시간", "Past date only · Korea time")}</option></CairnSelect></CairnField> : null}
       {account.state && (kind === "buy" || kind === "sell") ? <details open={fields.historyMode ? true : undefined}><summary>{t("과거 거래 추가·정정", "Historical trade entry / correction")}</summary>
-        <CairnField><CairnCheckbox checked={!!fields.historyMode} onChange={e => edit("historyMode",e.target.checked ? "yes" : "")} />{t("시작 잔액 이후 거래를 다시 계산", "Recalculate trades after the opening balance")}</CairnField>
+        <CairnField><CairnCheckbox checked={!!fields.historyMode} onChange={e => { if (!e.target.checked && fields.replaces) restoreNewEntry(); else edit("historyMode",e.target.checked ? "yes" : ""); }} />{t("시작 잔액 이후 거래를 다시 계산", "Recalculate trades after the opening balance")}</CairnField>
         {fields.historyMode ? <>{fields.assetId === "new" ? <CairnStatus as="p" tone="danger" role="alert" className={styles.note}>{t("과거 거래는 이미 등록된 종목에서 추가할 수 있어요.", "Historical trades need an existing holding.")}</CairnStatus> : null}<CairnField>{t("정정할 기록", "Record to correct")}<CairnSelect className="cairn-form-select" value={fields.replaces ?? ""} onChange={e => {
-          const row=data.trades?.find(row => row.id===e.target.value); const trade=row?.event;
-          if (trade && (trade.type === "buy" || trade.type === "sell")) { setEntryEdited(true); setKind(trade.type); setFields(previous => ({...previous,replaces:row!.id,assetId:trade.assetId,quantity:trade.quantity,inputMode:trade.settlementStatus === "unconfirmed" ? trade.executionTotal ? "execution_total" : "execution" : trade.settlement ? "total" : "price",total:trade.settlement?.amount ?? "",settlementCurrency:trade.settlement?.currency ?? trade.currency,price:trade.executionUnitPrice?.amount ?? trade.price ?? "",executionTotal:trade.executionTotal?.amount ?? "",memo:trade.memo ?? "",netTotal:"",fee:trade.fee?.amount ?? "",tax:trade.tax?.amount ?? "",timePrecision:trade.dateEvidence?.precision ?? "exact",tradeDate:trade.dateEvidence?.reportedDate ?? "",at:new Date(Date.parse(trade.at)-new Date(trade.at).getTimezoneOffset()*60000).toISOString().slice(0,-1)})); }
-          else edit("replaces","");
+          const row = data.trades?.find(row => row.id === e.target.value && row.accountId === account.id);
+          if (row) startCorrection(row); else restoreNewEntry();
         }}><option value="">{t("누락된 새 거래", "A missing trade")}</option>{data.trades?.filter(row => row.accountId===account.id).map(row => <option key={row.id} value={row.id}>{row.event.at.slice(0,10)} · {"settlementStatus" in row.event && row.event.settlementStatus === "unconfirmed" ? t("정산 미확인 · ","Settlement pending · ") : ""}{row.event.type === "buy" ? t("매수","Buy") : t("매도","Sell")} · {"quantity" in row.event ? row.event.quantity : ""}</option>)}</CairnSelect></CairnField>
         {label("변경 이유", "Reason for change", "reason")}
         <CairnField className={styles.confirm}><CairnCheckbox checked={fields.notInOpening === "yes"} onChange={e => edit("notInOpening",e.target.checked ? "yes" : "")} />{t("시작 잔액에 이미 포함된 거래가 아닙니다.", "This trade was not already included in the opening balance.")}</CairnField>
@@ -321,7 +333,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, embed
         <details><summary>{t("같은 날 거래 순서 확인", "Confirm same-day ordering")}</summary><CairnField>{t("이 거래 직전의 기록", "Immediately preceding record")}<CairnSelect className="cairn-form-select" value={fields.afterEventId ?? ""} onChange={e => edit("afterEventId",e.target.value)}><option value="">{t("시각 순서 사용", "Use recorded times")}</option>{data.ordering?.filter(row => row.accountId===account.id && row.id!==fields.replaces).map(row => <option key={row.id} value={row.id}>{row.at} · {row.type === "opening" ? t("시작 잔액","Opening") : EVENTS.find(e=>e[0]===row.type)?.[locale==="en"?2:1] ?? row.type}</option>)}</CairnSelect></CairnField></details>
         </> : null}</details> : null}
       {account.state && (kind === "buy" || kind === "sell") && fields.timePrecision === "date_only" ? <>{label("거래일 · 한국시간", "Trade date · Korea time", "tradeDate", "date")}<p className={styles.note}>{t("시각 미상으로 기록하며, 일별 수익률에는 하루 중간 시점으로 반영합니다.", "Saved as date-only. Daily returns use the middle of the service day.")}</p></> : (!account.state || !["buy", "sell"].includes(kind) || fields.historyMode) ? label("기록 시각 · 기기 시간대", "Recorded at · Device time zone", "at", "datetime-local") : null}
-      </details></CairnFieldset>{uncertain ? <p className={styles.note}>{t("저장 결과를 확인하지 못했어요. 같은 내용으로 다시 확인해 주세요.", "The save result is uncertain. Retry this same record to confirm it.")}</p> : null}<CairnFormActions className={styles.actions}><CairnButton variant="primary" className={`cairn-primary ${styles.primary}`} type="submit" disabled={busy || loading || conflict || signedOut || !!fields.historyMode && fields.assetId === "new"}>{busy ? (uncertain ? t("저장 여부 확인 중…","Checking save status…") : t("기록 중…", "Saving…")) : uncertain ? t("저장 여부 확인·재시도","Check save / retry") : account.state ? kind === "buy" ? t("매수 기록 저장", "Save buy record") : kind === "sell" ? t("매도 기록 저장", "Save sell record") : t("기록하기", "Save record") : t("잔액 확인 후 계속", "Confirm balances and continue")}</CairnButton>{!compact ? <Link href={homeHref ?? `/?currency=${fields.currency === "KRW" ? "KRW" : "USD"}`}>{t("나중에 하기", "Later")}</Link> : null}</CairnFormActions>
+      </details></CairnFieldset>{uncertain ? <p className={styles.note}>{t("저장 결과를 확인하지 못했어요. 같은 내용으로 다시 확인해 주세요.", "The save result is uncertain. Retry this same record to confirm it.")}</p> : null}<CairnFormActions className={styles.actions}><CairnButton variant="primary" className={`cairn-primary ${styles.primary}`} type="submit" disabled={busy || loading || conflict || signedOut || !!fields.historyMode && fields.assetId === "new"}>{busy ? (uncertain ? t("저장 여부 확인 중…","Checking save status…") : t("기록 중…", "Saving…")) : uncertain ? t("저장 여부 확인·재시도","Check save / retry") : account.state ? kind === "buy" ? t("매수 기록 저장", "Save buy record") : kind === "sell" ? t("매도 기록 저장", "Save sell record") : t("기록하기", "Save record") : t("잔액 확인 후 계속", "Confirm balances and continue")}</CairnButton>{!compact ? <Link href={accountContextHref(homeHref ?? "/beta?currency=KRW", account?.id ?? initialSelection.accountId)}>{t("나중에 하기", "Later")}</Link> : null}</CairnFormActions>
     </CairnForm></> : null}
   </section></div>;
 }

@@ -80,7 +80,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
     const [base, query = ""] = scoped.split("?");
     const next = new URLSearchParams(query);
     if (!selectedScopeKey && scope) next.set("scope", scope);
-    if (!researchHref && REPORTING_ROUTES.some(route => route === base) && ["KRW", "USD"].includes(params.get("currency") ?? "")) next.set("currency", params.get("currency")!);
+    if (!researchHref && (REPORTING_ROUTES.some(route => route === base) || ["/plans", "/portfolio/ledger", "/portfolio/holdings", "/portfolio/holdings/new", "/portfolio/risk"].includes(base)) && ["KRW", "USD"].includes(params.get("currency") ?? "")) next.set("currency", params.get("currency")!);
     if (preview) next.set("preview", "design");
     return `${base}${next.size ? `?${next}` : ""}`;
   }
@@ -150,7 +150,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           {preview ? <span className="varda-topbar-preview"><i />{t("예시 데이터")}</span>
             : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `View refreshed ${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `화면 갱신 ${formatKstTime(generatedAt)}`}</span> : null}
           {!preview && generatedAt ? <PortfolioRefreshButton compact autoSync={autoSyncPrices ?? (currentPath === "/history" || currentPath === "/today")} /> : null}
-          {!researchHref && !preview && REPORTING_ROUTES.some(route => route === currentPath) ? <ReportingCurrencySwitch /> : null}
+          {!researchHref && !preview && pathname === "/portfolio/risk" ? <span className="varda-reporting-control">{t("분석 기준", "Analysis basis")} · KRW</span> : !researchHref && !preview && REPORTING_ROUTES.some(route => route === currentPath) ? <ReportingCurrencySwitch /> : null}
           <span className="varda-topbar-language"><LanguageSwitch /></span>
           <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>

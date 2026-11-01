@@ -27,7 +27,8 @@ import tokens from "./ui/tokens.module.css";
 import controls from "./workspace-controls.module.css";
 
 /* eslint-disable @next/next/no-img-element -- Figma SVG assets retain their own root dimensions. */
-export function BetaShell({ children, context, setContext, readView, workspace, originalPath = "/" }: {
+export function BetaShell({ children, context, setContext, readView, workspace, fixedAnalysisCurrency, originalPath = "/" }: {
+  fixedAnalysisCurrency?: "KRW";
   children: ReactNode; context: BetaContext; setContext: (value: BetaContext) => void;
   readView?: BetaView; workspace?: "history" | "structure" | "holdings" | "accounts" | "analysis" | "simulation" | "etfs" | "lab" | "groups" | "targets" | "ledger" | "plans"; originalPath?: string;
 }) {
@@ -93,7 +94,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
         <div className={styles.topbarActions}>
           {!workspace && context.mode === 'domain' && existingCrudAvailable && <PortfolioRefreshButton autoSync compact />}
           {!workspace && readUnavailable && <CairnButton variant="bare" className={styles.retryRead} type="button" onClick={() => router.refresh()}>조회 다시 시도</CairnButton>}
-        <CairnField className={styles.currency}><span className={styles.visuallyHidden}>표시 통화</span><CairnSelect aria-label="표시 통화" value={context.currency} onChange={(e) => setContext({ ...context, currency: e.target.value === "USD" ? "USD" : "KRW" })}><option>KRW</option><option>USD</option></CairnSelect></CairnField>
+        {fixedAnalysisCurrency ? <span className={styles.currency}>분석 기준 · {fixedAnalysisCurrency}</span> : <CairnField className={styles.currency}><span className={styles.visuallyHidden}>표시 통화</span><CairnSelect aria-label="표시 통화" value={context.currency} onChange={(e) => setContext({ ...context, currency: e.target.value === "USD" ? "USD" : "KRW" })}><option>KRW</option><option>USD</option></CairnSelect></CairnField>}
         <CairnButton variant="bare" className={controls.mobileSettingsTrigger} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></CairnButton>
         </div>
       </header>

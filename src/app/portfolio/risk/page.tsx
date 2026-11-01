@@ -18,6 +18,7 @@ type PortfolioRiskPageProps = {
     preview?: string | string[];
     scope?: string | string[];
     window?: string | string[];
+    currency?: string | string[];
   }>;
 };
 
@@ -73,6 +74,7 @@ export default async function PortfolioRiskPage({
 
   return (
     <PortfolioRiskView
+      contextCurrency={params.currency === "USD" ? "USD" : "KRW"}
       model={model}
       scopes={scopeContext.catalog.scopes}
       selectedScope={selectedScope}

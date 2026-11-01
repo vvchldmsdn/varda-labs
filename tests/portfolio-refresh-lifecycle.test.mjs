@@ -9,12 +9,12 @@ describe("Today navigation refresh wiring", () => {
   it("activates shared automatic quote checks on direct Today entry and labels view time honestly", async () => {
     const RefreshButton = () => null;
     const icons = Object.fromEntries(["ArrowUpRight", "ChartNoAxesCombined", "ChartPie", "ChevronLeft", "ChevronRight", "FlaskConical", "History", "House", "Menu", "Plus", "Settings2", "TrendingUp", "UserRound", "X"].map(name => [name, () => null]));
-    let locale = "en";
+    let locale = "en", pathname = "/today", params = new URLSearchParams("scope=all");
     const [component] = await importUiWithPorts(["src/components/app-navigation.tsx"], {
       react: { useRef: () => ({ current: null }), useSyncExternalStore: (_subscribe, _snapshot, serverSnapshot) => serverSnapshot() },
       "next/image": { default: () => null },
       "next/link": { default: () => null, useLinkStatus: () => ({ pending: false }) },
-      "next/navigation": { usePathname: () => "/today", useSearchParams: () => new URLSearchParams("scope=all") },
+      "next/navigation": { usePathname: () => pathname, useSearchParams: () => params },
       "lucide-react": icons,
       "@/components/i18n/locale-provider": { useI18n: () => ({ locale, t: (ko, en) => locale === "en" ? en ?? ko : ko }) },
       "@/components/i18n/language-switch": { LanguageSwitch: () => null },
@@ -33,6 +33,10 @@ describe("Today navigation refresh wiring", () => {
     locale = "ko";
     assert.match(render({}).find(element => element.props?.className === "varda-updated-at").props.children, /^화면 갱신 /);
     assert.equal(render({ generatedAt: undefined }).some(element => element.type === RefreshButton), false);
+    pathname = "/portfolio/risk"; params = new URLSearchParams("scope=all&currency=USD");
+    const risk = render({ activePath: "/portfolio/structure" });
+    assert.ok(risk.some(element => element.props?.className === "varda-reporting-control" && JSON.stringify(element.props.children).includes("KRW")));
+    assert.ok(risk.some(element => element.props?.href === "/plans?scope=all&currency=USD"));
   });
   it("connects native/KRW and USD surfaces using their actual read time while keeping fixtures and missing evidence inert",async()=>{
     const Navigation=()=>null;
