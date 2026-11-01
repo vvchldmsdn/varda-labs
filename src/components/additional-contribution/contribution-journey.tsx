@@ -17,11 +17,11 @@ export function ContributionJourneyNav({ journey, current, returnHref }: { journ
 }
 
 /** Both frontends expose the same existing writers, without equating their different calculations. */
-export function ContributionNextSteps({ journey }: { journey: ContributionJourney }) {
+export function ContributionNextSteps({ journey, current }: { journey: ContributionJourney; current?: 'plan' | 'compare' | 'tracking' }) {
   const { t } = useI18n();
-  return <ActionGroup label={t('투자 계획 이어가기', 'Continue your investment plan')}>
-    {!journey.preview && <Link prefetch={false} data-primary="true" href={contributionJourneyHref('plan', journey)}><ActionContent icon={<Bookmark />} title={t('이 조건으로 계획 만들기', 'Create a plan with these inputs')} description={t('매도·보유 현금 포함', 'Includes sales and available cash')} /></Link>}
-    <Link prefetch={false} href={contributionJourneyHref('compare', journey)}><ActionContent icon={<ArrowLeftRight />} title={t('두 배분안 비교하기', 'Compare two allocations')} description={t('새 투자금만 · 매도 없이', 'New money only · No sales')} /></Link>
-    <Link prefetch={false} href={contributionJourneyHref('tracking', journey)}><ActionContent icon={<ReceiptText />} title={t('저장한 배분안 보기', 'View saved allocations')} description={t('매수 기록 연결·효과 확인', 'Link buys and review results')} /></Link>
+  return <ActionGroup layout={current ? 'list' : 'cards'} label={t('투자 계획 이어가기', 'Continue your investment plan')}>
+    {!journey.preview && current !== 'plan' && <Link prefetch={false} data-primary={!current || undefined} href={contributionJourneyHref('plan', journey)}><ActionContent icon={<Bookmark />} title={t('이 조건으로 계획 만들기', 'Create a plan with these inputs')} description={t('매도·보유 현금 포함', 'Includes sales and available cash')} /></Link>}
+    {current !== 'compare' && <Link prefetch={false} href={contributionJourneyHref('compare', journey)}><ActionContent icon={<ArrowLeftRight />} title={t('두 배분안 비교하기', 'Compare two allocations')} description={t('새 투자금만 · 매도 없이', 'New money only · No sales')} /></Link>}
+    {current !== 'tracking' && <Link prefetch={false} href={contributionJourneyHref('tracking', journey)}><ActionContent icon={<ReceiptText />} title={t('저장한 배분안 보기', 'View saved allocations')} description={t('매수 기록 연결·효과 확인', 'Link buys and review results')} /></Link>}
   </ActionGroup>;
 }

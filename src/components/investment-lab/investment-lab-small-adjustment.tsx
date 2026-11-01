@@ -147,7 +147,7 @@ export function InvestmentLabSmallAdjustment({
                     setSourceKey(event.target.value); setAmountError(null);
                     setResult(null);
                   }}
-                  value={sourceKey}
+                  aria-label={t("줄일 보유자산", "Source holding")} value={sourceKey}
                 >
                   <option value=""><LabText value="선택 안 함" /></option>
                   {selectedAccount.holdings.map((holding) => (
@@ -165,7 +165,7 @@ export function InvestmentLabSmallAdjustment({
                     setDestinationKey(event.target.value);
                     setResult(null);
                   }}
-                  value={destinationKey}
+                  aria-label={t("늘릴 보유자산", "Destination holding")} value={destinationKey}
                 >
                   <option value=""><LabText value="선택 안 함" /></option>
                   {selectedAccount.holdings.map((holding) => (
