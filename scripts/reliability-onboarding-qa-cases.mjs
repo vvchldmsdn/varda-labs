@@ -107,8 +107,17 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   await check('fullapp-completed-batch-does-not-lock-a-different-account',async()=>{
     await page.goto(url+'/beta/portfolio/holdings/new?'+new URLSearchParams({mode:'domain',scope:'account:'+alternate}));
     const form=page.locator('form.varda-holding-onboarding');
-    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toHaveValue(alternate);
-    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toBeEnabled();
+    await expect(form.locator('input[name="accountId"]')).toHaveValue(alternate);
+    await expect(form.getByRole('button',{name:'자료 입력하기',exact:true})).toBeEnabled();
+    await expect(form.getByRole('combobox',{name:'보유 계좌',exact:true})).toHaveCount(0);
+    await expect(form.locator('ol > li')).toHaveCount(0);assert.equal(await count(),6);
+    await page.getByRole('button',{name:'QA 다른계좌',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:/QA 일괄등록/}).click();
+    await expect(form.locator('input[name="accountId"]')).toHaveValue(account);
+    await expect(form.locator('li[data-saved="true"]')).toHaveCount(6);
+    await page.getByRole('button',{name:'QA 일괄등록',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:/QA 다른계좌/}).click();
+    await expect(form.locator('input[name="accountId"]')).toHaveValue(alternate);
     await expect(form.locator('ol > li')).toHaveCount(0);assert.equal(await count(),6);
   });
 
