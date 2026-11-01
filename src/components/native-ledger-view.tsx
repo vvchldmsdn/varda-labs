@@ -107,6 +107,7 @@ export function NativeLedgerView({ initialSelection = {}, compact = false, newIn
   const [checking, setChecking] = useState(false), [expiredOperation, setExpiredOperation] = useState("");
   const session = useRef<string | null>(null), pending = useRef<PendingOperation | null>(null), lock = useRef(false);
   const clock = useRef<NativeLedgerClock | null>(null);
+  const [entryEdited, setEntryEdited] = useState(false);
   function setPendingOperation(operation:PendingOperation|null){pending.current=operation;setPendingPreview(operation?.mutation.event??null);}
   const entryKey = data ? tradeEntryKey(data.sessionKey, initialSelection) : null;
   const localNow = () => nativeLedgerLocalTime(nativeLedgerNow(clock.current));
@@ -145,7 +146,9 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
     if (["invalid_input", "invalid_request", "invalid_amount", "money_precision", "invalid_currency", "state_or_event_mismatch"].includes(code)) return t("금액·수량과 잔액을 확인해 주세요. 원화는 정수, 달러 결제액은 소수 둘째 자리까지 입력할 수 있어요.", "Check amounts, quantities and balances. KRW settlements use whole won; USD settlements use at most two decimal places.");
     return t("지금은 기록을 저장할 수 없어요. 입력을 유지한 채 다시 시도할 수 있습니다.", "The record could not be saved. Your inputs are still here for retry.");
   };
+  function forgetEntry(key: string | null) { setEntryEdited(false); clearTradeEntry(tradeEntryStorage(), key); }
   function clearVisibleIdentity() {
+    setEntryEdited(false);
     setSignedOut(true); setData(null); session.current=null; setPendingOperation(null);
     setUncertain(false); setExpiredOperation(""); setSuccess(false); setConflict(false); setChecking(false);
     clock.current=null; setFields({currency:"USD"}); setLots([{amount:"",currency:"USD",at:""}]);
@@ -172,6 +175,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
         const draft = readTradeEntry(tradeEntryStorage(), tradeEntryKey(body.sessionKey, initialSelection));
         const draftAccount = draft && body.accounts.find((row: Account) => row.id === draft.accountId && row.active !== false);
         if (draft && draftAccount && (!initialSelection.accountId || draft.accountId === initialSelection.accountId) && (!initialSelection.assetId || draft.fields.assetId === initialSelection.assetId) && (draft.fields.assetId === "new" || draftAccount.assets.some((row: Account["assets"][number]) => row.id === draft.fields.assetId))) {
+          setEntryEdited(true);
           setAccountId(draft.accountId); setKind(draft.kind); setFields(draft.fields);
         }
       }
@@ -187,7 +191,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
         const status = await result.json();
         rejectChangedIdentity(result,status);
         if(!result.ok) throw new Error(status.error??"unavailable");
-        if (result.ok && ["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,body.sessionKey,"mutation" in saved ? saved.mutation.operationId : saved.operationId); setPendingOperation(null); setExpiredOperation(""); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); clearTradeEntry(tradeEntryStorage(), tradeEntryKey(body.sessionKey, initialSelection)); setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); }
+        if (result.ok && ["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,body.sessionKey,"mutation" in saved ? saved.mutation.operationId : saved.operationId); setPendingOperation(null); setExpiredOperation(""); setUncertain(false); onPendingChange?.(false); setSuccess(status.status==="committed"); forgetEntry(tradeEntryKey(body.sessionKey, initialSelection)); setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); }
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "unavailable"); }
     finally { setLoading(false); setChecking(false); }
@@ -203,9 +207,11 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
   }, []);
   useEffect(() => {
     if (!data || loading || uncertain || !accountId || !["buy", "sell"].includes(kind)) return;
+    // Loading or completing a record must not turn its default time into a new draft.
+    if (!entryEdited) { clearTradeEntry(tradeEntryStorage(), entryKey); return; }
     const saved = saveTradeEntry(tradeEntryStorage(), entryKey, { at: Date.now(), accountId, kind: kind as "buy" | "sell", fields });
     queueMicrotask(() => setDraftWarning(!saved));
-  }, [data, loading, uncertain, entryKey, accountId, kind, fields]);
+  }, [data, loading, uncertain, entryEdited, entryKey, accountId, kind, fields]);
   async function retireExpiredOperation() {
     if(!data||!expiredOperation||busy||loading) return;
     setBusy(true);setError("");
@@ -215,11 +221,11 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
       rejectChangedIdentity(response,result);
       if(!response.ok||!["committed","cancelled"].includes(result.status)) throw new Error(result.error??"unavailable");
       forgetTrade(localStorage,data.sessionKey,expiredOperation);
-      setPendingOperation(null);setExpiredOperation("");setUncertain(false);onPendingChange?.(false);clearTradeEntry(tradeEntryStorage(), entryKey);setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})}));setLots([{amount:"",currency:"USD",at:""}]);setSuccess(result.status==="committed");await load();
+      setPendingOperation(null);setExpiredOperation("");setUncertain(false);onPendingChange?.(false);forgetEntry(entryKey);setFields(previous => ({...fieldsAfterLedgerSave(previous, false, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})}));setLots([{amount:"",currency:"USD",at:""}]);setSuccess(result.status==="committed");await load();
     } catch(cause) {setError(cause instanceof Error?cause.message:"unavailable");}
     finally {setBusy(false);}
   }
-  function edit(name: string, value: string) { if (busy || uncertain) return; setFields(previous => ({ ...previous, [name]: value })); setPendingOperation(null); setSuccess(false); setError(""); }
+  function edit(name: string, value: string) { if (busy || uncertain) return; setEntryEdited(true); setFields(previous => ({ ...previous, [name]: value })); setPendingOperation(null); setSuccess(false); setError(""); }
   async function submit(event: FormEvent, readNow: () => number) {
     event.preventDefault();
     if(!data || !navigator.locks) {setError("recovery_storage_unavailable");return;}
@@ -239,7 +245,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
         const status=await lookup.json();
         rejectChangedIdentity(lookup,status);
         if (!lookup.ok) throw new Error(status.error ?? "unavailable");
-        if (["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId); setPendingOperation(null); setUncertain(false); onPendingChange?.(false); clearTradeEntry(tradeEntryStorage(), entryKey); setFields(previous => ({...fieldsAfterLedgerSave(previous, !account.state, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); setLots([{amount:"",currency:"USD",at:""}]); setSuccess(status.status==="committed"); await load(); if (status.status==="committed" && account.state) onSaved?.(); return; }
+        if (["committed","cancelled"].includes(status.status)) { forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId); setPendingOperation(null); setUncertain(false); onPendingChange?.(false); forgetEntry(entryKey); setFields(previous => ({...fieldsAfterLedgerSave(previous, !account.state, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); setLots([{amount:"",currency:"USD",at:""}]); setSuccess(status.status==="committed"); await load(); if (status.status==="committed" && account.state) onSaved?.(); return; }
       }
       lock.current = true; setBusy(true); onBusyChange?.(true); onPendingChange?.(true); dispatched = true;
       const response = await fetch("/api/portfolio/ledger", { method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(30_000), headers: { "Content-Type": "application/json" }, body: JSON.stringify(pending.current) });
@@ -247,7 +253,8 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
       if (body.error === "temporarily_unavailable") setData(previous => previous ? { ...previous, canWrite: false } : previous);
       if (!response.ok || !["created", "existing"].includes(body.status)) { if ([400,409].includes(response.status) && body.error !== "account_changed") { forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId); setPendingOperation(null); onPendingChange?.(false); setUncertain(false); } if (response.status === 409) setConflict(true); rejectChangedIdentity(response,body); throw new Error(body.error ?? "unavailable"); }
       forgetTrade(localStorage,data.sessionKey,pending.current?.mutation.operationId);
-      setPendingOperation(null); onPendingChange?.(false); setUncertain(false); clearTradeEntry(tradeEntryStorage(), entryKey); setSuccess(true); setSavedOpening(!account.state); setConfirmed(false); setFields(previous => ({...fieldsAfterLedgerSave(previous, !account.state, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); setLots([{ amount: "", currency: "USD", at: "" }]);
+      setEntryEdited(false);
+      setPendingOperation(null); onPendingChange?.(false); setUncertain(false); forgetEntry(entryKey); setSuccess(true); setSavedOpening(!account.state); setConfirmed(false); setFields(previous => ({...fieldsAfterLedgerSave(previous, !account.state, localNow()),...(compact ? {assetId:previous.assetId,inputMode:"execution"} : {})})); setLots([{ amount: "", currency: "USD", at: "" }]);
       await load();
       if (account.state) onSaved?.();
     } catch (cause) { if (dispatched && pending.current) setUncertain(true); if(cause instanceof Error && cause.message==="recovery_pending") {setPendingOperation(null);await load();} setError(cause instanceof Error ? cause.message : "unavailable"); }
@@ -256,6 +263,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
     function completeSettlement() {
     const row = data?.trades?.find(row => row.accountId === account?.id && (row.event.type === "buy" || row.event.type === "sell") && row.event.settlementStatus === "unconfirmed" && (!compact || row.event.assetId === fields.assetId));
     if (!row || (row.event.type !== "buy" && row.event.type !== "sell")) return;
+    setEntryEdited(true);
     const trade = row.event;
     setPendingOperation(null); setError(""); setSuccess(false); setKind(trade.type);
     setFields({ currency: trade.currency, assetId: trade.assetId, quantity: trade.quantity,

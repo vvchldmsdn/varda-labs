@@ -24,6 +24,11 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await form.getByRole('button',{name:'텍스트·표 붙여넣기',exact:false}).click();
       await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
       await expect(form.locator('h2')).toBeFocused();
+      await form.getByLabel('보유종목 표',{exact:true}).fill('종목명,수량,통화,평균매입가\nQA 보유 6,0.896567,USD,10');
+      await form.getByRole('button',{name:'표 읽고 종목 확인',exact:true}).click();
+      await expect(form.getByRole('alert')).toContainText('표의 통화와 선택한 종목');
+      await expect(form.getByRole('button',{name:'확인 목록으로 가져오기',exact:true})).toBeDisabled();
+      await form.getByRole('button',{name:'자료 입력으로',exact:true}).click();
       const text='종목명,수량\nQA 보유 6,0.896567';
       await form.getByLabel('보유종목 표',{exact:true}).fill(text);
       await page.reload();await expect(form.getByLabel('보유종목 표',{exact:true})).toHaveValue(text);
@@ -114,7 +119,12 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await expect(page.getByLabel('총 체결금액 · KRW',{exact:true})).toHaveValue('123');
       await optional.click();await expect(page.getByLabel('메모 · 선택',{exact:true})).toHaveValue('합성 검증 메모');
       await expect(page.getByLabel('기록 날짜',{exact:true})).toBeVisible();
+      await optional.click();await page.evaluate(()=>scrollTo(0,0));
       await capture(page,output,'guided-trade-'+beta,width,height);
+      await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
+      const save=page.getByRole('button',{name:'매도 기록 저장',exact:true});
+      const unobscured=await save.evaluate(button=>{const rect=button.getBoundingClientRect();return rect.bottom<innerHeight-60&&button.contains(document.elementFromPoint(rect.x+rect.width/2,rect.bottom-2));});
+      assert.equal(unobscured,true,'save button must stay above mobile navigation');
       let dropped=false;
       const loseResponse=async route=>{
         if(route.request().method()!=='POST'||dropped||!route.request().postDataJSON()?.mutation)return route.continue();
@@ -129,6 +139,7 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       const after=await readState();assert.deepEqual(after.cash,before.cash);
       assert.equal(after.positions.find(row=>row.assetId===asset).quantity,Decimal.from(beforeQuantity).sub("0.896567").toExactString());
       await page.reload();await expect(qty).toHaveValue('');assert.equal(dropped,true);
+      assert.equal(await page.evaluate(()=>Object.keys(sessionStorage).filter(key=>key.startsWith('cairn:trade-entry:v1:')).map(key=>JSON.parse(sessionStorage.getItem(key))).some(draft=>!draft.fields.quantity&&!draft.fields.price&&!draft.fields.memo)),false,'loading an empty form must not freeze a new default timestamp');
       assert.deepEqual(await readState(),after,'reload must not replay the already saved trade');
       await page.emulateMedia({reducedMotion:'no-preference'});
     });

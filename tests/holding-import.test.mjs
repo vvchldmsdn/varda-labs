@@ -11,6 +11,16 @@ describe("holdings text import", () => {
     assert.equal(parseHoldingImport('name,quantity\n"Company, Inc.",2').rows[0].label, "Company, Inc.");
     assert.equal(parseHoldingImport('name,quantity\n"Company ""A""",2').rows[0].label, 'Company "A"');
   });
+  it("preserves explicit source currency and rejects unsupported currencies without conversion", () => {
+    const result = parseHoldingImport("티커,수량,통화,평균매입가\nVOO,0.896567,usd,500.1234\n069500,2,원,40000");
+    assert.equal(result.error, null);
+    assert.deepEqual(result.rows, [
+      {label:"VOO",quantity:"0.896567",currency:"USD",averageCost:"500.1234"},
+      {label:"069500",quantity:"2",currency:"KRW",averageCost:"40000"},
+    ]);
+    assert.equal(parseHoldingImport("ticker,quantity,currency\nVOO,1,EUR").error, "currency");
+    assert.equal(parseHoldingImport("ticker,quantity,currency\nVOO,1,").rows[0].currency, undefined);
+  });
   it("does not reinterpret total cost basis as a per-unit purchase price", () => {
     for (const heading of ["costbasis", "cost basis", "원가", "매입금액", "totalcost"]) assert.equal(parseHoldingImport(`ticker,quantity,${heading}\nABC,10,1000`).error, "cost_unit");
     assert.equal(parseHoldingImport("ticker,quantity,averageCost\nABC,10,100").rows[0].averageCost, "100");
