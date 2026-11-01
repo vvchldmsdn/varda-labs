@@ -17,7 +17,7 @@ const ports = {
   '@/components/quick-trade-actions': { QuickTradeActions: () => null },
   '@/components/native-contribution-planner': { NativeContributionPlanner: () => null },
   '@/components/portfolio/portfolio-allocation-ring': { PortfolioAllocationRing: () => null },
-  react: { ...React, useState: value => [value, () => {}], useMemo: fn => fn(), useEffect() {}, useRef: () => ({ current: null }) },
+  react: { ...React, useState: value => [value, () => {}], useMemo: fn => fn(), useSyncExternalStore: (_subscribe, _snapshot, server) => server(), useEffect() {}, useRef: () => ({ current: null }) },
 };
 const [{ CurrencyTrackedView }] = await importUiWithPorts(['src/components/currency-tracked-view.tsx'], ports);
 function tracked({ fixture = false, missingPrice = false, mismatch = false } = {}) {
@@ -49,7 +49,7 @@ describe('native recovery journeys', () => {
     assert.equal(tracked({ mismatch: true }).notice, undefined);
   });
   it('classifies conflicts, prices, transactions and unsupported models without changing any evidence', () => {
-    assert.equal(currencyRecoveryKind(['price_observation_conflict']), 'retry');
+    assert.equal(currencyRecoveryKind(['price_observation_conflict']), 'market_review');
     assert.equal(currencyRecoveryKind(['fx_missing']), 'market');
     assert.equal(currencyRecoveryKind(['trade_evidence_missing']), 'trades');
     assert.equal(currencyRecoveryKind(['portfolio_scope_incomplete']), 'holdings');
@@ -88,11 +88,11 @@ it('owned research restores the local weight draft and selection while missing h
   const initial = [];
   const navigations = [];
   let index = 0;
-  const [module] = await importUiWithPorts(['src/components/currency-research-view.tsx'], { ...ports, 'next/link': { default: ({ children, ...props }) => ports.react.createElement('a', props, children) }, 'next/navigation': { useRouter: () => ({ replace: href => navigations.push(href), refresh: () => navigations.push('refresh') }) }, react: { ...ports.react, useState: value => { const at = index++; initial.push(value); return [at === 1 ? result : at === 2 ? false : value, () => {}]; } } });
+  const [module] = await importUiWithPorts(['src/components/currency-research-view.tsx'], { ...ports, 'next/link': { default: ({ children, ...props }) => ports.react.createElement('a', props, children) }, 'next/navigation': { useRouter: () => ({ replace: href => navigations.push(href), refresh: () => navigations.push('refresh') }) }, react: { ...ports.react, useState: value => { const at = index++; initial.push(value); return [at === 0 ? result : at === 1 ? false : value, () => {}]; } } });
   const boundary = module.CurrencyResearchView({ evidence, surface: 'lab', recoveryScope: scope, initialView });
   const tree = boundary.type(boundary.props), notice = walk(tree).find(node => node.type === Notice);
-  assert.deepEqual(initial[4], comparison); assert.deepEqual(initial[5], fields);
-  assert.equal(initial[6], '1'); assert.equal(initial[9], instruments[1]);
+  assert.deepEqual(initial[3].value.comparison, comparison); assert.deepEqual(initial[3].value.fields, fields);
+  assert.equal(initial[3].value.selected, '1'); assert.equal(initial[3].value.scenarioId, instruments[1]);
   assert.equal(notice.props.kind, 'market');
   assert.deepEqual(JSON.parse(notice.props.draft._nativeView).fields, fields);
   const previousLocation = globalThis.location;
@@ -110,7 +110,8 @@ it('owned research restores the local weight draft and selection while missing h
   index = 0; initial.length = 0;
   const next = module.CurrencyResearchView({ evidence, surface: 'lab', recoveryScope: scope, initialView: { ...initialView, instruments: [...instruments].reverse() } });
   next.type(next.props);
-  assert.equal(initial[5], null);
+  assert.equal(initial[3].value.fields, undefined);
+  assert.equal(initial[3].value.selected, '0');
 });
 
 it('routes the admitted native surface into scoped recovery without treating unsupported economic models as missing prices', async () => {

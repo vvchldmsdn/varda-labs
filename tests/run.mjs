@@ -425,3 +425,6 @@ import "./holding-analysis-progress.test.mjs";
 import "./target-revocation-integration.test.mjs";
 
 import './guided-entry.test.mjs';
+import './analysis-recovery-causes.test.mjs';
+import './native-ledger-records.test.mjs';
+import './analysis-navigation-draft.test.mjs';

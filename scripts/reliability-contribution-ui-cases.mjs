@@ -3,6 +3,7 @@ import path from 'node:path';
 import { expect } from '@playwright/test';
 import { runRecoveryUiCases } from './reliability-recovery-ui-cases.mjs';
 import { runContributionJourneyUiCases } from './reliability-contribution-journey-ui-cases.mjs';
+import { runContextComparisonDraftCases, runContextLabDraftCases } from './context-drafts-fullapp-cases.mjs';
 
 async function switchLanguage(page, label) {
   const menuButton = page.getByRole('button', {name: /^(메뉴 열기|Open menu)$/});
@@ -94,6 +95,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,ass
     await switchLanguage(page,'한국어로 전환');
   });
   await runContributionJourneyUiCases({page,check,admin,owner,account,asset,url,output});
+  await runContextComparisonDraftCases({page,check,admin,account,url,output});
 }
 
 export async function runLegacyContributionUiCase({page,check,account,url,output}) {
@@ -125,4 +127,5 @@ export async function runLegacyContributionUiCase({page,check,account,url,output
     }
     await switchLanguage(page,'한국어로 전환');
   });
+  await runContextLabDraftCases({page,check,account,url,output});
 }

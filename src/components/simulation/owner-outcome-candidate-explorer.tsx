@@ -3,7 +3,7 @@
 import { SimulationText, useSimulationText } from "@/components/simulation/simulation-text";
 
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import type { SimulationOwnerCandidateComparisonResult } from "@/lib/simulation-owner-candidate-comparison";
 
@@ -35,6 +35,8 @@ export function OwnerOutcomeCandidateExplorer({
   status: ReadyComparison["outcomeCandidateStatus"];
 }) {
   const pt = useSimulationText();
+  const tabsId = useId();
+  const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   const pathCount = currentExecution.assumptions.pathCount;
   const [selectedObjective, setSelectedObjective] =
     useState<OutcomeCandidate["objective"] | null>(
@@ -65,8 +67,12 @@ export function OwnerOutcomeCandidateExplorer({
             className="flex w-fit flex-wrap rounded-md border border-[var(--line)] bg-[var(--surface)] p-1"
             role="tablist"
           >
-            {candidates.map((candidate) => (
+            {candidates.map((candidate, index) => (
               <CairnButton variant="secondary"
+                ref={element => { tabs.current[index] = element; }}
+                id={`${tabsId}-${candidate.objective}`}
+                aria-controls={`${tabsId}-panel`}
+                tabIndex={candidate.objective === selected.objective ? 0 : -1}
                 aria-selected={candidate.objective === selected.objective}
                 className={`min-h-9 px-3 text-sm font-semibold ${
                   candidate.objective === selected.objective
@@ -75,6 +81,15 @@ export function OwnerOutcomeCandidateExplorer({
                 }`}
                 key={candidate.objective}
                 onClick={() => setSelectedObjective(candidate.objective)}
+                onKeyDown={event => {
+                  const next = event.key === "Home" ? 0 : event.key === "End" ? candidates.length - 1
+                    : event.key === "ArrowRight" ? (index + 1) % candidates.length
+                    : event.key === "ArrowLeft" ? (index - 1 + candidates.length) % candidates.length : null;
+                  if (next === null) return;
+                  event.preventDefault();
+                  setSelectedObjective(candidates[next].objective);
+                  tabs.current[next]?.focus();
+                }}
                 role="tab"
                 type="button"
               >
@@ -86,11 +101,13 @@ export function OwnerOutcomeCandidateExplorer({
       </div>
 
       {selected ? (
+        <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${selected.objective}`} tabIndex={0}>
         <ReadyOutcomeCandidate
           account={account}
           candidate={selected}
           currentExecution={currentExecution}
         />
+        </div>
       ) : (
         <div className="mt-4 rounded-md border border-[var(--warning-soft)] bg-[var(--surface)] px-4 py-4">
           <p className="font-semibold"><SimulationText ko={"확인 경로를 통과한 비중 후보가 없습니다."} /></p>

@@ -17,11 +17,13 @@ export function PortfolioRiskControls({
   selectedScope,
   selection,
   isDesignPreview = false,
+  contextCurrency = "KRW",
 }: {
   scopes: readonly PortfolioAnalysisScope[];
   selectedScope: PortfolioAnalysisScope;
   selection: PortfolioRiskSelection;
   isDesignPreview?: boolean;
+  contextCurrency?: "KRW" | "USD";
 }) {
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -29,7 +31,7 @@ export function PortfolioRiskControls({
         <p className="mb-1 text-xs font-semibold text-[var(--muted)]"><PortfolioText ko={"분석 범위"} /></p>
         <PortfolioAnalysisScopeTabs
           basePath="/portfolio/risk"
-          query={{
+          query={{ currency: contextCurrency,
             ...(isDesignPreview ? { preview: "design" } : {}),
             window:
               selection.window === 90 ? null : String(selection.window),
@@ -42,7 +44,7 @@ export function PortfolioRiskControls({
         {(isDesignPreview ? [selection.window] : WINDOWS).map((window) => (
           <RiskOptionLink
             key={window}
-            href={`${buildPortfolioRiskHref(selectedScope.key, window)}${isDesignPreview ? "&preview=design" : ""}`}
+            href={`${buildPortfolioRiskHref(selectedScope.key, window, contextCurrency)}${isDesignPreview ? "&preview=design" : ""}`}
             active={selection.window === window}
           >
             {window}<PortfolioText ko={"일"} />{isDesignPreview ? <> <PortfolioText ko="예시" /></> : null}

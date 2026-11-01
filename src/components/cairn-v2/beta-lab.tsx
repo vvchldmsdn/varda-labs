@@ -1,4 +1,7 @@
 'use client';
+import { DraftPreservationNotice } from '@/components/recovery/draft-preservation-notice';
+import { useNavigationDraft } from '@/components/recovery/use-navigation-draft';
+import { readLabPeriodDraft, type LabPeriodDraft } from '@/lib/lab-period-draft';
 import { HoldingAnalysisRecovery } from '@/components/holding-analysis-recovery';
 import { RecoveryNotice } from '@/components/recovery/recovery-notice';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
@@ -6,7 +9,7 @@ import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as
 import Link from 'next/link';
 import { ActionGroup, ActionContent } from '@/components/cairn-ui';
 import { betaHref, betaReadHref } from '@/lib/cairn-v2/navigation';
-import {useLayoutEffect,useState,useTransition} from 'react';
+import {useLayoutEffect,useTransition} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {BetaShell} from './beta-shell';
 import {useBetaReadFreshness,useBetaExistingCrudAvailable} from './beta-provider';
@@ -19,10 +22,11 @@ import styles from './lab.module.css';
 export function BetaLab({read}:{read:LabRead}){
  const crudAvailable=useBetaExistingCrudAvailable();
  const router=useRouter(),search=useSearchParams(),freshness=useBetaReadFreshness(),p=labParams(new URLSearchParams(search.toString())),context=labContext(p),key=labKey(p);
- const [pending,startTransition]=useTransition(),[draft,setDraft]=useState<{key:string;start:string;end:string}|null>(null);
+ const [pending,startTransition]=useTransition();
+ const initial:LabPeriodDraft={version:1,scope:context.scope,currency:context.currency,baseStart:typeof p.start==='string'?p.start:'',baseEnd:typeof p.end==='string'?p.end:'',start:typeof p.start==='string'?p.start:'',end:typeof p.end==='string'?p.end:''};
+ const [values,setDraft,draftNotPreserved]=useNavigationDraft({initial,path:'/beta/investment-lab',scope:context.scope,read:query=>readLabPeriodDraft(query.getAll('_labDraft'),initial),write:value=>({_labDraft:JSON.stringify(value)})});
  const observed=freshness?.observed,epoch=freshness?.epoch;
  useLayoutEffect(()=>{observed?.(read.readReceipt,read.readEpoch)},[observed,epoch,read.readReceipt,read.readEpoch]);
- const values=draft?.key===key?draft:{key,start:typeof p.start==='string'?p.start:'',end:typeof p.end==='string'?p.end:''};
  const dirty=values.start!==(typeof p.start==='string'?p.start:'')||values.end!==(typeof p.end==='string'?p.end:'');
  const visible=labVisible(read,key,pending,!!freshness?.store.blocked(read.readReceipt,read.readEpoch))?read:blankLab(p,'loading','현재 사용자·범위·기간을 확인하는 중');
  const model=dirty?null:visible.model,c=model?.comparison,ready=!!model&&['full','current_writer','selected'].includes(model.period.status)&&c?.status==='ready';
@@ -32,15 +36,15 @@ export function BetaLab({read}:{read:LabRead}){
  return <BetaShell workspace="lab" context={context} setContext={next=>startTransition(()=>router.push(labHref(next,{...p,run:undefined},freshness?.store.pendingEpoch()),{scroll:false}))} readView={shell} originalPath="/investment-lab">
  <section className={styles.workspace} id="lab-comparison" data-lab-state={dirty?'dirty':visible.state}>
   <header className={styles.heading}><h2>다른 종목에 투자했다면?</h2><p>같은 기간 · 같은 매매 금액 · KRW</p></header>
-  <CairnForm className={styles.conditions} onSubmit={e=>{e.preventDefault();nav({...p,start:values.start||undefined,end:values.end||undefined,run:'1'})}}>
+  <DraftPreservationNotice visible={draftNotPreserved} /><CairnForm className={styles.conditions} onSubmit={e=>{e.preventDefault();nav({...p,start:values.start||undefined,end:values.end||undefined,run:'1'})}}>
    <CairnField>시작일<CairnInput aria-label="과거 비교 시작일" type="date" value={values.start} onChange={e=>setDraft({...values,start:e.target.value})}/></CairnField>
    <CairnField>종료일<CairnInput aria-label="과거 비교 종료일" type="date" value={values.end} onChange={e=>setDraft({...values,end:e.target.value})}/></CairnField>
    <CairnButton variant="primary" className={styles.primary} type="submit" disabled={pending}>{pending?'비교 확인 중…':'과거 비교 실행'}</CairnButton>
-   <CairnButton variant="secondary" type="button" disabled={pending} onClick={()=>{setDraft(null);nav({...p,start:undefined,end:undefined,run:undefined})}}>기본 기간 선택</CairnButton>
+   <CairnButton variant="secondary" type="button" disabled={pending} onClick={()=>{nav({...p,start:undefined,end:undefined,run:undefined})}}>기본 기간 선택</CairnButton>
   </CairnForm>
   {(dirty||visible.state!=="ready")&&<CairnStatus as="p" role="status" className={styles.status}>{dirty?'새 기간으로 비교해 주세요.':visible.message}</CairnStatus>}
   <p className={styles.note}>날짜를 비우면 비교 가능한 기본 기간을 사용해요. 분석 기준은 KRW입니다.</p>
-  {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&<RecoveryNotice beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
+  {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&<RecoveryNotice source="current" beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
   {crudAvailable && !ready && visible === read && !['loading','unauthorized','invalid'].includes(visible.state) && <HoldingAnalysisRecovery key={`${context.scope}:${read.readReceipt}:${read.readEpoch}`} scope={context.scope} />}
   {model&&<>
    <details className={styles.evidence}><summary>비교 기간과 포함 범위</summary><dl className={styles.context}>

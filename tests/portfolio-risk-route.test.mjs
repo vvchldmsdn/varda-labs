@@ -48,3 +48,5 @@ describe("portfolio risk route presentation", () => {
     assert.equal(calculationReasonLabel(null), null);
   });
 });
+
+it('keeps the preferred reporting currency through KRW risk period navigation',()=>{ const href=new URL(buildPortfolioRiskHref('all',30,'USD'),'https://test.invalid');assert.equal(href.searchParams.get('currency'),'USD');assert.equal(href.searchParams.get('window'),'30');assert.equal(href.searchParams.get('scope'),'all'); });

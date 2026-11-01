@@ -10,13 +10,13 @@ const paths = new Set([
   '/beta/history/events', '/beta/history/snapshots', '/beta/portfolio/accounts', '/beta/portfolio/accounts/manage', '/beta/plans', '/beta/etfs', '/etfs',
 ]);
 const fields = new Set(['scope', 'account', 'accountId', 'currency', 'amount', 'cashAmountKrw',
-  'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window', 'effectId', 'pricePct', 'fxPct', 'scenarioRows', 'action',
+  'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window', 'effectId', 'pricePct', 'fxPct', 'scenarioRows', 'scenarioScope', 'scenarioCurrency', 'action',
   'horizon', 'end', 'start', 'period', 'metric', 'date', 'analysis', 'run', 'kodexWeight', 'basketAnchor', 'q', 'asOfDate',
   'view', 'detail', 'model', 'range', 'selectedDate', 'historyDate', 'historyPeriod', 'historyMetric', 'historySource',
   '_historyDate', '_historyPeriod', '_historyMetric', '_historyScope', '_historyCurrency', '_historyReturn', '_historyDateBasis',
-  '_historyViewPeriod', '_historyViewMetric', '_historyViewScope', '_historyViewCurrency', '_nativeView']);
+  '_historyViewPeriod', '_historyViewMetric', '_historyViewScope', '_historyViewCurrency', '_nativeView', '_labDraft']);
 export const RECOVERY_FRAGMENT = '#cairn-return=';
-export type RecoveryKind = 'targets' | 'holdings' | 'trades' | 'market' | 'history' | 'retry';
+export type RecoveryKind = 'targets' | 'holdings' | 'trades' | 'cash' | 'market' | 'market_review' | 'history' | 'retry';
 
 export function safeRecoveryUrl(raw: string): string | null {
   if (raw.length > 16000 || !raw.startsWith('/') || raw.startsWith('//') || /[\\\x00-\x20\x7f]/.test(raw)) return null;
@@ -39,25 +39,38 @@ export function recoveryHref(destination: string, source: string): string | null
   return to.split('#')[0] + RECOVERY_FRAGMENT + encodeURIComponent(back);
 }
 export function carryRecoveryFragment(href: string, hash: string): string {
+  // An explicit new task continuation outranks an inherited management trail.
+  const ownHash = href.includes('#') ? href.slice(href.indexOf('#')) : '';
+  if (recoveryReturnHref(ownHash)) return href;
   return recoveryReturnHref(hash) ? href.split('#')[0] + hash : href;
 }
 export function recoveryKind(reasons: readonly string[]): RecoveryKind {
+  if (reasons.some(r => /fetch_failed|query_failed|owner_scope_mismatch|unauthorized|basis_changed|request_mismatch|planning_valuation_mismatch|planning_vector_mismatch|planning_policy_mismatch|integrity/.test(r))) return 'retry';
+  if (reasons.includes('corporate_action_ledger_mismatch')) return 'trades';
+  if (marketEvidenceNeedsReview(reasons)) return 'market_review';
   // A changed/read-failed basis is retried, never 'repaired' by overwriting targets.
   if (reasons.some(r => /fetch_failed|query_failed|basis_changed|request_mismatch|planning_valuation_mismatch|planning_vector_mismatch|planning_policy_mismatch|conflict|integrity/.test(r))) return 'retry';
   if (reasons.some(r => /target.*missing|targets_required|target.*universe|target_universe_changed/.test(r))) return 'targets';
   if (reasons.includes('owner_input_unavailable')) return 'holdings';
-  if (reasons.some(r => /trade|event|flow|cost_basis/.test(r))) return 'trades';
+  if (reasons.includes('cash_not_observed')) return 'cash';
+  if (reasons.some(r => /trade|ledger|event|flow|cost_basis/.test(r))) return 'trades';
   if (reasons.some(r => /price|quote|fx|histor|observation|market|input_matrix_unavailable/.test(r))) return 'market';
   if (reasons.some(r => /holding|valuation|empty|account/.test(r))) return 'holdings';
   return 'retry';
 }
 export function recoveryDestination(kind: RecoveryKind, scope: string, beta: boolean): string | null {
-  if (kind === 'retry') return null;
-  const path = kind === 'history' ? '/history' : kind === 'targets' ? '/portfolio/targets' : kind === 'trades' ? '/portfolio/ledger' : kind === 'holdings' && beta ? '/portfolio/holdings/manage' : '/portfolio/holdings';
+  if (kind === 'retry' || kind === 'market_review') return null;
+  const ledger = kind === 'trades' || kind === 'cash';
+  const path = kind === 'history' ? '/history' : kind === 'targets' ? '/portfolio/targets' : ledger ? '/portfolio/ledger' : kind === 'holdings' && beta ? '/portfolio/holdings/manage' : '/portfolio/holdings';
   const query = new URLSearchParams({ scope, currency: 'KRW' });
-  if (kind === 'trades' && /^account:[0-9a-f-]{36}$/i.test(scope)) query.set('accountId', scope.slice(8));
+  if (ledger && /^account:[0-9a-f-]{36}$/i.test(scope)) query.set('accountId', scope.slice(8));
   if (kind === 'history') query.set('detail', 'raw');
   const useBeta = beta && kind !== 'market' && kind !== 'history';
   if (useBeta) query.set('mode', 'domain');
   return `${useBeta ? '/beta' : ''}${path}?${query}`;
+}
+
+/** Collection cannot establish corporate actions or resolve conflicting price evidence. */
+export function marketEvidenceNeedsReview(reasons: readonly string[]): boolean {
+  return reasons.some(reason => /corporate_action/.test(reason) && reason !== 'corporate_action_ledger_mismatch' || /price.*conflict|fx.*conflict|paired_history_conflict|historical_evidence_conflict|history_admission_mismatch|price_basis_mismatch|conflicting_provider_binding|provider_(symbol|exchange)_missing|adjusted_close_(basis_ineligible|provider_missing|source_missing)|raw_source_not_kis/.test(reason));
 }

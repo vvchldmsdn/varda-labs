@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import {expect} from '@playwright/test';
 import {runGuidedHoldingsQa, runGuidedRecoveryQa} from './guided-entry-fullapp-cases.mjs';
+import {runContextReadinessCases} from './context-readiness-fullapp-cases.mjs';
 
 // Called only by the disposable PostgreSQL/full Next application rehearsal.
 export async function runOnboardingQaCases({page,check,admin,setIdentity,token,owner,url,output}) {
@@ -223,4 +224,5 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
   });
   await runGuidedRecoveryQa({page,check,admin,owner,url,output});
   await runGuidedHoldingsQa({page,check,admin,owner,account:alternate,url,output});
+  await runContextReadinessCases({page,check,admin,setIdentity,token,owner,url,output});
 }

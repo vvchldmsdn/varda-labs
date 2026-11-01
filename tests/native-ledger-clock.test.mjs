@@ -49,20 +49,27 @@ function hooks() {
 }
 // Real view event handlers with only browser/network ports substituted. Remote
 // authenticated browser QA separately covers the actual provider/session/writer.
-async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true}={}) {
+async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[],loseResponse=false,pendingOther=false,otherAccount=false}={}) {
   deviceClock(t,offset);let monotonic=1000,serverNow=SERVER;const sent=[];
   t.mock.method(performance,'now',()=>monotonic);
   const values=new Map();globalValue(t,'localStorage',{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
+  if(pendingOther){
+    const otherId='33333333-3333-4333-8333-333333333333',sid='a'.repeat(64);
+    const draft={at:Date.now(),accountId,kind:'buy',fields:{currency:'USD',assetId,quantity:'2',price:'1',inputMode:'execution',historyMode:'yes',replaces:'old',at:'2026-09-26T07:00:00Z'},suspended:{kind:'buy',fields:{currency:'USD',assetId:'new',name:'New A instrument',ticker:'NEWA',quantity:'0.896567',price:'100',inputMode:'execution',at:'2026-09-26T07:00:00Z'}}};
+    const drafts=new Map([['cairn:trade-entry:v1:'+sid+':'+accountId+':'+assetId+':buy',JSON.stringify(draft)]]);
+    globalValue(t,'sessionStorage',{getItem:k=>drafts.get(k)??null,setItem:(k,v)=>drafts.set(k,v),removeItem:k=>drafts.delete(k)});
+    values.set('cairn:pending-trade:v1:'+sid,JSON.stringify({sessionKey:sid,mutation:{accountId:otherId,operationId:'77777777-7777-4777-8777-777777777777',expectedSequence:0,event:{type:'deposit',currency:'USD',amount:'1',at:'2026-09-26T07:00:00Z'}},savedAt:Date.now()}));
+  }
   globalValue(t,'navigator',{locks:{request:async(_name,callback)=>callback()}});
   t.mock.method(globalThis,'fetch',async(_url,options)=>{
-    if(options.method==='POST') {sent.push(JSON.parse(options.body));return Response.json({error:'conflict'},{status:409});}
-    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:[account],canWrite:true,ordering:[],trades:[]});
+    if(options.method==='POST') {const request=JSON.parse(options.body);sent.push(request);if(pendingOther)return Response.json({status:request.mutation?'created':'committed'});if(loseResponse){if(request.mutation)throw new Error('lost_response');return Response.json({status:'committed'});}return Response.json({error:'conflict'},{status:409});}
+    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:pendingOther||otherAccount?[account,{...account,id:"33333333-3333-4333-8333-333333333333",assets:[],state:{...account.state,positions:[]}}]:[account],canWrite:true,ordering:[],trades});
   });
   const h=hooks();const [view]=await importUiWithPorts([entry],{...ports,react:h.react});
   const render=()=>{h.begin();return elements(view.NativeLedgerView({compact,initialSelection:{accountId,assetId,action:'buy'}}));};
   render();h.effect();await new Promise(resolve=>setImmediate(resolve));
   const findTime=()=>render().find(e=>e.props?.name==='at');
-  const trade=render().find(e=>typeof e.props?.edit==='function');trade.props.edit('quantity','1');trade.props.edit('price','100');
+  const trade=render().find(e=>typeof e.props?.edit==='function');if(!pendingOther){trade.props.edit('quantity','1');trade.props.edit('price','100');}
   return {render,findTime,sent,advance(){monotonic+=5000;serverNow='2026-09-27T07:16:53.000Z';},
     submit:async()=>{render().find(e=>e.type==='form').props.onSubmit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));}};
 }
@@ -96,6 +103,20 @@ it('minute/date edits preserve retained event seconds and milliseconds',()=>{
 });
 
 function text(node) {if(node==null||typeof node==='boolean')return '';if(typeof node!=='object')return String(node);return Array.isArray(node)?node.map(text).join(''):text(node.props?.children);}
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) it(entry+' retains separate type drafts without leaking a buy fee into exchange',async t=>{
+  const h=await harness(t,0,{entry,compact:false});
+  const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+  input().props.edit('quantity','0.896567');input().props.edit('price','701.263896');input().props.edit('fee','0.17');
+  const selectKind=kind=>h.render().find(e=>e.props?.['aria-label']==='Record type').props.onChange({target:{value:kind}});
+  selectKind('exchange');
+  const amount=name=>h.render().find(e=>e.props?.['aria-label']===name);
+  assert.equal(amount('Separately debited fee USD').props.value,'');
+  amount('Amount to exchange USD').props.onValueChange('12.34');
+  amount('Amount actually received KRW').props.onValueChange('17000');
+  selectKind('buy');assert.equal(input().props.fields.quantity,'0.896567');assert.equal(input().props.fields.fee,'0.17');
+  selectKind('exchange');assert.equal(amount('Amount to exchange USD').props.value,'12.34');assert.equal(amount('Amount actually received KRW').props.value,'17000');
+  assert.equal(h.sent.length,0);
+});
 for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) {
   it(`${entry} shows the actual cash-event timestamp after switching from a date-only trade`,async t=>{
     const h=await harness(t,0,{entry,compact:false});
@@ -116,3 +137,59 @@ for(const entry of ['src/components/native-ledger-view.tsx','src/components/cair
     assert.equal(h.sent[0].mutation.event.dateEvidence,undefined);
   });
 }
+
+for (const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) it(entry+' separates correction target from new trade fields and restores original input',async t=>{
+  const id='22222222-2222-4222-8222-222222222222';
+  const event={type:'buy',assetId,quantity:'2',currency:'USD',executionUnitPrice:{amount:'1',currency:'USD'},settlementStatus:'unconfirmed',memo:'old trade',at:'2026-09-26T07:00:00Z'};
+  const h=await harness(t,0,{entry,compact:false,trades:[{id,accountId,event}]});
+  const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+  input().props.edit('quantity','0.896567');input().props.edit('price','701.263896');input().props.edit('memo','new draft');
+  const before={...input().props.fields};
+  input().props.edit('historyMode','yes');
+  const selector=()=>h.render().find(e=>e.type==='select'&&elements(e).some(child=>child.type==='option'&&child.props.value===id));
+  selector().props.onChange({target:{value:id}});
+  assert.equal(input().props.fields.quantity,'2');assert.equal(input().props.fields.memo,'old trade');
+  assert.equal(input().props.fields.notInOpening,'');
+  selector().props.onChange({target:{value:''}});
+  assert.equal(input().props.fields.quantity,before.quantity);assert.equal(input().props.fields.price,before.price);assert.equal(input().props.fields.memo,before.memo);
+  assert.equal(input().props.fields.replaces,undefined);assert.equal(input().props.fields.notInOpening,undefined);
+  input().props.edit('historyMode','');await h.submit();
+  assert.equal(h.sent.length,1);assert.equal(h.sent[0].mutation.history,undefined);assert.equal(h.sent[0].mutation.event.quantity,'0.896567');assert.equal(h.sent[0].mutation.event.memo,'new draft');
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' restores a new draft after an uncertain correction is confirmed without duplicate saving',async t=>{
+ const id='22222222-2222-4222-8222-222222222222',event={type:'buy',assetId,quantity:'2',currency:'USD',executionUnitPrice:{amount:'1',currency:'USD'},settlementStatus:'unconfirmed',memo:'old trade',at:'2026-09-26T07:00:00Z'};
+ const h=await harness(t,0,{entry,compact:false,trades:[{id,accountId,event}],loseResponse:true});
+ const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+ for(const [key,value] of Object.entries({quantity:'0.896567',price:'701.263896',memo:'new draft',historyMode:'yes'}))input().props.edit(key,value);
+ h.render().find(e=>e.type==='select'&&elements(e).some(child=>child.type==='option'&&child.props.value===id)).props.onChange({target:{value:id}});
+ input().props.edit('notInOpening','yes');input().props.edit('reason','correction');
+ await h.submit();await h.submit();assert.equal(h.sent.length,2);assert.equal(h.sent[1].mutation,undefined);
+ assert.equal(input().props.fields.quantity,'0.896567');assert.equal(input().props.fields.memo,'new draft');assert.equal(input().props.fields.replaces,undefined);
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' restores the account together with its draft after recovering another account pending operation',async t=>{
+ const h=await harness(t,0,{entry,compact:false,pendingOther:true});
+ const fields=h.render().find(e=>typeof e.props?.edit==='function').props.fields;
+ assert.equal(fields.quantity,'0.896567');assert.equal(fields.ticker,'NEWA');
+ await h.submit();const mutation=h.sent.find(row=>row.mutation)?.mutation;
+ assert.equal(mutation.accountId,accountId);assert.equal(mutation.newAsset.ticker,'NEWA');assert.equal(mutation.event.quantity,'0.896567');assert.equal(mutation.history,undefined);
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' never restores another account kind draft after a cross-tab pending recovery',async t=>{
+ const h=await harness(t,0,{entry,compact:false,otherAccount:true,loseResponse:true});
+ const selectKind=value=>h.render().find(e=>e.props?.['aria-label']==='Record type').props.onChange({target:{value}});
+ const amount=name=>h.render().find(e=>e.props?.['aria-label']===name);
+ selectKind('cost_basis');h.render().find(e=>typeof e.props?.onValueChange==='function').props.onValueChange('420');
+ selectKind('buy');
+ selectKind('exchange');
+ amount('Amount to exchange USD').props.onValueChange('12.34');amount('Amount actually received KRW').props.onValueChange('17000');
+ selectKind('buy');
+ const otherId='33333333-3333-4333-8333-333333333333',sessionKey='a'.repeat(64);
+ localStorage.setItem('cairn:pending-trade:v1:'+sessionKey,JSON.stringify({sessionKey,mutation:{accountId:otherId,operationId:'77777777-7777-4777-8777-777777777777',expectedSequence:0,event:{type:'deposit',currency:'USD',amount:'1',at:'2026-09-26T07:00:00Z'}},savedAt:Date.now()}));
+ await h.submit();selectKind('exchange');
+ assert.equal(h.render().find(e=>e.type==='select').props.value,otherId);
+ assert.equal(amount('Amount to exchange USD').props.value,'');assert.equal(amount('Amount actually received KRW').props.value,'');
+ selectKind('cost_basis');assert.equal(h.render().find(e=>typeof e.props?.onValueChange==='function').props.value,'');
+ assert.ok(h.sent.every(row=>!row.mutation),'recovery may look up a pending request, never create a new transaction');
+});

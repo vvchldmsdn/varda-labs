@@ -15,6 +15,9 @@ import { normalizePortfolioAccountScope } from "@/lib/portfolio-account-scope";
 import { sessionResolutionEvidence } from "@/lib/session-resolution-evidence";
 import type { SessionResolverResult } from "@/lib/session-resolver-contract";
 import { PageTitle as CairnPageTitle } from "@/components/cairn-ui";
+import { T } from "@/components/i18n/localized-text";
+import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
+import { nativeLedgerRecordsHref } from "@/lib/native-ledger-records";
 
 
 export const dynamic = "force-dynamic";
@@ -37,12 +40,14 @@ export default async function TenantEventsPage({
     resolveCurrentTenantContext(),
   ]);
   const scope = normalizePortfolioAccountScope(params.account);
-  const result = resolution.ok
-    ? await getReadOnlyTenantEvents({
+  const [result, catalog] = resolution.ok
+    ? await Promise.all([getReadOnlyTenantEvents({
         tenantContext: resolution.tenantContext,
         scope,
-      })
-    : null;
+      }), getReadOnlyTenantPortfolioAnalysisScopeContext({ account: scope, tenantContext: resolution.tenantContext })])
+    : [null, null];
+  const selected = catalog?.state === "ready" && catalog.resolution.state === "resolved" ? catalog.resolution.scope : null;
+  const recordsHref = nativeLedgerRecordsHref(selected?.kind === "account" ? selected.accountId : undefined);
   const evidence = isEvidenceResult(result) ? result : null;
 
   return (
@@ -52,10 +57,11 @@ export default async function TenantEventsPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold text-[var(--muted)]">Cairn Labs</p>
-            <CairnPageTitle className="mt-2 text-2xl font-semibold tracking-normal"><ManagementText>{"소유 계정 이벤트"}</ManagementText></CairnPageTitle>
+            <CairnPageTitle className="mt-2 text-2xl font-semibold tracking-normal"><T ko="이전 거래·자산 기록" en="Earlier transactions and asset records" /></CairnPageTitle>
             <p className="mt-2 text-sm text-[var(--muted)]"><ManagementText>{"소유권이 확인된 계정 연결을 통해 읽은 거래 및 자산 상태 근거"}</ManagementText></p>
           </div>
           <ManagementElement as="nav" className="flex flex-wrap gap-2" aria-label="관련 근거 화면">
+            {selected && <PageLink href={recordsHref}><T ko="직접 기록한 거래 보기" en="View recorded transactions" /></PageLink>}
             <PageLink href="/portfolio/accounts?account=all"><ManagementText>{"계정"}</ManagementText></PageLink>
             <PageLink href="/portfolio/holdings?account=all"><ManagementText>{"보유 종목"}</ManagementText></PageLink>
             <PageLink href="/portfolio/position-snapshots?account=all"><ManagementText>{"포지션 스냅샷"}</ManagementText></PageLink>

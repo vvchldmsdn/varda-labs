@@ -30,7 +30,11 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
   if (investmentsOnly && !investment) return { status: 'blocked', reason: 'holding_evidence_incomplete' };
   const evidence = investment ? { ...rawEvidence, ...investment.evidence } : rawEvidence;
   const current = buildTrackedCurrencyPortfolio(evidence).current;
-  if (!current?.complete || !investmentsOnly && !evidence.ledgerComplete) return { status: "blocked", reason: "valuation_incomplete", ...(investmentsOnly ? { unavailableHoldings: current?.positions.filter(row => row.value === null).map(row => row.name) ?? [] } : {}) };
+  if (!current?.complete || !investmentsOnly && !evidence.ledgerComplete) return {
+    status: "blocked", reason: "valuation_incomplete",
+    evidenceReasons: [...new Set([...(current?.issues.map(issue => issue.code) ?? []), ...(!investmentsOnly && !evidence.ledgerComplete ? ['ledger_incomplete'] : [])])],
+    ...(investmentsOnly ? { unavailableHoldings: current?.positions.filter(row => row.value === null).map(row => row.name) ?? [] } : {}),
+  };
   if (model.status !== "ready" || model.policyValidation.status !== "available" || !model.approvedPolicy.policy) return { status: "blocked", reason: "approved_targets_required" };
   const holdings = evidence.current.positions.filter(row => row.kind !== "cash" && row.observation && Decimal.from(row.observation.quantity).compare(0) > 0);
   if (holdings.some(row => !model.rows.some(target => (target.heldAssetId ?? target.assetId) === row.id && target.accountId === row.accountId && target.currency === row.observation!.currency)) || model.rows.some(target=>target.heldAssetId!==null && !holdings.some(row=>row.id===(target.heldAssetId ?? target.assetId)))) return { status: "blocked", reason: "target_universe_changed" };

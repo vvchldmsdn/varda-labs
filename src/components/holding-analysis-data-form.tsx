@@ -28,7 +28,7 @@ export function HoldingAnalysisDataForm({
   holdingId: string;
   readiness: HoldingAnalysisDataReadiness | null;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [progress, setProgress] = useState<Awaited<ReturnType<typeof readHoldingAnalysisProgress>>>(null);
   const [readFailed, setReadFailed] = useState(false);
@@ -69,11 +69,12 @@ export function HoldingAnalysisDataForm({
   if (!readiness) {
     return <p className="text-xs text-[var(--warning)]"><ManagementText>{"상태 확인 불가"}</ManagementText></p>;
   }
+  const needsOnlyFx = readiness.reason !== 'latest_close_stale' && readiness.trendReady && readiness.missingInputs?.length === 1 && readiness.missingInputs[0] === 'historical_fx';
 
   return (
     <div className="min-w-[190px] text-xs text-[var(--muted)]">
       <p className="font-semibold text-[var(--ink)]">
-        <ManagementText>{readinessLabel(readiness)}</ManagementText>
+        {readinessLabel(readiness, locale === 'en')}
       </p>
       {readiness.state !== "unsupported" && readiness.state !== "blocked" ? (
         <>
@@ -81,12 +82,13 @@ export function HoldingAnalysisDataForm({
               ? ` · 최신 ${readiness.latestSourceDate}`
               : ""}</ManagementText>
           </p>
-          <p className="mt-1"><ManagementText>{"시뮬레이션"}</ManagementText><ManagementText>{readiness.simulationReady ? "가능" : "자료 필요"}</ManagementText><ManagementText>{"· 추세"}</ManagementText>{" "}
-            <ManagementText>{readiness.trendReady ? "가능" : "자료 필요"}</ManagementText>
+          <p className="mt-1">{t('기본 가격·환율 이력', 'Basic price and FX history')} {readiness.simulationReady ? t('확인됨', 'verified') : t('자료 필요', 'incomplete')}{' · '}
+            {t('추세 이력', 'Trend history')} {readiness.trendReady ? t('확인됨', 'verified') : t('자료 필요', 'incomplete')}
           </p>
+          {readiness.state === 'ready' && <p className="mt-1">{t('선택한 분석의 기간·공통 날짜 등 조건은 분석 화면에서 확인해 주세요.', 'The analysis screen checks its date range and shared observations.')}</p>}
         </>
       ) : null}
-      {readiness.canPrepare ? (
+      {readiness.canPrepare && !needsOnlyFx ? (
         <CairnForm action={action} className="mt-2" onReset={actionFormOnReset} ref={actionFormRef}>
           <input name="holdingId" type="hidden" value={holdingId} />
           <CairnButton variant="primary"
@@ -116,26 +118,27 @@ export function HoldingAnalysisDataForm({
       {!!readiness.missingInputs?.length && <details className="mt-2"><summary>{t('더 필요한 자료', 'Missing evidence')}</summary>
         {readiness.missingInputs.includes('prices') && <p>{t('공통 날짜의 종가가 부족해요. 과거 가격 준비를 요청해 주세요.', 'Closing prices are missing. Request historical prices.')}</p>}
         {readiness.missingInputs.includes('adjusted_prices') && <p>{t('수정주가가 부족해요. 과거 가격 수집 결과를 확인해 주세요.', 'Adjusted prices are missing. Check the historical collection result.')}</p>}
-        {readiness.missingInputs.includes('historical_fx') && <p>{t('해당 날짜의 환율이 부족해요. 이 버튼은 종목 가격만 수집합니다. 과거 환율은 서비스의 데이터 보완이 필요하며, 현재 환율로 대신 계산하지 않아요.', 'Dated FX is missing. This button collects prices only. Historical FX needs service-side data repair; current FX is not substituted.')}</p>}
+        {readiness.missingInputs.includes('historical_fx') && <p>{t('해당 날짜의 환율은 서비스에서 보완해야 해요. 종목 가격 수집으로 채울 수 없으며 현재 환율로 대신 계산하지 않아요.', 'Dated FX needs service-side repair. Collecting stock prices cannot supply it, and current FX is not substituted.')}</p>}
       </details>}
     </div>
   );
 }
 
-function readinessLabel(readiness: HoldingAnalysisDataReadiness) {
-  if (readiness.state === "ready") return "분석 준비 완료";
-  if (readiness.state === "missing") return "과거 가격 없음";
+function readinessLabel(readiness: HoldingAnalysisDataReadiness, english: boolean) {
+  if (readiness.state === "ready") return english ? 'Instrument history prepared' : '종목 이력 준비됨';
+  if (readiness.state === "missing") return english ? 'No historical prices' : "과거 가격 없음";
   if (readiness.state === "limited") {
     return readiness.reason === "latest_close_stale"
-      ? "최신 가격 보완 필요"
-      : "일부 분석 가능";
+      ? english ? 'Recent prices needed' : "최신 가격 보완 필요"
+      : english ? 'Some history is missing' : "분석 자료 보완 필요";
   }
   if (readiness.reason === "manual_history_required") {
-    return "수동 평가 기록 사용";
+    return english ? 'Uses dated manual valuations' : "수동 평가 기록 사용";
   }
   if (readiness.reason === "managed_sleeve_excluded") {
-    return "투자랩·시뮬레이션 제외";
+    return english ? 'Excluded from lab and simulation' : "투자랩·시뮬레이션 제외";
   }
-  if (readiness.state === "blocked") return "분석 범위 확인 필요";
-  return "자동 가격 준비 미지원";
+  if (readiness.reason === 'historical_evidence_conflict') return english ? 'Price evidence needs service review' : '가격 자료 확인 필요 · 서비스에서 확인';
+  if (readiness.state === "blocked") return english ? 'Analysis scope needs review' : "분석 범위 확인 필요";
+  return english ? 'Automatic price preparation unsupported' : "자동 가격 준비 미지원";
 }

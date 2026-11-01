@@ -1,3 +1,4 @@
+import { InvestmentLabDateInputs } from "./investment-lab-date-inputs";
 import { LabText } from "./lab-text";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
 import {
@@ -14,7 +15,7 @@ import {
   type PortfolioAnalysisScopeKey,
   type PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
-import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput } from "@/components/cairn-ui";
+import { Button as CairnButton, Form as CairnForm } from "@/components/cairn-ui";
 
 
 export function InvestmentLabPeriodSelector({
@@ -65,25 +66,11 @@ export function InvestmentLabPeriodSelector({
             <input name="scope" type="hidden" value={scopeKey} />
             <PreservedHiddenInputs query={query} />
             <InvestmentLabQueryFields />
-            <DateField
-              defaultValue={
-                period.requestedStartServiceDate ??
-                period.selectedStartServiceDate
-              }
-              label="시작 관측일"
-              max={period.availableEndServiceDate}
-              min={period.availableStartServiceDate}
-              name="start"
-            />
-            <DateField
-              defaultValue={
-                period.requestedEndServiceDate ?? period.selectedEndServiceDate
-              }
-              label="종료 관측일"
-              max={period.availableEndServiceDate}
-              min={period.availableStartServiceDate}
-              name="end"
-            />
+            <InvestmentLabDateInputs scope={scopeKey} currency={query.currency === "USD" ? "USD" : "KRW"}
+              start={period.requestedStartServiceDate ?? period.selectedStartServiceDate}
+              end={period.requestedEndServiceDate ?? period.selectedEndServiceDate}
+              baseStart={typeof query.start === "string" ? query.start : ""} baseEnd={typeof query.end === "string" ? query.end : ""}
+              min={period.availableStartServiceDate} max={period.availableEndServiceDate} />
             <div className="flex flex-wrap items-center gap-4">
               <CairnButton variant="primary"
                 type="submit"
@@ -130,6 +117,7 @@ function PreservedHiddenInputs({
       name === "end" ||
       name === "view" ||
       name === "preview" ||
+      name === "_labDraft" ||
       value === null ||
       value === undefined
     ) {
@@ -140,35 +128,6 @@ function PreservedHiddenInputs({
       <input key={`${name}:${index}`} name={name} type="hidden" value={item} />
     ));
   });
-}
-
-function DateField({
-  defaultValue,
-  label,
-  max,
-  min,
-  name,
-}: {
-  defaultValue: string | null;
-  label: string;
-  max: string | null;
-  min: string | null;
-  name: "start" | "end";
-}) {
-  return (
-    <CairnField className="min-w-0 flex-1 basis-48">
-      <LabText value={label} />
-      <CairnInput
-        style={{ minHeight: 48 }}
-        defaultValue={defaultValue ?? ""}
-        max={max ?? undefined}
-        min={min ?? undefined}
-        name={name}
-        required
-        type="date"
-      />
-    </CairnField>
-  );
 }
 
 function periodReasonLabel(reason: InvestmentLabPeriodSelectionReason | null) {

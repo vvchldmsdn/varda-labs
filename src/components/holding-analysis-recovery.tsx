@@ -19,7 +19,7 @@ export function HoldingAnalysisRecovery({ scope }: { scope: string }) {
   const current = read?.scope === scope ? read.result : null;
   return <details className="border-y border-[var(--line)] py-4" onToggle={event => { if (event.currentTarget.open && !current && !pending) void load(); }}>
     <summary>{t('가격·환율 준비 상태', 'Price and FX readiness')}</summary>
-    {pending ? <p role="status">{t('자료 확인 중…', 'Checking data…')}</p> : current ? <><HoldingAnalysisDataPanelView result={current} />{current.state === 'ready' && current.entries.every(entry => entry.readiness.state === 'ready') && <p>{t('종목별 시장 자료가 있습니다. 과거 비교에는 공통 날짜와 시작 보유 기록도 필요해요.', 'Instrument data is available. Past comparisons also require common dates and opening holdings.')}</p>}</> : null}
+    {pending ? <p role="status">{t('자료 확인 중…', 'Checking data…')}</p> : current ? <><HoldingAnalysisDataPanelView result={current} />{current.state === 'ready' && (current.entries.length === 0 ? <p>{t('확인할 보유종목이 없습니다.', 'There are no holdings to check.')}</p> : current.entries.every(entry => entry.readiness.state === 'ready') ? <p>{t('종목별 기본 이력이 준비됐어요. 선택한 분석의 기간·공통 날짜 등 조건은 분석 화면에서 확인해 주세요.', 'Basic instrument history is prepared. The analysis screen checks its date range and shared observations.')}</p> : null)}</> : null}
     <Button variant="ghost" type="button" disabled={pending} onClick={load}>{t('다시 확인', 'Check again')}</Button>
   </details>;
 }

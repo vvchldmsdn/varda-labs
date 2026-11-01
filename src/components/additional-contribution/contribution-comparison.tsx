@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { DraftPreservationNotice } from '@/components/recovery/draft-preservation-notice';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowDownRight, ArrowUpRight, Equal } from 'lucide-react';
 import { Button, Field, Input, Select, PageTitle, SectionHeading, Metric, MetricGroup, Status } from '@/components/cairn-ui';
@@ -10,7 +11,8 @@ import type { Currency } from '@/lib/money';
 import styles from './contribution-comparison.module.css';
 import { ContributionEffectTracking, type EffectTrackingProps } from './contribution-effect-tracking';
 import { ContributionJourneyNav } from './contribution-journey';
-import { comparisonDraftQuery, type ComparisonDraft } from '@/lib/contribution-journey';
+import { comparisonDraft, comparisonDraftQuery, contributionBackHref, contributionJourneyHref, type ComparisonDraft } from '@/lib/contribution-journey';
+import { useNavigationDraft } from '@/components/recovery/use-navigation-draft';
 
 const won = (n: number) => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(n);
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${won(Math.abs(n))}`;
@@ -23,21 +25,34 @@ const cases = [
   { name: '달러 약세', price: 0, fx: -5 },
 ] as const;
 
-export function ContributionComparisonView({ basis, initialAmount = '1000000', initialCurrency = 'KRW', preview = false, backHref, tracking, initialDraft }: {
-  basis: ComparisonBasisResult; initialAmount?: string; initialCurrency?: Currency; preview?: boolean; backHref: string; tracking?: EffectTrackingProps; initialDraft?: ComparisonDraft;
+export function ContributionComparisonView({ basis, initialAmount = '1000000', initialCurrency = 'KRW', preview = false, backHref, tracking, initialDraft, accounts = [] }: {
+  basis: ComparisonBasisResult; initialAmount?: string; initialCurrency?: Currency; preview?: boolean; backHref: string; tracking?: EffectTrackingProps; initialDraft?: ComparisonDraft; accounts?: readonly { key: string; label: string }[];
 }) {
   const router = useRouter();
-  const [amount, setAmount] = useState(initialAmount);
-  const [currency, setCurrency] = useState<Currency>(initialCurrency);
-  const [price, setPrice] = useState(initialDraft?.price ?? '0');
-  const [fx, setFx] = useState(initialDraft?.fx ?? '0');
-  const [horizon, setHorizon] = useState(initialDraft?.horizon ?? '30');
-  const [overrides, setOverrides] = useState<Record<string, string>>(initialDraft?.overrides ?? {});
   const backQuery = new URLSearchParams(backHref.split('?')[1] ?? '');
   const scope = backQuery.get('scope') ?? 'all';
   const beta = backHref.startsWith('/beta?') || backHref === '/beta';
+  const [draft, setDraft, draftNotPreserved] = useNavigationDraft({
+    initial: { amount: initialAmount, currency: initialCurrency, ...(initialDraft ?? comparisonDraft({})) },
+    path: '/additional-contribution/compare', scope,
+    read(query) {
+      if (!query.has('amount')) return null;
+      const values = Object.fromEntries([...query.keys()].map(key => [key, query.getAll(key).length === 1 ? query.get(key)! : query.getAll(key)]));
+      if (typeof values.amount !== 'string' || values.amount.length > 32 || !['KRW', 'USD'].includes(String(values.currency))) return null;
+      return { amount: values.amount, currency: values.currency as Currency, ...comparisonDraft(values) };
+    },
+    write(value) { return { amount: value.amount, currency: value.currency, ...comparisonDraftQuery(value) }; },
+  });
+  const { amount, currency, price, fx, horizon } = draft;
+  const overrides = Object.fromEntries(Object.entries(draft.overrides).filter(([key]) => basis.status !== 'ready' || basis.rows.some(row => row.allocationKey === key)));
+  const setAmount = (value: string) => setDraft({ ...draft, amount: value });
+  const setCurrency = (value: Currency) => setDraft({ ...draft, currency: value });
+  const setPrice = (value: string) => setDraft({ ...draft, price: value, overrides: {} });
+  const setFx = (value: string) => setDraft({ ...draft, fx: value });
+  const setHorizon = (value: string) => setDraft({ ...draft, horizon: value });
+  const setOverrides = (value: Record<string, string>) => setDraft({ ...draft, overrides: value });
   const scenarioDraft = comparisonDraftQuery({ horizon, price, fx, overrides });
-  const journey = { scope, amount, currency, beta, preview };
+  const journey = { scope, amount, currency, beta, preview, comparison: { scope, currency, horizon, price, fx, overrides } };
   const recoveryQuery = new URLSearchParams({ scope, amount, currency, ...scenarioDraft, ...(beta ? { from: 'beta' } : {}), ...(preview ? { preview: 'design' } : {}) });
   const returnHref = `/additional-contribution/compare?${recoveryQuery}`;
   const recoveryDraft = { amount, currency, ...scenarioDraft };
@@ -45,11 +60,12 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
   const rowPricePct = Object.fromEntries(Object.entries(overrides).filter(([, value]) => value.trim() !== '').map(([key, value]) => [key, Number(value)]));
   const valid = price.trim() !== '' && fx.trim() !== '';
   const result = comparison.status === 'ready' && valid ? evaluateContributionScenario(comparison, { pricePct: Number(price), usdKrwPct: Number(fx), rowPricePct }) : null;
-  const setCase = (p: number, f: number) => { setPrice(String(p)); setFx(String(f)); setOverrides({}); };
+  const setCase = (p: number, f: number) => setDraft({ ...draft, price: String(p), fx: String(f), overrides: {} });
   return <div className={styles.content} id="varda-main-content">
-    <a href={backHref} className={styles.back}>← 추가투입으로 돌아가기</a>
+    <a href={contributionBackHref(journey)} className={styles.back}>← 추가투입으로 돌아가기</a>
+    {accounts.length > 0 && <nav className={styles.accounts} aria-label="비교할 계좌">{accounts.map(account => <a key={account.key} aria-current={scope === account.key ? 'page' : undefined} href={contributionJourneyHref('compare', { ...journey, scope: account.key })}>{account.label}</a>)}</nav>}
     <header className={styles.header}><div><p className={styles.eyebrow}>CONTRIBUTION / COMPARE</p><PageTitle>같은 투자금, 다른 배분</PageTitle><p className={styles.lead}>비율대로 샀을 때와 환율·이동평균선을 반영했을 때를 비교해 보세요.</p></div><span className={styles.badge}>가정 비교 · 실제 성과 아님</span></header>
-    <ContributionJourneyNav journey={journey} current="compare" returnHref={returnHref} />
+    <DraftPreservationNotice visible={draftNotPreserved} /><ContributionJourneyNav journey={journey} current="compare" returnHref={returnHref} />
     {preview && <Status>화면 검증용 예시 데이터입니다. 실제 계좌와 연결되지 않습니다.</Status>}
     {basis.status !== 'ready' ? basis.reason === 'choose_one_account' ? <Status tone="warning">비교할 계좌를 위에서 선택해 주세요. 계좌 사이의 자금 이동은 계산하지 않습니다.</Status> : <RecoveryNotice reasons={[basis.reason]} scope={scope} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={() => router.refresh()} details={`${reasonLabel(basis.reason)}${basis.unavailableHoldings?.length ? ` 확인 필요: ${basis.unavailableHoldings.join(', ')}.` : ''}`} /> : <>
       <div className={styles.context}>{basis.scopeLabel}<span>기준 {new Date(basis.asOf).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false })} KST</span><span>목표비중 승인 {basis.policyRevision}차</span></div>
@@ -71,7 +87,7 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
           <SectionHeading title={`02. ${horizon}일 뒤, 이런 상황이라면?`} description="기간 전체의 누적 변화를 입력합니다. 기간을 바꿔도 변화율을 자동으로 늘리거나 예측하지 않습니다." />
           <div className={styles.presets} role="group" aria-label="시나리오 선택">{cases.map(item => <Button key={item.name} variant="selection" aria-pressed={Number(price) === item.price && Number(fx) === item.fx && !Object.values(overrides).some(v => v.trim())} onClick={() => setCase(item.price, item.fx)}>{item.name}</Button>)}</div>
           <div className={styles.scenarioInputs}>
-            <Field label="종목 가격 변화 (%)" hint="각 종목의 거래 통화 기준"><Input type="number" min="-100" max="200" step="0.1" value={price} onChange={event => { setPrice(event.target.value); setOverrides({}); }} /></Field>
+            <Field label="종목 가격 변화 (%)" hint="각 종목의 거래 통화 기준"><Input type="number" min="-100" max="200" step="0.1" value={price} onChange={event => setPrice(event.target.value)} /></Field>
             <Field label="USD/KRW 변화 (%)" hint="+는 달러 강세 · USD 종목만 환산"><Input type="number" min="-100" max="200" step="0.1" value={fx} onChange={event => setFx(event.target.value)} /></Field>
           </div>
           {result ? <div className={styles.outcome} aria-live="polite">

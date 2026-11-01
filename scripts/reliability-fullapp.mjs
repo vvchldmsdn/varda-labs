@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT, stageSource, childEnvironment } from './reliability-ci.mjs';
@@ -35,6 +35,31 @@ export const readCurrentSessionSubject = cache(async (): Promise<CurrentSessionS
   const layoutSource=await readFile(layout,'utf8');
   assert.ok(layoutSource.includes('<body>'));
   await writeFile(layout,'import {FullAppRefreshControl} from "@/components/fullapp-refresh-control";\n'+layoutSource.replace('<body>','<body><FullAppRefreshControl />'));
+  // Presentation fixtures exist in the disposable app only. The real components,
+  // layout, locale provider and CSS render here; no financial write is involved.
+  const qaRoute = 'src/app/qa-context-presentation';
+  await assert.rejects(access(path.join(ROOT, qaRoute)), { code: 'ENOENT' });
+  const {readyOwnerMatrix,ownerWeights} = await import('../tests/support/simulation-owner-ready-matrix.mjs');
+  const {prepareSimulationResearchPaths,executeSimulationResearchPathsFromPrepared} = await import('../src/lib/simulation-research-execution-core.ts');
+  const {buildSimulationOwnerCandidateComparison} = await import('../src/lib/simulation-owner-candidate-comparison.ts');
+  const prepared=prepareSimulationResearchPaths({matrix:readyOwnerMatrix(),seed:0x56415244,expectedBlockLength:5,horizon:63,pathCount:500});
+  assert.equal(prepared.status,'ready');
+  const currentWeights=ownerWeights([5000,2500,2500]);
+  const currentExecution=executeSimulationResearchPathsFromPrepared({prepared,scenarioId:'owner-current-all',scenarioVersion:'v1',weights:currentWeights,samplePathCount:12});
+  const comparison=buildSimulationOwnerCandidateComparison({account:'all',prepared,currentExecution,currentWeights,samplePathCount:12});
+  assert.equal(comparison.status,'ready');assert.ok(comparison.outcomeCandidates.length>=2);
+  await mkdir(path.join(stage,qaRoute));
+  await writeFile(path.join(stage,qaRoute,'fixture.json'),JSON.stringify({candidates:comparison.outcomeCandidates,currentExecution,reason:comparison.outcomeCandidateReason,status:comparison.outcomeCandidateStatus}));
+  await writeFile(path.join(stage,qaRoute,'page.tsx'), `
+import {OwnerOutcomeCandidateExplorer} from '@/components/simulation/owner-outcome-candidate-explorer';
+import {EventTable,EventEvidence} from '@/components/cairn-v2/event-table';
+import {PositionSnapshotTable,SnapshotEvidence} from '@/components/cairn-v2/snapshot-table';
+import {LanguageSwitch} from '@/components/i18n/language-switch';
+import data from './fixture.json';
+const event={eventDate:'2026-09-18',recordedAt:'2026-09-18T10:00:00.123Z',accountCode:'brokerage',accountName:'QA account',ticker:'VOO',assetName:'QA ETF',eventType:'buy',eventKind:'trade',assetReferenceStatus:'stored_asset_reference',correctionStatus:'none',evidenceStatus:'partial',missingFields:['price'],amountKrw:123,quantityDelta:0.896567} satisfies Parameters<typeof EventTable>[0]['rows'][number];
+const model={state:'ready',snapshotDate:'2026-09-18',source:'synthetic',expectedAccounts:['synthetic'],coveredAccounts:['synthetic'],missingAccounts:[],excludedPositionCount:0,linkedPositionCount:1,historicalOnlyPositionCount:0,positions:[{accountCode:'synthetic',accountName:'QA account',assetName:'QA ETF',ticker:'VOO',assetType:'etf',market:'us',currency:'USD',quantity:'0.896567',storedPrice:'701.263896',storedPriceKind:'current_price',marketValueKrw:'123.456789',currentWeight:'100',targetWeight:null,belowMa:false,priceSource:'synthetic',priceBasis:'manual_current',assetLinkStatus:'linked'}]} satisfies Parameters<typeof PositionSnapshotTable>[0]['model'];
+export default function Page(){return <main style={{padding:20,maxWidth:1200,margin:'auto'}}><LanguageSwitch/><p>Synthetic presentation fixture — no account writes</p><section aria-label="Record presentation"><EventTable rows={[event]}/><PositionSnapshotTable model={model}/><details><summary>Source details</summary><EventEvidence rows={[event]}/><SnapshotEvidence model={model}/></details></section><OwnerOutcomeCandidateExplorer account="all" {...data as Omit<Parameters<typeof OwnerOutcomeCandidateExplorer>[0],'account'>}/></main>}
+`);
   return { identityBoundary: 'external verified session subject substituted only in disposable build',
     sourceIdentitySha256: createHash('sha256').update(await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'))).digest('hex') };
 }
@@ -80,6 +105,7 @@ export async function main(args) {
     assert.equal(createHash('sha256').update(originalIdentity).digest('hex'), report.isolation.sourceIdentitySha256, 'Original production auth source changed during rehearsal');
     assert.ok(!originalIdentity.toString().includes('cairn_fullapp_identity'), 'Production identity source cannot contain the test fixture');
     assert.ok(!(await readFile(path.join(ROOT,'src/app/layout.tsx'),'utf8')).includes('FullAppRefreshControl'), 'Refresh control must stay in disposable builds');
+    await assert.rejects(access(path.join(ROOT,'src/app/qa-context-presentation')), { code: 'ENOENT' });
 
   }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2));

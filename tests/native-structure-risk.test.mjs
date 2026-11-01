@@ -39,13 +39,13 @@ it("uses the shared return matrix for risk only, with independent volatility and
 
 it("renders the existing risk evidence as one section without a second portfolio or simulation", async () => {
   const input = evidence(), result = await buildCurrencyResearch(input);
-  const states = ["USD", result, false, false, undefined, null, "0", 126, 126, input.histories[0].instrumentId];
+  const states = [result, false, false];
   let index = 0;
   const [view] = await importUiWithPorts(["src/components/currency-research-view.tsx"], {
     "@/components/recovery/recovery-notice": { RecoveryNotice: () => null },
     "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
     "next/navigation": { useRouter: () => ({ replace() {}, refresh() {} }) },
-    react: { ...React, useState: () => [states[index++], () => {}], useMemo: fn => fn(), useEffect: () => {}, useRef: () => ({ current: null }) },
+    react: { ...React, useState: initial => [index < states.length ? states[index++] : initial, () => {}], useMemo: fn => fn(), useSyncExternalStore: (_subscribe, _snapshot, server) => server(), useEffect: () => {}, useRef: () => ({ current: null }) },
     "@/components/i18n/locale-provider": { useI18n: () => ({ locale: "en", t: (ko, en) => en ?? ko }) },
     "@/components/portfolio/portfolio-allocation-ring": { PortfolioAllocationRing: () => React.createElement("p", null, "DUPLICATE RING") },
   });

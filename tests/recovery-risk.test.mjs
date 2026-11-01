@@ -14,6 +14,18 @@ const risk = (input = {}) => ({
   provenance: { eligibleHoldingCount: 2, ...input.provenance },
   calculation: { calculationStatus: "complete", reason: null, ...input.calculation },
 });
+it('complete risk calculations still disclose excluded holdings and reweighted analysis shares', async () => {
+  const [{RiskUniverseNote}] = await importUiWithPorts(['src/components/portfolio-risk/risk-universe-note.tsx'], {'@/components/portfolio/portfolio-text': {PortfolioText: ({ko}) => ko}});
+  const fixture = portfolioRiskReadModelFixture();
+  const whole = composePortfolioRiskReadModel(fixture);
+  assert.equal(RiskUniverseNote({model:whole}),null);
+  fixture.assetRows.push({...fixture.assetRows[0],id:'excluded',ticker:null,name:'Unidentified'});
+  const partial=composePortfolioRiskReadModel(fixture), before=structuredClone(partial);
+  assert.equal(partial.calculation.calculationStatus,'complete');
+  const html=renderToStaticMarkup(React.createElement(RiskUniverseNote,{model:partial}));
+  assert.match(html,/제외 1개/);assert.match(html,/100%/);
+  assert.deepEqual(partial,before);
+});
 describe("risk recovery actions use admitted reasons without changing calculations", () => {
   it("distinguishes a real single-stock missing-price read from supported standalone risk", () => {
     const fixture = portfolioRiskReadModelFixture();

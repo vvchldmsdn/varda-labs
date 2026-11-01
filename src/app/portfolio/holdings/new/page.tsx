@@ -1,5 +1,5 @@
 import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
-import { ArrowLeft } from "lucide-react";
+import { HoldingRegistrationBack } from "@/components/onboarding/holding-registration-back";
 import { localizedMetadata } from "@/lib/i18n/server";
 import { T } from "@/components/i18n/localized-text";
 import { SecondaryPageHeader } from "@/components/secondary-page-header";
@@ -33,7 +33,7 @@ export default async function NewHoldingPage({ searchParams }: { searchParams: P
   return <main className="varda-holding-add-page" data-design-preview={preview || undefined}>
     <SecondaryPageHeader />
     <div className="varda-holding-add-content">
-      <Link className="varda-holding-add-back" href={preview ? "/portfolio/onboarding?preview=design&step=holding" : `/portfolio/holdings${initialAccountId ? `?scope=${encodeURIComponent(`account:${initialAccountId}`)}` : ""}`}><ArrowLeft size={15} /><T ko="돌아가기" en="Back" /></Link>
+      <HoldingRegistrationBack initialAccountId={initialAccountId} preview={preview} />
       <header className="varda-holding-add-heading"><CairnPageTitle><T ko="보유종목 등록" en="Add holdings" /></CairnPageTitle></header>
       {!preview && !resolution?.ok ? <div className="varda-onboarding-error"><T ko="로그인 후 보유종목을 추가할 수 있습니다." en="Sign in to add holdings." /><p><Link className="varda-onboarding-text-button" href="/auth/sign-in"><T ko="로그인" en="Sign in" /></Link></p></div>
         : options?.state !== "ready" ? <p className="varda-onboarding-error"><T ko="계좌 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." en="Accounts could not be loaded. Please try again shortly." /></p>

@@ -172,7 +172,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await page.clock.setSystemTime(new Date());
     });
     await check('fullapp-transactions-today-history-native-missing-evidence', async () => {
-      await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '소유 계정 이벤트' })).toBeVisible();
+      await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '이전 거래·자산 기록' })).toBeVisible();
       await expect(page.locator('body')).toContainText('Synthetic USD');
       await visitValuation('/today?currency=USD'); await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('2,010.00');
       await visitValuation('/history?currency=USD');
@@ -273,7 +273,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('100,000');
       await page.setViewportSize({ width: 320, height: 844 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       await page.screenshot({ path: path.join(output, 'mobile-320-home.png'), fullPage: true });
-      await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '소유 계정 이벤트' })).toBeVisible(); await expect(page.locator('body')).toContainText('Synthetic KRW');
+      await page.goto(url + '/portfolio/events?account=all'); await expect(page.getByRole('heading', { name: '이전 거래·자산 기록' })).toBeVisible(); await expect(page.locator('body')).toContainText('Synthetic KRW');
       await visitValuation('/today?currency=KRW'); await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('201,000');
       await visitValuation('/history?currency=KRW');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

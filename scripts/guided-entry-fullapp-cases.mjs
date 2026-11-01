@@ -173,9 +173,11 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await expect(page.getByLabel('기록 날짜',{exact:true})).toBeVisible();
       await optional.click();await page.evaluate(()=>scrollTo(0,0));
       await capture(page,output,'guided-trade-'+beta,width,height);
-      await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
       const save=page.getByRole('button',{name:'매도 기록 저장',exact:true});
-      const unobscured=await save.evaluate(button=>{const rect=button.getBoundingClientRect();return rect.bottom<innerHeight-60&&button.contains(document.elementFromPoint(rect.x+rect.width/2,rect.bottom-2));});
+      // The read-only history follows the form. Test the save action at the form,
+      // rather than the end of the history where the form is outside the viewport.
+      await save.scrollIntoViewIfNeeded();
+      const unobscured=await save.evaluate(button=>{const rect=button.getBoundingClientRect();return rect.top>=0&&rect.bottom<innerHeight-60&&button.contains(document.elementFromPoint(rect.x+rect.width/2,rect.bottom-2));});
       assert.equal(unobscured,true,'save button must stay above mobile navigation');
       let dropped=false;
       const loseResponse=async route=>{
@@ -193,6 +195,65 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await page.reload();await expect(qty).toHaveValue('');assert.equal(dropped,true);
       assert.equal(await page.evaluate(()=>Object.keys(sessionStorage).filter(key=>key.startsWith('cairn:trade-entry:v1:')).map(key=>JSON.parse(sessionStorage.getItem(key))).some(draft=>!draft.fields.quantity&&!draft.fields.price&&!draft.fields.memo)),false,'loading an empty form must not freeze a new default timestamp');
       assert.deepEqual(await readState(),after,'reload must not replay the already saved trade');
+      const records=page.getByRole('region',{name:'직접 기록한 거래',exact:true});
+      await expect(records.getByRole('listitem').filter({hasText:'합성 검증 메모'}).first()).toContainText('0.896567');
+      await capture(page,output,'context-records-'+beta,width,height);
+      // A correction is a different draft; switching back must never create a new trade from the old fill.
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
+      await page.getByRole('combobox',{name:/^종목/}).selectOption(asset);
+      await qty.fill('0.000002');await page.getByLabel('체결 단가 · KRW',{exact:true}).fill('2');
+      await optional.click();await page.getByLabel('메모 · 선택',{exact:true}).fill('새 거래 초안');
+      await page.locator('summary').filter({hasText:'계좌 현금'}).click();
+      const pendingLedger=await (await page.request.get(url+'/api/portfolio/ledger')).json();
+      const pendingFill=pendingLedger.trades.find(row=>row.accountId===account&&row.event.settlementStatus==='unconfirmed');
+      await page.getByRole('button',{name:'정산 보완',exact:true}).click();
+      await expect(qty).toHaveValue(pendingFill.event.quantity);
+      await expect(page.getByLabel('시작 잔액에 이미 포함된 거래가 아닙니다.',{exact:true})).not.toBeChecked();
+      await page.reload();
+      await page.getByRole('button',{name:'새 거래 초안으로 돌아가기',exact:true}).click();
+      await expect(qty).toHaveValue('0.000002');await expect(page.getByLabel('체결 단가 · KRW',{exact:true})).toHaveValue('2');
+      await optional.click();await expect(page.getByLabel('메모 · 선택',{exact:true})).toHaveValue('새 거래 초안');
+      await expect(page.getByLabel('정정할 기록',{exact:true})).toHaveCount(0);
+      await capture(page,output,'context-correction-restored-'+beta,width,height);
+      assert.deepEqual(await readState(),after,'editing and cancelling a correction must not mutate the ledger');
+      await page.getByRole('button',{name:'총 체결금액',exact:true}).click();
+      await page.getByLabel('총 체결금액 · KRW',{exact:true}).fill('123');
+      await page.getByRole('button',{name:/^정산 금액/}).click();
+      await page.getByRole('button',{name:'정산액 없이 체결만 기록',exact:true}).click();
+      await expect(page.getByLabel('총 체결금액 · KRW',{exact:true})).toHaveValue('123');
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('exchange');
+      const currency=page.getByRole('combobox',{name:/^통화/});
+      await currency.selectOption('USD');
+      await page.getByRole('textbox',{name:'환전할 금액 USD',exact:true}).fill('12.34');
+      await page.getByRole('textbox',{name:'실제로 받은 금액 KRW',exact:true}).fill('17000');
+      await currency.selectOption('KRW');
+      await expect(page.getByRole('textbox',{name:'환전할 금액 KRW',exact:true})).toHaveValue('17,000');
+      await expect(page.getByRole('textbox',{name:'실제로 받은 금액 USD',exact:true})).toHaveValue('12.34');
+      await capture(page,output,'context-exchange-swapped-'+beta,width,height);
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
+      await expect(page.getByLabel('총 체결금액 · KRW',{exact:true})).toHaveValue('123');
+      assert.deepEqual(await readState(),after,'switching form modes and record types must not mutate the ledger');
+
+      const time=page.getByLabel('기록 시간',{exact:true}),date=page.getByLabel('기록 날짜',{exact:true});
+      assert.ok((await time.boundingBox()).width>240,'AM/PM and time control need full width');
+      assert.ok((await time.boundingBox()).y>(await date.boundingBox()).y);
+      await time.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'context-time-'+beta+'-'+width+'.png')});
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('cost_basis');
+      await page.getByLabel('매입 근거 1 · 매입원가',{exact:true}).fill('12.34');
+      await page.getByLabel('매입 근거 1 · 실제 매입 시각',{exact:true}).fill('2026-09-18T10:00:00.123');
+      await page.getByRole('button',{name:'다른 매입 날짜 추가',exact:true}).click();
+      await page.getByLabel('매입 근거 2 · 통화',{exact:true}).selectOption('KRW');
+      await page.getByLabel('매입 근거 2 · 매입원가',{exact:true}).fill('12345');
+      await page.getByLabel('매입 근거 2 · 실제 매입 시각',{exact:true}).fill('2026-09-19T12:00:00.456');
+      await page.getByRole('button',{name:'매입 근거 1 입력 지우기',exact:true}).click();
+      await expect(page.getByLabel('매입 근거 1 · 매입원가',{exact:true})).toBeFocused();
+      await expect(page.getByLabel('매입 근거 1 · 매입원가',{exact:true})).toHaveValue('12,345');
+      await expect(page.getByLabel('매입 근거 1 · 통화',{exact:true})).toHaveValue('KRW');
+      await expect(page.getByLabel('매입 근거 1 · 실제 매입 시각',{exact:true})).toHaveValue('2026-09-19T12:00:00.456');
+      await page.screenshot({path:path.join(output,'context-cost-entry-'+beta+'-'+width+'.png')});
+      assert.deepEqual(await readState(),after,'cost draft removal must not change stored cost or trades');
+      await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('cairn:trade-entry:v1:')).forEach(k=>sessionStorage.removeItem(k)));
+
       await page.emulateMedia({reducedMotion:'no-preference'});
     });
   }
@@ -213,6 +274,16 @@ export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
   for(const beta of [false,true]) await check(`guided-recovery-archived-retry-scope-${beta}`,async()=>{
     const a=await makeAccount('QA 종료 '+beta,{archived:true}),b=await makeAccount('QA 빈초안 '+beta);
     const href=id=>url+(beta?'/beta':'')+'/portfolio/holdings/new?'+new URLSearchParams({scope:'account:'+id,...(beta?{mode:'domain'}:{accountId:id})});
+    if (!beta) {
+      await page.goto(url+'/portfolio/risk?'+new URLSearchParams({scope:'account:'+a.account,currency:'USD'}));
+      await expect(page.getByText('분석 기준 · KRW',{exact:true})).toBeVisible();
+      await expect(page.getByRole('combobox',{name:'분석 통화',exact:true})).toHaveCount(0);
+      const thirty=page.getByRole('link',{name:'30일',exact:true});
+      await expect(thirty).toHaveAttribute('href',/currency=USD/);await thirty.click();
+      await expect.poll(()=>new URL(page.url()).searchParams.get('currency')).toBe('USD');
+      await capture(page,output,'context-risk-krw-basis',390,844);
+    }
+
     await page.goto(href(a.account));
     const form=page.locator('form.varda-holding-onboarding');
     await form.getByRole('radio',{name:/직접 입력하기/}).check();await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();

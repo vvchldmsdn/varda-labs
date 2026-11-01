@@ -2,12 +2,17 @@ import { Decimal, type Currency } from './money';
 import { recoveryHref } from './recovery-navigation';
 
 /** Display/navigation hints only. The destination verifies account ownership and calculation inputs. */
-export type ContributionJourney = { scope: string; amount?: string; currency?: Currency; reportingCurrency?: Currency; useCash?: boolean; beta?: boolean; preview?: boolean; excludeSell?: readonly string[] };
+export type ContributionJourney = { scope: string; amount?: string; currency?: Currency; reportingCurrency?: Currency; useCash?: boolean; beta?: boolean; preview?: boolean; excludeSell?: readonly string[]; comparison?: ComparisonDraft & { scope: string; currency: Currency } };
 export function contributionJourneyHref(path: 'compare' | 'tracking' | 'plan', journey: ContributionJourney, effectId?: string) {
   const query = new URLSearchParams({ scope: journey.scope, currency: journey.currency ?? 'KRW' });
   if (journey.amount !== undefined) query.set('amount', journey.amount);
   if (journey.beta) query.set('from', 'beta');
   if (journey.preview) query.set('preview', 'design');
+  if (path !== 'plan' && journey.comparison?.scope === journey.scope && journey.comparison.currency === (journey.currency ?? 'KRW')) {
+    for (const [key, value] of Object.entries(comparisonDraftQuery(journey.comparison))) query.set(key, value);
+    query.set('scenarioScope', journey.scope);
+    query.set('scenarioCurrency', journey.currency ?? 'KRW');
+  }
   if (path === 'plan') {
     query.set('fundingCurrency', journey.currency ?? 'KRW');
     query.set('currency', journey.reportingCurrency ?? journey.currency ?? 'KRW');
@@ -55,4 +60,23 @@ export function comparisonDraft(params: SearchValues): ComparisonDraft {
 }
 export function comparisonDraftQuery(draft: ComparisonDraft) {
   return { horizon: draft.horizon, pricePct: draft.price, fxPct: draft.fx, scenarioRows: JSON.stringify(Object.entries(draft.overrides)) };
+}
+
+export function comparisonContinuation(params: SearchValues, scope: string, currency: Currency): ContributionJourney['comparison'] {
+  return params.scenarioScope === scope && params.scenarioCurrency === currency
+    ? { ...comparisonDraft(params), scope, currency } : undefined;
+}
+
+export function contributionBackHref(journey: ContributionJourney): string {
+  const query = new URLSearchParams({ scope: journey.scope, currency: journey.currency ?? 'KRW' });
+  if (journey.preview) query.set('preview', 'design');
+  if (journey.beta) query.set('mode', 'domain');
+  // Beta's home planner takes KRW, regardless of its display currency.
+  if (journey.amount !== undefined && (!journey.beta || journey.currency !== 'USD')) query.set(journey.beta ? 'cashAmountKrw' : 'amount', journey.amount);
+  // Supply the home's independent KRW default before attaching the continuation.
+  // Its server redirect cannot retain a browser-only fragment. This is never a
+  // conversion of the comparison's USD input, which stays in the return address.
+  if (journey.beta && !query.has('cashAmountKrw')) query.set('cashAmountKrw', '1000000');
+  const destination = `${journey.beta ? '/beta' : '/additional-contribution'}?${query}`;
+  return recoveryHref(destination, contributionJourneyHref('compare', journey)) ?? destination;
 }
