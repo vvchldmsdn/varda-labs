@@ -53,7 +53,6 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
    <div className={styles.explorer}>
     <div className={styles.chart}>
      <SectionHeading title="종목별 가격·환율 변동" description={"변동액 크기순 · " + context.currency} />
-     <div className={styles.axis} aria-hidden="true"><span>감소</span><span>증가</span></div>
      <div className={styles.rows} aria-label="종목별 변동 기여 목록">
       {rows.map(row=><button key={row.key} type="button" className={styles.row} onClick={()=>select(row)} onFocus={()=>select(row)} aria-pressed={active?.key===row.key} aria-controls={readoutId} aria-label={(row.name??"이름 확인 전")+" · "+(row.accountLabel??"계좌 확인 전")+" · 변동 "+money(row.changeKrw,true)+" "+context.currency+" · 가격·환율 수익률 "+formatPercent(row.returnPct,2,true)}>
        <span className={styles.identity}><strong title={row.name??undefined}>{row.name??"이름 확인 전"}</strong><small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></span>

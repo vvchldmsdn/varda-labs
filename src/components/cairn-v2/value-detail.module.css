@@ -1,7 +1,7 @@
-.detail {min-width:0;display:grid;gap:28px;padding:28px 0 30px;color:var(--cairn-v2-ink);font-feature-settings:"cv02","cv03","cv04","cv11";}
+.detail {min-width:0;display:grid;gap:24px;padding:8px 0 30px;color:var(--cairn-v2-ink);font-feature-settings:"cv02","cv03","cv04","cv11";}
 .hero {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:30px;}
 .eyebrow {font-size:11px;color:var(--cairn-v2-muted);line-height:1.6;}
-.amount {display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-top:14px!important;font-size:clamp(34px,4.5vw,62px);font-weight:450;letter-spacing:-.065em;line-height:1.1;font-variant-numeric:tabular-nums;}
+.amount {display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-top:0!important;font-size:clamp(34px,4.5vw,62px);font-weight:450;letter-spacing:-.065em;line-height:1.1;font-variant-numeric:tabular-nums;}
 .amount>span {min-width:0;overflow-wrap:anywhere;}
 .amount small {font-size:14px;font-weight:400;letter-spacing:0;white-space:nowrap;color:var(--cairn-v2-muted);}
 .basis {margin-top:13px!important;font-size:12px;color:var(--cairn-v2-muted);line-height:1.6;}

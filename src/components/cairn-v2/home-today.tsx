@@ -26,24 +26,21 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
     );
   return (
     <div className={styles.body}>
-      <p className={styles.label}>가격·환율 변동률 · KRW</p>
-      <p className={styles.headline}>
+      <p className={styles.headline} aria-label="오늘 변동률 · KRW 기준">
         <ValueText tone={tone}>{formatPercent(value, 2, true)}</ValueText>
       </p>
-      <p className={styles.amount}>
+      <p className={styles.amount} data-tone={tone} aria-label={`오늘 변동액 · ${currency}`}>
         {ready && current.changeKrw !== null ? (
           <>
             {displayReadMoney(view, current.changeKrw, currency, true, "dashboard")}{" "}
-            {currency === "KRW" ? "원" : "USD"}
+            <small>{currency === "KRW" ? "원" : "USD"}</small>
           </>
         ) : (
           "비교 근거 확인 전"
         )}
       </p>
-      <p className={styles.note}>
-        현재 보유 수량 기준{ready ? ` · ${current.includedCount}종목` : ""}
-        {ready && current.excludedCount > 0 ? ` · 제외 ${current.excludedCount}종목` : ""}
-      </p>
+      {ready && current.excludedCount > 0 && <p className={styles.note}>일부 종목 기준 · {current.excludedCount}종목 제외</p>}
+      {currency === "USD" && <p className={styles.note}>변동률은 KRW 기준</p>}
     </div>
   );
 }

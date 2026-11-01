@@ -4,6 +4,7 @@ import type { RecoveredReturnCurve } from '@/lib/period-return-recovery';
 import { buildReturnTimeline, returnTimelineSegments, returnTimelineLabel, type StoredReturnPoint } from '@/lib/return-timeline';
 import styles from './return-timeline-chart.module.css';
 import { Input as CairnInput } from "@/components/cairn-ui";
+import { useMeasuredPlot } from "@/components/use-measured-plot";
 
 
 export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays, selectedDate, onSelect, onInspect, hideReadout = false }: {
@@ -11,6 +12,7 @@ export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays,
   selectedDate?: string | null; onSelect?: (date: string) => void; onInspect?: (date: string | null) => void; hideReadout?: boolean;
 }) {
   const points = buildReturnTimeline(stored, curve, rangeDays);
+  const [measured, setPlotElement] = useMeasuredPlot();
   const [localDate, setLocalDate] = useState<string | null>(null);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const chosen = points.findIndex(p => p.date === (hoverDate ?? selectedDate ?? localDate));
@@ -21,8 +23,10 @@ export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays,
   const min = Math.min(0, ...values), max = Math.max(0, ...values), padding = Math.max((max - min) * .12, .4);
   const low = min - padding, high = max + padding;
   const first = Date.parse(points[0].date), elapsed = Date.parse(points.at(-1)!.date) - first || 1;
-  const x = (date: string) => 14 + (Date.parse(date) - first) / elapsed * 932;
-  const y = (v: number) => 304 - (v - low) / (high - low) * 266;
+  const width = measured.width || 960, height = measured.height || (compact ? 185 : 300);
+  const left = 14, right = width - 14, top = 30, bottom = height - 20;
+  const x = (date: string) => left + (Date.parse(date) - first) / elapsed * (right - left);
+  const y = (v: number) => bottom - (v - low) / (high - low) * (bottom - top);
   const percent = (v: number | null) => v === null ? '종가 미확인' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
   const series = [
     { field: 'storedPct' as const, color: 'var(--ink, #20211f)' },
@@ -35,7 +39,7 @@ export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays,
   const leave = () => { setHoverDate(null); onInspect?.(null); };
   const inspect = (event: PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const at = (event.clientX - rect.left) / rect.width * 960;
+    const at = (event.clientX - rect.left) / rect.width * width;
     const nearest = points.reduce((best, p) => Math.abs(x(p.date) - at) < Math.abs(x(best.date) - at) ? p : best, points[0]);
     setHoverDate(nearest.date); onInspect?.(nearest.date);
     if (event.type === 'pointerdown') choose(nearest.date);
@@ -46,18 +50,22 @@ export function ReturnTimelineChart({ stored, curve, compact = false, rangeDays,
       <span><i className={styles.recoveredDot}/>복구 기간 · {curve.baseDate.slice(5).replace('-', '.')} = 0%</span>
     </figcaption>
     {!hideReadout && <div className={styles.readout}><span>{current.date} · {returnTimelineLabel(current)}</span><strong>{percent(current.returnPct)}</strong></div>}
-    <div className={styles.plotArea}>
-    {baseVisible && <span className={styles.basisLabel} style={{left: `${Math.min(70,x(curve.baseDate)/960*100)}%`}}>{hasPrior ? "계산 기준 변경" : "복구 시작 · 0%"}</span>}
-    <svg viewBox="0 0 960 340" preserveAspectRatio="none" role="img" aria-label={`수익률 추이 ${points[0].date}부터 ${points.at(-1)!.date}, 계산 기준 구분, ${gaps.length}일 종가 미확인`}
+    <div ref={setPlotElement} className={styles.plotArea}>
+    {baseVisible && <span className={styles.basisLabel} style={{left: `${Math.min(70,x(curve.baseDate)/width*100)}%`}}>{hasPrior ? "계산 기준 변경" : "복구 시작 · 0%"}</span>}
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`수익률 추이 ${points[0].date}부터 ${points.at(-1)!.date}, 계산 기준 구분, ${gaps.length}일 종가 미확인`}
       className={styles.plot} onPointerMove={inspect} onPointerDown={inspect} onPointerLeave={leave} onPointerCancel={leave}>
-      <line x1="14" x2="946" y1={y(0)} y2={y(0)} stroke="var(--line, #d9dbd5)" strokeDasharray="3 6" />
-      {gaps.map(p => <rect key={p.date} x={x(p.date) - Math.max(2, 466 * 86400000 / elapsed)} y="30" width={Math.max(4, 932 * 86400000 / elapsed)} height="280" fill="var(--muted, #777a73)" opacity=".07"><title>{`${p.date} · 해당 거래일 종가 미수집`}</title></rect>)}
+      <line x1={left} x2={right} y1={y(0)} y2={y(0)} stroke="var(--line, #d9dbd5)" strokeDasharray="3 6" />
+      {gaps.map(p => {
+        const gapWidth = Math.min(right - left, Math.max(4, (right - left) * 86400000 / elapsed));
+        const start = Math.max(left, x(p.date) - gapWidth / 2);
+        return <rect key={p.date} x={start} y={top} width={Math.min(gapWidth, right - start)} height={bottom - top} fill="var(--muted, #777a73)" opacity=".07"><title>{`${p.date} · 해당 거래일 종가 미수집`}</title></rect>;
+      })}
       {series.flatMap(({ field, color }) => returnTimelineSegments(points, field).map((segment, i) => <g key={`${field}-${i}`} data-return-series={field}>
         <path d={segment.map((p, j) => `${j ? 'L' : 'M'}${x(p.date).toFixed(2)},${y(p[field]!).toFixed(2)}`).join(' ')} fill="none" stroke={color} strokeWidth={compact ? 1.4 : 2.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         {segment.length === 1 && <circle cx={x(segment[0].date)} cy={y(segment[0][field]!)} r="3" fill={color}/>}
       </g>))}
-      {baseVisible && <g><line x1={x(curve.baseDate)} x2={x(curve.baseDate)} y1="25" y2="310" stroke="var(--muted, #777a73)" strokeDasharray="4 5" opacity=".6"/></g>}
-      <line x1={x(current.date)} x2={x(current.date)} y1="32" y2="312" stroke="var(--ink, #20211f)" strokeDasharray="2 5" opacity=".16" />
+      {baseVisible && <g><line x1={x(curve.baseDate)} x2={x(curve.baseDate)} y1={top} y2={bottom} stroke="var(--muted, #777a73)" strokeDasharray="4 5" opacity=".6"/></g>}
+      <line x1={x(current.date)} x2={x(current.date)} y1={top} y2={bottom} stroke="var(--ink, #20211f)" strokeDasharray="2 5" opacity=".16" />
       {current.returnPct !== null && <circle cx={x(current.date)} cy={y(current.returnPct)} r={compact ? 4 : 6} fill={current.basis === 'stored' ? 'var(--ink, #20211f)' : 'var(--brand, #c64623)'} stroke="var(--paper, #f7f8f3)" strokeWidth="2"/>}
     </svg>
     </div>

@@ -8,6 +8,7 @@ import styles from "./beta.module.css";
 import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { CURRENT_VALUATION_SOURCE, historyWithCurrentValue } from "@/lib/cairn-v2/history-current";
 import { useBetaPreferences } from "./beta-provider";
+import { useMeasuredPlot } from "@/components/use-measured-plot";
 
 import { historyRows, historyAxis, readStateText } from "@/lib/cairn-v2/read-presentation";
 export { historyRows } from "@/lib/cairn-v2/read-presentation";
@@ -29,6 +30,7 @@ export function HistoryChart({
   compact?: boolean;
 }) {
   const { metric, period, historyDate, setHistoryDate } = useBetaPreferences();
+  const [measured, setPlotElement] = useMeasuredPlot();
   const historySource = historySourceView(inputView, undefined, historyDate);
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
@@ -80,9 +82,9 @@ export function HistoryChart({
   const min = Math.min(...valid);
   const max = Math.max(...valid);
   const extent = max - min || 1;
-  const plot = compact
-    ? { width: 485, height: 230, left: 4, right: 481, top: 18, bottom: 216 }
-    : { width: 864, height: 410, left: 12, right: 852, top: 22, bottom: 382 };
+  const width = measured.width || (compact ? 485 : 864);
+  const height = measured.height || (compact ? 220 : 410);
+  const plot = { width, height, left: 8, right: width - 8, top: 16, bottom: height - 16 };
   const axis = historyAxis(rows);
   const points = values.map((value, i) =>
     value === null
@@ -154,9 +156,10 @@ export function HistoryChart({
       {view.domain?.historyState === "partial" && (
         <p className={styles.muted}>부분 이력 포함 · 확인 소계 · 전체 비교 주의</p>
       )}
+      <div ref={setPlotElement} className={styles.historyPlot} data-history-plot>
       <svg
         viewBox={`0 0 ${plot.width} ${plot.height}`}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         tabIndex={compact ? undefined : 0}
         aria-label={
@@ -191,7 +194,7 @@ export function HistoryChart({
             <stop offset="1" stopColor="#c64623" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {(compact ? [89, 183, 277] : [plot.top, (plot.top + plot.bottom) / 2, plot.bottom]).map(
+        {[plot.top, (plot.top + plot.bottom) / 2, plot.bottom].map(
           (y) => (
             <line
               key={y}
@@ -208,7 +211,7 @@ export function HistoryChart({
         {segments.map((d, i) => (
           <g key={i}>
             {compact && !view.domain && view.history.every((p) => p.valueKrw !== null) && (
-              <path d={`${d} L481,282 L4,282 Z`} fill={`url(#${gradientId})`} />
+              <path d={`${d} L${plot.right},${plot.bottom} L${plot.left},${plot.bottom} Z`} fill={`url(#${gradientId})`} />
             )}
             <path
               d={d}
@@ -269,6 +272,7 @@ export function HistoryChart({
           />
         )}
       </svg>
+      </div>
       <figcaption className={`${styles.chartDates} ${styles.historyDates}`}>
         {axis.labels.map((date, i) => (
           <span
