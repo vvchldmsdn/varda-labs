@@ -75,7 +75,7 @@ function CurrencyResearchWorkspace({ evidence, surface, hideCurrencyControl, rec
   const owned = evidence.provenance === "owned_native_history" && evidence.input.version === 3;
   const scenarios = evidence.histories.filter(history => history.admission !== "native_cash");
   const horizons = owned && surface === "simulation" ? [63, 126] : [30, 126, 252];
-  const path = surface === "simulation" ? "/simulation" : surface === "structure" ? "/portfolio/structure" : "/investment-lab";
+  const path = surface === "simulation" ? "/simulation" : surface === "structure" ? "/portfolio/structure" : surface === "lab" ? "/investment-lab" : null;
   const defaults: NativeViewDraft = { version: 1, scope: recoveryScope ?? "all", view: surface ?? "research", currency: evidence.reportingCurrency,
     instruments: evidence.input.rows.map(row => row.instrumentId ?? ""), selected: "0", horizon: evidence.horizon ?? 126, step: evidence.horizon ?? 126,
     scenarioId: scenarios[0]?.instrumentId ?? "", ...(evidence.comparisonWeights ? { comparison: [...evidence.comparisonWeights] } : {}) };

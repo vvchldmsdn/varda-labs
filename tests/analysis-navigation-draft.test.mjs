@@ -90,6 +90,13 @@ test('actual navigation draft hook keeps edits on reload/back and refuses late w
     globalThis.location = new URL(`https://test.invalid${path}?scope=account:other&amount=10&currency=KRW`);
     update({ ...edited, amount: '999' });
     assert.equal(writes.length, 2); assert.equal(location.searchParams.get('amount'), '10');
+    globalThis.location = new URL('https://test.invalid/portfolio/research?draft=saved-input');
+    local = undefined;
+    const standalone = { ...options, path: null };
+    useNavigationDraft(standalone)[1](edited);
+    assert.deepEqual(useNavigationDraft(standalone)[0], edited, 'standalone research retains its existing local edits');
+    assert.equal(useNavigationDraft(standalone)[2], false);
+    assert.equal(writes.length, 2, 'saved-input research must not write account continuation URLs');
   } finally {
     if (oldLocation === undefined) delete globalThis.location; else globalThis.location = oldLocation;
     if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow;

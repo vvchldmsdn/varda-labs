@@ -16,7 +16,7 @@ const canonical = (value: unknown): string => JSON.stringify(value, (_key, item)
 
 /** Editable hints live in this history entry, never in financial records or a shared user store. */
 export function useNavigationDraft<T>({ initial, path, scope, read, write }: {
-  initial: T; path: string; scope?: string;
+  initial: T; path: string | null; scope?: string;
   read: (query: URLSearchParams) => T | null;
   write: (value: T) => Record<string, string>;
 }) {
@@ -30,7 +30,9 @@ export function useNavigationDraft<T>({ initial, path, scope, read, write }: {
   const serialized = JSON.stringify(value);
   const stableValue = useMemo(() => JSON.parse(serialized) as T, [serialized]);
   function update(next: T) {
-    if (typeof window === 'undefined') { setLocal({ value: next, rejectedAt: null }); return; }
+    // Standalone saved-input research has its own identity lifecycle, not an
+    // account continuation URL. Preserve its existing local editing behavior.
+    if (path === null || typeof window === 'undefined') { setLocal({ value: next, rejectedAt: null }); return; }
     const current = new URL(location.href);
     // A late event from an old account/surface must not overwrite the new URL.
     if (current.pathname !== path || current.searchParams.getAll('scope').length > 1 || (current.searchParams.get('scope') ?? 'all') !== (scope ?? 'all')) {
