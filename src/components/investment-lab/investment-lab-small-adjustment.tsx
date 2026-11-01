@@ -212,7 +212,7 @@ export function InvestmentLabSmallAdjustment({
               </span>
               <span><LabText value="직접 보유 " />{selectedAccount.holdings.length}<LabText value="개" /></span>
               {source ? (
-                <span><LabText value="이동 가능 상한 " /><LabText value={formatKrw(source.currentValueKrw)} /></span>
+                <span><LabText value="이동 가능 상한 " /><LabText value={formatKrw(Math.floor(source.currentValueKrw))} /></span>
               ) : null}
             </div>
           </CairnForm>

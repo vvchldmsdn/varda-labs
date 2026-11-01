@@ -106,6 +106,7 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await section.getByLabel('늘릴 보유자산',{exact:true}).selectOption({index:2});
     const amount=section.getByRole('spinbutton',{name:/이동 금액/});
     const max=Number(await amount.getAttribute('max'));
+    await expect(section).toContainText(`이동 가능 상한 ₩${max.toLocaleString('ko-KR')}`);
     await amount.fill(String(max+1));await section.getByRole('button',{name:'영향 계산',exact:true}).click();
     await expect(section.getByRole('alert')).toContainText('까지 입력해 주세요.');
     await expect(amount).toHaveValue(String(max+1));await expect(amount).toHaveAttribute('aria-invalid','true');
