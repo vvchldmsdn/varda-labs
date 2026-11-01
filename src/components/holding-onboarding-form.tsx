@@ -59,6 +59,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [photoDraft, setPhotoDraft] = useState<BalanceReviewRow[]>([]);
   const [tableDraft, setTableDraft] = useState<TableHoldingDraft>({ text: "", rows: [] });
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const needsFocus = useRef(false);
   function go(next: 0 | 1 | 2) {
@@ -74,12 +75,13 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
   }, [step]);
   const draftKey = !preview && options.draftOwnerKey ? `cairn:holding-draft:v2:${options.draftOwnerKey}:${accountId}` : null;
   const hydratedKey = useRef<string | null>(null);
-  function retainDraft(inFlight = uncertain, completed?: { saved: typeof saved; results: typeof rowResults }) {
+  function retainDraft(inFlight = uncertain, completed?: { saved: typeof saved; results: typeof rowResults }, submitted = hasSubmitted) {
     if (!draftKey) return true;
-    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, saved: completed?.saved ?? saved, accountId, groupId, groupName, results: completed?.results ?? rowResults, uncertain: inFlight, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); return true; }
+    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, hasSubmitted: submitted, saved: completed?.saved ?? saved, accountId, groupId, groupName, results: completed?.results ?? rowResults, uncertain: inFlight, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); return true; }
     catch { setDraftUnavailable(true); return false; }
   }
   const [state, action, pending] = useActionState(async (previous: HoldingBatchState, data: FormData) => {
+    setHasSubmitted(true);
     const allRows: HoldingDraft[] = JSON.parse(String(data.get("holdings")));
     const submitted = data.get("retryKey") ? allRows.filter(row => row.key === data.get("retryKey")) : allRows;
     data.set("holdings", JSON.stringify(submitted));
@@ -89,7 +91,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
       return { status: "invalid", attemptedKeys: [], results: invalid } as HoldingBatchState;
     }
     // Persist the immutable submission before any request can reach the server.
-    if (!retainDraft([...new Set([...uncertain, ...submitted.map(row => row.key)])])) return previous;
+    if (!retainDraft([...new Set([...uncertain, ...submitted.map(row => row.key)])], undefined, true)) return previous;
     setUncertain([...new Set([...uncertain, ...submitted.map(row => row.key)])]);
     let result: HoldingBatchState;
     try { result = await submitBatch(previous, data); }
@@ -108,7 +110,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
       if (row) nextSaved[item.key] = identity(row);
     }
     setSaved(nextSaved);
-    retainDraft(nextUncertain, { saved: nextSaved, results: [...rowResults.filter(item => !result.results.some(next => next.key === item.key)), ...result.results] });
+    retainDraft(nextUncertain, { saved: nextSaved, results: [...rowResults.filter(item => !result.results.some(next => next.key === item.key)), ...result.results] }, true);
     if (rows.length > 0 && rows.every(row => nextSaved[row.key])) onComplete?.(accountId);
     return result;
   }, INITIAL_STATE);
@@ -127,6 +129,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
         setRows(draft.rows); setSaved(draft.saved ?? {});
         setGroupId(draft.groupId ?? ""); setGroupName(draft.groupName ?? "");
         setRowResults(draft.results ?? []); setUncertain(draft.uncertain ?? []);
+        setHasSubmitted(draft.hasSubmitted === true || Object.keys(draft.saved ?? {}).length > 0 || (draft.results?.length ?? 0) > 0 || (draft.uncertain?.length ?? 0) > 0);
         const workspace = draft.workspace;
         setStep(workspace && [0, 1, 2].includes(workspace.step) ? workspace.step : draft.rows.length ? 2 : 0);
         if (workspace) {
@@ -146,9 +149,9 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
   }, [draftKey, options.accounts, options.draftOwnerKey, accountId]);
   useEffect(() => {
     if (!draftLoaded || !draftKey) return;
-    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, saved, accountId, groupId, groupName, results: rowResults, uncertain, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); }
+    try { sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), rows, hasSubmitted, saved, accountId, groupId, groupName, results: rowResults, uncertain, workspace: { step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft } })); }
     catch { queueMicrotask(() => setDraftUnavailable(true)); }
-  }, [draftLoaded, draftKey, rows, saved, accountId, groupId, groupName, rowResults, uncertain, step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft]);
+  }, [draftLoaded, draftKey, rows, saved, accountId, groupId, groupName, rowResults, uncertain, hasSubmitted, step, method, searchQuery, selected, quantity, cost, manualMarket, manualType, manualTicker, manualName, photoDraft, tableDraft]);
   const unsaved = rows.filter(row => !saved[row.key]);
   const hasSaved = Object.keys(saved).length > 0;
   const allSaved = rows.length > 0 && hasSaved && unsaved.length === 0;
@@ -194,7 +197,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
     setRowResults(previous => previous.filter(row => row.key !== key));
   }
 
-  const completion = hasSaved ? <CairnStatus as="div" tone="success" className={`varda-onboarding-success ${motion.success}`} role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href={`/portfolio/first-look?${new URLSearchParams({scope: `account:${accountId}`})}`}>{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{hasSaved ? <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" onClick={() => { setRows(previous => previous.filter(row => !saved[row.key])); if (unsaved.length === 0 && uncertain.length === 0) { setSaved({}); setRowResults([]); setResumedAccount(null); go(0); } }} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></CairnButton> : null}</CairnStatus> : null;
+  const completion = hasSaved ? <CairnStatus as="div" tone="success" className={`varda-onboarding-success ${motion.success}`} role="status"><Check size={20} /><strong>{t(`${Object.keys(saved).length}종목이 포트폴리오에 담겼어요.`, `${Object.keys(saved).length} holdings added to your portfolio.`)}</strong><Link href={`/portfolio/first-look?${new URLSearchParams({scope: `account:${accountId}`})}`}>{t("내 포트폴리오 첫 화면 보기", "See your portfolio")}<ArrowRight size={16} /></Link>{hasSaved ? <CairnButton variant="secondary" type="button" className="varda-onboarding-text-button" onClick={() => { setRows(previous => previous.filter(row => !saved[row.key])); if (unsaved.length === 0 && uncertain.length === 0) { setSaved({}); setRowResults([]); setHasSubmitted(false); setResumedAccount(null); go(0); } }} disabled={pending}>{t("저장된 목록 접고 더 추가하기", "Clear saved rows and add more")}<Plus size={16} /></CairnButton> : null}</CairnStatus> : null;
 
   if (nativeAccountIds.includes(accountId)) return <div className="varda-holding-onboarding">
     <CairnField>{t("담을 계좌", "Add to account")}<CairnSelect className="cairn-form-select" value={accountId} onChange={event => selectAccount(event.target.value)} aria-label={t("보유 계좌", "Holding account")}>{options.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</CairnSelect></CairnField>
@@ -266,7 +269,7 @@ export function HoldingOnboardingWorkspace({ options, initialAccountId, nativeAc
             <CairnField className="varda-onboarding-row-quantity">{t("보유 수량", "Quantity")}<CairnInput type="number" inputMode="decimal" min="0.000001" step="0.000001" value={row.quantity} required disabled={locked} onChange={event => editRow(row.key, "quantity", event.target.value)} aria-label={t(`${row.name} 보유 수량`, `${row.name} quantity`)} /></CairnField>
             {!isSaved ? <details className="varda-onboarding-disclosure"><summary>{t("매입가·가격 확인", "Cost & price lookup")}</summary><div className="varda-onboarding-fields"><CairnField>{t("평균 매입가 (선택)", "Average cost (optional)")}<CairnInput type="number" inputMode="decimal" min="0.0001" step="0.0001" value={row.averageCost} disabled={locked} onChange={event => editRow(row.key, "averageCost", event.target.value)} /></CairnField><CairnField>{t("현재 1주 가격 · 자동 조회가 안 될 때", "Current price if lookup is unavailable")}<CairnInput type="number" inputMode="decimal" min="0.0001" step="0.0001" value={row.currentPrice} disabled={locked} onChange={event => editRow(row.key, "currentPrice", event.target.value)} /></CairnField></div><p>{t("저장하려면 자동 조회 가격 또는 직접 입력한 현재가가 필요해요. 매입가는 비워도 됩니다.", "We look up the current price. If unavailable, you can enter it here.")}</p></details> : null}
             {!isSaved ? <span className="varda-onboarding-hint">{uncertain.includes(row.key) ? t("저장 확인 필요", "Confirm save") : result?.status === "price_unavailable" ? result.retryAfterSeconds ? t("시세 조회 대기", "Price lookup pending") : t("가격 입력 필요", "Price required") : result && result.status !== "success" ? t("저장 실패 · 다시 확인", "Save failed · review") : t("저장 대기", "Ready to save")}</span> : null}
-            {!isSaved && (state.status !== "idle" || uncertain.includes(row.key)) && <CairnButton variant="secondary" type="submit" name="retryKey" value={row.key} disabled={pending || preview || !draftLoaded}>{uncertain.includes(row.key) ? t("저장 여부 확인·재시도", "Check save & retry") : t("이 종목 다시 저장", "Retry this holding")}</CairnButton>}
+            {!isSaved && (hasSubmitted || uncertain.includes(row.key)) && <CairnButton variant="secondary" type="submit" name="retryKey" value={row.key} disabled={pending || preview || !draftLoaded}>{uncertain.includes(row.key) ? t("저장 여부 확인·재시도", "Check save & retry") : t("이 종목 다시 저장", "Retry this holding")}</CairnButton>}
             {result?.conflictReason && <Link href={`${typeof window !== "undefined" && window.location.pathname.startsWith("/beta") ? "/beta/portfolio/holdings/manage" : "/portfolio/holdings"}?scope=account:${accountId}`}>{t("기존 보유 기록 확인", "Review existing holding")}</Link>}
             {result && !isSaved && result.message ? <CairnStatus as="p" tone="neutral" role="status" className="varda-onboarding-error"><ManagementText>{result.message}</ManagementText></CairnStatus> : null}
           </li>;

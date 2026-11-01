@@ -235,6 +235,7 @@ export async function runGuidedRecoveryQa({page,check,admin,owner,url,output}) {
     await first.locator('summary').click();await first.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
     await first.getByRole('button',{name:'이 종목 다시 저장',exact:true}).click();
     await expect(first).toHaveAttribute('data-saved','true');await expect(second).toContainText('가격 입력 필요');
+    await page.reload();await expect(first).toHaveAttribute('data-saved','true');await expect(second).toContainText('가격 입력 필요');
     await second.locator('summary').click();await second.getByLabel('현재 1주 가격 · 자동 조회가 안 될 때',{exact:true}).fill('100');
     await second.getByRole('button',{name:'이 종목 다시 저장',exact:true}).click();
     if(beta)await expect.poll(()=>new URL(page.url()).pathname).toBe('/beta/portfolio/holdings/manage');

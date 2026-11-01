@@ -193,6 +193,7 @@ async function batchFormFixture(locale, outcomes, { collectionState = null, init
   }
   return {
     render, submissions, submittedAccountIds,
+    resetActionState() { actionState = idle; },
     add(ticker) {
       render().find(node => node.type === InstrumentSearch).props.onSelect({ id: "", ticker, name: ticker, market: "us", currency: "USD", assetType: "stock" });
       const quantity = render().find(node => node.props?.className?.split(" ").includes("varda-onboarding-quantity"));
@@ -364,4 +365,20 @@ it('writer error locks only attempted rows and allows an independent row retry',
   assert.deepEqual(h.submissions[1].map(row=>row.ticker),['VOO']);
   assert.equal(h.render().find(node=>node.props?.['aria-label']==='AAPL quantity').props.disabled,true);
   assert.deepEqual(JSON.parse(h.render().find(node=>node.props?.name==='holdings').props.value).map(row=>row.ticker),['AAPL']);
+});
+
+it('keeps row retry available when a refresh resets the action and the missing price is corrected',async()=>{
+  const h=await batchFormFixture('en',[
+    rows=>({status:'partial',results:rows.map(row=>({key:row.key,result:waitingPrice}))}),
+    rows=>({status:'complete',results:rows.map(row=>({key:row.key,result:success}))})
+  ]);
+  h.add('VOO');await h.submit();h.resetActionState();
+  const row=h.render().find(node=>node.type==='li' && node.props['data-saved']===false);
+  const price=elements(row).filter(node=>node.type==='input').at(-1);
+  price.props.onChange({target:{value:'100'}});
+  const retry=h.render().find(node=>node.type==='button' && node.props.name==='retryKey');
+  assert.ok(retry,'editing a restored draft must not remove the row retry action');
+  await h.submit(retry.props.value);
+  assert.deepEqual(h.submissions.map(rows=>rows.map(row=>row.ticker)),[['VOO'],['VOO']]);
+  assert.equal(h.render().filter(node=>node.type==='li' && node.props['data-saved']===true).length,1);
 });
