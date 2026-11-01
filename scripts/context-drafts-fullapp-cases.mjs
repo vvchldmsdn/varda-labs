@@ -15,13 +15,17 @@ async function comparisonValues(page) {
   await expect(controls.getByRole('textbox', { name: '새 투자금', exact: true })).toHaveValue('240.25');
   await expect(controls.getByRole('combobox', { name: '투자금 통화', exact: true })).toHaveValue('USD');
   await expect(controls.getByRole('combobox', { name: '비교 시점', exact: true })).toHaveValue('90');
-  await expect(page.getByRole('spinbutton', { name: '종목 가격 변화 (%)', exact: true })).toHaveValue('10');
-  await expect(page.getByRole('spinbutton', { name: 'USD/KRW 변화 (%)', exact: true })).toHaveValue('-5');
+  await expect(page.getByRole('spinbutton', { name: /^종목 가격 변화/ })).toHaveValue('10');
+  await expect(page.getByRole('spinbutton', { name: /^USD\/KRW 변화/ })).toHaveValue('-5');
 }
 
 /** Run after the existing contribution journey has approved targets and admitted FX. No writes. */
-export async function runContextComparisonDraftCases({ page, check, account, url, output }) {
+export async function runContextComparisonDraftCases({ page, check, admin, account, url, output }) {
   admit(url, account);
+  // This USD-funding journey needs current FX, unlike the preceding KRW cases.
+  // Seed only the runner's disposable database, never relax production evidence.
+  const observed = new Date(Date.now() - 60000).toISOString();
+  await admin.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values($1,1400,'synthetic','ok',$2,$2,'spot')", [observed.slice(0, 10), observed]);
   const scope = `account:${account}`;
   for (const beta of [false, true]) {
     await check(`fullapp-context-comparison-draft-${beta ? 'beta-360' : 'original-390'}`, async () => {
@@ -33,8 +37,8 @@ export async function runContextComparisonDraftCases({ page, check, account, url
       await controls.getByRole('textbox', { name: '새 투자금', exact: true }).fill('240.25');
       await controls.getByRole('combobox', { name: '투자금 통화', exact: true }).selectOption('USD');
       await controls.getByRole('combobox', { name: '비교 시점', exact: true }).selectOption('90');
-      await page.getByRole('spinbutton', { name: '종목 가격 변화 (%)', exact: true }).fill('10');
-      await page.getByRole('spinbutton', { name: 'USD/KRW 변화 (%)', exact: true }).fill('-5');
+      await page.getByRole('spinbutton', { name: /^종목 가격 변화/ }).fill('10');
+      await page.getByRole('spinbutton', { name: /^USD\/KRW 변화/ }).fill('-5');
       await page.getByText('종목별 변화율 직접 입력', { exact: true }).click();
       const overrides = page.locator('details[open]').filter({ has: page.locator('input[type="number"]') }).getByRole('spinbutton');
       await overrides.first().fill('2.5');

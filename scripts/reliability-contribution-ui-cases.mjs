@@ -95,7 +95,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,ass
     await switchLanguage(page,'한국어로 전환');
   });
   await runContributionJourneyUiCases({page,check,admin,owner,account,asset,url,output});
-  await runContextComparisonDraftCases({page,check,account,url,output});
+  await runContextComparisonDraftCases({page,check,admin,account,url,output});
 }
 
 export async function runLegacyContributionUiCase({page,check,account,url,output}) {

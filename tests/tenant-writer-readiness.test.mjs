@@ -63,6 +63,8 @@ const REHEARSAL_ONLY_DML_PATHS = new Set([
   "scripts/reliability-auto-refresh-ui-cases.mjs", // Injected disposable cluster only; synthetic automatic-refresh UI fixtures.
   "scripts/reliability-onboarding-qa-cases.mjs", // Same injected disposable cluster; synthetic holdings/FX fixtures, never a product writer.
   "scripts/guided-entry-fullapp-cases.mjs", // Same injected disposable cluster; synthetic catalog/account fixtures for guided registration.
+  "scripts/context-readiness-fullapp-cases.mjs", // Injected disposable cluster; synthetic accounts and analysis evidence only.
+  "scripts/context-drafts-fullapp-cases.mjs", // Injected disposable cluster; current FX fixture for USD draft navigation only.
   "scripts/ui-convergence-fullapp-cases.mjs", // Same injected disposable cluster; synthetic UI fixtures only.
   "scripts/reliability-limit-cases.mjs", // Bounded synthetic replay fixtures on injected isolated pools.
   "scripts/reliability-browser-cases.mjs", // Browser fixture uses the same isolated DB and synthetic identity ports.
@@ -95,6 +97,19 @@ describe("tenant writer Phase 1D-A readiness", () => {
     assert.match(source, /export async function prepareCutoffUpgradeAudit\(db\)/);
     for (const path of walkProductRuntimeFiles(join(ROOT, "src"))) {
       assert.doesNotMatch(readFileSync(path, "utf8"), /cutoff-upgrade-audit/);
+    }
+  });
+
+  it("confines analysis context fixtures to the injected full-app rehearsal", () => {
+    for (const file of ["scripts/context-readiness-fullapp-cases.mjs", "scripts/context-drafts-fullapp-cases.mjs"]) {
+      const source = readFileSync(join(ROOT, file), "utf8");
+      assert.equal(REHEARSAL_ONLY_DML_PATHS.has(file), true);
+      assert.doesNotMatch(source, /DATABASE_URL|process\.env|dotenv|fetch\(|new (?:Client|Pool)/);
+      assert.match(source, /localhost/);
+      assert.equal(TENANT_WRITER_REGISTRY.some(writer => writer.implementationPaths.includes(file)), false);
+    }
+    for (const file of walkProductRuntimeFiles(join(ROOT, "src"))) {
+      assert.doesNotMatch(readFileSync(file, "utf8"), /context-(?:readiness|drafts)-fullapp-cases/);
     }
   });
 
