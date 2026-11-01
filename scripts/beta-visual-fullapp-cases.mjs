@@ -23,6 +23,12 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(today).toContainText('일부 종목 기준 · 1종목 제외');
       await expect(page.getByRole('button',{name:'추가 투자 계산하기',exact:true})).toHaveCount(0);
       await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
+      if(width===1440){
+        await page.setViewportSize({width:900,height});
+        await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
+        await page.setViewportSize({width,height});
+        await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
+      }
       const ring=page.locator('[data-beta-card="structure"] [data-allocation-ring] svg');
       const ringBox=await ring.boundingBox();assert.ok(ringBox&&Math.abs(ringBox.width-ringBox.height)<1);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -60,7 +66,8 @@ export async function runBetaVisualCases({page,check,url,output}) {
       const returned=page.getByRole('region',{name:'Synthetic recovered history'});await returned.scrollIntoViewIfNeeded();
       await chartGeometry(returned.locator('svg'));
       await expect(returned.locator('[data-return-series="recoveredPct"]')).toHaveCount(2);
-      await returned.getByRole('slider').focus();await page.keyboard.press('Home');for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');await expect(returned).toContainText('종가 미확인');
+      await returned.getByRole('slider').focus();await page.keyboard.press('Home');for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');
+      await expect(returned.getByRole('slider')).toHaveAttribute('aria-valuetext',/2026-10-02 .*종가 미확인/);
       await page.screenshot({path:path.join(output,`beta-recovered-${width}.png`)});
     });
   }
