@@ -19,6 +19,7 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
   const { t } = useI18n();
   const [rows, setRows] = useState<BalanceReviewRow[]>(initialRows), [active, setActive] = useState(initialRows[0]?.key ?? "");
   const [photo, setPhoto] = useState<string>(), [progress, setProgress] = useState<number | null>(null);
+  const [replacing, setReplacing] = useState(false);
   const [message, setMessage] = useState(""), [error, setError] = useState("");
   const task = useRef<AbortController | null>(null), previewUrl = useRef<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -30,17 +31,18 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
   useEffect(() => { onDraftChange?.(rows); }, [rows, onDraftChange]);
   useEffect(() => { if (disabled && task.current) { generation.current++; task.current.abort(); task.current = null; queueMicrotask(() => setProgress(null)); } }, [disabled]);
   function update(key: string, change: Partial<BalanceReviewRow>) { setRows(previous => previous.map(row => row.key === key ? { ...row, verified: false, ...change } : row)); setError(""); }
-  function clear() { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); previewUrl.current = undefined; setPhoto(undefined); setRows([]); setActive(""); }
+  function clearPreview() { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); previewUrl.current = undefined; setPhoto(undefined); }
+  function clear() { clearPreview(); setRows([]); setActive(""); setReplacing(false); }
   async function recognize(file: File) {
     const request = ++generation.current; task.current?.abort(); const controller = new AbortController(); task.current = controller;
-    setError(""); setMessage(""); setProgress(0); clear();
+    setError(""); setMessage(""); setProgress(0);
     try {
       const { readBalancePhoto } = await import("@/lib/balance-photo-reader");
       const result = await readBalancePhoto(file, controller.signal, value => { if (request === generation.current) setProgress(value); });
       if (request !== generation.current || controller.signal.aborted) return;
       if (result.state !== "review") { setError(result.state === "not_balance" ? t("거래 내역 사진이에요. 종목명과 보유 수량이 보이는 잔고 사진을 선택해 주세요.", "This is a transaction photo. Choose a balance photo showing holding names and quantities.") : t("잔고 표를 읽지 못했어요. 종목명·보유 수량 제목까지 포함하거나 직접 입력해 주세요.", "The balance table could not be read. Include the name and quantity headers, or enter holdings manually.")); return; }
       const next = result.rows.map(row => ({ ...row, key: crypto.randomUUID(), verified: false }));
-      setRows(next); onDraftChange?.(next); setActive(next[0].key); previewUrl.current = URL.createObjectURL(file); setPhoto(previewUrl.current);
+      clearPreview(); setReplacing(false); setRows(next); onDraftChange?.(next); setActive(next[0].key); previewUrl.current = URL.createObjectURL(file); setPhoto(previewUrl.current);
       setMessage(t(`${next.length}종목을 읽었어요. 사진과 맞는지 확인해 주세요.`, `${next.length} possible holdings found. Check them against the photo.`));
       onReview?.();
     } catch { if (request === generation.current && !controller.signal.aborted) setError(t("사진을 읽지 못했어요. JPG·PNG·WebP, 12MB·1,600만 픽셀 이하로 다시 선택하거나 직접 입력해 주세요.", "Could not read the photo. Choose JPG, PNG or WebP under 12 MB and 16 megapixels, or enter manually.")); }
@@ -53,8 +55,8 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
       <span className={styles.icon} aria-hidden="true"><ImagePlus size={26} /></span>
       <SectionHeading title={t("잔고 사진으로 간편하게", "Start with a balance photo")} description={t("기기에서 읽고, 확인한 종목만 담아요.", "Read on your device. Add only what you verify.")} />
     </div>}
-    <div className={styles.choose} hidden={stage === "review"}><Button type="button" variant={guided ? "primary" : "secondary"} disabled={busy || rows.length > 0 || remaining < 1} onClick={() => fileInput.current?.click()}><ImagePlus size={19} aria-hidden="true" />{t("잔고 사진 선택", "Choose balance photo")}</Button>{rows.length > 0 && <Button type="button" variant="secondary" onClick={onReview}>{t("읽어둔 내용 확인", "Review saved details")}</Button>}</div>
-    <Input ref={fileInput} type="file" hidden aria-label={t("잔고 사진 파일", "Balance photo file")} accept="image/jpeg,image/png,image/webp" disabled={busy || rows.length > 0 || remaining < 1} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void recognize(file); }} />
+    <div className={styles.choose} hidden={stage === "review"}><Button type="button" variant={guided ? "primary" : "secondary"} disabled={busy || (rows.length > 0 && !replacing) || remaining < 1} onClick={() => fileInput.current?.click()}><ImagePlus size={19} aria-hidden="true" />{t("잔고 사진 선택", "Choose balance photo")}</Button>{rows.length > 0 && <Button type="button" variant="secondary" onClick={onReview}>{t("읽어둔 내용 확인", "Review saved details")}</Button>}</div>
+    <Input ref={fileInput} type="file" hidden aria-label={t("잔고 사진 파일", "Balance photo file")} accept="image/jpeg,image/png,image/webp" disabled={busy || (rows.length > 0 && !replacing) || remaining < 1} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void recognize(file); }} />
     {stage !== "review" && <InfoDisclosure summary={t("어떤 사진을 올리나요?", "Which photo should I use?")}>
       <p>{t("종목명·보유 수량 제목까지 포함해 주세요. 사진은 기기에서만 읽으며 전송·보관하지 않습니다.", "Include the holding name and quantity headers. Photos are read only on this device, without upload or storage.")}</p>
       <p>{t("수량은 소수점 6자리까지 지원해요. 매입가·평가금액은 자동 등록하지 않으며 중복 사진이나 일반·소수점 잔고도 자동 합산하지 않아요. 종목과 수량을 확인한 뒤 목록에서 저장해 주세요.", "Quantities support up to six decimal places. Purchase prices and values are not added automatically. Duplicate photos and whole/fractional holdings are not merged. Review holdings and quantities before saving the list.")}</p>
@@ -81,7 +83,7 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
       <div className={styles.actions}><Button variant="primary" type="button" disabled={busy || !valid} onClick={() => {
         const accepted = onAdd(rows.map(row => ({ key: row.key, instrumentId: row.instrument!.id, name: row.instrument!.name, ticker: row.instrument!.ticker, market: row.instrument!.market, assetType: row.instrument!.assetType, quantity: balanceQuantity(row.quantity)!, averageCost: "", currentPrice: "" })));
         if (accepted) { clear(); setMessage(t("목록에 담았어요. 계좌·수량 확인 후 목록을 저장해 주세요.", "Added to your review list. Check the account and quantities, then save the list.")); } else setError(t("같은 종목이 있거나 등록 한도를 넘었어요. 기존 목록을 확인해 주세요.", "A holding is already in the list, or the limit was exceeded. Check your review list."));
-      }}>{t(`${rows.length}종목 확인 목록에 담기`, `Add ${rows.length} holdings to review`)}</Button><Button variant="ghost" type="button" disabled={busy} onClick={() => { clear(); setMessage(""); setError(""); onProvide?.(); }}>{t("다른 사진 선택", "Choose another photo")}</Button></div>
+      }}>{t(`${rows.length}종목 확인 목록에 담기`, `Add ${rows.length} holdings to review`)}</Button><Button variant="ghost" type="button" disabled={busy} onClick={() => { setReplacing(true); setMessage(""); setError(""); onProvide?.(); }}>{t("다른 사진 선택", "Choose another photo")}</Button></div>
       {rows.length > remaining && <p className={styles.note}>{t(`${remaining}종목을 더 담을 수 있어요. 일부를 제외하고 나누어 등록해 주세요.`, `You can add ${remaining} more holdings. Remove some to add them separately.`)}</p>}
     </div>}
   </section>;

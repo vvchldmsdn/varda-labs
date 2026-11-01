@@ -7,6 +7,7 @@ async function capture(page,output,name,width,height) {
   await page.setViewportSize({width,height});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${name}: horizontal overflow`);
   await page.screenshot({path:path.join(output,`${name}-${width}.png`),fullPage:true});
+  await page.screenshot({path:path.join(output,`${name}-${width}-viewport.png`)});
 }
 
 // Only called inside the disposable PostgreSQL + actual Next route rehearsal.
@@ -80,6 +81,12 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
         await capture(page,output,'guided-photo-review-'+beta,width,height);
         await page.reload();await expect(form.getByLabel('보유 수량',{exact:true})).toHaveValue('0.896567');
         assert.equal(await page.locator('img[src^="blob:"]').count(),0,'only parsed fields survive reload');
+        await form.getByRole('button',{name:'다른 사진 선택',exact:true}).click();
+        await expect(form).toHaveAttribute('data-entry-step','1');
+        await form.getByLabel('잔고 사진 파일',{exact:true}).setInputFiles({name:'unsupported.gif',mimeType:'image/gif',buffer:Buffer.from('GIF89a')});
+        await expect(form.getByRole('alert')).toContainText('사진을 읽지 못했어요');
+        await form.getByRole('button',{name:'읽어둔 내용 확인',exact:true}).click();
+        await expect(form.getByLabel('보유 수량',{exact:true})).toHaveValue('0.896567');
         assert.equal(uploaded.length,0,'photo must not upload to a server');
       } finally {page.off('request',record);}
     });
