@@ -280,19 +280,27 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     });
     await runContributionUiCases({page,check,admin,owner:other,account:otherAccount,asset:otherAsset,url,output});
     await check('fullapp-journey-owner-refresh-clears-prior-plan-client-state', async () => {
-      const isPlanRead=r=>new URL(r.url()).pathname==='/api/native-contribution-plans'&&new URL(r.url()).searchParams.get('scope')==='all'&&r.request().method()==='GET';
+      const isPlanRead=r=>new URL(r.url()).pathname==='/api/native-contribution-plans'&&r.request().method()==='GET';
       const priorRead=page.waitForResponse(isPlanRead);
-      await page.goto(url + '/additional-contribution/plan?scope=all&currency=KRW');
+      await page.goto(url + '/additional-contribution/plan?scope=account%3A'+otherAccount+'&currency=KRW');
       const priorSession=(await (await priorRead).json()).sessionKey;
       const planner=page.getByRole('region',{name:'추가 투자 계획',exact:true});
+      let allScopeReads=0;
+      const observeRead=request=>{if(new URL(request.url()).pathname==='/api/native-contribution-plans'&&new URL(request.url()).searchParams.get('scope')==='all')allScopeReads++;};
+      page.on('request',observeRead);
+      await page.goto(url + '/additional-contribution/plan?scope=all&currency=KRW');
+      await expect(planner.getByRole('status')).toContainText('투자할 계좌 하나를 선택해 주세요.');
       await expect(planner.getByRole('navigation',{name:'투자할 계좌 선택'})).toContainText('Synthetic KRW');
       await setIdentity(sessionTokens[0]);
-      const nextRead=page.waitForResponse(isPlanRead);
       await page.evaluate(()=>window.dispatchEvent(new Event('cairn-fullapp-refresh')));
-      assert.notEqual((await (await nextRead).json()).sessionKey,priorSession,'Owner change must reload client data, not just navigation labels');
       await expect(planner.getByRole('navigation',{name:'투자할 계좌 선택'})).toContainText('Synthetic USD');
       await expect(planner.getByRole('heading',{name:'저장한 계획',exact:true})).not.toBeVisible();
       await expect(planner).not.toContainText('Synthetic KRW');
+      assert.equal(allScopeReads,0,'Choose an account before fetching plan data');
+      page.off('request',observeRead);
+      const nextRead=page.waitForResponse(isPlanRead);
+      await planner.getByRole('navigation',{name:'투자할 계좌 선택'}).getByRole('link',{name:'Synthetic USD',exact:true}).click();
+      assert.notEqual((await (await nextRead).json()).sessionKey,priorSession,'Owner change must reload client data, not just navigation labels');
     });
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });

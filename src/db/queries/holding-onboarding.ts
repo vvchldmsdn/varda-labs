@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { hash } from "node:crypto";
 
 import { and, asc, eq } from "drizzle-orm";
 
@@ -52,7 +52,7 @@ export async function getHoldingOnboardingOptions(
 
     return Object.freeze({
       state: "ready",
-      draftOwnerKey: createHash("sha256").update(`holding-draft:${tenantContext.ownerUserId}`).digest("hex"),
+      draftOwnerKey: hash("sha256", `holding-draft:${tenantContext.ownerUserId}`),
       accounts: Object.freeze(ownedAccounts.map((row) => Object.freeze(row))),
       portfolioGroups: Object.freeze(
         ownedGroups.map((row) => Object.freeze(row)),

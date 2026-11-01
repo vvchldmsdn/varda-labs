@@ -18,7 +18,7 @@ async function setup(options = {}) {
     "@/lib/market-data/providers/kis": { getKisProviderPolicy: () => ({ configured: config.configured }) },
     "@/lib/market-data/collection-queue": { enqueueMarketCollection: async jobs => { calls.push("enqueue"); if (config.queueFailure) throw new Error("private DB details"); enqueued.push(jobs); if (config.gate) await config.gate; return { queuedCount: 1, retryAfterSeconds: 10 }; } },
     "@/lib/market-data/collection-worker": { scheduleMarketCollection: () => calls.push("schedule_after") },
-    "@/lib/snapshots/market-calendar": { resolveSnapshotCycle: () => ({ snapshotDate: "2026-09-09" }), closeCalendarReferenceDateForAsset: (input, date) => { assert.equal(input, config.target); assert.equal(date, "2026-09-09"); return "2026-09-08"; } },
+    "@/lib/snapshots/market-calendar": { resolveSnapshotCycle: () => ({ snapshotDate: "2026-09-09" }), closeCalendarReferenceDateForAsset: (input, date) => { assert.deepEqual(input, {ticker:config.target.ticker,market:config.target.market,currency:config.target.currency}); assert.equal(date, "2026-09-09"); return "2026-09-08"; } },
   });
   const formData = new FormData();
   formData.set("holdingId", holdingId);

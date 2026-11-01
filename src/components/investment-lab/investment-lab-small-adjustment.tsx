@@ -104,7 +104,7 @@ export function InvestmentLabSmallAdjustment({
               id="investment-lab-small-adjustment-title"
               className="mt-3 text-lg font-medium sm:text-xl"
             ><LabText value=" 작은 조정 영향 실험 " /></CairnSectionTitle>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]"><LabText value=" 두 보유자산 사이에서 금액을 옮겨보는 가상 실험입니다. " /></p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">{t("두 보유자산 사이에서 금액을 옮겨보는 가상 실험입니다.", "Try a hypothetical transfer between two holdings.")}</p>
           </div>
           <p className="text-sm font-semibold text-[var(--muted)]"><LabText value=" 계산 가능 계정 " />{readyAccountCount}/{model.accounts.length}
           </p>

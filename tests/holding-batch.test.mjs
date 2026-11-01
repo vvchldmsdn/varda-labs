@@ -290,3 +290,14 @@ describe("holding batch completion notices", () => {
     assert.deepEqual(remaining, []);
   });
 });
+
+it('can start a new account list after hiding saved rows and cancelling the last pending row',async()=>{
+  const h=await batchFormFixture('en',[rows=>({status:'partial',results:[{key:rows[0].key,result:success},{key:rows[1].key,result:waitingPrice}]})]);
+  h.add('AAPL');h.add('MSFT');await h.submit();
+  const clear=()=>h.render().find(node=>node.type==='button'&&node.props.children?.includes?.('Clear saved rows and add more'));
+  clear().props.onClick();
+  h.render().find(node=>node.props?.['aria-label']==='Remove MSFT from list').props.onClick();
+  assert.ok(clear(),'the completed receipt must keep a visible reset action');clear().props.onClick();
+  assert.equal(h.render().find(node=>node.props?.['aria-label']==='Holding account').props.disabled,false);
+  assert.deepEqual(JSON.parse(h.render().find(node=>node.props?.name==='holdings').props.value),[]);
+});
