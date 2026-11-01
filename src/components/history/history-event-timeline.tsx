@@ -1,3 +1,4 @@
+import { recordDisplayLabel } from "@/lib/record-display-labels";
 
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
@@ -195,21 +196,7 @@ function evidenceLabel(row: HistoryEventDisplayRow) {
   return row.missingFields.map(missingFieldLabel).join(", ") || "부분 근거";
 }
 
-function missingFieldLabel(field: HistoryEventMissingField) {
-  const labels: Record<HistoryEventMissingField, string> = {
-    event_date: "이벤트 일자 누락",
-    event_type: "유형 누락",
-    asset_name: "이름 누락",
-    event_identity: "식별 근거 누락",
-    asset_reference: "자산 참조 누락",
-    amount_krw: "금액 누락",
-    quantity_delta: "수량 누락",
-    price: "단가 누락",
-    unknown_event_type: "미지원 유형",
-    correction_target_unverified: "정정 대상 미검증",
-  };
-  return labels[field];
-}
+function missingFieldLabel(field: HistoryEventMissingField) { return recordDisplayLabel(field); }
 
 function assetReferenceLabel(row: HistoryEventDisplayRow) {
   if (row.assetReferenceStatus === "stored_asset_reference") {

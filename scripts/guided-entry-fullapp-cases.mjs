@@ -233,6 +233,25 @@ export async function runGuidedTradeQa({page,check,setIdentity,token,account,ass
       await page.getByLabel('기록 종류',{exact:true}).selectOption('buy');
       await expect(page.getByLabel('총 체결금액 · KRW',{exact:true})).toHaveValue('123');
       assert.deepEqual(await readState(),after,'switching form modes and record types must not mutate the ledger');
+
+      const time=page.getByLabel('기록 시간',{exact:true}),date=page.getByLabel('기록 날짜',{exact:true});
+      assert.ok((await time.boundingBox()).width>240,'AM/PM and time control need full width');
+      assert.ok((await time.boundingBox()).y>(await date.boundingBox()).y);
+      await time.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'context-time-'+beta+'-'+width+'.png')});
+      await page.getByLabel('기록 종류',{exact:true}).selectOption('cost_basis');
+      await page.getByLabel('매입 근거 1 · 매입원가',{exact:true}).fill('12.34');
+      await page.getByLabel('매입 근거 1 · 실제 매입 시각',{exact:true}).fill('2026-09-18T10:00:00.123');
+      await page.getByRole('button',{name:'다른 매입 날짜 추가',exact:true}).click();
+      await page.getByLabel('매입 근거 2 · 통화',{exact:true}).selectOption('KRW');
+      await page.getByLabel('매입 근거 2 · 매입원가',{exact:true}).fill('12345');
+      await page.getByLabel('매입 근거 2 · 실제 매입 시각',{exact:true}).fill('2026-09-19T12:00:00.456');
+      await page.getByRole('button',{name:'매입 근거 1 입력 지우기',exact:true}).click();
+      await expect(page.getByLabel('매입 근거 1 · 매입원가',{exact:true})).toBeFocused();
+      await expect(page.getByLabel('매입 근거 1 · 매입원가',{exact:true})).toHaveValue('12,345');
+      await expect(page.getByLabel('매입 근거 1 · 통화',{exact:true})).toHaveValue('KRW');
+      await expect(page.getByLabel('매입 근거 1 · 실제 매입 시각',{exact:true})).toHaveValue('2026-09-19T12:00:00.456');
+      await page.screenshot({path:path.join(output,'context-cost-entry-'+beta+'-'+width+'.png')});
+      assert.deepEqual(await readState(),after,'cost draft removal must not change stored cost or trades');
       await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('cairn:trade-entry:v1:')).forEach(k=>sessionStorage.removeItem(k)));
 
       await page.emulateMedia({reducedMotion:'no-preference'});

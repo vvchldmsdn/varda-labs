@@ -68,6 +68,10 @@ export async function runContextReadinessCases({ page, check, admin, setIdentity
     await expect(recovery).toContainText('확인할 보유종목이 없습니다.');
     await expect(recovery).not.toContainText('종목별 기본 이력이 준비됐어요');
     await capture('readiness-empty-account', recovery);
+    await page.goto(url+'/portfolio/risk?'+new URLSearchParams({scope:'account:'+emptyAccount,currency:'KRW'}));
+    await expect(page.getByRole('button',{name:'위험 수치·기여',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'계산·데이터 근거',exact:true})).toBeVisible();
+
   });
 
   await check('context-readiness-cash-records-return-keeps-native-funding-draft', async () => {

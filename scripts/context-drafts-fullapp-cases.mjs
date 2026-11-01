@@ -118,4 +118,41 @@ export async function runContextLabDraftCases({ page, check, account, url, outpu
       if (!beta) await region.getByRole('button', { name: '닫기', exact: true }).click();
     });
   }
+  await check('context-presentation-tabs-locales-and-exact-records', async () => {
+    await page.context().addCookies([{name:'varda-locale',value:'ko',url}]);
+    await page.goto(url+'/qa-context-presentation');
+    const tabs=page.getByRole('tablist').getByRole('tab');
+    const count=await tabs.count();assert.ok(count>=2);
+    await tabs.first().focus();await tabs.first().press('End');
+    await expect(tabs.last()).toBeFocused();await expect(tabs.last()).toHaveAttribute('aria-selected','true');
+    await tabs.last().press('ArrowRight');await expect(tabs.first()).toBeFocused();
+    await tabs.first().press('ArrowLeft');await expect(tabs.last()).toBeFocused();
+    await tabs.last().press('Home');await expect(tabs.first()).toBeFocused();
+    await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby',await tabs.first().getAttribute('id'));
+    await expect(page.getByRole('tablist').locator('[tabindex="0"]')).toHaveCount(1);
+    for(const locale of ['ko','en']){
+      if(locale==='en')await page.getByRole('button',{name:'Switch to English',exact:true}).click();
+      const records=page.getByRole('region',{name:'Record presentation',exact:true});
+      await expect(records).toContainText(locale==='ko'?'단가 누락':'Unit price missing');
+      await expect(records).toContainText(locale==='ko'?'직접 입력한 현재가':'Manually entered quote');
+      await expect(records).toContainText('0.896567');await expect(records).toContainText('701.263896');
+      const visible=await records.innerText();assert.equal(visible.includes('manual_current'),false);
+      for(const [width,height] of [[390,844],[360,800]]){
+        await page.setViewportSize({width,height});await page.evaluate(()=>scrollTo(0,0));
+        await capture(page,output,'context-record-presentation-'+locale+'-'+width);
+        await page.getByRole('tablist').scrollIntoViewIfNeeded();
+        await page.screenshot({path:path.join(output,'context-candidate-tabs-'+locale+'-'+width+'.png')});
+      }
+    }
+    await page.getByText('Source details',{exact:true}).click();
+    await expect(page.locator('details[open]')).toContainText('manual_current');
+    await page.context().addCookies([{name:'varda-locale',value:'ko',url}]);
+    await page.goto(url+'/market');await expect(page.getByRole('heading',{name:'시장 현황',exact:true})).toBeVisible();
+    await capture(page,output,'context-market-ko-360');
+    await page.context().addCookies([{name:'varda-locale',value:'en',url}]);await page.reload();
+    await expect(page.getByRole('heading',{name:'Market Context',exact:true})).toBeVisible();
+    await capture(page,output,'context-market-en-360');
+    await page.context().addCookies([{name:'varda-locale',value:'ko',url}]);
+  });
+
 }
