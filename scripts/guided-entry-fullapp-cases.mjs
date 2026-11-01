@@ -24,7 +24,7 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await form.getByRole('button',{name:'텍스트·표 붙여넣기',exact:false}).click();
       await form.getByRole('button',{name:'자료 입력하기',exact:true}).click();
       await expect(form.locator('h2')).toBeFocused();
-      await form.getByLabel('보유종목 표',{exact:true}).fill('종목명,수량,통화,평균매입가\nQA 보유 6,0.896567,USD,10');
+      await form.getByLabel('보유종목 표',{exact:true}).fill('종목명,수량,통화,평균매입가\nQA 보유 6,0.896567,KRW,10');
       await form.getByRole('button',{name:'표 읽고 종목 확인',exact:true}).click();
       await expect(form.getByRole('alert')).toContainText('표의 통화와 선택한 종목');
       await expect(form.getByRole('button',{name:'확인 목록으로 가져오기',exact:true})).toBeDisabled();

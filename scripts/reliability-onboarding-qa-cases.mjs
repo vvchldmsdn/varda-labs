@@ -80,6 +80,9 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
     await form.getByRole('button',{name:'1종목 저장',exact:true}).click();
     await expect(form.locator('li[data-saved="true"]')).toHaveCount(6);
     assert.equal(await count(),6);assert.equal(discarded,true);
+    await expect(form.locator('h2')).toHaveText('보유종목을 등록했어요');
+    await expect(form.locator('.varda-saved-holdings')).not.toHaveAttribute('open','');
+    await expect(form.getByRole('button',{name:'종목 더 추가하기',exact:true})).toHaveCount(0);
     await capture('onboarding-replayed',form.getByRole('link',{name:'내 포트폴리오 첫 화면 보기',exact:true}));
   });
 
