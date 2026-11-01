@@ -50,7 +50,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.getByRole('button',{name:'오늘의 변동 확대',exact:true}).click();
       const list=dialog.getByLabel('종목별 변동 기여 목록',{exact:true});await expect(list.getByRole('button')).toHaveCount(8);
       const boxes=await list.getByRole('button').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,bottom:r.bottom};}));
-      if(width>1000){assert.ok(Math.abs(boxes[0].y-boxes[1].y)<1&&boxes[1].x>boxes[0].x,'desktop shows two columns');assert.ok(boxes.filter(r=>r.bottom<height-40).length>=6,'six holdings must fit without scrolling');}
+      if(width>1000){const panel=await dialog.locator('[data-beta-panel]').boundingBox();assert.ok(Math.abs(boxes[0].y-boxes[1].y)<1&&boxes[1].x>boxes[0].x,'desktop shows two columns');assert.ok(panel&&boxes.filter(r=>r.bottom<panel.y+panel.height-8).length>=6,'six holdings must fit inside the panel without scrolling');}
       else {
         assert.ok(boxes[1].y>boxes[0].y&&Math.abs(boxes[1].x-boxes[0].x)<1,'mobile retains readable single column');
         const sizes=await dialog.locator('header [data-cairn-metric] > dd:first-of-type').evaluateAll(els=>els.map(el=>parseFloat(getComputedStyle(el).fontSize)));
