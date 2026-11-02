@@ -10,7 +10,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
     const dot=svg.locator('circle').last(), bounds=await dot.boundingBox();
     assert.ok(bounds&&bounds.width>0&&Math.abs(bounds.width-bounds.height)<0.5,'selected marker must remain circular');
   };
-  for(const [width,height] of [[1440,900],[1366,768],[390,844],[360,800]]) {
+  for(const [width,height] of [[1440,900],[1366,768],[1265,712],[390,844],[360,800]]) {
     await check(`beta-visual-${width}`,async()=>{
       await page.setViewportSize({width,height});
       await page.emulateMedia({reducedMotion:'reduce'});
