@@ -60,7 +60,7 @@ export function movementEvidenceRows(dashboard: DashboardData) {
   const exclusions: BetaMovementExclusion[] = dashboard.todayMovement.exclusions.map(row => ({subject:row.subject,reason:row.reason,source:row.source,ticker:row.ticker,assetName:row.assetName,account:row.account,currency:row.currency,valueKrw:row.valueKrw}));
   return { rows, exclusions };
 }
-export type DomainRead = { context: BetaContext; view: BetaView; readReceipt?: string; readEpoch?: string };
+export type DomainRead = { context: BetaContext; view: BetaView; readReceipt?: string; readEpoch?: string; displayBinding?: string };
 export const requestKey = (context: BetaContext) => JSON.stringify([context.mode, context.scope, context.currency, context.cashAmountKrw, ...(context.excludeSell!==undefined?[context.excludeSell]:[])]);
 export function blankDomainView(state: ReadState, message: string): BetaView {
   return { rows: [], totalKrw: null, history: [], priceMoveKrw: 0, fxMoveKrw: 0, todayMoveKrw: null,

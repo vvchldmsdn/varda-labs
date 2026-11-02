@@ -48,7 +48,15 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
           await expect(surface==='beta'?page.locator('[data-beta-card="today"]'):page.locator('body')).toContainText(`${(price-100).toFixed(2)}%`);
         };
         await expectPrice(200);
-        await page.clock.runFor(360000);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        // Another viewer/worker can update the shared quote. Returning to this
+        // tab must validate access without replacing the displayed valuation.
+        await quote(205);
+        await page.clock.runFor(360000);
+        const sessionCheck=surface==='beta'?page.waitForResponse(response=>response.url().endsWith('/api/portfolio/read-session')&&response.status()===200):null;
+        await page.evaluate(()=>{window.dispatchEvent(new Event('blur'));window.dispatchEvent(new Event('focus'));});
+        if(sessionCheck)await sessionCheck;
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        await expectPrice(200);
         assert.equal(requests.length,0,'No page-view, interval or focus quote collection');
         await page.getByRole('button',{name:/시세.*갱신|가격.*갱신|시세 새로고침|Refresh prices/}).first().click();
         await expect.poll(()=>requests.length).toBeGreaterThan(0);

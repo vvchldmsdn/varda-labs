@@ -14,13 +14,19 @@ import { getBetaTargetPolicyModel } from "./target-plan-read";
 import { getBetaAdditionalContributionPreview } from "./target-plan-contribution";
 import { getReadOnlyTenantApprovedTargetPolicy } from "@/db/queries/target-policy";
 import { readBetaDomain } from "./read-service";
+import { displayBindingForScopes } from "./display-session";
 export async function getBetaDomainRead(
   params: Record<string, string | string[] | undefined>,
   options: { includeHeatmap?: boolean } = {},
 ) {
+  let displayBinding: string | undefined;
   const read = await readBetaDomain(params, {
     session: resolveCurrentTenantContext,
-    scopes: getReadOnlyTenantPortfolioAnalysisScopeContext,
+    scopes: async args => {
+      const scopes = await getReadOnlyTenantPortfolioAnalysisScopeContext(args);
+      if (scopes.state === "ready") displayBinding = displayBindingForScopes(args.tenantContext, scopes.catalog);
+      return scopes;
+    },
     dashboard: async (args) => {
       const basisPromise = loadNativeInvestmentBasis(args.tenantContext).then(
         (value) => ({ value }),
@@ -68,6 +74,7 @@ export async function getBetaDomainRead(
   });
   return {
     ...read,
+    displayBinding,
     readReceipt: randomUUID(),
     readEpoch: canonicalBetaReadEpoch(params._betaRead),
   };

@@ -432,3 +432,5 @@ import './responsive-history-chart.test.mjs';
 
 import "./instrument-display.test.mjs";
 import "./manual-native-quotes.test.mjs";
+
+import './display-session.test.mjs';

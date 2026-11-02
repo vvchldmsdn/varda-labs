@@ -16,7 +16,8 @@ it('reprojects history into measured dimensions while retaining null breaks and 
   for(const dimensions of [{width:320,height:220},{width:900,height:300}]){
     size=dimensions; const tree=render(), svg=tree.find(e=>e.type==='svg');
     assert.equal(svg.props.viewBox,`0 0 ${size.width} ${size.height}`);
-    const paths=tree.filter(e=>e.type==='path');assert.equal(paths.length,2,'null day must split the financial series');
+    const paths=tree.filter(e=>e.type==='path'&&e.props.fill==='none');assert.equal(paths.length,2,'null day must split the financial series');
+    const areas=tree.filter(e=>e.type==='path'&&e.props.fill!=='none');assert.equal(areas.length,1,'only the two adjacent observations have a filled area');
     const last=tree.find(e=>e.type==='circle');assert.equal(last.props.cx,size.width-8);assert.equal(Number(last.props.r),3);
     svg.props.onPointerDown({clientX:16,currentTarget:{getBoundingClientRect:()=>({left:8,width:size.width}),setPointerCapture:()=>{}},pointerId:1});
     assert.equal(selected,'2026-10-01');

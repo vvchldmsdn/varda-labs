@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createBetaReadFreshness } from "@/lib/cairn-v2/read-freshness";
 
@@ -14,7 +14,7 @@ type Preferences = {
 const BetaPreferences = createContext<Preferences | null>(null);
 const BetaExistingCrud = createContext(false);
 export function useBetaExistingCrudAvailable() { return useContext(BetaExistingCrud); }
-type ReadFreshness = { epoch: number; store: ReturnType<typeof createBetaReadFreshness>; observed: (receipt?: string, readEpoch?: string) => void };
+type ReadFreshness = { epoch: number; store: ReturnType<typeof createBetaReadFreshness>; observed: (receipt?: string, readEpoch?: string, displayBinding?: string) => void };
 const BetaReadFreshness = createContext<ReadFreshness | null>(null);
 const domainRoots = () => document.querySelectorAll<HTMLElement>('[data-beta-root][data-read-mode="domain"]');
 function maskDomainRoots(masked: boolean) {
@@ -29,16 +29,26 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
   const router = useRouter();
   const [store] = useState(createBetaReadFreshness);
   const [epoch, setEpoch] = useState(0);
-  const observed = useCallback((receipt?: string, readEpoch?: string) => {
+  const accessPending = useRef(false);
+  const committedRead = useRef<string | undefined>(undefined);
+  const committedBinding = useRef<string | undefined>(undefined);
+  const observed = useCallback((receipt?: string, readEpoch?: string, displayBinding?: string) => {
+    committedRead.current = receipt ? `${receipt}:${readEpoch ?? ""}` : undefined;
+    committedBinding.current = displayBinding;
     if (store.accept(receipt, readEpoch)) setEpoch(value => value + 1);
     else store.observe(receipt);
     // Called after the new/blank view committed, never before a cached financial view is masked.
-    maskDomainRoots(false);
+    // A late RSC response cannot reopen a financial view while the independent
+    // session check is still pending (or while the tab is suspended).
+    maskDomainRoots(accessPending.current);
   }, [store]);
   useEffect(() => {
     let suspended = false;
+    let checkGeneration = 0;
     let refreshTimer: number | undefined;
     const recheck = () => {
+      checkGeneration++;
+      accessPending.current = false;
       if (!domainRoots().length) return;
       maskDomainRoots(true);
       const readEpoch = crypto.randomUUID();
@@ -55,9 +65,30 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
         router.replace(url.pathname + url.search + url.hash, { scroll: false });
       }, 0);
     };
-    const suspend = () => { if (domainRoots().length) { suspended = true; maskDomainRoots(true); } };
-    const visible = () => { if (document.visibilityState === "hidden") suspend(); else if (suspended) { suspended = false; recheck(); } };
-    const focus = () => { if (suspended && document.visibilityState === "visible") { suspended = false; recheck(); } };
+    const resume = async () => {
+      const displayBinding = committedBinding.current;
+      if (!displayBinding) { recheck(); return; }
+      const generation = ++checkGeneration;
+      const href = window.location.href;
+      const roots = [...domainRoots()];
+      const read = committedRead.current;
+      try {
+        const response = await fetch("/api/portfolio/read-session", { cache: "no-store", credentials: "same-origin", signal: AbortSignal.timeout(10_000) });
+        const result = response.ok ? await response.json() : null;
+        if (generation !== checkGeneration || document.visibilityState !== "visible" || window.location.href !== href || roots.some(root => !root.isConnected) || roots.length !== domainRoots().length) return;
+        if (read !== committedRead.current || displayBinding !== committedBinding.current) { recheck(); return; }
+        if (result?.binding === displayBinding) { accessPending.current = false; maskDomainRoots(false); }
+        // Reload all server layouts after an ownership/role change. The marker
+        // belongs to the committed financial read, never to a cached layout.
+        else if (response.ok) window.location.reload();
+        else recheck();
+      } catch {
+        if (generation === checkGeneration && document.visibilityState === "visible" && window.location.href === href) recheck();
+      }
+    };
+    const suspend = () => { checkGeneration++; if (domainRoots().length) { suspended = true; accessPending.current = true; maskDomainRoots(true); } };
+    const visible = () => { if (document.visibilityState === "hidden") suspend(); else if (suspended) { suspended = false; void resume(); } };
+    const focus = () => { if (suspended && document.visibilityState === "visible") { suspended = false; void resume(); } };
     const restored = (event: PageTransitionEvent) => { if (event.persisted) { suspended = false; recheck(); } };
     // Capture before the router restores a cached page. Keep preferences mounted; only read data is withheld.
     window.addEventListener("popstate", recheck, true);
@@ -67,6 +98,7 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
     window.addEventListener("focus", focus);
     document.addEventListener("visibilitychange", visible);
     return () => {
+      checkGeneration++;
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
       window.removeEventListener("popstate", recheck, true);
       window.removeEventListener("pagehide", suspend);
