@@ -101,6 +101,7 @@ export type InvestmentLabStressReplayWindow = Readonly<{
   excludedHoldings: readonly Readonly<{
     name: string;
     ticker: string | null;
+    market: string;
     account: string;
     reason:
       | "missing_ticker"
@@ -210,6 +211,7 @@ function buildWindow({
       excludedHoldings.push({
         name: row.name,
         ticker: normalizeTicker(row.ticker),
+        market: row.market,
         account: row.account,
         reason: result.reason,
       });
@@ -313,6 +315,7 @@ function aggregateHoldings(holdings: readonly InvestmentLabStressHoldingInput[])
       exclusions.push({
         name: row.name,
         ticker,
+        market: row.market,
         account: row.account,
         reason,
       });

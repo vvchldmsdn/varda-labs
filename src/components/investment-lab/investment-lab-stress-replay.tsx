@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { LabText } from "./lab-text";
 import { T } from "@/components/i18n/localized-text";
 import { labEnglish } from "./lab-copy";
@@ -163,7 +164,7 @@ function StressWindowCard({
             {window.excludedHoldings.map((row, index) => (
               <li key={`${row.account}:${row.ticker ?? row.name}:${index}`}>
                 <strong className="text-[var(--ink)]">
-                  {row.ticker ?? row.name}
+                  {instrumentLabel(row)}
                 </strong>{" "}
                 · {Object.hasOwn(accountLabels, row.account) ? accountLabels[row.account] : <T ko="계좌" en="Account" />} · <LabText value={exclusionReasonLabel(row.reason)} />
               </li>

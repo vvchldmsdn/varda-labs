@@ -48,13 +48,21 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
           await expect(surface==='beta'?page.locator('[data-beta-card="today"]'):page.locator('body')).toContainText(`${(price-100).toFixed(2)}%`);
         };
         await expectPrice(200);
+        if(surface==='beta') {
+          // The initial value is server-rendered. Exercise a real control so
+          // focus events are tested after client handlers have hydrated.
+          await page.getByRole('button',{name:'현재 평가액 확대',exact:true}).click();
+          await expect(page.getByRole('dialog')).toBeVisible();
+          await page.keyboard.press('Escape');
+          await expect(page.getByRole('dialog')).toHaveCount(0);
+        }
         // Another viewer/worker can update the shared quote. Returning to this
         // tab must validate access without replacing the displayed valuation.
         await quote(205);
         await page.clock.runFor(360000);
-        const sessionCheck=surface==='beta'?page.waitForResponse(response=>response.url().endsWith('/api/portfolio/read-session')&&response.status()===200):null;
+        const sessionCheck=surface==='beta'?page.waitForResponse(response=>new URL(response.url()).pathname==='/api/portfolio/read-session'):null;
         await page.evaluate(()=>{window.dispatchEvent(new Event('blur'));window.dispatchEvent(new Event('focus'));});
-        if(sessionCheck)await sessionCheck;
+        if(sessionCheck)assert.equal((await sessionCheck).status(),200,'Focus must validate the real authenticated session');
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         await expectPrice(200);
         assert.equal(requests.length,0,'No page-view, interval or focus quote collection');

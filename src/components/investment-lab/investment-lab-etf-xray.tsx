@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { LabText } from "./lab-text";
 import type {
   InvestmentLabEtfXrayEtfRow,
@@ -222,7 +223,7 @@ function EtfCoverageRow({ row }: { row: InvestmentLabEtfXrayEtfRow }) {
     <tr className="border-t border-[var(--wash)]">
       <td className="px-4 py-3">
         <p className="max-w-[240px] truncate font-medium" title={row.name}>
-          {row.name || row.ticker || "이름 없음"}
+          {instrumentLabel(row)}
         </p>
         <p className="mt-0.5 text-xs text-[var(--muted)]">
           {row.ticker ?? "티커 없음"}
@@ -285,7 +286,7 @@ function ComponentTable({
             >
               <td className="px-4 py-3">
                 <p className="max-w-[260px] truncate font-medium" title={row.name}>
-                  {row.name || row.symbol}
+                  {instrumentLabel({ ...row, ticker: row.symbol })}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--muted)]">
                   {row.symbol}

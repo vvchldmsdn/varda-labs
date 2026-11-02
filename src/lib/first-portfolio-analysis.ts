@@ -7,11 +7,11 @@ export function buildFirstPortfolioAnalysis(portfolio: PortfolioStructureResult)
   const totalValueKrw = holdings.reduce((sum, holding) => sum + holding.currentValueKrw, 0);
   const valuesValid = Number.isFinite(totalValueKrw) && totalValueKrw > 0;
   const complete = valuationComplete && valuesValid;
-  const exposures = new Map<string, { name: string; ticker: string | null; valueKrw: number }>();
+  const exposures = new Map<string, { name: string; ticker: string | null; market: string; valueKrw: number }>();
   for (const holding of holdings) {
     const key = [holding.market, holding.currency, holding.ticker ?? `${holding.account}|${holding.name}`].join("|");
     const current = exposures.get(key);
-    exposures.set(key, { name: current?.name ?? holding.name, ticker: holding.ticker, valueKrw: (current?.valueKrw ?? 0) + holding.currentValueKrw });
+    exposures.set(key, { name: current?.name ?? holding.name, ticker: holding.ticker, market: holding.market, valueKrw: (current?.valueKrw ?? 0) + holding.currentValueKrw });
   }
   const rows = [...exposures.entries()]
     .map(([key, row]) => ({ ...row, key, weightPct: complete ? row.valueKrw / totalValueKrw * 100 : null }))

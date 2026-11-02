@@ -24,6 +24,7 @@ export type PortfolioGroupManagementModel = Readonly<{
     accountName: string;
     name: string;
     ticker: string | null;
+    market: string;
   }>[];
   groups: readonly Readonly<{
     id: string;
@@ -73,6 +74,7 @@ export async function getReadOnlyTenantPortfolioGroupManagementModel({
             accountName: accounts.name,
             name: assets.name,
             ticker: assets.ticker,
+            market: assets.market,
           })
           .from(assets)
           .innerJoin(accounts, eq(assets.accountId, accounts.id))

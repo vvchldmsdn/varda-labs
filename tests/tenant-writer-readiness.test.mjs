@@ -616,7 +616,9 @@ describe("tenant writer Phase 1D-A readiness", () => {
       assert.ok(writer.targets.some(({ table, classification }) => table === "market_data_sync_runs" && classification === "admin_system"));
     }
     const route = readFileSync(join(ROOT, "src/app/api/portfolio/live-prices/sync/route.ts"), "utf8");
-    assert.ok(route.indexOf("await resolveCurrentTenantContext()") < route.indexOf("await enqueueMarketCollection("));
+    const liveSessionResolution = route.indexOf("await resolveCurrentTenantContext()");
+    const liveCollection = route.indexOf("enqueueMarketCollection(lane)");
+    assert.ok(liveSessionResolution >= 0 && liveCollection > liveSessionResolution);
     assert.match(route, /getTenantLivePriceTargets\(resolution\.tenantContext\)/);
     const preparation = readFileSync(join(ROOT, "src/lib/holding-analysis-data-preparation-write.ts"), "utf8");
     const sessionResolution = preparation.indexOf("await resolveCurrentTenantContext()");
