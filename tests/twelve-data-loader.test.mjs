@@ -41,7 +41,7 @@ describe("tracked owner provider integration with isolated boundary ports", () =
   it("uses reviewed identity once for duplicate holdings and preserves an unsupported holding", async () => {
     const { loader, calls } = await fixture({ assets: [asset(), asset({ id: "second-voo" }), asset({ id: "unreviewed", ticker: "UNKNOWN", priceAsOf: null })] });
     const result = await loader.getTrackedCurrencyEvidence({ ownerUserId: owner }, scope, "USD");
-    assert.equal(calls.requests.length, 1); assert.equal(calls.requests[0].target.key, listing.instrumentKey);
+    assert.equal(calls.requests.length, 0); assert.equal(calls.reads.filter(row=>row.kind==="live").length, 1); assert.equal(calls.reads.find(row=>row.kind==="live").target.key, listing.instrumentKey);
     assert.equal(result.current.positions[0].observation.price, "125.125"); assert.equal(result.current.positions[1].observation.price, "125.125");
     assert.equal(result.current.positions[2].observation, null); assert.equal(result.current.positions.length, 3);
     assert.equal(calls.tenant.ownerUserId, owner); assert.equal(calls.ledgerTenant.ownerUserId, owner);

@@ -1,4 +1,5 @@
 'use client';
+import { instrumentLabel } from "@/lib/instrument-display";
 import { ActionGroup, ActionContent, Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 import { Plus, Wallet } from 'lucide-react';
 
@@ -54,8 +55,8 @@ export function BetaOwnedManagement({read}:{read:OwnedManagementRead}){
    {!blocked&&state==='unauthorized'&&<Link prefetch={false} href={ownedManagementHref(read.kind,{...context,scope:'all'},store?.pendingEpoch())}>전체 범위에서 접근 다시 확인 ↗</Link>}
    <div className={styles.reusedForms} inert={!enabled} aria-hidden={!readable} hidden={!readable} onSubmitCapture={preventBlocked} key={generation}>
     {read.kind==='groups'&&read.groups&&<ManagementWorkbench label="범위" create={<section className={styles.create}><CairnSectionTitle level="h3">새 범위 만들기</CairnSectionTitle><GroupSelectionEvidence><PortfolioGroupCreateForm accounts={read.groups.accounts} assets={read.groups.assets} action={saveGroup}/></GroupSelectionEvidence></section>} items={read.groups.groups.map(group=>({id:group.id,name:group.name,meta:'계좌 '+group.accountIds.length+' · 개별 종목 '+group.assetIds.length,group:'저장된 범위',content:<><CairnSectionTitle level="h3">{group.name}</CairnSectionTitle><GroupSelectionEvidence accounts={group.accountIds.length} assets={group.assetIds.length}><PortfolioGroupEditor key={group.id+':'+group.updatedAt} accounts={read.groups!.accounts} assets={read.groups!.assets} group={group} saveAction={saveGroup} archiveAction={archiveGroup}/></GroupSelectionEvidence></>}))}/>}
-    {read.kind==='holdings'&&<ManagementWorkbench label="보유 기록" items={[...read.holdings.filter(row=>!row.archivedAt),...read.holdings.filter(row=>row.archivedAt)].map(row=>({id:row.holdingId,name:row.name,meta:row.accountName+' · '+(row.ticker??'심볼 없음')+' · '+row.currency,group:row.archivedAt?'종료·보관 기록':'보유 중',content:<article className={styles.holding} key={row.holdingId+':'+row.updatedAt}>
-     <CairnSectionTitle level="h3">{row.name}<small>{row.accountName} · {row.ticker??'심볼 없음'} · {row.market} · {row.currency}{row.archivedAt?' · 보관 기록':''}</small></CairnSectionTitle>
+    {read.kind==='holdings'&&<ManagementWorkbench label="보유 기록" items={[...read.holdings.filter(row=>!row.archivedAt),...read.holdings.filter(row=>row.archivedAt)].map(row=>({id:row.holdingId,name:instrumentLabel(row),meta:row.accountName+' · '+(row.ticker??'심볼 없음')+' · '+row.currency,group:row.archivedAt?'종료·보관 기록':'보유 중',content:<article className={styles.holding} key={row.holdingId+':'+row.updatedAt}>
+     <CairnSectionTitle level="h3">{instrumentLabel(row)}<small>{row.accountName} · {row.ticker??'심볼 없음'} · {row.market} · {row.currency}{row.archivedAt?' · 보관 기록':''}</small></CairnSectionTitle>
      <dl className={styles.facts}><div><dt>보유 수량</dt><dd>{row.quantity}</dd></div><div><dt>평균 매입가 ({row.currency})</dt><dd>{row.averageCost??'미등록'}</dd></div></dl>
      <div className={styles.holdingActions}>{row.archivedAt?<HoldingRestoreForm holdingId={row.holdingId} updatedAt={row.updatedAt} action={restore}/>:<><HoldingStateCorrectionForm holdingId={row.holdingId} updatedAt={row.updatedAt} quantity={row.quantity} averageCost={row.averageCost} currency={row.currency} action={correct}/><HoldingArchiveForm holdingId={row.holdingId} updatedAt={row.updatedAt} action={archive}/></>}</div>
     </article>}))}/>}

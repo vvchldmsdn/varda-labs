@@ -36,14 +36,15 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
       if (cancelled) return;
       // This endpoint reports current quotes only. History readiness remains a
       // server-read concern; continuing its refreshes must not relabel fresh quotes.
-      setOutcome(count >= 12 && state !== "fresh" ? "waiting" : state);
+      const complete = ["fresh", "partial", "empty"].includes(state);
+      setOutcome(count >= 12 && !complete ? "waiting" : state);
       // Refresh changed evidence too: equal ready counts can hide price/FX updates.
       // History progresses in separate 30s checks.
       if (state !== "unavailable" && (signature !== previousSignature || keepCheckingHistory && (count % 3 === 1 || count === 12))) {
         startTransition(() => router.refresh());
       }
       previousSignature = signature;
-      if (count >= 12) window.clearInterval(timer);
+      if (count >= 12 || !keepCheckingHistory && complete) window.clearInterval(timer);
     }, 10_000);
     return () => { cancelled = true; window.clearInterval(timer); window.clearTimeout(reset); };
   }, [active, router, generation, keepCheckingHistory]);

@@ -1,4 +1,6 @@
 "use client";
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -95,7 +97,7 @@ export function HoldingMovementHeatmap({
         <div className="min-h-[310px] space-y-5 py-3">
           {history.rows.map((row) => (
             <div key={row.holdingId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
-              <p className="truncate text-sm font-medium text-[var(--ink)]">{row.name}</p>
+              <p className="truncate text-sm font-medium text-[var(--ink)]">{instrumentLabel(row)}</p>
               <p className="text-sm font-medium tabular-nums text-[var(--ink)]">
                 {formatPercent(row.currentWeight)}
               </p>
@@ -120,7 +122,7 @@ export function HoldingMovementHeatmap({
         <div className="varda-heatmap-popover" id="holding-heatmap-selection" aria-live="polite">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--ink)]">{selectedRow.name}</p>
+            <p className="text-sm font-semibold text-[var(--ink)]">{instrumentLabel(selectedRow)}</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               {<T ko={formatDate(selectedCell.date)} en={translateHomeHistory(formatDate(selectedCell.date))}/>}
               {selectedRow.ticker ? ` · ${selectedRow.ticker}` : ""}
@@ -231,7 +233,7 @@ function MovementMatrix({
                   aria-pressed={selected} aria-controls={selected ? "holding-heatmap-selection" : undefined}
                   disabled={!cell} onClick={() => onSelect(rowIndex, cellIndex)}>
                   <i aria-hidden="true" style={cell ? heatmapStyle(cell) : missingCellStyle} />
-                  <span><strong>{row.name}</strong><small>{row.ticker || formatPercent(row.currentWeight)}</small></span>
+                  <span><strong>{instrumentLabel(row)}</strong><small>{row.ticker || formatPercent(row.currentWeight)}</small></span>
                   <span><strong className={toneClass(cell?.changePct ?? null)}>{cell?.changePct == null ? (cell ? missingChangeText(cell, t) : t("기록 없음", "No record")) : formatPercent(cell.changePct, true)}</strong>
                     <small>{cell?.changePct == null && cell?.changeKrw == null && cell?.priceReturnEvidence?.changePct != null ? <span data-heatmap-price-summary>{t("가격", "Price")} <span className={toneClass(cell.priceReturnEvidence.changePct)}>{formatPercent(cell.priceReturnEvidence.changePct, true)}</span></span> : <span className={toneClass(cell?.changeKrw ?? null)}>{t(formatSignedKrw(cell?.changeKrw ?? null), translateHomeHistory(formatSignedKrw(cell?.changeKrw ?? null)))}</span>}</small></span>
                 </CairnButton>
@@ -312,8 +314,8 @@ function HeatmapRow({
   const { t } = useI18n();
   return (
     <>
-      <div className={styles.heatmapRowLabel} data-selected={selection?.rowIndex === rowIndex} title={row.name}>
-        <span className="truncate">{row.name}</span>
+      <div className={styles.heatmapRowLabel} data-selected={selection?.rowIndex === rowIndex} title={instrumentLabel(row)}>
+        <span className="truncate">{instrumentLabel(row)}</span>
       </div>
       {row.cells.map((cell, cellIndex) => {
         const selected = selection?.rowIndex === rowIndex && selection.cellIndex === cellIndex;
@@ -324,7 +326,7 @@ function HeatmapRow({
           <CairnButton variant="bare"
             key={`${row.holdingId}:${cell.date}`}
             type="button"
-            aria-label={`${row.name} ${formatDate(cell.date)} ${cell.basis === "live_movement" || cell.priceReturnEvidence ? t("평가액 변동률", "Value change (%)") : ""} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
+            aria-label={`${instrumentLabel(row)} ${formatDate(cell.date)} ${cell.basis === "live_movement" || cell.priceReturnEvidence ? t("평가액 변동률", "Value change (%)") : ""} ${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
             aria-pressed={selected}
             className={styles.heatmapCell}
             data-cell-index={cellIndex}
@@ -344,7 +346,7 @@ function HeatmapRow({
             onClick={() => onSelect(rowIndex, cellIndex)}
             style={{ ...heatmapStyle(cell), "--cell-delay": `${Math.min((rowIndex + cellIndex) * 10, 320)}ms` } as CSSProperties}
             tabIndex={selected || (!selection && rowIndex === 0 && cellIndex === 0) ? 0 : -1}
-            title={`${row.name}\n${formatDate(cell.date)}\n${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
+            title={`${instrumentLabel(row)}\n${formatDate(cell.date)}\n${t(evidenceLabel, translateHomeHistory(evidenceLabel))}`}
           >
             {cell.changePct === null ? "·" : null}
           </CairnButton>

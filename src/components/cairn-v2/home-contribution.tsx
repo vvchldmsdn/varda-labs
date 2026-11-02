@@ -1,4 +1,5 @@
 "use client";
+import { instrumentLabel } from "@/lib/instrument-display";
 import { RecoveryTitle } from "@/components/recovery/recovery-notice";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
@@ -12,7 +13,7 @@ export function ContributionHome({ view, dirty = false }: { view: BetaView; dirt
         .filter((row) => row.allocationKrw > 0)
         .map((row, index) => ({
           key: row.accountCode + ":" + index,
-          name: row.name + " · " + row.accountName,
+          name: instrumentLabel(row) + " · " + row.accountName,
           amount: row.allocationKrw,
           color: colors[index % colors.length],
         }))

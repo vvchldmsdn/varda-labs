@@ -24,6 +24,7 @@ export type PortfolioDashboardPositionHistoryRow = Readonly<{
 export type PortfolioDashboardHistoryHolding = Readonly<{
   id: string;
   name: string;
+  market?: string | null;
   ticker: string | null;
   account: string;
   currentWeight: number;
@@ -49,6 +50,7 @@ export type PortfolioDashboardHeatmapCell = Readonly<{
 export type PortfolioDashboardHeatmapRow = Readonly<{
   holdingId: string;
   name: string;
+  market?: string | null;
   ticker: string | null;
   account: string;
   currentWeight: number;
@@ -99,6 +101,7 @@ export function buildPortfolioDashboardHoldingHistory({
   const heatmapRows = selectedHoldings.map((holding) => ({
     holdingId: holding.id,
     name: holding.name,
+    market: holding.market,
     ticker: holding.ticker,
     account: holding.account,
     currentWeight: holding.currentWeight,

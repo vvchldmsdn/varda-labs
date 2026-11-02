@@ -64,6 +64,7 @@ async function fixture(options = {}) {
       finishMarketCollection: async (job, outcome) => outcomes.push({ job, outcome }),
       getMarketCollectionSummary: async () => ({ pending: pending.size }),
     },
+    "@/lib/market-data/manual-native-quotes": { manualNativeQuotes:async(targets,collect)=>{assert.deepEqual(targets,config.targets);events.push(collect?'native_manual':'native_read');return config.native??{available:false,pending:false,failed:false,version:'disabled'};} },
     "@/lib/market-data/twelve-data-service": { resumeConfiguredTwelveDataService: async () => ({ status: "disabled", processed: 0, failed: 0 }) },
     "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async task => {
       if (leaseActive) return task();
@@ -89,6 +90,27 @@ function request({ url = "http://localhost/api/portfolio/live-prices/sync", head
 }
 
 describe("tenant live-price enqueue and after boundary", () => {
+  it('keeps a configured native provider usable without KIS',async()=>{
+    const f=await fixture({configured:false,native:{available:true,pending:true,failed:false,version:'waiting'}});
+    const first=await f.route.POST(request());assert.equal(first.status,202);assert.equal((await first.json()).state,'queued');
+    assert.ok(f.events.includes('native_manual'));assert.equal(f.queued.length,0);
+    f.config.native={available:true,pending:false,failed:false,version:'ready'};
+    const second=await f.route.POST(request({body:{reason:'poll'}}));assert.equal((await second.json()).state,'partial');
+    assert.ok(f.events.includes('native_read'));
+  });
+  it('keeps successful native work visible when KIS admission fails',async()=>{
+    const f=await fixture({queueFailure:true,native:{available:true,pending:true,failed:false,version:'pending'}});
+    const result=await f.route.POST(request());
+    assert.equal(result.status,202);assert.equal((await result.json()).state,'queued');
+  });
+  it('continues KIS collection when the independent native provider failed',async()=>{
+    const f=await fixture({native:{available:false,pending:false,failed:true,version:'failed'}});
+    assert.equal((await f.route.POST(request())).status,202);assert.equal(f.queued.flat().length,1);
+  });
+  it('legacy page_view cannot create new collection demand',async()=>{
+    const f=await fixture();await f.route.POST(request({body:{reason:'page_view'}}));
+    assert.equal(f.queued.length,0);assert.ok(f.events.includes('native_read'));assert.ok(!f.events.includes('native_manual'));
+  });
   it("returns a stable owned-evidence receipt that changes for prices and FX, not unrelated instruments", async () => {
     const f = await fixture({ targets:[{...target,currency:'usd'}], quotes: [quote()] });
     const read = async () => (await (await f.route.POST(request({body:{reason:'poll'}}))).json()).readVersion;

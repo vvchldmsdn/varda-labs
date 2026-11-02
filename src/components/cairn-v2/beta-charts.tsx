@@ -139,7 +139,7 @@ export function HistoryChart({
       aria-label={`${metric === "value" ? "평가액" : view.domain ? "기존 저장 수익률" : "예시 수익률"} 추이 · ${view.domain ? "도메인 읽기" : "가상 데이터"}`}
     >
       {view.domain && metric === "return" && <p className={styles.muted}>{returnSummary}</p>}
-      {historySource.options.length > 1 && !(compact && metric === "return") && (
+      {historySource.options.length > 1 && metric === "return" && !compact && (
         <p className={styles.muted}>{historySource.label} 기준</p>
       )}
       {view.domain && metric === "return" && !compact && (
@@ -190,7 +190,7 @@ export function HistoryChart({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="#c64623" stopOpacity=".07" />
+            <stop stopColor="#c64623" stopOpacity=".10" />
             <stop offset="1" stopColor="#c64623" stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -210,13 +210,15 @@ export function HistoryChart({
         )}
         {segments.map((d, i) => (
           <g key={i}>
-            {compact && !view.domain && view.history.every((p) => p.valueKrw !== null) && (
-              <path d={`${d} L${plot.right},${plot.bottom} L${plot.left},${plot.bottom} Z`} fill={`url(#${gradientId})`} />
+            {metric === "value" && d.includes(" L") && (
+              <path d={`${d} L${d.split(" L").at(-1)!.split(",")[0]},${plot.bottom} L${d.slice(1).split(",")[0]},${plot.bottom} Z`} fill={`url(#${gradientId})`} />
             )}
             <path
               d={d}
-              stroke={compact ? "#c64623" : "#20211f"}
-              strokeWidth="1.4"
+              stroke="#c64623"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               fill="none"
               vectorEffect="non-scaling-stroke"
             />

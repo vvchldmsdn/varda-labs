@@ -127,3 +127,6 @@
 }
 
 @media (min-width:761px) { .workspace { padding:20px 0; background:transparent; border-radius:0; border:0; box-shadow:none; } }
+
+/* Shared contiguous composition bar owns segment interaction and geometry. */
+.fundingBar {display:block;height:auto;--composition-height:56px;border-radius:0;}

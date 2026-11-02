@@ -30,6 +30,12 @@ export async function runBetaVisualCases({page,check,url,output}) {
         await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
       }
       const ring=page.locator('[data-beta-card="structure"] [data-allocation-ring] svg');
+      if(width>700){
+        const nav=page.getByLabel('목적별 내비게이션',{exact:true});assert.ok((await nav.boundingBox()).width<=114);
+        await expect(nav.locator('svg').first()).toBeVisible();
+      }
+      await expect(ring.getByRole('button',{name:'KODEX 200',exact:false})).toHaveCount(1);
+      await expect(ring.getByRole('button',{name:'069500',exact:false})).toHaveCount(0);
       const ringBox=await ring.boundingBox();assert.ok(ringBox&&Math.abs(ringBox.width-ringBox.height)<1);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       await page.screenshot({path:path.join(output,`beta-home-${width}.png`),fullPage:true});
@@ -45,6 +51,14 @@ export async function runBetaVisualCases({page,check,url,output}) {
       assert.ok(ribbon&&costs&&ribbon.y<costs.y&&ribbon.y+ribbon.height<height,'composition must precede costs and appear in the opening viewport');
       await expect(dialog.getByText('전체 투자자산 평가액',{exact:true})).toHaveCount(0);
       await expect(dialog.getByText('현재 가격·환율 기준',{exact:true})).toHaveCount(0);
+      const composition=dialog.locator('[data-composition-bar]');const segments=composition.locator('[data-segment-key]');
+      const geometries=await segments.evaluateAll(els=>els.map(el=>({x:el.getBoundingClientRect().x,right:el.getBoundingClientRect().right})));
+      for(let i=1;i<geometries.length;i++)assert.ok(Math.abs(geometries[i].x-geometries[i-1].right)<1,'segments must be contiguous');
+      const korea=dialog.locator('table').getByRole('button',{name:/KODEX 200/});await korea.hover();
+      await expect(composition.getByRole('tooltip')).toContainText('KODEX 200');
+      const key=await composition.locator('[data-active=true]').getAttribute('data-segment-key');
+      await korea.click();await expect(composition.locator('[data-segment-key="'+key+'"]')).toHaveAttribute('aria-pressed','true');
+      await expect(composition.locator('[data-segment-key="'+key+'"]')).toHaveCSS('transform','none');
       await page.screenshot({path:path.join(output,`beta-value-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
       await page.getByRole('button',{name:'오늘의 변동 확대',exact:true}).click();
@@ -66,7 +80,18 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.getByRole('button',{name:'히스토리 확대',exact:true}).click();
       const history=dialog.locator('[data-history-plot] svg');await chartGeometry(history);await history.focus();await page.keyboard.press('Home');
       await expect(history).toHaveAttribute('aria-label',/2026-07-03/);await page.keyboard.press('End');await expect(history).toHaveAttribute('aria-label',/2026-10-03/);
+      await page.screenshot({path:path.join(output,`beta-history-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+      await page.getByRole('button',{name:'포트 구조 확대',exact:true}).click();
+      const detailRing=dialog.locator('[data-allocation-ring] svg');await expect(detailRing).toBeVisible();
+      const donutBounds=await detailRing.boundingBox(),panelBounds=await dialog.locator('[data-beta-panel]').boundingBox();
+      assert.ok(donutBounds&&panelBounds&&donutBounds.y+donutBounds.height<panelBounds.y+panelBounds.height,'entire donut fits first viewport');
+      const domestic=detailRing.getByRole('button',{name:/KODEX 200/});await domestic.click();await expect(domestic).toHaveCSS('outline-style','none');
+      await page.screenshot({path:path.join(output,`beta-structure-${width}.png`)});
+      await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+      const funding=page.getByRole('region',{name:'Synthetic funding'});await funding.scrollIntoViewIfNeeded();
+      await funding.locator('[data-segment-key="KR"]').hover();await expect(funding.getByRole('tooltip')).toContainText('KODEX 200');
+      await page.screenshot({path:path.join(output,`beta-funding-${width}.png`)});
       const returned=page.getByRole('region',{name:'Synthetic recovered history'});await returned.scrollIntoViewIfNeeded();
       await chartGeometry(returned.locator('svg'));
       await expect(returned.locator('[data-return-series="recoveredPct"]')).toHaveCount(2);
@@ -83,4 +108,16 @@ export async function runBetaVisualCases({page,check,url,output}) {
     await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.04%');
   });
   await page.emulateMedia({reducedMotion:'no-preference'});
+  await check('beta-composition-motion-keyboard',async()=>{
+    await page.setViewportSize({width:1440,height:900});
+    await page.goto(url+'/qa-beta-visual?mode=domain&scope=all&currency=KRW');
+    await page.getByRole('button',{name:'현재 평가액 확대',exact:true}).click();
+    const bar=page.getByRole('dialog').locator('[data-composition-bar]');
+    const segment=bar.getByRole('button',{name:/KODEX 200/});await segment.hover();
+    await expect(segment).toHaveCSS('transform','matrix(1, 0, 0, 1, 0, -4)');
+    await page.mouse.move(0,0);await segment.focus();await page.keyboard.press('Enter');
+    await expect(segment).toHaveAttribute('aria-pressed','true');
+    await expect(bar.getByRole('tooltip')).toContainText('KODEX 200');
+    await page.keyboard.press('Escape');
+  });
 }

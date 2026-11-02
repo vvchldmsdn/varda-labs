@@ -25,7 +25,7 @@ export type CurrencyResearchHistory = Readonly<{
   corporateActions?: Readonly<{ status: "unknown" | "verified_no_actions" | "verified_split_adjusted" | "synthetic_none"; source: string; from: string; through: string }>;
   points: readonly NativeReturnPoint[];
 }>;
-export type OwnedResearchComposition = { version: 3; source: "owned_native"; ownerId: string; currency: Currency; asOf: string; timeZone: string; rows: { name: string; value: number; inputCurrency: Currency; instrumentId: string; nativeCurrency: Currency }[] };
+export type OwnedResearchComposition = { version: 3; source: "owned_native"; ownerId: string; currency: Currency; asOf: string; timeZone: string; rows: { name: string; market?: string | null; ticker?: string | null; value: number; inputCurrency: Currency; instrumentId: string; nativeCurrency: Currency }[] };
 export type CurrencyResearchInput = Readonly<{
   input: QuickInput | OwnedResearchComposition; reportingCurrency: Currency; asOf: string;
   histories: readonly CurrencyResearchHistory[]; fx: readonly FxEvidence[];

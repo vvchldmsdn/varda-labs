@@ -1,5 +1,6 @@
 "use client";
 
+import { instrumentLabel } from "@/lib/instrument-display";
 import { useActionFormReset } from "@/components/cairn-ui/client";
 import { TargetApprovalControls } from "@/components/portfolio/target-approval-controls";
 
@@ -93,7 +94,7 @@ export function PortfolioTargetPolicyForm({ universeHash, rows, scopeKey, approv
             const fieldId = `target-weight-${index}`;
             const errorId = `${fieldId}-error`;
             return <li className={styles.row} key={`${row.accountName}:${row.market}:${row.currency}:${row.ticker ?? row.assetName}`}>
-              <div className={styles.identity}><span className={styles.rowNumber}>{String(index + 1).padStart(2, "0")}</span><div><CairnField htmlFor={fieldId}>{row.assetName}</CairnField><p>{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</p></div></div>
+              <div className={styles.identity}><span className={styles.rowNumber}>{String(index + 1).padStart(2, "0")}</span><div><CairnField htmlFor={fieldId}>{instrumentLabel({...row, name:row.assetName})}</CairnField><p>{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</p></div></div>
               <div className={styles.weightInput}><CairnField htmlFor={fieldId}>{t("목표 비중", "Target weight")}</CairnField><div><CairnInput
                 aria-invalid={invalid || undefined}
                 aria-describedby={invalid ? errorId : !buyable ? `${fieldId}-restriction` : undefined}

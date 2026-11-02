@@ -1,3 +1,5 @@
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import type {HoldingsRead} from '@/lib/cairn-v2/holding-contract';
 import {snapshotDecimal} from '@/lib/cairn-v2/snapshot-contract';
 import styles from './holdings.module.css';
@@ -9,7 +11,7 @@ export function HoldingsTable({rows}:{rows:HoldingsRead['rows']}) {
     <table aria-label="저장 보유 근거 표"><caption>원본 통화·저장 수량/가격 · 같은 티커도 개별 보유 기록으로 표시</caption>
       <thead><tr><th scope="col">종목</th><th scope="col">계좌</th><th scope="col" className={styles.number}>수량</th><th scope="col" className={styles.number}>평균원가</th><th scope="col" className={styles.number}>저장 가격</th><th scope="col">가격·기록 근거</th></tr></thead>
       <tbody>{rows.map(row=><tr key={row.key}>
-        <td><span className={styles.name} title={row.name} tabIndex={0}>{row.name}</span><small>{row.ticker??'티커 미제공'}{row.assetType?' · '+row.assetType:''}</small><small>{row.archivedAt?'보관 기록':'보유 중'}</small></td>
+        <td><span className={styles.name} title={instrumentLabel(row)} tabIndex={0}>{instrumentLabel(row)}</span><small>{row.ticker??'티커 미제공'}{row.assetType?' · '+row.assetType:''}</small><small>{row.archivedAt?'보관 기록':'보유 중'}</small></td>
         <td>{row.accountName}</td>
         <td className={styles.number}>{snapshotDecimal(row.quantity)}</td>
         <td className={styles.number}>{row.averageCost===null?'미기록':snapshotDecimal(row.averageCost)+' '+row.currency}</td>

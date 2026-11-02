@@ -138,7 +138,7 @@ export async function getOwnedCurrencyResearchInput(tenant: TenantContext, scope
     : "performanceReturn" in report ? report.performanceReturn : null;
   const actualBoundary = performance && "boundary" in performance ? performance.boundary : boundary;
   return { input: { version: 3, source: "owned_native", ownerId: tenant.ownerUserId, currency: reporting, asOf, timeZone: "Asia/Seoul",
-    rows: holdings.map(row => ({ name: row.name, value: Decimal.from(row.observation!.quantity).mul(row.observation!.price).toNumber(), inputCurrency: row.observation!.currency, nativeCurrency: row.observation!.currency, instrumentId: row.id })) },
+    rows: holdings.map(row => ({ name: row.name, market:row.market, ticker:row.ticker, value: Decimal.from(row.observation!.quantity).mul(row.observation!.price).toNumber(), inputCurrency: row.observation!.currency, nativeCurrency: row.observation!.currency, instrumentId: row.id })) },
     reportingCurrency: reporting, asOf, histories, fx, provenance: "owned_native_history",
     ...(options.horizon === undefined ? {} : { horizon: options.horizon }),
     ...(historyEndAt === undefined ? {} : { historyEndAt }),

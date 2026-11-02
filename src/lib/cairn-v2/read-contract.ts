@@ -13,7 +13,7 @@ export type DemoView = ReturnType<typeof getFixtureView>;
 export type ReadState = "ready" | "empty" | "partial" | "unavailable" | "unauthorized" | "loading";
 export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" | "history"> & {
   history: (DemoView["history"][number] & { storageSnapshotDate?: string; valueSegment?: string; segment?: string; source?: string; rowKind?: string; account?: string; includedAccounts?: string[] })[];
-  rows: (Omit<DemoView["rows"][number], "targetPct"> & { targetPct: number | null; ticker?: string | null; currency?: string; priceAsOf?: string | null; quantity?: number; currentPrice?: number })[];
+  rows: (Omit<DemoView["rows"][number], "targetPct"> & { targetPct: number | null; ticker?: string | null; market?: string | null; currency?: string; priceAsOf?: string | null; quantity?: number; currentPrice?: number })[];
   totalKrw: number | null; fxRate: number | null;
   drift: DemoView["drift"] | undefined;
   domain?: {
@@ -88,7 +88,7 @@ export function adaptBetaRead({ dashboard, structure, history, context }: {
   // The structure engine already computed exclusions, subtotal and weights. Never normalize excluded assets away here.
   view.rows = structure.holdingRows.map((row, i) => ({
     key: JSON.stringify([row.account, row.market, row.currency, row.ticker, row.name]), ticker: row.ticker,
-    name: row.name, account: row.account, currency: row.currency, priceAsOf: row.priceAsOf, quantity: row.quantity, currentPrice: row.currentPrice,
+    name: row.name, account: row.account, market: row.market, currency: row.currency, priceAsOf: row.priceAsOf, quantity: row.quantity, currentPrice: row.currentPrice,
     weightPct: row.currentWeightPct, targetPct: null, valueKrw: row.currentValueKrw,
     priceMove: 0, fxMove: 0, color: ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][i % 5], heatmap: [],
   }));

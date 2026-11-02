@@ -6,7 +6,7 @@ import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 const WINDOW_MS = TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds;
 
 describe("Today navigation refresh wiring", () => {
-  it("activates shared automatic quote checks on direct Today entry and labels view time honestly", async () => {
+  it("exposes manual quote refresh on direct Today entry and labels view time honestly", async () => {
     const RefreshButton = () => null;
     const icons = Object.fromEntries(["ArrowUpRight", "ChartNoAxesCombined", "ChartPie", "ChevronLeft", "ChevronRight", "FlaskConical", "History", "House", "Menu", "Plus", "Settings2", "TrendingUp", "UserRound", "X"].map(name => [name, () => null]));
     let locale = "en", pathname = "/today", params = new URLSearchParams("scope=all");
@@ -24,11 +24,10 @@ describe("Today navigation refresh wiring", () => {
     const elements = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(elements) : [tree, ...elements(tree.props?.children)];
     const render = props => elements(component.AppNavigation({ generatedAt: "2026-09-10T03:37:00Z", ...props }));
     const today = render({});
-    assert.equal(today.find(element => element.type === RefreshButton).props.autoSync, true, "Today must refresh without visiting Home first");
-    assert.equal(render({ activePath: "/history" }).find(element => element.type === RefreshButton).props.autoSync, true);
-    assert.equal(render({ activePath: "/simulation" }).find(element => element.type === RefreshButton).props.autoSync, false);
-    assert.equal(render({ activePath: "/", autoSyncPrices: true }).find(element => element.type === RefreshButton).props.autoSync, true);
-    assert.equal(render({ activePath: "/" }).find(element => element.type === RefreshButton).props.autoSync, false, "Legacy home retains its separate refresh consumer");
+    for(const activePath of ['/today','/history','/simulation','/']) {
+      const button=render({activePath}).find(element=>element.type===RefreshButton);
+      assert.ok(button); assert.equal(Object.hasOwn(button.props,'autoSync'),false);
+    }
     assert.match(today.find(element => element.props?.className === "varda-updated-at").props.children, /^View refreshed /);
     locale = "ko";
     assert.match(render({}).find(element => element.props?.className === "varda-updated-at").props.children, /^화면 갱신 /);
@@ -60,10 +59,10 @@ describe("Today navigation refresh wiring", () => {
       for(const surface of ["home","today","history"]){
         const nav=navigation({surface,evidence:{...evidence,reporting:currency}});
         assert.equal(nav.generatedAt,evidence.asOf,"Read time is not replaced with a quote timestamp or the render clock");
-        assert.equal(nav.autoSyncPrices,true);
+        assert.equal(Object.hasOwn(nav,'autoSyncPrices'),false);
       }
     }
-    assert.equal(navigation({surface:"structure"}).autoSyncPrices,false);
+    assert.equal(navigation({surface:"structure"}).autoSyncPrices,undefined);
     assert.equal(navigation({surface:"today",evidence:undefined}).generatedAt,undefined);
     assert.equal(navigation({surface:"today",evidence:{...evidence,current:{...evidence.current,source:"synthetic_fixture"}}}).generatedAt,undefined);
     params=new URLSearchParams("preview=design");
@@ -153,7 +152,7 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     requests, storage, states, timeouts, intervals,
     get refreshCount() { return refreshCount; },
     get bucket() { return String(Math.floor(now / WINDOW_MS)); },
-    mount(props = { autoSync: true }) {
+    mount(props = {}) {
       const effectStart = effects.length;
       const button = component.PortfolioRefreshButton(props);
       const cleanups = effects.slice(effectStart).map(effect => effect()).filter(cleanup => typeof cleanup === "function");
@@ -187,110 +186,27 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 describe("portfolio refresh lifecycle", () => {
-  it("rejoins pending collection after leaving and returning in the same freshness bucket", async test => {
-    const h=await refreshHarness(test,{responseState:'queued'});
-    const first=h.mount();h.runMountTimer();await settle();
-    assert.equal(h.states.at(-1),'queued');
+  it("never starts collection on mount, time passing, focus, visibility or a route return", async test => {
+    const h=await refreshHarness(test);const first=h.mount();
+    h.runMountTimer();h.advanceBucket();h.runInterval();h.focus();h.visibilityChange();await settle();
     first.unmount();h.mount();h.runMountTimer();await settle();
-    assert.equal(h.requests.length,2);
-    assert.equal(h.states.at(-1),'queued','the new page must regain the state that enables its poller');
+    assert.equal(h.requests.length,0);assert.equal(h.refreshCount,0);
+    assert.equal(h.timeouts.size,0);assert.equal(h.intervals.size,0);assert.equal(h.listenerCount,0);
   });
-  it("checks each visible entry and later bucket without retaining another page or session state", async test => {
-    const h = await refreshHarness(test);
-    const first = h.mount();
-    assert.equal(h.requests.length, 0);
-    h.runMountTimer();
-    await settle();
-    assert.equal(h.requests.length, 1);
-    const { signal, ...requestOptions } = h.requests[0].options;
-    assert.ok(signal instanceof AbortSignal, "refresh requests must have an abort deadline");
-    assert.equal(signal.aborted, false);
-    assert.deepEqual({ ...requestOptions, body: JSON.parse(requestOptions.body) }, {
-      method: "POST", cache: "no-store", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: { reason: "page_view" },
-    });
-    assert.equal(h.requests[0].url, "/api/portfolio/live-prices/sync");
-    assert.equal(h.storage.size, 0);
-    h.focus(); h.visibilityChange(); h.runInterval();
-    await settle();
-    assert.equal(h.requests.length, 1);
-    first.unmount();
-    h.mount(); h.runMountTimer();
-    await settle();
-    assert.equal(h.requests.length, 2, "a route remount must read current readiness and resume queued work");
-    h.advanceBucket(); h.runInterval();
-    await settle();
-    assert.equal(h.requests.length, 3);
-    assert.equal(h.storage.size, 0);
+  it("deduplicates overlapping manual clicks and permits the next explicit refresh", async test => {
+    const h=await refreshHarness(test,{autoRespond:false});const first=h.mount(),second=h.mount();
+    first.click();second.click();first.click();assert.equal(h.requests.length,1);
+    const request=h.requests[0];assert.deepEqual(JSON.parse(request.options.body),{reason:'manual'});
+    assert.equal(request.url,'/api/portfolio/live-prices/sync');assert.ok(request.options.signal instanceof AbortSignal);
+    h.respond(0,'fresh');await settle();assert.ok(h.refreshCount>0);
+    first.click();assert.equal(h.requests.length,2);h.respond(1,'queued');await settle();
+    assert.equal(h.states.at(-1),'queued');
   });
 
-  it("skips hidden checks without consuming the bucket and catches up once on return or focus", async test => {
-    const h = await refreshHarness(test, { visibility: "hidden" });
-    h.mount(); h.runMountTimer(); h.runInterval(); h.focus();
-    await settle();
-    assert.equal(h.requests.length, 0);
-    assert.equal(h.storage.size, 0);
-    h.advanceBucket(); h.runInterval();
-    h.setVisibility("visible"); h.visibilityChange(); h.focus();
-    await settle();
-    assert.equal(h.requests.length, 1);
-    h.setVisibility("hidden"); h.advanceBucket(); h.runInterval();
-    h.setVisibility("visible"); h.focus(); h.visibilityChange();
-    await settle();
-    assert.equal(h.requests.length, 2);
-  });
-
-  it("shares an in-flight request across automatic and manual callers and releases it after completion", async test => {
-    const h = await refreshHarness(test, { autoRespond: false });
-    h.mount(); h.runMountTimer();
-    const manual = h.mount({ autoSync: false });
-    manual.click(); manual.click();
-    assert.equal(h.requests.length, 1);
-    h.respond(0, "fresh");
-    await settle();
-    assert.ok(h.refreshCount > 0, "fresh server cache must still reach the displayed Server Components");
-    manual.click();
-    assert.equal(h.requests.length, 2);
-    assert.deepEqual(JSON.parse(h.requests[1].options.body), { reason: "manual" });
-    h.respond(1, "synced");
-    await settle();
-  });
-
-  it("removes the initial timer, repeating timer and both listeners on unmount", async test => {
-    const h = await refreshHarness(test);
-    const button = h.mount();
-    assert.equal(h.timeouts.size, 1);
-    assert.equal(h.intervals.size, 1);
-    assert.equal(h.listenerCount, 2);
-    button.unmount();
-    assert.equal(h.timeouts.size, 0);
-    assert.equal(h.intervals.size, 0);
-    assert.equal(h.listenerCount, 0);
-    h.advanceBucket(); h.runMountTimer(); h.runInterval(); h.focus(); h.visibilityChange();
-    await settle();
-    assert.equal(h.requests.length, 0);
-  });
-
-  for (const storageFailure of ["access", "read", "write"]) {
-    it(`continues one check per local bucket when session storage ${storageFailure} fails`, async test => {
-      const h = await refreshHarness(test, { storageFailure });
-      h.mount();
-      assert.doesNotThrow(() => h.runMountTimer());
-      await settle();
-      assert.equal(h.requests.length, 1);
-      assert.doesNotThrow(() => { h.focus(); h.visibilityChange(); h.runInterval(); });
-      await settle();
-      assert.equal(h.requests.length, 1);
-      h.advanceBucket();
-      assert.doesNotThrow(() => h.focus());
-      await settle();
-      assert.equal(h.requests.length, 2);
-    });
-  }
-
-  for (const state of ["synced", "partial", "fresh", "cooldown"]) {
+  for (const state of ["synced", "partial", "fresh", "empty", "cooldown"]) {
     it(`refreshes Server Components when the sync endpoint returns ${state}`, async test => {
       const h = await refreshHarness(test, { responseState: state });
-      const button = h.mount({ autoSync: false });
+      const button = h.mount();
       button.click();
       await settle();
       assert.equal(h.refreshCount, 1);
@@ -300,7 +216,7 @@ describe("portfolio refresh lifecycle", () => {
 
   it("releases failed in-flight requests so a manual retry can succeed", async test => {
     const h = await refreshHarness(test, { autoRespond: false });
-    const button = h.mount({ autoSync: false });
+    const button = h.mount();
     button.click(); h.reject(0);
     await settle();
     assert.equal(h.states.at(-1), "error");
@@ -312,10 +228,10 @@ describe("portfolio refresh lifecycle", () => {
     assert.equal(h.refreshCount, 1);
   });
 
-  it("does not start automatic timers when disabled or in design preview, and preview click refreshes without POST", async test => {
+  it("does not start timers in design preview, and preview click refreshes without POST", async test => {
     const h = await refreshHarness(test);
-    h.mount({ autoSync: false });
-    const preview = h.mount({ autoSync: true, designPreview: true });
+    h.mount();
+    const preview = h.mount({ designPreview: true });
     assert.equal(h.timeouts.size, 0);
     assert.equal(h.intervals.size, 0);
     assert.equal(h.listenerCount, 0);
@@ -356,6 +272,18 @@ describe("market collection quote and history polling", () => {
     for (let check = 0; check < 12; check++) await h.runPollingInterval();
     assert.equal(h.states.at(-1), "fresh");
     assert.equal(h.refreshCount, 1);
+    assert.equal(h.intervals.size, 0);
+  });
+
+  for (const terminal of ["partial", "empty"]) it("keeps final completion result " + terminal, async test => {
+    const h = await refreshHarness(test, { autoRespond: false });
+    h.mountPolling(); h.runMountTimer();
+    for (let index = 0; index < 12; index++) {
+      const tick = h.runPollingInterval();
+      h.respond(index, {state:index === 11 ? terminal : "queued", readVersion:String(index)});
+      await tick;
+    }
+    assert.equal(h.states.at(-1), terminal);
     assert.equal(h.intervals.size, 0);
   });
 

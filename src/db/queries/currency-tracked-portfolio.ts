@@ -18,7 +18,8 @@ import { getTwelveDataServerConfig, requestTwelveDataEvidence, readTwelveDataEvi
 export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: PortfolioAnalysisScope, reporting: Currency, options: { asOf?: Date; collect?: boolean; investmentsOnly?: boolean } = {}): Promise<TrackedPortfolioEvidence & { contributionPolicy: ReturnType<typeof resolveAdditionalContributionPolicyParameters> }> {
   const now = options.asOf ?? new Date();
   if (!Number.isFinite(now.getTime()) || now.getTime() > Date.now()) throw new Error("currency_valuation_time_invalid");
-  const providerEvidence = options.collect === false ? readTwelveDataEvidence : requestTwelveDataEvidence;
+  // Page reads never create live-price or spot-FX demand. Explicit collection remains opt-in.
+  const providerEvidence = options.collect === true ? requestTwelveDataEvidence : readTwelveDataEvidence;
   const historicalFxEvidence = options.collect === false ? readTwelveDataHistoricalFx : requestTwelveDataHistoricalFx;
   const splitRiskEvidence = options.collect === false ? readTwelveDataSplitRisk : requestTwelveDataSplitRisk;
   const sources = await getReadOnlyTenantPortfolioDashboardSources({ tenantContext: tenant, scope, serviceDate: resolveSnapshotCycle(now).snapshotDate });

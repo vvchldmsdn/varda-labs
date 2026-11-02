@@ -1,4 +1,5 @@
 "use client";
+import { instrumentLabel } from "@/lib/instrument-display";
 import { ActionGroup, ActionContent, Button as CairnButton, Field as CairnField, Select as CairnNativeSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 import Link from 'next/link';
@@ -20,7 +21,7 @@ import {RiskCorrelationMatrix} from './reused/risk-correlation-matrix';
 import {CairnSelect} from './reused/cairn-select';
 
 const percent=(value:number|null|undefined)=>value==null?'—':number(value*100)+'%';
-const instrumentName=(row:{ticker:string;names:readonly string[]})=>row.names.filter(name=>name.trim()).join(' / ')||row.ticker;
+const instrumentName=(row:{ticker:string;market?:string;names:readonly string[]})=>instrumentLabel({...row,name:row.names.filter(name=>name.trim()).join(' / ')});
 
 export function BetaAnalysis({read}:{read:AnalysisRead}) {
  const [context,setContext]=useBetaContext(read.context),freshness=useBetaReadFreshness(),router=useRouter();
@@ -58,7 +59,7 @@ export function BetaAnalysis({read}:{read:AnalysisRead}) {
   {direct&&<>
    <dl className={styles.basis} aria-label="직접 보유 분석 기준"><div><dt>기준일</dt><dd>{visible.serviceDate??'—'}</dd></div><div><dt>{direct.status==='partial'?'확인 평가 소계':'분석 평가 합계'}</dt><dd>{number(m?.totalValueKrw,0)} KRW</dd></div><div><dt>확인 범위</dt><dd>입력 {direct.inputHoldingCount} · 확인 {direct.resolvedInputHoldingCount} · 제외 {direct.excludedHoldingCount}</dd></div></dl>
    <p className={styles.scopeNote}>{direct.status==='partial'?'확인 소계 기준 · 전체 비중 아님':'직접 보유 종목 기준'} · KRW 평가 비중</p>
-   <div className={styles.exposureLayout}><section aria-label="통화 노출"><CairnSectionTitle level="h3">통화 노출</CairnSectionTitle>{m?m.currencyExposures.map(row=><div className={styles.exposure} key={row.currency}><p><strong>{row.currency}</strong><span>{number(row.currentWeightPct)}%</span></p><div role="img" aria-label={row.currency+' '+number(row.currentWeightPct)+'%'}><span style={{width:row.currentWeightPct+'%'}} /></div></div>):<p className={styles.noExposure}>통화 비중을 계산할 수 있는 평가 근거가 없습니다.</p>}<p>{direct.directHoldingCount}개 직접 보유 종목 · 환율 충격 계산 미연결</p></section><section className={styles.selected}><p className={styles.eyebrow}>가장 큰 직접 보유</p><CairnSectionTitle level="h3">{direct.largestHolding?.name||direct.largestHolding?.ticker||'확인 근거 없음'}</CairnSectionTitle>{direct.largestHolding&&<p>{direct.largestHolding.ticker} · {direct.largestHolding.market} · {direct.largestHolding.currency}</p>}<p className={styles.largestWeight}>{m?number(m.largestHoldingWeightPct)+'%':'—'}</p><p>현재 분석 범위의 평가 비중</p></section></div>
+   <div className={styles.exposureLayout}><section aria-label="통화 노출"><CairnSectionTitle level="h3">통화 노출</CairnSectionTitle>{m?m.currencyExposures.map(row=><div className={styles.exposure} key={row.currency}><p><strong>{row.currency}</strong><span>{number(row.currentWeightPct)}%</span></p><div role="img" aria-label={row.currency+' '+number(row.currentWeightPct)+'%'}><span style={{width:row.currentWeightPct+'%'}} /></div></div>):<p className={styles.noExposure}>통화 비중을 계산할 수 있는 평가 근거가 없습니다.</p>}<p>{direct.directHoldingCount}개 직접 보유 종목 · 환율 충격 계산 미연결</p></section><section className={styles.selected}><p className={styles.eyebrow}>가장 큰 직접 보유</p><CairnSectionTitle level="h3">{direct.largestHolding?instrumentLabel(direct.largestHolding):'확인 근거 없음'}</CairnSectionTitle>{direct.largestHolding&&<p>{direct.largestHolding.ticker} · {direct.largestHolding.market} · {direct.largestHolding.currency}</p>}<p className={styles.largestWeight}>{m?number(m.largestHoldingWeightPct)+'%':'—'}</p><p>현재 분석 범위의 평가 비중</p></section></div>
    <dl className={styles.directSummary} aria-label="직접 보유 핵심 지표"><div><dt>최대 보유 비중</dt><dd>{m?number(m.largestHoldingWeightPct)+'%':'—'}</dd></div><div><dt>상위 3종목 합계</dt><dd>{m?number(m.topThreeWeightPct)+'%':'—'}</dd></div><div><dt>직접 보유 유효 종목 수</dt><dd>{number(m?.effectiveHoldingCount)}</dd></div><div><dt>HHI</dt><dd>{number(m?.hhiPoints)}</dd></div></dl>
    <details className={styles.evidence}><summary>범위와 제외 기준 확인</summary><p>입력 {direct.inputHoldingCount} · 확인 {direct.resolvedInputHoldingCount} · 제외 {direct.excludedHoldingCount} · 식별 불가 {direct.unresolvedIdentityCount} · 금액 불가 {direct.invalidValueCount}</p><p>계좌 범위는 account/market/currency/ticker, 전체 범위는 기존 모델의 market/currency/ticker 병합 규칙을 유지합니다. 직접 보유 집중도이며 ETF look-through가 아닙니다.</p><pre>{JSON.stringify(visible.exclusions,null,2)}</pre></details>
   </>}

@@ -1,0 +1,9 @@
+.chart {position:relative;min-width:0;--composition-height:32px;}
+.bar {display:flex;gap:0;height:var(--composition-height);background:var(--cairn-ui-surface,#eeeee9);}
+.bar .segment {display:block;flex:none;min-width:0;min-height:0;height:100%;padding:0;margin:0;border:0;border-radius:0;cursor:pointer;transform:translateY(0);transition:transform 160ms ease,filter 160ms ease;}
+.bar .segment[data-active=true] {transform:translateY(-4px);filter:brightness(1.06);z-index:1;}
+.bar .segment:focus-visible {outline:2px solid var(--ink,#20211f);outline-offset:3px;z-index:2;}
+.tooltip {position:absolute;left:50%;bottom:calc(100% + 12px);transform:translateX(-50%);display:flex;gap:12px;align-items:baseline;max-width:100%;padding:7px 12px;border-radius:8px;background:var(--ink,#20211f);color:var(--paper,#fff);font-size:12px;line-height:1.4;pointer-events:none;z-index:3;overflow-wrap:anywhere;}
+.tooltip small {white-space:nowrap;font-variant-numeric:tabular-nums;opacity:.75;}
+@media(prefers-reduced-motion:reduce) {.bar .segment {transition:none;}.bar .segment[data-active=true] {transform:none;filter:brightness(1.12);}}
+:global([data-reduced=true]) .bar .segment {transition:none;transform:none;}

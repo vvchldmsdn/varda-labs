@@ -93,3 +93,6 @@
 :global([data-reduced="true"]) .surface .presets button { transition:none; }
 :global([data-reduced="true"]) .surface .fundingSegment[aria-pressed="true"] { translate:none; }
 @media (prefers-reduced-motion:reduce) { .surface .presets button { transition:none; } }
+
+/* Shared contiguous composition bar owns segment interaction and geometry. */
+.surface .fundingBar {display:block;height:auto;--composition-height:56px;border-radius:0;}

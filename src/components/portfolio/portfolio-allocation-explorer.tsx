@@ -1,5 +1,7 @@
 "use client";
 
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 
@@ -36,18 +38,18 @@ export function PortfolioAllocationExplorer({ compact=false, groupRows, holdingR
     {selected ? <div className={styles.explorerBody}>
       <aside className={styles.summaryCell} aria-label={pt("포트폴리오 핵심 수치")}>{summary}</aside>
       <div className={styles.visualCell}>
-        {view==="ring" ? <PortfolioAllocationRing entries={keyedRows.map(({key,row})=>({key,name:row.name,weightPct:row.currentWeightPct}))} selectedKey={selected.key} onSelect={setSelectedKey} /> : <div className={styles.mapFrame}><div className={styles.map}>{layout.map(rect=>{
+        {view==="ring" ? <PortfolioAllocationRing entries={keyedRows.map(({key,row})=>({key,name:instrumentLabel(row),weightPct:row.currentWeightPct}))} selectedKey={selected.key} onSelect={setSelectedKey} /> : <div className={styles.mapFrame}><div className={styles.map}>{layout.map(rect=>{
           const row=rowsByKey.get(rect.key);if(!row)return null;
           const active=rect.key===selected.key;
-          return <CairnButton variant="bare" key={rect.key} type="button" aria-label={pt(`${row.name}, 현재 비중 ${formatPercent(row.currentWeightPct)}`)} aria-pressed={active} onClick={()=>setSelectedKey(rect.key)} className={`absolute overflow-hidden rounded-md border p-2 text-left transition-[filter,box-shadow] duration-150 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${active?"z-10 border-[var(--ink)] shadow-[0_0_0_1px_var(--ink)]":"border-[var(--paper)] hover:brightness-[0.97]"}`} style={tileStyle(rect,row.driftPct)}>
-            {rect.width>=11&&rect.height>=10?<span className="block truncate text-[10px] font-semibold leading-4 text-[var(--ink)]">{row.name}</span>:null}
+          return <CairnButton variant="bare" key={rect.key} type="button" aria-label={pt(`${instrumentLabel(row)}, 현재 비중 ${formatPercent(row.currentWeightPct)}`)} aria-pressed={active} onClick={()=>setSelectedKey(rect.key)} className={`absolute overflow-hidden rounded-md border p-2 text-left transition-[filter,box-shadow] duration-150 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${active?"z-10 border-[var(--ink)] shadow-[0_0_0_1px_var(--ink)]":"border-[var(--paper)] hover:brightness-[0.97]"}`} style={tileStyle(rect,row.driftPct)}>
+            {rect.width>=11&&rect.height>=10?<span className="block truncate text-[10px] font-semibold leading-4 text-[var(--ink)]">{instrumentLabel(row)}</span>:null}
             {rect.width>=15&&rect.height>=15?<span className="mt-1 block truncate text-[9px] text-[var(--muted)]"><PortfolioText ko={accountLabel(row.account, accountLabels)} /> · {row.ticker ?? <PortfolioText ko="종목 코드 없음" />}</span>:null}
             {rect.width>=9&&rect.height>=8?<span className="absolute bottom-2 left-2 text-[9px] tabular-nums">{formatPercent(row.currentWeightPct)}</span>:null}
           </CairnButton>;
         })}</div><div className={styles.mapLegend}><LegendSwatch color="var(--brand)" label="목표보다 낮음" /><LegendSwatch color="var(--line)" label="목표 근접" /><LegendSwatch color="var(--negative-mid)" label="목표보다 높음" /><LegendSwatch color="var(--wash)" label="목표 없음" /></div></div>}
       </div>
       <aside className={styles.selectedDetail} aria-label={pt("선택 종목 근거")}>
-        <CairnSelect id="allocation-selected-holding" label={pt("비중 종목 선택")} className={styles.holdingSelect} value={selected.key} onValueChange={setSelectedKey} options={keyedRows.map(({key,row})=>({value:key,label:`${row.name} · ${formatPercent(row.currentWeightPct)}`}))} />
+        <CairnSelect id="allocation-selected-holding" label={pt("비중 종목 선택")} className={styles.holdingSelect} value={selected.key} onValueChange={setSelectedKey} options={keyedRows.map(({key,row})=>({value:key,label:`${instrumentLabel(row)} · ${formatPercent(row.currentWeightPct)}`}))} />
         <div className={styles.selectedDesktop}><SelectedHoldingEvidence row={selected.row} accountLabels={accountLabels} /></div>
         <div className={styles.selectedMobile}><span><PortfolioText ko={"현재"} /><strong>{formatPercent(selected.row.currentWeightPct)}</strong></span><span><PortfolioText ko={"목표"} /><strong><PortfolioText ko={formatPercent(selected.row.effectiveTargetPct)} /></strong></span><span><PortfolioText ko={"편차"} /><strong>{formatSignedPercent(selected.row.driftPct)}</strong></span></div>
       </aside>
@@ -61,7 +63,7 @@ export function PortfolioAllocationExplorer({ compact=false, groupRows, holdingR
 
 function SelectedHoldingEvidence({row, accountLabels}:{row:PortfolioStructureHoldingRow; accountLabels: Readonly<Record<string, string>>}) {
   const pt = usePortfolioText();
-  return <section className={styles.holdingEvidence}><CairnSectionTitle level="h3">{row.name}</CairnSectionTitle><p className={styles.holdingIdentity}><PortfolioText ko={accountLabel(row.account, accountLabels)} /> · {row.ticker ?? <PortfolioText ko="종목 코드 없음" />} · {row.currency}</p><dl className={styles.holdingFacts}><DetailRow label="평가액" value={formatKrw(row.currentValueKrw)}/><DetailRow label="현재 비중" value={formatPercent(row.currentWeightPct)}/><DetailRow label="목표 비중" value={pt(formatPercent(row.effectiveTargetPct))}/><DetailRow label="편차" tone={row.driftPct} value={formatSignedPercent(row.driftPct)}/></dl><div className={styles.targetComparison}><div><span><PortfolioText ko={"현재 / 목표"} /></span><strong>{formatPercent(row.currentWeightPct)} / <PortfolioText ko={formatPercent(row.effectiveTargetPct)} /></strong></div><div className={styles.targetTrack}><div style={{width:`${Math.min(100,row.currentWeightPct)}%`}}/>{row.effectiveTargetPct!==null?<span aria-hidden="true" style={{left:`${Math.min(100,row.effectiveTargetPct)}%`}}/>:null}</div></div><p className={styles.holdingNote}><PortfolioText ko={row.targetPolicyStatus==="approved_policy"?"승인된 목표비중과 현재 평가액을 비교한 읽기 전용 근거입니다.":"현재 범위에 적용된 승인 목표가 없어 보유 근거만 표시합니다."} /></p></section>;
+  return <section className={styles.holdingEvidence}><CairnSectionTitle level="h3">{instrumentLabel(row)}</CairnSectionTitle><p className={styles.holdingIdentity}><PortfolioText ko={accountLabel(row.account, accountLabels)} /> · {row.ticker ?? <PortfolioText ko="종목 코드 없음" />} · {row.currency}</p><dl className={styles.holdingFacts}><DetailRow label="평가액" value={formatKrw(row.currentValueKrw)}/><DetailRow label="현재 비중" value={formatPercent(row.currentWeightPct)}/><DetailRow label="목표 비중" value={pt(formatPercent(row.effectiveTargetPct))}/><DetailRow label="편차" tone={row.driftPct} value={formatSignedPercent(row.driftPct)}/></dl><div className={styles.targetComparison}><div><span><PortfolioText ko={"현재 / 목표"} /></span><strong>{formatPercent(row.currentWeightPct)} / <PortfolioText ko={formatPercent(row.effectiveTargetPct)} /></strong></div><div className={styles.targetTrack}><div style={{width:`${Math.min(100,row.currentWeightPct)}%`}}/>{row.effectiveTargetPct!==null?<span aria-hidden="true" style={{left:`${Math.min(100,row.effectiveTargetPct)}%`}}/>:null}</div></div><p className={styles.holdingNote}><PortfolioText ko={row.targetPolicyStatus==="approved_policy"?"승인된 목표비중과 현재 평가액을 비교한 읽기 전용 근거입니다.":"현재 범위에 적용된 승인 목표가 없어 보유 근거만 표시합니다."} /></p></section>;
 }
 function GroupAllocationRow({ row }: { row: PortfolioStructureGroupRow }) {
   return (

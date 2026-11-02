@@ -1,4 +1,6 @@
 "use client";
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -167,7 +169,7 @@ export function TodayContributionExplorer({
 function ContributionRowContent({ row, maximum, active }: { row: TodayContributionDisplayRow; maximum: number; active: boolean }) {
   return <>
     <span className="min-w-0">
-      <span className="block text-sm font-medium text-[var(--ink)]" title={row.name}>{row.name}</span>
+      <span className="block text-sm font-medium text-[var(--ink)]" title={instrumentLabel(row)}>{instrumentLabel(row)}</span>
       <span className="mt-0.5 block truncate text-xs text-[var(--muted)]">{row.accountLabel}{row.ticker ? ` · ${row.ticker}` : ""}</span>
     </span>
     <DotContributionBar value={row.changeKrw} maximum={maximum} active={active} />

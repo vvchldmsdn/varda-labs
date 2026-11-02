@@ -1,5 +1,6 @@
 "use client";
 
+import { instrumentLabel } from "@/lib/instrument-display";
 import { Button as CairnButton } from "@/components/cairn-ui";
 
 import { PortfolioText, usePortfolioText } from "@/components/portfolio/portfolio-text";
@@ -10,7 +11,7 @@ import styles from "./risk-workspace.module.css";
 import stageStyles from "./risk-stage.module.css";
 
 
-type Instrument = Readonly<{ instrumentKey: string; ticker: string; names: readonly string[] }>;
+type Instrument = Readonly<{ instrumentKey: string; ticker: string; market?: string; names: readonly string[] }>;
 
 export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: {
   instruments: readonly Instrument[];
@@ -27,11 +28,11 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
   return (
     <div className={`${styles.interactiveMatrix} ${compact ? stageStyles.compactMatrix : ""}`}>
       <div className={styles.matrixReadout} data-matrix-readout aria-live="polite">
-        <div><span><PortfolioText ko={"선택한 종목 쌍"} /></span><p>{instruments[rowIndex]?.ticker ?? "—"}<i>×</i>{instruments[columnIndex]?.ticker ?? "—"}</p></div>
+        <div><span><PortfolioText ko={"선택한 종목 쌍"} /></span><p>{instruments[rowIndex] ? instrumentName(instruments[rowIndex]) : "—"}<i>×</i>{instruments[columnIndex] ? instrumentName(instruments[columnIndex]) : "—"}</p></div>
         <strong data-negative={finiteSelected && selectedValue < 0}>{finiteSelected ? selectedValue.toFixed(2) : "—"}</strong>
         <span className={styles.readoutHint}><PortfolioText ko={finiteSelected ? rowIndex === columnIndex ? "같은 종목" : selectedValue > 0 ? "같은 방향의 움직임" : selectedValue < 0 ? "반대 방향의 움직임" : "선형 상관 없음" : "계산 근거 없음"} /></span>
       </div>
-      <p className={styles.matrixPairNames} data-matrix-pair>{instruments[rowIndex]?.names.join(", ") ?? <PortfolioText ko="종목 근거 없음" />}<span>×</span>{instruments[columnIndex]?.names.join(", ") ?? <PortfolioText ko="종목 근거 없음" />}</p>
+      <p className={styles.matrixPairNames} data-matrix-pair>{(instruments[rowIndex] ? instrumentName(instruments[rowIndex]) : null) ?? <PortfolioText ko="종목 근거 없음" />}<span>×</span>{(instruments[columnIndex] ? instrumentName(instruments[columnIndex]) : null) ?? <PortfolioText ko="종목 근거 없음" />}</p>
       <div className={styles.matrixScroll} data-matrix-scroll tabIndex={0} role="region" aria-label={pt("좌우로 스크롤할 수 있는 상관관계 행렬")}>
         <table className={styles.heatmapTable} style={{ minWidth }}>
           <thead><tr><th scope="col"><span className="sr-only"><PortfolioText ko={"종목"} /></span></th>{instruments.map((instrument, index) => <th key={instrument.instrumentKey} scope="col" data-highlight={columnIndex === index} title={instrumentName(instrument)}><span className={styles.instrumentName}>{instrumentName(instrument)}</span></th>)}</tr></thead>
@@ -64,7 +65,7 @@ export function RiskCorrelationMatrix({ instruments, matrix, compact = false }: 
 }
 
 function instrumentName(instrument: Instrument) {
-  return instrument.names.filter(name => name.trim()).join(", ") || instrument.ticker;
+  return instrumentLabel({...instrument,name:instrument.names.filter(name => name.trim()).join(", ")});
 }
 
 function correlationFill(value: number | null, diagonal: boolean) {

@@ -1,4 +1,5 @@
 'use client';
+import { instrumentLabel } from "@/lib/instrument-display";
 import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
 
 
@@ -45,7 +46,7 @@ export function OnboardingInstrumentSearch({onSelect,disabled=false,privateQuery
   </CairnStatus>
   {results.length>0&&<ul ref={list} id={`${id}-results`} className={styles.results} aria-label="종목 검색 결과">
    {results.map(row=><li key={row.id}><CairnButton variant="ghost" className={styles.result} type="button" disabled={disabled} onClick={()=>{onSelect(row);close();}}>
-    <span><strong>{row.name}</strong><small>{row.ticker} · {row.market==='korea'?'한국':'미국'} · {row.currency}</small></span><span>{row.assetType==='stock'?'주식':'ETF'}</span>
+    <span><strong>{instrumentLabel(row)}</strong><small>{row.market === "us" ? row.name : row.ticker} · {row.market==='korea'?'한국':'미국'} · {row.currency}</small></span><span>{row.assetType==='stock'?'주식':'ETF'}</span>
    </CairnButton></li>)}
   </ul>}
  </div>;

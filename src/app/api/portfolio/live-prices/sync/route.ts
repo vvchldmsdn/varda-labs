@@ -12,6 +12,7 @@ import { planTenantLivePriceSync, TENANT_LIVE_PRICE_SYNC_POLICY, type TenantLive
 import { enqueueMarketCollection } from "@/lib/market-data/collection-queue";
 import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
 import { livePriceReadVersion } from "@/lib/market-data/live-price-read-version";
+import { manualNativeQuotes } from "@/lib/market-data/manual-native-quotes";
 import type { CollectionInput } from "@/lib/market-data/collection-policy";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,9 +30,9 @@ export async function POST(request: Request) {
       if (reason === "poll") { scheduleMarketCollection(); return response({ state: "queued", targetLimitExceeded: true, retryAfterSeconds: 10 }, 202); }
       return response({ state: "target_limit_exceeded", targetCount: targets.length, maximumTargetCount: TENANT_LIVE_PRICE_SYNC_POLICY.maximumTargetCount }, 409);
     }
-    const [quotes, fxEvidence] = await Promise.all([getCurrentKisQuoteEvidence(targets), getCurrentUsdKrwEvidence()]);
+    const [quotes, fxEvidence, native] = await Promise.all([getCurrentKisQuoteEvidence(targets), getCurrentUsdKrwEvidence(), manualNativeQuotes(targets, reason === "manual").catch(() => ({available:false,pending:false,failed:true,version:"unavailable"}))]);
     const plan = planTenantLivePriceSync({ targets, quotes });
-    const readVersion = livePriceReadVersion(targets, quotes, fxEvidence);
+    const readVersion = livePriceReadVersion(targets, quotes, fxEvidence, native.version);
     // A manual click does not force another provider request for a fresh shared quote.
     const fxPlan = planTenantLiveFxSync({ currencies: targets.map(t => t.currency), evidence: fxEvidence, reason: "page_view" });
     const fxTarget = selectKisUsdKrwQuoteTarget({ targets, quotes });
@@ -40,16 +41,29 @@ export async function POST(request: Request) {
     if (jobs.length === 0) {
       // Polling can wake another pending lane without admitting arbitrary instruments.
       scheduleMarketCollection();
-      return response({ state: targets.length ? "fresh" : "empty", freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion });
+      return response({ state: native.pending ? "queued" : native.failed ? "partial" : targets.length ? "fresh" : "empty", freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion, ...(native.pending ? { retryAfterSeconds: 10 } : {}) }, native.pending ? 202 : 200);
     }
-    if (reason === "poll") {
+    if (!getKisProviderPolicy().configured) {
+      if (!native.available) return response({ state: "provider_unavailable" }, 503);
+      scheduleMarketCollection();
+      return response({ state: native.pending ? "queued" : "partial", readVersion, unavailableProvider: "kis", retryAfterSeconds: 10 }, native.pending ? 202 : 200);
+    }
+    if (reason !== "manual") {
       scheduleMarketCollection();
       return response({ state: "queued", retryAfterSeconds: 10, freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion }, 202);
     }
-    if (!getKisProviderPolicy().configured) return response({ state: "provider_unavailable" }, 503);
     // Keep the instrument cap separate from the one shared FX request.
-    const result = await enqueueMarketCollection(jobs.filter(job => job.kind !== "fx"));
-    if (jobs.some(job => job.kind === "fx")) await enqueueMarketCollection(jobs.filter(job => job.kind === "fx"));
+    const admissions = await Promise.allSettled([
+      jobs.filter(job => job.kind !== "fx"), jobs.filter(job => job.kind === "fx"),
+    ].filter(lane => lane.length).map(lane => enqueueMarketCollection(lane)));
+    const accepted = admissions.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
+    if (accepted.length !== admissions.length) {
+      if (!accepted.length && !native.available) return response({ state: "service_unavailable" }, 503);
+      scheduleMarketCollection();
+      const pending = accepted.length > 0 || native.pending;
+      return response({state:pending ? "queued" : "partial", readVersion, retryAfterSeconds:10}, pending ? 202 : 200);
+    }
+    const result = accepted[0];
     scheduleMarketCollection();
     return response({ state: "queued", queuedTargetCount: jobs.length, freshTargetCount: plan.freshTargetCount, targetCount: targets.length, readVersion,
       retryAfterSeconds: result.retryAfterSeconds }, 202, { "Retry-After": String(result.retryAfterSeconds) });
