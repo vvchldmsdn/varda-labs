@@ -100,6 +100,22 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.screenshot({path:path.join(output,`beta-recovered-${width}.png`)});
     });
   }
+  await check('beta-structure-short-viewport-1265',async()=>{
+    await page.setViewportSize({width:1265,height:712});
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.goto(url+'/qa-beta-visual?mode=domain&scope=all&currency=KRW');
+    await expect(page.locator('[data-beta-root]')).toHaveAttribute('data-beta-ready','true');
+    await page.getByRole('button',{name:'포트 구조 확대',exact:true}).click();
+    const dialog=page.getByRole('dialog');
+    const ring=dialog.locator('[data-allocation-ring] svg');await expect(ring).toBeVisible();
+    const donutBounds=await ring.boundingBox(),panelBounds=await dialog.locator('[data-beta-panel]').boundingBox();
+    assert.ok(donutBounds&&panelBounds&&donutBounds.y>=panelBounds.y&&donutBounds.y+donutBounds.height<panelBounds.y+panelBounds.height,'entire donut fits the shorter opening viewport');
+    await ring.getByRole('button',{name:/KODEX 200/}).click();
+    const selectedBounds=await ring.boundingBox();
+    assert.ok(selectedBounds&&panelBounds&&selectedBounds.y+selectedBounds.height<panelBounds.y+panelBounds.height,'selecting a holding keeps the donut fully visible');
+    await page.screenshot({path:path.join(output,'beta-structure-1265.png')});
+    await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
+  });
   await check('beta-visual-currency-basis',async()=>{
     await page.goto(url+'/qa-beta-visual?mode=domain&scope=all&currency=USD');
     const today=page.locator('[data-beta-card="today"]');
