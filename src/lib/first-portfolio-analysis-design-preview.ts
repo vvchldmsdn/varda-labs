@@ -23,7 +23,7 @@ export function buildFirstPortfolioAnalysisDesignPreview(empty = false) {
     readiness: {
       state: "ready" as const,
       entries: assets.map((asset) => ({
-        holdingId: asset.id, accountCode: asset.account, name: asset.name, ticker: asset.ticker,
+        holdingId: asset.id, accountCode: asset.account, name: asset.name, ticker: asset.ticker, market: asset.market,
         readiness: buildHoldingAnalysisDataReadiness({ holding: { holdingId: asset.id, accountCode: asset.account, ...asset }, serviceDate: "2026-09-09", priceRows: [], fxRows: [] }),
       })),
     },

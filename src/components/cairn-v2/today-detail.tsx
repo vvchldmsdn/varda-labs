@@ -1,4 +1,5 @@
 "use client";
+import { instrumentLabel } from "@/lib/instrument-display";
 import { useId, useState } from "react";
 import Link from "next/link";
 import { ActionGroup, ActionContent } from "@/components/cairn-ui";
@@ -54,15 +55,15 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
     <div className={styles.chart}>
      <SectionHeading title="종목별 변동" />
      <div className={styles.rows} aria-label="종목별 변동 기여 목록">
-      {rows.map(row=><button key={row.key} type="button" className={styles.row} onClick={()=>select(row)} onFocus={()=>select(row)} aria-pressed={active?.key===row.key} aria-controls={readoutId} aria-label={(row.name??"이름 확인 전")+" · "+(row.accountLabel??"계좌 확인 전")+" · 변동 "+money(row.changeKrw,true)+" "+context.currency+" · 가격·환율 수익률 "+formatPercent(row.returnPct,2,true)}>
-       <span className={styles.identity}><strong title={row.name??undefined}>{row.name??"이름 확인 전"}</strong><small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></span>
+      {rows.map(row=><button key={row.key} type="button" className={styles.row} onClick={()=>select(row)} onFocus={()=>select(row)} aria-pressed={active?.key===row.key} aria-controls={readoutId} aria-label={(instrumentLabel(row))+" · "+(row.accountLabel??"계좌 확인 전")+" · 변동 "+money(row.changeKrw,true)+" "+context.currency+" · 가격·환율 수익률 "+formatPercent(row.returnPct,2,true)}>
+       <span className={styles.identity}><strong title={instrumentLabel(row)}>{instrumentLabel(row)}</strong><small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></span>
        <DotBar value={row.changeKrw} maximum={maximum} active={active?.key===row.key}/>
        <span className={styles.rowValue} data-tone={tone(row.changeKrw)}>{money(row.changeKrw,true)}<small>{row.returnPct===null?"변동률 —":formatPercent(row.returnPct,2,true)}</small></span>
       </button>)}
      </div>
     </div>
     {active&&<aside className={styles.selected} id={readoutId} aria-live="polite">
-     <p className={styles.eyebrow}>선택한 종목</p><h3>{active.name??"이름 확인 전"}</h3><p>{active.accountLabel??"계좌 확인 전"} · {active.market??"시장 미제공"}</p>
+     <p className={styles.eyebrow}>선택한 종목</p><h3>{instrumentLabel(active)}</h3><p>{active.accountLabel??"계좌 확인 전"} · {active.market??"시장 미제공"}</p>
      <strong className={styles.selectedAmount} data-tone={tone(active.changeKrw)}>{money(active.changeKrw,true)} <small>{context.currency}</small></strong>
      <dl><Metric label="가격·환율 수익률" value={formatPercent(active.returnPct,2,true)} /><Metric label="같은 수량의 기준 평가" value={formatNumber(active.previousValueKrw,{maximumFractionDigits:0})} unit="원" /></dl>
      <p className={styles.selectedNote}>같은 수량의 가격·환율 변화입니다.</p>
@@ -77,7 +78,7 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
   <details className={styles.evidence}><summary>숫자·시세·비교 근거</summary>
    {rows.length>0&&<>
    <div className={styles.tableScroll} tabIndex={0} aria-label="종목별 변동 원본 숫자 표">
-    <table><caption>종목별 변동 근거 · KRW 원본</caption><thead><tr><th>종목 · 계좌</th><th>가격·환율 변동액</th><th>수익률</th><th>같은 수량의 기준 평가</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th>{row.name??"이름 확인 전"}<small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></th><td data-tone={tone(row.changeKrw)}>{exact(row.changeKrw,true)}</td><td>{row.returnPct===null?"—":exact(row.returnPct,true)+"%"}</td><td>{exact(row.previousValueKrw)}</td></tr>)}</tbody></table>
+    <table><caption>종목별 변동 근거 · KRW 원본</caption><thead><tr><th>종목 · 계좌</th><th>가격·환율 변동액</th><th>수익률</th><th>같은 수량의 기준 평가</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th>{instrumentLabel(row)}<small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></th><td data-tone={tone(row.changeKrw)}>{exact(row.changeKrw,true)}</td><td>{row.returnPct===null?"—":exact(row.returnPct,true)+"%"}</td><td>{exact(row.previousValueKrw)}</td></tr>)}</tbody></table>
    </div>
 
    </>}

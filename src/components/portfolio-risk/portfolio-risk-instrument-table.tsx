@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
@@ -50,7 +51,7 @@ export function RiskInstrumentTable({
               {instruments.map((instrument) => (
                 <tr key={instrument.instrumentKey}>
                   <RiskTableCell strong>
-                    <div>{instrument.ticker}</div>
+                    <div>{instrumentLabel({ ...instrument, name: instrument.names.join(", ") })}</div>
                     <div className="max-w-56 truncate text-xs font-normal text-[var(--muted)]">
                       {instrument.names.join(", ")}
                     </div>

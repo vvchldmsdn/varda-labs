@@ -72,7 +72,7 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await page.reload();
       await form.getByRole('button',{name:'표 읽고 종목 확인',exact:true}).click();
       await expect(search).toHaveValue('QAFU');
-      await form.getByRole('button',{name:/QA 보유 6.*QAFUND/}).click();
+      await form.getByRole('button',{name:/QAFUND.*QA 보유 6/}).click();
       await form.getByRole('button',{name:'확인 목록으로 가져오기',exact:true}).click();
       await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
       await page.reload();await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');

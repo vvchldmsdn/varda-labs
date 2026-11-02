@@ -1,3 +1,5 @@
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { snapshotProgressMessage, type SnapshotProgress } from "@/lib/snapshots/progress";
 
 import { T } from "@/components/i18n/localized-text";
@@ -88,7 +90,7 @@ export function TodayMovement({
           holding.market,
           holding.ticker ?? holding.name,
         ].join("|"),
-        name: holding.name,
+        name: instrumentLabel(holding),
         priceImpactKrw: row.priceChangeKrw,
         returnPct: row.returnPct,
         selected: isSelectedHolding(detail, holding),
@@ -380,7 +382,7 @@ function HoldingDetailPanel({
             SELECTED HOLDING
           </p>
           <CairnSectionTitle id="holding-detail-title" className="mt-1 text-2xl font-medium">
-            {holding.name}
+            {instrumentLabel(holding)}
           </CairnSectionTitle>
           <p className="mt-1 text-xs text-[var(--muted)]">
             {accountLabels.get(holding.account) ?? <T ko="계좌" en="Account" />} · {<T ko={holding.ticker ?? "티커 없음"} en={translateHomeHistory(holding.ticker ?? "티커 없음")}/>} ·{" "}
@@ -396,7 +398,7 @@ function HoldingDetailPanel({
 
       <SelectedHoldingHistoryChart
         currency={holding.currency}
-        name={holding.name}
+        name={instrumentLabel(holding)}
         points={historyPoints}
       />
 

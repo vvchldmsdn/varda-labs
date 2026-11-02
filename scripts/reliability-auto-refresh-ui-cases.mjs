@@ -6,7 +6,7 @@ import { resolveSnapshotCycle, buildCycleForSnapshotDate } from '../src/lib/snap
 
 /** Disposable PostgreSQL only. Keep the real authenticated API read receipt and
  * App Router rendering; model the provider's asynchronous queue with a response
- * override and explicit synthetic quote writes. Never call the test refresh control. */
+ * override and explicit synthetic quote writes. Only explicit clicks create new collection demand. */
 export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,url,output,report}) {
   const account=randomUUID(),asset=randomUUID(),ticker='999997';
   const now=new Date(),{snapshotDate}=resolveSnapshotCycle(now),cycle=buildCycleForSnapshotDate(snapshotDate,now);
@@ -28,7 +28,7 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
       await context.route('**/*',route=>['localhost','127.0.0.1'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort());
       await context.addCookies([{name:'cairn_fullapp_identity',value:identityToken,url,httpOnly:true,sameSite:'Lax'},{name:'varda-locale',value:'ko',url}]);
       const page=await context.newPage(),requests=[];
-      const result={name:`automatic-refresh-${surface}-${viewport.width}`,status:'FAIL'};report.cases.push(result);
+      const result={name:`manual-refresh-${surface}-${viewport.width}`,status:'FAIL'};report.cases.push(result);
       try {
         await quote(200);
         await page.clock.install({time:new Date()});
@@ -48,27 +48,41 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
           await expect(surface==='beta'?page.locator('[data-beta-card="today"]'):page.locator('body')).toContainText(`${(price-100).toFixed(2)}%`);
         };
         await expectPrice(200);
+        if(surface==='beta') {
+          // The initial value is server-rendered. Exercise a real control so
+          // focus events are tested after client handlers have hydrated.
+          await page.getByRole('button',{name:'현재 평가액 확대',exact:true}).click();
+          await expect(page.getByRole('dialog')).toBeVisible();
+          await page.keyboard.press('Escape');
+          await expect(page.getByRole('dialog')).toHaveCount(0);
+        }
+        // Another viewer/worker can update the shared quote. Returning to this
+        // tab must validate access without replacing the displayed valuation.
+        await quote(205);
+        await page.clock.runFor(360000);
+        const sessionCheck=surface==='beta'?page.waitForResponse(response=>new URL(response.url()).pathname==='/api/portfolio/read-session'):null;
+        await page.evaluate(()=>{window.dispatchEvent(new Event('blur'));window.dispatchEvent(new Event('focus'));});
+        if(sessionCheck)assert.equal((await sessionCheck).status(),200,'Focus must validate the real authenticated session');
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        await expectPrice(200);
+        assert.equal(requests.length,0,'No page-view, interval or focus quote collection');
+        await page.getByRole('button',{name:/시세.*갱신|가격.*갱신|시세 새로고침|Refresh prices/}).first().click();
         await expect.poll(()=>requests.length).toBeGreaterThan(0);
         await page.screenshot({path:path.join(output,`auto-${surface}-${viewport.width}-before.png`),fullPage:true});
         // First receipt always refreshes; second catches equal-count price changes.
         await quote(210);await page.clock.runFor(10000);await expectPrice(210);
         await quote(220);await page.clock.runFor(10000);await expectPrice(220);
-        const beforeCycle=requests.filter(r=>r.reason==='page_view').length;
-        // Expire the bounded poller and advance to the next automatic 5-minute check.
+        // Finish bounded completion checks, then route away and back without a new request.
         for(let tick=0;tick<10;tick++) {
-          const previous=requests.length;
-          await page.clock.runFor(10000);
-          await expect.poll(()=>requests.length).toBeGreaterThan(previous);
+          const before=requests.length;await page.clock.runFor(10000);
+          await expect.poll(()=>requests.length).toBe(before+1);
         }
-        await page.clock.runFor(180000);
-        await expect.poll(()=>requests.filter(r=>r.reason==='page_view').length).toBeGreaterThan(beforeCycle);
-        await quote(230);await page.clock.runFor(10000);await expectPrice(230);
-        assert.equal(requests.some(r=>r.reason==='manual'),false,'No refresh button clicks');
-        // A same-window route return must rejoin the queue, rather than suppress it.
+        const finished=requests.length;await page.clock.runFor(360000);assert.equal(requests.length,finished);
         await page.goto(`${url}/portfolio/structure?scope=account%3A${account}`);
-        await quote(240);const onReturn=requests.length;await page.goBack();await expectPrice(240);
-        await expect.poll(()=>requests.length).toBeGreaterThan(onReturn);
-        await quote(250);await page.clock.runFor(10000);await expectPrice(250);
+        const onReturn=requests.length;await page.goBack();await expectPrice(220);
+        await page.clock.runFor(360000);assert.equal(requests.length,onReturn);
+        assert.equal(requests.filter(r=>r.reason==='manual').length,1);
+        assert.equal(requests.some(r=>r.reason==='page_view'),false);
         await page.screenshot({path:path.join(output,`auto-${surface}-${viewport.width}-after.png`),fullPage:true});
         result.status='PASS';result.requests=requests.length;result.receipts=new Set(requests.map(r=>r.readVersion)).size;
       } catch(error) {

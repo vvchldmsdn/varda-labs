@@ -1,7 +1,7 @@
 /* Adapted from the original Cairn HistoryTimeExplorer hero/plot/footer hierarchy.
    No parent page, data model, reset or modal is imported. */
-.surface {container:history-detail / inline-size;min-width:0;margin-top:20px;--history-negative:#3568ae;--history-sage:#8c9f89;--history-sand:#cca17b;}
-.toolbar {display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px;}
+.surface {container:history-detail / inline-size;min-width:0;margin-top:8px;--history-negative:#3568ae;--history-sage:#8c9f89;--history-sand:#cca17b;}
+.toolbar {display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px;}
 .toolbarActions {display:flex;align-items:center;gap:16px;}
 .latestButton {min-height:40px;padding:8px 14px!important;border:1px solid var(--cairn-v2-line)!important;border-radius:20px;font-size:12px!important;white-space:nowrap;}
 .latestButton:hover {background:#eceee8!important;}
@@ -9,7 +9,7 @@
 .sourceSelect {width:min(390px,55%);}
 .sourceLabel,.eyebrow,.note,.caption,.range,.plotHeading>p,.plotNote,.trackLegend {color:var(--cairn-v2-muted);}
 .sourceLabel,.eyebrow {font-size:11px;}
-.stage {display:grid;grid-template-columns:minmax(205px,24%) minmax(0,1fr);gap:42px;}
+.stage {display:grid;grid-template-columns:minmax(180px,22%) minmax(0,1fr);gap:24px;}
 .hero {display:flex;flex-direction:column;justify-content:center;gap:28px;min-width:0;padding:8px 0;}
 .date {margin-top:7px!important;font-size:21px;font-weight:500;letter-spacing:-.035em;font-variant-numeric:tabular-nums;}
 .value {margin-top:14px!important;font-size:clamp(30px,3.2vw,44px);line-height:1.1;font-weight:500;letter-spacing:-.055em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
@@ -29,7 +29,7 @@
 .plotHeading>p {font-size:11px;}
 .plot>figure {margin-top:0;}
 .plot>figure>p {font-size:11px;line-height:1.6;margin-bottom:4px;}
-.plot>figure>[data-history-plot] {height:clamp(230px,42vh,350px);}
+.plot>figure>[data-history-plot] {height:clamp(220px,38vh,330px);}
 .periodControls {display:flex;align-items:center;justify-content:flex-end;gap:22px;font-size:12px;color:var(--cairn-v2-muted);margin-top:8px;}
 .periodControls button {min-width:32px;min-height:40px;border-bottom:1px solid transparent;}
 .periodControls button[aria-pressed="true"] {color:var(--cairn-v2-ink);border-bottom-color:var(--cairn-v2-ink);font-weight:500;}
@@ -59,7 +59,7 @@
 @media(max-width:1100px) {.stage {grid-template-columns:minmax(180px,27%) minmax(0,1fr);gap:26px;}.value {font-size:32px;}.periodValue {font-size:23px;}}
 @container history-detail (max-width:760px) {.stage {grid-template-columns:1fr;gap:24px;}.hero {display:block;}.plot>figure>[data-history-plot] {height:270px;}}
 @media(max-width:699px) {
- .surface {margin-top:14px;}.toolbar {align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:22px;}.sourceSelect {width:100%;}.toolbar>div:last-child {min-height:40px;}
+ .surface {margin-top:8px;}.toolbar {align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;}.sourceSelect {width:100%;}.toolbar>div:last-child {min-height:40px;}
  .stage {grid-template-columns:1fr;gap:24px;}.hero {display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding:0;}.date {font-size:19px;}.value {font-size:clamp(34px,10vw,42px);}.periodSummary {display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:baseline;}.periodValue {font-size:22px;margin-top:0!important;}.periodSummary>.note {grid-column:1/-1;margin-top:0!important;}.range {grid-column:1/-1;}.range span {display:inline;margin-left:12px;}
  .comparison {display:grid;gap:16px;}.plot>figure>[data-history-plot] {height:250px;}.plotHeading {gap:8px;}.plotHeading h3 {font-size:15px;}.periodControls {justify-content:space-between;gap:12px;}.periodControls button {min-width:44px;min-height:44px;}.footer {margin-top:18px;gap:8px;}.links {flex-basis:100%;}.evidence {width:100%;}.evidence dl {grid-template-columns:1fr;gap:12px;}
 }

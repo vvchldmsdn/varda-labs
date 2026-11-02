@@ -1,5 +1,6 @@
 "use client";
 
+import { instrumentLabel } from "@/lib/instrument-display";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -70,7 +71,7 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
     </div>
     {results.length > 0 && <ul className="varda-instrument-results" aria-label={t("검색 결과", "Search results")}>
       {results.map(row => <li key={row.id}><CairnButton variant="secondary" type="button" disabled={disabled} onClick={() => { onSelect(row); setQuery(""); setResults([]); setStatus("idle"); }}>
-        <span><strong>{row.name}</strong><small>{row.ticker} · {row.market === "korea" ? "KR" : "US"} · {row.currency}</small></span><span>{row.assetType.toUpperCase()} ↗</span>
+        <span><strong>{instrumentLabel(row)}</strong><small>{row.market === "us" ? row.name : row.ticker} · {row.market === "korea" ? "KR" : "US"} · {row.currency}</small></span><span>{row.assetType.toUpperCase()} ↗</span>
       </CairnButton></li>)}
     </ul>}
   </div>;

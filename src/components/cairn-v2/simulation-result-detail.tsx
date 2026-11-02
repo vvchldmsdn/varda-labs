@@ -1,4 +1,5 @@
 "use client";
+import { instrumentLabel } from "@/lib/instrument-display";
 import { ActionGroup, ActionContent, Status } from "@/components/cairn-ui";
 import { ChartNoAxesCombined } from "lucide-react";
 
@@ -96,7 +97,7 @@ export default function SimulationResultDetail({ read, context, heading = true }
             const weight = execution.executionWeights.find(row => row.instrumentKey === instrument.instrumentKey);
             const included = weight != null && weight.weightBps > 0;
             return <tr key={instrument.instrumentKey}>
-              <th scope="row">{instrument.name}<small>{instrument.ticker} · {instrument.accounts.join(" / ")}</small></th>
+              <th scope="row">{instrumentLabel(instrument)}<small>{instrument.ticker} · {instrument.accounts.join(" / ")}</small></th>
               <td>{formatPercent(instrument.weightBps == null ? null : instrument.weightBps / 100)}</td>
               <td>{formatPercent(weight == null ? null : weight.weightBps / 100)}</td>
               <td><StatusPill tone={included ? "neutral" : "muted"}>{included ? "포함" : "제외"}</StatusPill>

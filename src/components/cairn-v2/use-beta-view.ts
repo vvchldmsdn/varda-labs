@@ -11,8 +11,8 @@ export function useBetaView(context: BetaContext, read?: DomainRead): BetaView {
   const store = freshness?.store;
   useLayoutEffect(() => {
     if (context.mode !== "domain") store?.leaveDomain();
-    observed?.(context.mode === "domain" ? read?.readReceipt : undefined, read?.readEpoch);
-  }, [context.mode, read?.readReceipt, read?.readEpoch, observed, epoch, store]);
+    observed?.(context.mode === "domain" ? read?.readReceipt : undefined, read?.readEpoch, context.mode === "domain" ? read?.displayBinding : undefined);
+  }, [context.mode, read?.readReceipt, read?.readEpoch, read?.displayBinding, observed, epoch, store]);
   return useMemo(() => context.mode === "domain" ? freshness?.store.blocked(read?.readReceipt, read?.readEpoch) ?
     blankDomainView("loading", "사용자와 조회 권한을 다시 확인하는 중") : read ? visibleDomainRead(read, context) :
     blankDomainView("unavailable", "읽기 응답 없음") : getFixtureView(context), [context, read, freshness]);

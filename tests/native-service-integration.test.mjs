@@ -200,7 +200,7 @@ it("connects group membership SQL and tenant RLS to the same native writer, snap
   assert.equal(await f.writer.hasNativeLedger({ ownerUserId: other }, groupScope), false);
   await assert.rejects(f.pg.query("insert into portfolio_group_account_memberships(canonical_owner_user_id,portfolio_group_id,account_id,valid_from) values($1,$2,$3,'2026-09-01')", [owner, groupId, foreign]), /foreign key/);
   await f.pg.query("insert into portfolio_group_asset_memberships(canonical_owner_user_id,portfolio_group_id,asset_id,valid_from) values($1,$2,$3,'2026-09-01')", [owner, groupId, asset]);
-  for (let i = 0; i < 2; i++) { await f.loader.getTrackedCurrencyEvidence(tenant, { kind: "all", key: "all", label: "All" }, "KRW"); await f.service.drainTwelveDataService(f.config); }
+  for (let i = 0; i < 2; i++) { await f.loader.getTrackedCurrencyEvidence(tenant, { kind: "all", key: "all", label: "All" }, "KRW", { collect: true }); await f.service.drainTwelveDataService(f.config); }
   const all = await f.loader.getTrackedCurrencyEvidence(tenant, { kind: "all", key: "all", label: "All" }, "KRW", { collect: false });
   assert.equal((await f.snapshots.saveNativeSnapshots(tenant, all)).created, 2);
   const first = await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "USD", { collect: false });
@@ -213,7 +213,7 @@ it("connects group membership SQL and tenant RLS to the same native writer, snap
   f.state.historicalRates[dividend.event.at] = "1260";
   await f.service.requestTwelveDataHistoricalFx({ requestedAt: [dividend.event.at], asOf: new Date().toISOString() }, f.config);
   await f.service.drainTwelveDataService(f.config);
-  for (let i = 0; i < 3; i++) { await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "KRW"); await f.service.drainTwelveDataService(f.config); }
+  for (let i = 0; i < 3; i++) { await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "KRW", { collect: true }); await f.service.drainTwelveDataService(f.config); }
   const evidence = await f.loader.getTrackedCurrencyEvidence(tenant, groupScope, "USD", { collect: false });
   const usd = f.engine.buildTrackedCurrencyPortfolio(evidence), krw = f.engine.buildTrackedCurrencyPortfolio({ ...evidence, reporting: "KRW" });
   assert.equal(usd.current.total, "320"); assert.equal(krw.current.total, "403200");
@@ -236,14 +236,14 @@ it("connects group membership SQL and tenant RLS to the same native writer, snap
 it("runs native mutation through actual dashboard DAL and preserves intraday captures without inventing daily performance", async t => {
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 10, 22) });
   const f = await fixture(), tenant = { ownerUserId: owner };
-  const first = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW");
+  const first = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true });
   assert.equal(f.calls.length, 0, "demand never calls the HTTP boundary inline");
   assert.equal(f.engine.buildTrackedCurrencyPortfolio(first).current.complete, false);
   const drained = await f.service.drainTwelveDataService(f.config);
   assert.equal(drained.failed, 0); assert.equal(drained.processed, 3);
   const unknown = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(unknown.current.positions.find(row => row.id === asset).observation, null, "unknown split coverage cannot prove quantity matches raw-price basis");
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).processed, 1);
   const usd = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   const krw = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: false });
@@ -271,11 +271,11 @@ it("runs native mutation through actual dashboard DAL and preserves intraday cap
   t.mock.timers.tick(25 * 3600000);
   assert.equal((await f.writer.writeNativeMutation(tenant, { operationId: randomUUID(), accountId: account, expectedSequence: 1, event: { type: "deposit", at: new Date().toISOString(), amount: "100", currency: "USD" } })).status, "created");
   t.mock.timers.tick(3600000); f.state.price = "130"; f.state.fx = "1500";
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const expired = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(expired.current.positions.find(row => row.id === asset).observation, null, "expired action coverage blocks only the holding");
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const next = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: false });
   const nextKrw = f.engine.buildTrackedCurrencyPortfolio(next), nextUsd = f.engine.buildTrackedCurrencyPortfolio({ ...next, reporting: "USD" });
@@ -290,8 +290,8 @@ it("runs native mutation through actual dashboard DAL and preserves intraday cap
 it("limits missing dated FX, stale FX and conflicting quote effects to the actual dependent metrics", async t => {
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 10, 22) });
   const f = await fixture(), tenant = { ownerUserId: owner };
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW"); await f.service.drainTwelveDataService(f.config);
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW"); await f.service.drainTwelveDataService(f.config);
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true }); await f.service.drainTwelveDataService(f.config);
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true }); await f.service.drainTwelveDataService(f.config);
   await f.pg.exec("delete from market_provider_observations where dataset='usd_krw_history'");
   const missingCost = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: false });
   const missingCostKrw = f.engine.buildTrackedCurrencyPortfolio(missingCost);
@@ -307,7 +307,7 @@ it("limits missing dated FX, stale FX and conflicting quote effects to the actua
   // Reuse the original quote observation with a different value through the actual worker.
   f.state.timestamp = Math.floor((Date.now() - 25 * 3600000) / 1000); f.state.price = "126";
   t.mock.timers.tick(20 * 60000);
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 1);
   const conflict = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(conflict.current.positions.find(row => row.id === asset).observation, null);
@@ -324,7 +324,7 @@ it("quarantines an admitted split until the owner records the matching ratio wit
   f.state.price = "62.5";
   const target = f.service.resolveTwelveDataTarget({ ticker: "VOO", market: "us", currency: "USD" }, f.config).target;
   await f.service.requestTwelveDataEvidence({ kind: "history", target, startDate: "2026-09-09", endDate: "2026-09-10", asOf: new Date().toISOString() }, f.config);
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const blocked = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(blocked.current.positions.find(row => row.id === asset).observation, null);
@@ -349,7 +349,7 @@ it("values closed recorded sales from original acquisition and sale FX while kee
   assert.equal(f.engine.buildTrackedCurrencyPortfolio(missing).realizedPnl.total, null);
   assert.equal(f.engine.buildTrackedCurrencyPortfolio({ ...missing, reporting: "USD" }).realizedPnl.total, "20");
   assert.equal(missing.current.positions.some(row => row.id === asset), false, "closed holding is absent from current dashboard assets");
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const evidence = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "KRW", { collect: false });
   const krw = f.engine.buildTrackedCurrencyPortfolio(evidence), usd = f.engine.buildTrackedCurrencyPortfolio({ ...evidence, reporting: "USD" });
@@ -397,9 +397,9 @@ for (const actionCase of [
   const f = await fixture(), tenant = { ownerUserId: owner };
   f.config.storage.retentionSeconds = 3 * 86400;
   f.state.price = actionCase.price; f.state.timestamp = Date.UTC(2026, 8, 10, 21) / 1000;
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true });
   await f.service.drainTwelveDataService(f.config);
-  const pending = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD");
+  const pending = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true });
   assert.equal(pending.current.positions.find(row => row.id === asset).evidenceReason, "corporate_actions_pending");
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const target = f.service.resolveTwelveDataTarget({ ticker: "VOO", market: "us", currency: "USD" }, f.config).target;
@@ -423,9 +423,9 @@ for (const actionCase of [
   assert.equal((await f.writer.writeNativeMutation(tenant, operation)).status, "created");
   assert.equal((await f.writer.writeNativeMutation(tenant, operation)).status, "existing");
   t.mock.timers.tick(8 * 3600000);
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD");
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true });
   assert.equal((await f.service.drainTwelveDataService(f.config)).failed, 0);
   const confirmed = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(confirmed.current.positions.find(row => row.id === asset).observation.quantity, actionCase.quantity);
@@ -450,12 +450,12 @@ it("holds an owner action ahead of its price and never automatically books provi
   assert.equal((await f.writer.writeNativeMutation(tenant, { operationId: randomUUID(), accountId: account, expectedSequence: 1, event: { type: "split", at: "2026-09-10T15:00:00.000Z", assetId: asset, ratio: { n: "2", d: "1" } } })).status, "created");
   const target = f.service.resolveTwelveDataTarget({ ticker: "VOO", market: "us", currency: "USD" }, f.config).target;
   await f.service.requestTwelveDataEvidence({ kind: "history", target, startDate: "2026-09-10", endDate: "2026-09-10", asOf: new Date().toISOString() }, f.config);
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD"); await f.service.drainTwelveDataService(f.config);
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true }); await f.service.drainTwelveDataService(f.config);
   const beforePrice = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(beforePrice.current.positions.find(row => row.id === asset).evidenceReason, "corporate_action_price_pending");
   assert.equal(f.engine.buildTrackedCurrencyPortfolio(beforePrice).current.total, null);
   t.mock.timers.tick(11 * 60000); f.state.timestamp = Date.UTC(2026, 8, 10, 21) / 1000; f.state.price = "62.5";
-  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD"); await f.service.drainTwelveDataService(f.config);
+  await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: true }); await f.service.drainTwelveDataService(f.config);
   const priced = await f.loader.getTrackedCurrencyEvidence(tenant, f.scope(account), "USD", { collect: false });
   assert.equal(f.engine.buildTrackedCurrencyPortfolio(priced).current.total, "1050", "provider cash-per-share never creates an account cash credit");
   assert.equal((await f.snapshots.saveNativeSnapshots(tenant, priced)).created, 1);

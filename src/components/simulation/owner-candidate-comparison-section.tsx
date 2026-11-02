@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { SimulationText } from "@/components/simulation/simulation-text";
 import type { SimulationOwnerCandidateComparisonResult } from "@/lib/simulation-owner-candidate-comparison";
 
@@ -157,7 +158,7 @@ function ReadyCandidateComparison({
                   key={row.instrumentKey}
                 >
                   <td className="px-4 py-3">
-                    <p className="font-semibold">{instruments.find((item) => item.instrumentKey === row.instrumentKey)?.name ?? row.ticker}</p>
+                    <p className="font-semibold">{instrumentLabel({...row, name: instruments.find((item) => item.instrumentKey === row.instrumentKey)?.name})}</p>
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       {row.market} · {row.currency}
                     </p>

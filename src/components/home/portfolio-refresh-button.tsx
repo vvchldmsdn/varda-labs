@@ -6,9 +6,8 @@ import { useI18n } from "@/components/i18n/locale-provider";
 
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 
-import { TENANT_LIVE_PRICE_SYNC_POLICY } from "@/lib/market-data/tenant-live-price-sync-policy";
 import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
 import { Button as CairnButton } from "@/components/cairn-ui";
 
@@ -21,11 +20,9 @@ type SyncResponse = {
 let activeSyncRequest: Promise<SyncResponse> | null = null;
 
 export function PortfolioRefreshButton({
-  autoSync = false,
   compact = false,
   designPreview = false,
 }: {
-  autoSync?: boolean;
   compact?: boolean;
   designPreview?: boolean;
 }) {
@@ -35,19 +32,19 @@ export function PortfolioRefreshButton({
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [collectionGeneration, setCollectionGeneration] = useState(0);
   const collectionState = useMarketCollectionPolling(syncState === "queued" && !designPreview, collectionGeneration);
-  const displayState = syncState === "queued" && collectionState === "fresh" ? "fresh" : syncState === "queued" && collectionState === "waiting" ? "waiting" : syncState;
+  const displayState = syncState === "queued" && collectionState === "partial" ? "partial" : syncState === "queued" && ["fresh", "empty"].includes(collectionState ?? "") ? "fresh" : syncState === "queued" && collectionState === "waiting" ? "waiting" : syncState;
   const pending = syncState === "syncing" || refreshPending;
 
   const sync = useCallback(
-    async (reason: "page_view" | "manual") => {
+    async () => {
       setSyncState("syncing");
 
       try {
-        const result = await requestLivePriceSync(reason);
+        const result = await requestLivePriceSync();
 
         if (result.state === "synced") setSyncState("fresh");
         else if (result.state === "queued") {
-          // Each scheduled/manual attempt owns a new bounded polling window,
+          // Each manual attempt owns a new bounded polling window,
           // including a fast response batched with the previous queued state.
           setCollectionGeneration(generation => generation + 1);
           setSyncState("queued");
@@ -65,6 +62,7 @@ export function PortfolioRefreshButton({
           result.state === "synced" ||
           result.state === "partial" ||
           result.state === "fresh" ||
+          result.state === "empty" ||
           result.state === "cooldown"
         ) {
           startTransition(() => router.refresh());
@@ -76,32 +74,6 @@ export function PortfolioRefreshButton({
     [router],
   );
 
-  useEffect(() => {
-    if (!autoSync || designPreview) return;
-
-    let lastBucket: number | null = null;
-    const check = () => {
-      if (document.visibilityState !== "visible") return;
-      const bucket = Math.floor(Date.now() / TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds);
-      if (lastBucket === bucket) return;
-      lastBucket = bucket;
-      // A new page must rejoin queued collection and resolve its current session.
-      // Tab-wide suppression lost the pending poller on original/beta navigation.
-      // Concurrent mounts still share the request; the server coalesces fresh quotes.
-      void sync("page_view");
-    };
-    const timeout = window.setTimeout(check, 0);
-    const interval = window.setInterval(check, TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds);
-    document.addEventListener("visibilitychange", check);
-    window.addEventListener("focus", check);
-    return () => {
-      window.clearTimeout(timeout);
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", check);
-      window.removeEventListener("focus", check);
-    };
-  }, [autoSync, designPreview, sync]);
-
   return (
     <CairnButton variant="secondary"
       type="button"
@@ -112,7 +84,7 @@ export function PortfolioRefreshButton({
           : "inline-flex min-h-11 items-center gap-3 px-1 text-sm font-medium text-[var(--ink)] transition-colors hover:text-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)] disabled:opacity-40"
       }
       disabled={pending}
-      onClick={() => designPreview ? startTransition(() => router.refresh()) : void sync("manual")}
+      onClick={() => designPreview ? startTransition(() => router.refresh()) : void sync()}
       title={t(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState), translateHomeHistory(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState)))}
     >
       <span aria-hidden="true" className={pending ? "animate-spin" : undefined}>
@@ -123,7 +95,7 @@ export function PortfolioRefreshButton({
   );
 }
 
-function requestLivePriceSync(reason: "page_view" | "manual") {
+function requestLivePriceSync() {
   if (activeSyncRequest) return activeSyncRequest;
 
   activeSyncRequest = fetch("/api/portfolio/live-prices/sync", {
@@ -132,7 +104,7 @@ function requestLivePriceSync(reason: "page_view" | "manual") {
     credentials: "same-origin",
     signal: AbortSignal.timeout(15_000),
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ reason: "manual" }),
   })
     .then(async (response) => {
       const body = (await response.json()) as SyncResponse;

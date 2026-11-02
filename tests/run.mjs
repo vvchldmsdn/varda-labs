@@ -429,3 +429,8 @@ import './analysis-recovery-causes.test.mjs';
 import './native-ledger-records.test.mjs';
 import './analysis-navigation-draft.test.mjs';
 import './responsive-history-chart.test.mjs';
+
+import "./instrument-display.test.mjs";
+import "./manual-native-quotes.test.mjs";
+
+import './display-session.test.mjs';

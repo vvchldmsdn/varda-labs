@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
@@ -436,7 +437,7 @@ function riskWindowHref(scopeKey: string, window: number) {
 function instrumentName(
   instrument: PortfolioRiskReadModel["calculation"]["instruments"][number],
 ) {
-  return instrument.names[0]?.trim() || instrument.ticker;
+  return instrumentLabel({...instrument,name:instrument.names[0]});
 }
 
 function riskStatusLabel(model: PortfolioRiskReadModel) {

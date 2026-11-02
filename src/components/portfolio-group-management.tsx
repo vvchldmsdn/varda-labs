@@ -1,5 +1,8 @@
 "use client";
 
+import { instrumentLabel } from "@/lib/instrument-display";
+
+
 import { useActionFormReset } from "@/components/cairn-ui/client";
 
 import { ManagementText } from "@/components/i18n/management-text";
@@ -222,7 +225,7 @@ function MembershipFields({
                 />
                 <span className="min-w-0">
                   <strong className="block truncate text-[var(--ink)]">
-                    {asset.ticker ?? asset.name}
+                    {instrumentLabel(asset)}
                   </strong>
                   <span className="block truncate text-xs text-[var(--muted)]">
                     {asset.accountName} · {asset.name}

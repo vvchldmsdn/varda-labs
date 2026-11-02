@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState, useTransition } from 'react';
+import { instrumentLabel } from '@/lib/instrument-display';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { contributionJourneyHref, contributionTradeHref, savedEffectFundingAmount, type ContributionJourney } from '@/lib/contribution-journey';
@@ -64,6 +65,10 @@ function EffectRecord({ item, tracking, journey, selected: active = false }: { i
   const lock = useRef(false);
   const [selected, setSelected] = useState(item.tradeIds), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const result = item.result;
+  const candidateLabels = new Map(item.document.quotes.flatMap(quote => {
+    const metadata = item.document.comparison.basis.rows.find(row => row.allocationKey === quote.key)?.metadata;
+    return metadata ? [[quote.assetId, instrumentLabel(metadata)] as const] : [];
+  }));
   async function link() {
     if (lock.current) return;
     if (tracking.preview) { setMessage('예시 거래입니다. 실제 금융 기록은 변경하지 않습니다.'); return; }
@@ -78,7 +83,7 @@ function EffectRecord({ item, tracking, journey, selected: active = false }: { i
     <SectionHeading title={`${date(item.createdAt)} · ${amountText(item.document.comparison.budget)}원`} description={`목표비중 승인 ${item.document.comparison.basis.policyRevision}차 · ${item.document.comparison.funding} 투자금 · 저장 당시 배분 유지`} />
     <p className={styles.note}>{item.tradeIds.length ? `실제 매수 ${item.tradeIds.length}건 연결됨` : '다음 단계: 증권사에서 체결한 매수를 기록하고 아래에서 선택해 주세요.'}</p>
     <div className={styles.recordActions}>{!tracking.preview && <Link prefetch={false} href={contributionTradeHref(journey, item.id)}>매수 기록하러 가기 ↗</Link>}<Link prefetch={false} href={contributionJourneyHref('compare', { ...journey, amount: savedEffectFundingAmount(item.document.comparison), currency: item.document.comparison.funding })}>현재 조건으로 새 비교 ↗</Link></div>
-    <details className={styles.details}><summary>저장 당시 두 배분안 보기</summary><p className={styles.note}>기준 {date(item.document.capturedAt)} · {item.document.comparison.basis.scopeLabel} · 이후 목표·가격 변경을 소급 적용하지 않습니다.</p><div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>종목</th><th>비율 매수 · 원</th><th>조정 매수 · 원</th></tr></thead><tbody>{item.document.comparison.basis.rows.map(row => <tr key={row.allocationKey}><th>{row.metadata.name}</th><td>{amountText(item.document.comparison.ratio.amounts[row.allocationKey] ?? 0)}</td><td>{amountText(item.document.comparison.adjusted.amounts[row.allocationKey] ?? 0)}</td></tr>)}<tr><th>비교용 보류금</th><td>{amountText(item.document.comparison.ratio.cash)}</td><td>{amountText(item.document.comparison.adjusted.cash)}</td></tr></tbody></table></div></details>
+    <details className={styles.details}><summary>저장 당시 두 배분안 보기</summary><p className={styles.note}>기준 {date(item.document.capturedAt)} · {item.document.comparison.basis.scopeLabel} · 이후 목표·가격 변경을 소급 적용하지 않습니다.</p><div className={styles.tableScroll}><table className={styles.table}><thead><tr><th>종목</th><th>비율 매수 · 원</th><th>조정 매수 · 원</th></tr></thead><tbody>{item.document.comparison.basis.rows.map(row => <tr key={row.allocationKey}><th>{instrumentLabel(row.metadata)}</th><td>{amountText(item.document.comparison.ratio.amounts[row.allocationKey] ?? 0)}</td><td>{amountText(item.document.comparison.adjusted.amounts[row.allocationKey] ?? 0)}</td></tr>)}<tr><th>비교용 보류금</th><td>{amountText(item.document.comparison.ratio.cash)}</td><td>{amountText(item.document.comparison.adjusted.cash)}</td></tr></tbody></table></div></details>
     {result.status === 'ready' ? <>
       <MetricGroup><Metric label="비율 매수 가정" value={`${amountText(result.ratio)}원`} note={`${result.ratioReturnPct.toFixed(2)}%`} /><Metric label="조정 매수 가정" value={`${amountText(result.adjusted)}원`} note={`${result.adjustedReturnPct.toFixed(2)}%`} /><Metric label="같은 조건에서의 차이" value={`${signed(result.gap)}원`} /></MetricGroup>
       <p className={styles.note}>부족비중 반영 {signed(result.alignmentEffect)}원 + 환율·MA120 조정 {signed(result.adjustmentEffect)}원 · 평가 {date(result.asOf)}</p>
@@ -86,7 +91,7 @@ function EffectRecord({ item, tracking, journey, selected: active = false }: { i
     </> : <Status tone="warning">{effectReason(result.reason)}</Status>}
     <details className={styles.details}><summary>실제 매수 연결 · {item.tradeIds.length}건</summary>
       <p className={styles.note}>이 투자금으로 매수한 기록만 선택하세요. 같은 거래를 여러 추적에 중복 연결할 수 없습니다. 시각을 모르는 당일 거래는 저장 전후를 구분할 수 없어 제외됩니다.</p>
-      <div className={styles.tradeChoices}>{item.candidates.map(trade => <Field key={trade.id}><Checkbox checked={selected.includes(trade.id)} onChange={event => setSelected(event.target.checked ? [...selected, trade.id] : selected.filter(id => id !== trade.id))} /><span>{trade.name}<small>{date(trade.at)} · {trade.quantity}주 · {trade.executionTotal ? `총 ${trade.executionTotal.amount} ${trade.executionTotal.currency}` : `1주 ${trade.price} ${trade.currency}`}</small></span></Field>)}</div>
+      <div className={styles.tradeChoices}>{item.candidates.map(trade => <Field key={trade.id}><Checkbox checked={selected.includes(trade.id)} onChange={event => setSelected(event.target.checked ? [...selected, trade.id] : selected.filter(id => id !== trade.id))} /><span>{candidateLabels.get(trade.assetId) ?? trade.name}<small>{date(trade.at)} · {trade.quantity}주 · {trade.executionTotal ? `총 ${trade.executionTotal.amount} ${trade.executionTotal.currency}` : `1주 ${trade.price} ${trade.currency}`}</small></span></Field>)}</div>
       {!item.candidates.length && <p>저장 이후 연결할 수 있는 매수 기록이 없습니다.</p>}
       {item.tradeIds.some(id => !item.candidates.some(t => t.id === id)) && <Button variant="bare" onClick={() => setSelected(selected.filter(id => item.candidates.some(t => t.id === id)))}>확인할 수 없는 연결 해제</Button>}
       <Button disabled={busy} onClick={link}>{busy ? '연결 중…' : `선택한 ${selected.length}건 연결 저장`}</Button>

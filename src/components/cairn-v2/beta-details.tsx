@@ -1,4 +1,6 @@
 "use client";
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import Link from "next/link";
 import { ActionGroup, ActionContent } from "@/components/cairn-ui";
 import { Target } from "lucide-react";
@@ -56,7 +58,7 @@ function StructureDetail({
   return (
     <>
       <div className={styles.structureHeading}>
-        <div><h3>자산 배분</h3><p className={styles.muted}>등록한 종목 기준 · 현금 잔액 별도</p></div>
+        <h3>자산 배분</h3>
         <div className={styles.textTabs} role="group" aria-label="포트 구조 보기">
           <button
             type="button"
@@ -82,7 +84,7 @@ function StructureDetail({
       )}
       {!!view.domain?.excluded.length && <details className={structureLayout.exclusions}><summary>제외 종목 확인</summary>{view.domain.excluded.map((r, i) => (
         <p key={i} className={styles.muted}>
-          제외: {r.name} · {r.currency} · {dataIssueLabel(r.reason)}
+          제외: {instrumentLabel(r)} · {r.currency} · {dataIssueLabel(r.reason)}
         </p>
       ))}</details>}
       <div className={structureLayout.layout}>
@@ -101,7 +103,7 @@ function StructureDetail({
           <p className={styles.muted}>보유 종목</p>
           <p>{view.rows.length}개</p>
           <p className={styles.muted}>목표비중</p>
-          <p>{view.domain ? targetMessage(view) : view.rows.length ? "가상 설정됨" : "없음"}</p>
+          <p>{view.domain ? view.domain.planning?.targets.state === "ready" ? "설정됨" : targetMessage(view) : view.rows.length ? "가상 설정됨" : "없음"}</p>
         </aside>
         <div className={structureLayout.visual}>
           {structureView === "ring" ? (
@@ -109,7 +111,7 @@ function StructureDetail({
               compositionOnly={!!view.domain}
               entries={view.rows.map((r) => ({
                 key: r.key,
-                name: r.ticker ?? r.name,
+                name: instrumentLabel(r),
                 weightPct: r.weightPct,
                 color: r.color,
               }))}
@@ -129,12 +131,12 @@ function StructureDetail({
                   key={r.key}
                   style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%`, background: `color-mix(in srgb, ${r.color} 18%, var(--cairn-ui-paper))` }}
                   type="button"
-                  aria-label={`${r.name} ${r.weightPct.toFixed(2)}%`}
+                  aria-label={`${instrumentLabel(r)} ${r.weightPct.toFixed(2)}%`}
                   aria-pressed={r.key === active?.key}
                   onClick={() => setSelected(r.key)}
-                  title={`${r.ticker ?? r.name} ${r.weightPct.toFixed(2)}%`}
+                  title={`${instrumentLabel(r)} ${r.weightPct.toFixed(2)}%`}
                 >
-                  {rect.width >= 15 && rect.height >= 15 && <span>{r.ticker ?? r.name}</span>}
+                  {rect.width >= 15 && rect.height >= 15 && <span>{instrumentLabel(r)}</span>}
                   {rect.width >= 12 && rect.height >= 12 && <small>{r.weightPct.toFixed(2)}%</small>}
                 </button>
               );})}
@@ -149,14 +151,14 @@ function StructureDetail({
             value={active?.key ?? ""}
             options={view.rows.map((row) => ({
               value: row.key,
-              label: (row.ticker ?? row.name) + " · " + row.weightPct.toFixed(2) + "%",
+              label: (instrumentLabel(row)) + " · " + row.weightPct.toFixed(2) + "%",
             }))}
             onValueChange={setSelected}
             disabled={!active}
           />
           {active ? (
             <>
-              <h3>{active.name}</h3>
+              <h3>{instrumentLabel(active)}</h3>
               <p className={evidence.holdingIdentity}>{active.ticker ?? active.key}</p>
               <p className={styles.muted}>
                 {view.domain ? "소유 계좌" : "가상 계좌"} {active.account} ·{" "}

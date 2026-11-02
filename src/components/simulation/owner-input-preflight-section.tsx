@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { SimulationText } from "@/components/simulation/simulation-text";
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import type {
@@ -112,7 +113,7 @@ export function OwnerInputPreflightSection({
                 key={row.instrumentKey}
               >
                 <td className="px-3 py-3">
-                  <p className="font-semibold">{row.name}</p>
+                  <p className="font-semibold">{instrumentLabel(row)}</p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     {row.ticker} · {row.market} · {row.currency}
                   </p>
@@ -145,7 +146,7 @@ export function OwnerInputPreflightSection({
           <ul className="mt-2 space-y-1 text-sm text-[var(--warning)]">
             {model.valuationGaps.map((gap, index) => (
               <li key={`${gap.account}-${gap.ticker ?? gap.name}-${index}`}>
-                {gap.name} · {gap.account} · <SimulationText ko={valuationGapLabel(gap.reason)} />
+                {instrumentLabel(gap)} · {gap.account} · <SimulationText ko={valuationGapLabel(gap.reason)} />
               </li>
             ))}
           </ul>

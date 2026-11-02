@@ -150,9 +150,9 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-native-home-quick-buy-sell-clock-skew-real-router-refresh', async () => {
       await page.clock.install({ time: new Date(Date.now() + 60_000) });
       await visitValuation('/?currency=USD');
-      await expect(page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'TESTUSD 매수', exact: true })).toBeVisible();
       await expect(page.getByRole('region', { name: '현재 평가' })).toContainText('1,000.00');
-      await page.getByRole('button', { name: 'Synthetic USD holding 매수', exact: true }).click();
+      await page.getByRole('button', { name: 'TESTUSD 매수', exact: true }).click();
       const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
       await fillSettledTrade(dialog, '2', '200');
       const buyResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/portfolio/ledger' && response.request().method() === 'POST' && !!response.request().postDataJSON()?.mutation);
@@ -161,7 +161,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await expect(dialog).not.toBeVisible(); assert.equal((await readState()).positions[0].quantity, '12');
       await expect(page.getByRole('region', { name: '보유자산' })).toContainText('1,200.00');
       await page.clock.setSystemTime(new Date(Date.now() - 60_000));
-      await page.getByRole('button', { name: 'Synthetic USD holding 매도', exact: true }).click();
+      await page.getByRole('button', { name: 'TESTUSD 매도', exact: true }).click();
       await fillSettledTrade(dialog, '1', '110');
       const sellResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/portfolio/ledger' && response.request().method() === 'POST' && !!response.request().postDataJSON()?.mutation);
       await dialog.getByRole('button', { name: '매도 기록 저장', exact: true }).click();
@@ -330,8 +330,9 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-legacy-home-router-refresh-retains-scroll-desktop-mobile', async()=>{
       await setIdentity(sessionTokens[2]);
       // Replace the external collection response only; RSC, DAL, ownership and DB stay real.
-      let nextSyncState='fresh';
+      let nextSyncState='fresh';const syncCalls=[];
       await page.route('**/api/portfolio/live-prices/sync', async route=>{
+        syncCalls.push(route.request().postDataJSON().reason);
         const state=nextSyncState; nextSyncState='fresh';
         await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({state})});
       });
@@ -362,13 +363,13 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
           await page.screenshot({path:path.join(output,`home-refresh-debug-${width}-${attempt}.png`),fullPage:true});
           assert.ok(Math.abs(after-before)<=2,`refresh moved page from ${before} to ${after}`);
         }
-        // A real focus listener triggers the automatic refresh in the next freshness bucket.
-        await page.clock.setSystemTime(new Date(Date.now()+6*60_000));
-        const focusRefresh=page.waitForResponse(r=>new URL(r.url()).pathname==='/' && r.request().headers().rsc==='1');
-        await page.evaluate(()=>{sessionStorage.removeItem('varda:live-price-sync:last-bucket');window.dispatchEvent(new Event('focus'));});
-        await focusRefresh; await expect(refresh).toBeEnabled();
+        // Time and focus alone cannot collect quotes or move the current screen.
+        const beforeFocus=syncCalls.length;
+        await page.clock.runFor(360000);
+        await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-        assert.ok(Math.abs(await page.evaluate(()=>scrollY)-before)<=2,'automatic focus refresh moved Home');
+        assert.equal(syncCalls.length,beforeFocus,'focus must not request quotes');
+        assert.ok(Math.abs(await page.evaluate(()=>scrollY)-before)<=2,'focus moved Home');
         await page.clock.setSystemTime(new Date());
         // Exercise the actual polling hook; only the remote collection boundary is synthetic.
         nextSyncState='queued';
@@ -378,13 +379,13 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
         await pollRefresh; await expect(refresh).toBeEnabled();
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         assert.ok(Math.abs(await page.evaluate(()=>scrollY)-before)<=2,'queued polling refresh moved Home');
-        report.scrollRefresh.push({width,scrollY:before,result:'retained after manual, automatic focus and queued polling RSC refreshes'});
+        report.scrollRefresh.push({width,scrollY:before,result:'retained after manual/queued refresh; time and focus caused no collection'});
         await page.screenshot({path:path.join(output,`home-refresh-${width}.png`)});
       }
       await page.unroute('**/api/portfolio/live-prices/sync');
     });
     await runLegacyContributionUiCase({page,check,admin,owner:legacyOwner,account:legacyAccount,asset:legacyAsset,url,output});
-    await check('fullapp-beta-home-resumes-shared-quote-refresh-after-navigation', async()=>{
+    await check('fullapp-beta-home-manual-quote-refresh-after-navigation', async()=>{
       await setIdentity(sessionTokens[0]);
       const calls=[];
       await page.route('**/api/portfolio/live-prices/sync', async route=>{
@@ -398,13 +399,16 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
         await page.goto(url+'/beta?mode=domain&scope=account%3A'+account+'&currency=USD');
         const refresh=page.getByRole('button',{name:'실시간 시세 갱신',exact:true});
         await expect(refresh).toBeEnabled();
-        await expect.poll(()=>calls.length).toBeGreaterThan(prior);
-        assert.equal(calls[prior],'page_view');
-        await expect(refresh).toHaveAttribute('title',/보유 종목/);
+        await page.clock.runFor(360000);
+        await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+        assert.equal(calls.length,prior,'entering or focusing beta must not collect quotes');
         const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/portfolio/live-prices/sync'&&r.request().postDataJSON().reason==='poll');
-        await response;
         const manual=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/portfolio/live-prices/sync'&&r.request().postDataJSON().reason==='manual');
         await refresh.click();await manual;
+        await page.clock.runFor(10000);await response;
+        assert.equal(calls[prior],'manual');
+        assert.equal(calls.slice(prior).filter(reason=>reason==='manual').length,1);
+        assert.equal(calls.includes('page_view'),false);
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
         await page.screenshot({path:path.join(output,`beta-quote-refresh-${width}.png`),fullPage:true});
       }

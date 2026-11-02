@@ -12,12 +12,15 @@ import styles from "./value-detail.module.css";
 import { Metric, SectionHeading } from "./ui/molecules";
 import { StatusPill } from "./ui/atoms";
 import { formatNumber, formatPercent } from "./ui/format";
+import { instrumentLabel } from "@/lib/instrument-display";
+import { CompositionBar } from "@/components/portfolio/composition-bar";
 
 // Limited presentation reuse: portfolio overview's value hierarchy and the
 // original structure HoldingEvidenceTable/selected holding roles. All figures,
 // composition weights, colors and exclusions come from the existing BetaView.
 export function ValueDetail({ view, context }: { view: BetaView; context: BetaContext }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const id = useId();
   const freshness = useBetaReadFreshness();
   const domain = view.domain;
@@ -48,17 +51,18 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
 
     <section className={styles.composition} aria-label="투자자산 구성">
       <SectionHeading title="투자자산 구성"  />
-      <div className={styles.ribbon} role="img" aria-label="확인 소계 내 종목별 비중 · 아래 목록에서 종목 선택" data-value-ribbon>
-        {view.rows.map(row => <span key={row.key} style={{ flexBasis: `${row.weightPct}%`, background: row.color }} title={`${row.name} · ${snapshotDecimal(row.weightPct)}%`} data-weight={row.weightPct} />)}
+      <div className={styles.ribbon} data-value-ribbon>
+        <CompositionBar label="투자자산 비중 · 종목 선택" entries={view.rows.map(row => ({key:row.key,label:instrumentLabel(row),share:row.weightPct,color:row.color}))}
+          selectedKey={selectedKey} hoveredKey={hoveredKey} onHover={setHoveredKey} onSelect={setSelectedKey} />
       </div>
       <div className={styles.explorer}>
         <div className={styles.tableScroll} role="region" aria-label="투자자산 구성 표 · 가로 세로 스크롤" tabIndex={0}>
           <table>
             <thead><tr><th scope="col">종목 / 계좌</th><th scope="col" className={styles.number}>평가액 ({unit})</th><th scope="col" className={styles.number}>비중</th></tr></thead>
-            <tbody>{view.rows.map(row => <tr key={row.key} data-selected={row.key === active?.key}>
-              <th scope="row"><button type="button" className={styles.holdingButton} aria-pressed={row.key === active?.key} aria-controls={`${id}-holding`} onClick={() => setSelectedKey(row.key)}>
+            <tbody>{view.rows.map(row => <tr key={row.key} data-selected={row.key === active?.key} onPointerEnter={event => {if(event.pointerType !== "touch") setHoveredKey(row.key);}} onPointerLeave={() => setHoveredKey(null)}>
+              <th scope="row"><button type="button" className={styles.holdingButton} aria-pressed={row.key === active?.key} aria-controls={`${id}-holding`} onFocus={() => setHoveredKey(row.key)} onBlur={() => setHoveredKey(null)} onClick={() => setSelectedKey(row.key)}>
                 <span className={styles.dot} style={{ background: row.color }} aria-hidden="true" />
-                <span><strong>{row.name}</strong><small>{row.account}{row.ticker ? " · " + row.ticker : ""}</small></span>
+                <span><strong>{instrumentLabel(row)}</strong><small>{row.account}{row.ticker ? " · " + row.ticker : ""}</small></span>
               </button></th>
               <td className={styles.number}>{money(row.valueKrw)}</td>
               <td className={styles.number} title={String(row.weightPct) + "%"}>{row.weightPct.toFixed(2)}<small>%</small></td>
@@ -67,7 +71,7 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
         </div>
         {active && <section className={styles.selection} id={`${id}-holding`} aria-label="선택 종목 평가 근거" aria-live="polite">
           <p className={styles.eyebrow}>선택한 종목</p>
-          <h3>{active.name}</h3>
+          <h3>{instrumentLabel(active)}</h3>
           <p className={styles.identity}>{active.account} · {active.ticker ?? "티커 미제공"}</p>
           <p className={styles.selectedValue}>{money(active.valueKrw)}<small>{unit}</small></p>
           <dl className={styles.facts}>
@@ -95,12 +99,12 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
         <Metric label={partialCost ? "확인 종목 보유 수익률" : "보유 수익률"} value={formatPercent(partial ? null : partialCost ? costCoverage!.knownReturnPct : investment.returnPct, 2, true)} note={partialCost ? "원가 확인 종목만 비교" : "매입원가 대비 평가손익"} />
       </dl>
       {!costCoverage && investment.reason && <p className={styles.costNotice} role="status">{investment.reason === "valuation_basis_changed" ? "조회 중 평가 근거가 바뀌었습니다. 다시 조회하면 원가와 평가액을 같은 기준으로 비교합니다." : "매입원가 근거를 불러오지 못했습니다. 다시 조회해 주세요."}</p>}
-      {!!investment.rows?.length && <details className={styles.costEvidence}><summary>종목별 원가 확인 상태</summary><ul>{investment.rows.map(row => <li key={row.key}><span><strong>{row.name}</strong><small>{row.account}</small></span><span>{row.costKrw === null ? costReason(row.reason) : formatNumber(row.costKrw) + "원"}</span></li>)}</ul></details>}
+      {!!investment.rows?.length && <details className={styles.costEvidence}><summary>종목별 원가 확인 상태</summary><ul>{investment.rows.map(row => <li key={row.key}><span><strong>{instrumentLabel(view.rows.find(holding => holding.key === row.key) ?? row)}</strong><small>{row.account}</small></span><span>{row.costKrw === null ? costReason(row.reason) : formatNumber(row.costKrw) + "원"}</span></li>)}</ul></details>}
     </section>}
 
     {domain.excluded.length > 0 && <section className={styles.excluded} aria-label="평가 제외 근거">
       <header className={styles.sectionHeader}><h3>평가 제외 {domain.excluded.length}종목</h3><span>전체 합계에 포함하지 않음</span></header>
-      <ul>{domain.excluded.map((row, index) => <li key={`${row.account}:${row.ticker ?? row.name}:${index}`}><strong>{row.name}</strong><span>{row.account} · {row.currency}</span><span>{reasonLabel(row.reason)}</span></li>)}</ul>
+      <ul>{domain.excluded.map((row, index) => <li key={`${row.account}:${row.ticker ?? row.name}:${index}`}><strong>{instrumentLabel(row)}</strong><span>{row.account} · {row.currency}</span><span>{reasonLabel(row.reason)}</span></li>)}</ul>
     </section>}
 
     <details className={styles.evidence}><summary>평가 기준·원본 수치</summary>

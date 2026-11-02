@@ -4,7 +4,7 @@ import { convertMoney } from './currency-valuation.ts';
 import { Decimal, parseMoneyInput, type Currency } from './money.ts';
 import type { NativeContributionContextResult } from './native-contribution-plan.ts';
 
-export type ComparisonRow = AdditionalContributionPolicyRow<{ name: string; currency: Currency }>;
+export type ComparisonRow = AdditionalContributionPolicyRow<{ name: string; currency: Currency; market?: string; ticker?: string }>;
 export type ContributionComparisonBasis = {
   status: 'ready'; scopeLabel: string; asOf: string; policyRevision: number;
   rows: ComparisonRow[]; modifiers: ContributionModifiers;
@@ -32,11 +32,12 @@ export function prepareContributionComparison(context: NativeContributionContext
       const converted = convertMoney(row.value.amount, row.value.currency, 'KRW', input.asOf, input.fx, input.maxFxAgeMs);
       if (!converted.ok) return { status: 'blocked', reason: converted.reason };
       const maValid = row.maBasis && row.maBasis.priceCurrency === row.maBasis.averageCurrency && row.maBasis.priceBasis === row.maBasis.averageBasis;
+      const metadata = row.metadata as {market?:string;ticker?:string} | undefined;
       rows.push({ allocationKey: row.allocationKey, assetType: row.assetType, buyable: row.buyable,
         currentValueKrw: converted.value.toNumber(), costBasisKrw: null, targetWeightBps: row.targetWeightBps,
         maAssetClass: row.maAssetClass, maRuleEnabled: row.maRuleEnabled,
         ma120Evidence: maValid ? row.ma120Evidence : { status: 'unavailable', distanceFromMaPct: null },
-        fxExposureType: row.fxExposureType, metadata: { name: context.names[row.allocationKey] ?? row.allocationKey, currency: row.value.currency } });
+        fxExposureType: row.fxExposureType, metadata: { name: context.names[row.allocationKey] ?? row.allocationKey, currency: row.value.currency, market: metadata?.market, ticker: metadata?.ticker } });
     }
     const fx = convertMoney('1', 'USD', 'KRW', input.asOf, input.fx, input.maxFxAgeMs);
     return { status: 'ready', scopeLabel: context.scopeLabel, asOf: input.asOf, policyRevision: context.policy.revision,

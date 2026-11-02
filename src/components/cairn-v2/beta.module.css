@@ -19,7 +19,7 @@
 .shell {min-height:100vh;background:radial-gradient(ellipse 680px 720px at 67% 26%,#d7dfe0aa,transparent),radial-gradient(ellipse 760px 700px at 95% 70%,#e6e0d555,transparent),#eeefeb;}
 .navigation {position:fixed;inset:0 auto 0 0;width:200px;padding:28px 16px;display:flex;flex-direction:column;background:#f1f1ed;z-index:2;overflow-y:auto;}
 .brand {display:block;font-size:12px;font-weight:500;line-height:18px;padding-left:3px;}
-.brand span {display:block;font-size:9px;color:var(--cairn-v2-muted);font-weight:400;padding-left:3px;line-height:16px;}
+
 .navigation nav {display:grid;gap:16px;margin-top:42px;}
 .purposeLink {display:flex;align-items:center;gap:14px;padding:12px;min-height:52px;font-size:15px;color:var(--cairn-v2-muted);border-radius:14px;transition:background-color 180ms,color 180ms;}
 .purposeLink[aria-current] {background:#eeeee9;color:var(--cairn-v2-ink);font-weight:500;}
@@ -169,7 +169,7 @@
 .dateSlider input::-webkit-slider-thumb {appearance:none;width:10px;height:10px;margin-top:-4px;border:1px solid var(--cairn-v2-paper);border-radius:50%;background:#656760;}
 .dateSlider input::-moz-range-track {height:2px;background:#a5a6a0;}
 .dateSlider input::-moz-range-thumb {width:9px;height:9px;border:1px solid var(--cairn-v2-paper);border-radius:50%;background:#656760;}
-.structureHeading {display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:26px;}
+.structureHeading {display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px;}
 .structureHeading h3 {font-size:18px;font-weight:500;}
 .structureDetail {display:grid;grid-template-columns:minmax(140px,.6fr) minmax(260px,1.4fr) minmax(210px,1fr);gap:26px;align-items:start;margin-top:12px;padding-bottom:34px;flex:1;}
 .structureSummary {padding-top:64px;}
@@ -502,3 +502,16 @@
 }
 @media(prefers-reduced-motion:reduce) { .homeShell .card { transition:none; } }
 .homeShell[data-reduced=true] .card { transition:none; }
+
+@media(min-width:700px) {
+ .navigation,.workspaceShell .navigation {width:112px;padding:20px 8px;}
+ .brand,.workspaceShell .brand {display:flex;justify-content:center;padding:0;}
+ .navigation nav,.workspaceShell .navigation nav {gap:8px;margin-top:28px;}
+ .purposeLink,.workspaceShell .purposeLink {gap:8px;padding:12px 9px;font-size:14px;}
+ .main,.workspaceShell .main {margin-left:112px;}
+ .workspaceShell .subnav {font-size:11px;overflow-wrap:anywhere;}
+}
+
+/* Chart dialogs reserve their first viewport for the visual. */
+.detailContent[data-detail-kind="structure"] > [data-cairn-detail-header],
+.detailContent[data-detail-kind="history"] > [data-cairn-detail-header] {margin-bottom:12px;}

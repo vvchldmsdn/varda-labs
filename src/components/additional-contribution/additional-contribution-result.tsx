@@ -1,3 +1,5 @@
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import { portfolioEnglish } from "@/components/portfolio/portfolio-copy";
 import { LocalizedElement } from "@/components/i18n/localized-element";
@@ -26,7 +28,7 @@ export function AdditionalContributionAllocationTable({ preview }: { preview: Ad
       <div className={styles.listHeading} aria-hidden="true"><span><PortfolioText ko={"종목 / 계좌"} /></span><span><PortfolioText ko={"현재 → 투입 후"} /></span><span><PortfolioText ko={"계산 금액"} /></span></div>
       <LocalizedElement aria-label="종목별 배분 결과" as="ul" en={{"aria-label": portfolioEnglish("종목별 배분 결과")}}>
         {orderedRows.map((row) => <li key={rowKey(row)} className={styles.allocationRow}>
-          <div className={styles.holdingName}><strong>{row.name}</strong><span>{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</span></div>
+          <div className={styles.holdingName}><strong>{instrumentLabel(row)}</strong><span>{row.accountName}{row.ticker ? ` · ${row.ticker}` : ""}</span></div>
           <div className={styles.weightChange}><span>{formatPercent(row.currentWeightPct)} <span aria-hidden="true">→</span> <strong>{formatPercent(row.postTopupWeightPct)}</strong></span><span><PortfolioText ko={"목표"} />{" "}{formatPercent(row.targetWeightPct)}</span></div>
           <div className={styles.tradeAmount} data-action={row.action}>
             <span><small><PortfolioText ko={row.action === "buy" ? "매수" : row.action === "trim" ? "매도" : "유지"} /></small><strong>{row.action === "hold" ? "—" : formatKrw(row.action === "buy" ? row.allocationKrw : row.trimAmountKrw)}</strong></span>
@@ -233,8 +235,8 @@ function WeightRow({
   return (
     <div className="grid gap-4 px-1 py-5 md:grid-cols-[minmax(180px,0.7fr)_minmax(280px,1.5fr)_auto] md:items-center md:gap-8">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium" title={row.name}>
-          {row.name}
+        <p className="truncate text-sm font-medium" title={instrumentLabel(row)}>
+          {instrumentLabel(row)}
         </p>
         <p className="mt-1 truncate text-xs text-[var(--muted)]">
           {row.accountName}
@@ -243,7 +245,7 @@ function WeightRow({
       </div>
       <LocalizedElement
         className="relative h-6"
-        aria-label={`${row.name} 현재 ${formatPercent(row.currentWeightPct)}, 목표 ${formatPercent(row.targetWeightPct)}, 투입 후 ${formatPercent(row.postTopupWeightPct)}`} as="div" en={{"aria-label": portfolioEnglish(`${row.name} 현재 ${formatPercent(row.currentWeightPct)}, 목표 ${formatPercent(row.targetWeightPct)}, 투입 후 ${formatPercent(row.postTopupWeightPct)}`)}}
+        aria-label={`${instrumentLabel(row)} 현재 ${formatPercent(row.currentWeightPct)}, 목표 ${formatPercent(row.targetWeightPct)}, 투입 후 ${formatPercent(row.postTopupWeightPct)}`} as="div" en={{"aria-label": portfolioEnglish(`${instrumentLabel(row)} 현재 ${formatPercent(row.currentWeightPct)}, 목표 ${formatPercent(row.targetWeightPct)}, 투입 후 ${formatPercent(row.postTopupWeightPct)}`)}}
       >
         <div className="absolute left-0 right-0 top-1/2 h-px bg-[var(--line)]" />
         <LocalizedElement

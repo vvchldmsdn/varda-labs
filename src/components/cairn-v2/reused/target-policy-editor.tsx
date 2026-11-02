@@ -1,4 +1,5 @@
 'use client';
+import { instrumentLabel } from "@/lib/instrument-display";
 import {useActionFormReset} from '@/components/cairn-ui/client';
 import {TargetApprovalControls} from '@/components/portfolio/target-approval-controls';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
@@ -54,7 +55,7 @@ export function TargetPolicyEditor({rows,accounts,scopeKey,universeHash,approval
     const hidden=i<rows.length&&removed.includes(r.assetId),buyable=r.buyability==='buyable',invalid=parsed[i]===null,id='target-weight-'+i;
     if(hidden)return <li key={r.assetId} hidden><input type="hidden" name={'targetWeight:'+i} value="0"/></li>;
     return <li className={styles.row} key={r.assetId}>
-     <div className={styles.identity}><CairnField htmlFor={id}>{r.assetName}</CairnField><p>{r.accountName}{r.ticker?' · '+r.ticker:''}</p>{r.heldAssetId===null&&<small>미보유 목표</small>}</div>
+     <div className={styles.identity}><CairnField htmlFor={id}>{instrumentLabel({...r, name:r.assetName})}</CairnField><p>{r.accountName}{r.ticker?' · '+r.ticker:''}</p>{r.heldAssetId===null&&<small>미보유 목표</small>}</div>
      <CairnField className={styles.weight} htmlFor={id}><span className={styles.visuallyHidden}>목표 비중</span><div><CairnInput id={id} name={'targetWeight:'+i} type="text" inputMode="decimal" autoComplete="off" value={buyable?values[i]:'0'} disabled={pending||!buyable} aria-invalid={invalid||undefined} aria-describedby={invalid?id+'-error':undefined} onChange={e=>{const value=e.target.value;if(i<rows.length)setWeights(old=>old.map((v,at)=>at===i?value:v));else setCandidates(old=>old.map((v,at)=>at===i-rows.length?{...v,weight:value}:v));edited();}}/><b>%</b></div>{!buyable&&<input type="hidden" name={'targetWeight:'+i} value="0"/>}</CairnField>
      {invalid&&<p className={styles.warning} id={id+'-error'}>0~100 사이, 소수점 둘째 자리까지 입력하세요.</p>}
      {!buyable&&<p className={styles.warning}>이 종목은 목표 0%만 설정할 수 있습니다.</p>}

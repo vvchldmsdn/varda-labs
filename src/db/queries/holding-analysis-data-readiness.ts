@@ -30,6 +30,7 @@ export type ScopedHoldingAnalysisDataReadinessQueryResult =
         accountCode: string;
         name: string;
         ticker: string | null;
+        market: string;
         readiness: HoldingAnalysisDataReadiness;
       }>[];
     }>
@@ -89,6 +90,7 @@ export async function getReadOnlyTenantHoldingAnalysisDataReadinessForScope(
                 accountCode: holding.accountCode,
                 name: holding.name,
                 ticker: holding.ticker,
+                market: holding.market,
                 readiness,
               }),
             ]

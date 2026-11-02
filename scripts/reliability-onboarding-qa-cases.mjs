@@ -145,7 +145,7 @@ export async function runOnboardingQaCases({page,check,admin,setIdentity,token,o
       await page.goto(url+'/?'+new URLSearchParams({...query,currency}));
       const home=page.locator('main[data-page="home"], main[data-surface="home"]');
       await expect(home).toBeVisible();
-      await expect(home).toContainText('QA 보유 6');
+      await expect(home).toContainText('QAFUND');
       if(currency==='USD'){
         await expect(page.getByText('현재 투자자산 · 현금 제외 · 과거 수익률과 별도',{exact:true})).toBeVisible();
         await expect(home).not.toContainText('cash_not_observed');

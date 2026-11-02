@@ -55,7 +55,7 @@ export function CurrencyPortfolioSurfaceClient({ recoveredReturn, surface, evide
   return <div className={styles.surface}>
     <AppNavigation activePath={path} selectedScopeKey={selectedScope.key}
       generatedAt={allowRecovery ? evidence?.asOf : undefined}
-      autoSyncPrices={surface === "home" || surface === "today" || surface === "history"} />
+      />
     <div className={styles.controls}><PortfolioAnalysisScopeTabs basePath={path} scopes={scopes} selectedScopeKey={selectedScope.key} query={query} variant="underline" /><Link className={styles.ledgerLink} href={ledgerHref}>{t("보유 정보 보완 ↗", "Complete holding details ↗")}</Link></div>
     {evidence?.current.source === 'owned_investments_current_only' && <p className={styles.controls}>{t('현재 투자자산 · 현금 제외 · 과거 수익률과 별도', 'Current investments · Cash excluded · Separate from historical returns')}</p>}
     {recoveredReturn && (surface === 'home' || surface === 'history') && <section aria-label="복구된 기간 수익률" style={{ margin: '20px auto', padding: '24px', maxWidth: 960, background: 'var(--panel, #f7f8f3)', borderRadius: 24 }}><RecoveredReturnChart curve={recoveredReturn} /></section>}

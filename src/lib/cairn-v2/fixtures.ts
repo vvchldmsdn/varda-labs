@@ -29,7 +29,7 @@ export function getFixtureView(context: BetaContext) {
   const sourceWeight = source.reduce((sum, h) => sum + h.weightPct, 0);
   const targetWeight = source.reduce((sum, h) => sum + h.targetPct, 0);
   const totalKrw = 33_482_910 * sourceWeight / 100 * (context.fixture === "large" ? 1_000_000 : 1);
-  const rows = source.map((h, index) => ({ ...h,
+  const rows = source.map((h, index) => ({ ...h, market: "us", ticker: h.key,
     name: context.fixture === "large" ? `${h.name} · 장기 분산 포트폴리오의 매우 긴 종목명 표시 검증` : h.name,
     weightPct: h.weightPct / sourceWeight * 100,
     targetPct: h.targetPct / targetWeight * 100,

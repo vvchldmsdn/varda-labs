@@ -8,7 +8,7 @@ type Fx = { usdKrw: string | number; status: string | null; fetchedAt: Date | st
 /** Opaque receipt for the owned instruments' current shared evidence. Counts alone
  * miss price/FX changes while another instrument remains queued. No owner IDs,
  * credentials or holdings are returned, and observation timestamps stay intact. */
-export function livePriceReadVersion(targets: readonly Target[], quotes: readonly Quote[], fx: Fx | null) {
+export function livePriceReadVersion(targets: readonly Target[], quotes: readonly Quote[], fx: Fx | null, nativeVersion?: string) {
   const key = (row: Target) => {
     const normalized = normalizeTenantLivePriceTarget(row);
     return normalized ? JSON.stringify([normalized.market, normalized.ticker, normalized.currency]) : null;
@@ -20,5 +20,5 @@ export function livePriceReadVersion(targets: readonly Target[], quotes: readonl
     .sort();
   const fxEvidence = targets.some(row => normalizeTenantLivePriceTarget(row)?.currency === "usd") && fx
     ? [String(fx.usdKrw), fx.status, time(fx.fetchedAt)] : null;
-  return createHash("sha256").update(JSON.stringify([[...selected].sort(), evidence, fxEvidence])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([[...selected].sort(), evidence, fxEvidence, nativeVersion ?? null])).digest("hex");
 }

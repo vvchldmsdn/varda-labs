@@ -1,7 +1,7 @@
 // Synthetic presentation evidence only. Never used by production queries.
 export function betaVisualFixture(base, blank) {
-  const rows = base.rows.map(row => ({...row, ticker:row.key, currency:'USD', quantity:0.896567, currentPrice:701.26}));
-  const movements = rows.map((row,index) => ({key:row.key,name:row.name,ticker:row.key,account:'QA',accountLabel:'QA account',market:'us',currency:'USD',changeKrw:index===2?-4500:8000-index*750,returnPct:index===2?-0.5:0.04,previousValueKrw:row.valueKrw,tradeFlowKrw:0,source:'daily_position_snapshot',identityStatus:'matched'}));
+  const rows = base.rows.map((row,index) => ({...row, market:index===2?'korea':'us', name:index===2?'KODEX 200':row.name, ticker:index===2?'069500':row.key, currency:'USD', quantity:0.896567, currentPrice:701.26}));
+  const movements = rows.map((row,index) => ({key:row.key,name:row.name,ticker:row.ticker,account:'QA',accountLabel:'QA account',market:row.market,currency:row.currency,changeKrw:index===2?-4500:8000-index*750,returnPct:index===2?-0.5:0.04,previousValueKrw:row.valueKrw,tradeFlowKrw:0,source:'daily_position_snapshot',identityStatus:'matched'}));
   return {...base,rows,domain:{...blank.domain,state:'ready',valueState:'ready',historyState:'ready',movementState:'partial',knownSubtotalKrw:base.totalKrw,
     historyDisplayCurrency:'KRW',comparisonDate:'2026-10-01',refreshedAt:'2026-10-03T02:00:00Z',
     scopes:[{key:'all',label:'QA portfolio',detail:'Synthetic presentation'}],

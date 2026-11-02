@@ -1,3 +1,5 @@
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { QuickTradeActions } from "@/components/quick-trade-actions";
 import { RecoveredPortfolioHistoryChart } from "@/components/recovered-return-section";
 
@@ -40,11 +42,9 @@ import { PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionG
 export function PortfolioDashboard({
   data,
   designPreview = false,
-  liveSyncEnabled = false,
 }: {
   data: DashboardData;
   designPreview?: boolean;
-  liveSyncEnabled?: boolean;
 }) {
   const movementReady = data.dataHealth.movementReady;
   const baselineIsDelayed = data.dataHealth.movementReason === "stale_baseline_snapshot";
@@ -99,7 +99,7 @@ export function PortfolioDashboard({
               <LocalizedLink href={targetNavigation.settingsHref} className={styles.targetEntry} aria-label="목표비중 설정" en={{ "aria-label": "Set target weights" }}>
                 <Target size={17} strokeWidth={1.6} aria-hidden="true" /><T ko="목표비중" en="Targets" />
               </LocalizedLink>
-              <span className={styles.secondaryRefresh}><PortfolioRefreshButton autoSync={liveSyncEnabled} designPreview={designPreview} /></span>
+              <span className={styles.secondaryRefresh}><PortfolioRefreshButton designPreview={designPreview} /></span>
             </div>
           </header>
 
@@ -202,7 +202,7 @@ export function PortfolioDashboard({
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
           <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
-          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{row.name}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={row.name} quantity={String(row.quantity)} /></div>)}
+          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{instrumentLabel(row)}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} /></div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}
       </div>

@@ -1,4 +1,6 @@
 "use client";
+
+import { instrumentLabel } from "@/lib/instrument-display";
 import { Button as CairnButton, Status as CairnStatus, ActionGroup, ActionContent } from "@/components/cairn-ui";
 import { Grid2X2, ChartNoAxesCombined } from 'lucide-react';
 
@@ -180,7 +182,7 @@ export function BetaHome({
                   compositionOnly={!!view.domain}
                   entries={view.rows.map((r) => ({
                     key: r.key,
-                    name: r.ticker ?? r.name,
+                    name: instrumentLabel(r),
                     weightPct: r.weightPct,
                     color: r.color,
                   }))}

@@ -1,3 +1,4 @@
+import { instrumentLabel } from "@/lib/instrument-display";
 import { PortfolioText } from "@/components/portfolio/portfolio-text";
 import type { PortfolioRiskReadModel } from "@/lib/portfolio-risk-read-model";
 
@@ -153,7 +154,7 @@ function ExclusionTable({
               key={`${exclusion.account}-${exclusion.ticker ?? exclusion.name}-${index}`}
             >
               <RiskTableCell strong>
-                {exclusion.ticker ?? exclusion.name}
+                {instrumentLabel(exclusion)}
               </RiskTableCell>
               <RiskTableCell>{exclusion.account}</RiskTableCell>
               <RiskTableCell><PortfolioText ko={exclusionReasonLabel(exclusion.reason)} /></RiskTableCell>
