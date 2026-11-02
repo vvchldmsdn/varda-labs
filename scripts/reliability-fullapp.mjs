@@ -55,7 +55,6 @@ import {OwnerOutcomeCandidateExplorer} from '@/components/simulation/owner-outco
 import {EventTable,EventEvidence} from '@/components/cairn-v2/event-table';
 import {PositionSnapshotTable,SnapshotEvidence} from '@/components/cairn-v2/snapshot-table';
 import {LanguageSwitch} from '@/components/i18n/language-switch';
-import {ContributionFundingVisual} from '@/components/cairn-v2/reused/contribution-funding';
 import data from './fixture.json';
 const event={eventDate:'2026-09-18',recordedAt:'2026-09-18T10:00:00.123Z',accountCode:'brokerage',accountName:'QA account',ticker:'VOO',assetName:'QA ETF',eventType:'buy',eventKind:'trade',assetReferenceStatus:'stored_asset_reference',correctionStatus:'none',evidenceStatus:'partial',missingFields:['price'],amountKrw:123,quantityDelta:0.896567} satisfies Parameters<typeof EventTable>[0]['rows'][number];
 const model={state:'ready',snapshotDate:'2026-09-18',source:'synthetic',expectedAccounts:['synthetic'],coveredAccounts:['synthetic'],missingAccounts:[],excludedPositionCount:0,linkedPositionCount:1,historicalOnlyPositionCount:0,positions:[{accountCode:'synthetic',accountName:'QA account',assetName:'QA ETF',ticker:'VOO',assetType:'etf',market:'us',currency:'USD',quantity:'0.896567',storedPrice:'701.263896',storedPriceKind:'current_price',marketValueKrw:'123.456789',currentWeight:'100',targetWeight:null,belowMa:false,priceSource:'synthetic',priceBasis:'manual_current',assetLinkStatus:'linked'}]} satisfies Parameters<typeof PositionSnapshotTable>[0]['model'];
@@ -74,6 +73,7 @@ export default function Page(){return <main style={{padding:20,maxWidth:1200,mar
 import {BetaProvider} from '@/components/cairn-v2/beta-provider';
 import {BetaHome} from '@/components/cairn-v2/beta-home';
 import {ReturnTimelineChart} from '@/components/return-timeline-chart';
+import {ContributionFundingVisual} from '@/components/cairn-v2/reused/contribution-funding';
 import type {DomainRead} from '@/lib/cairn-v2/read-contract';
 import type {RecoveredReturnCurve} from '@/lib/period-return-recovery';
 import data from './fixture.json';
