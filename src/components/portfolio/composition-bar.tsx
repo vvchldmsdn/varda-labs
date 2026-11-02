@@ -1,5 +1,6 @@
 "use client";
 
+import { Button as CairnButton } from "@/components/cairn-ui";
 import { useId } from "react";
 import styles from "./composition-bar.module.css";
 
@@ -16,7 +17,7 @@ export function CompositionBar({ entries, selectedKey, hoveredKey, onHover, onSe
   const hovered = entries.find(row => row.key === hoveredKey);
   return <div className={`${styles.chart} ${className}`} data-composition-bar>
     <div className={styles.bar} role="group" aria-label={label} onPointerLeave={() => onHover(null)}>
-      {entries.map(row => <button key={row.key} type="button" className={styles.segment}
+      {entries.map(row => <CairnButton variant="bare" key={row.key} type="button" className={styles.segment}
         style={{ width: `${row.share}%`, background: row.color }}
         data-segment-key={row.key} data-active={row.key === activeKey}
         aria-label={row.description ?? `${row.label} ${row.share.toFixed(2)}%`}
