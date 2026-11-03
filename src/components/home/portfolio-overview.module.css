@@ -127,7 +127,7 @@
 .stageHeatmap :global(.varda-heatmap-popover) { background: var(--surface); border-radius: 12px; box-shadow: 0 10px 32px #20211f14; }
 .stageFooter { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; min-height: 44px; border-top: 1px solid var(--line); padding-top: 12px; }
 .stageFooter > p { font-size: 10px; line-height: 1.6; text-align: right; color: var(--muted); }
-.stageLaunchers { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 22px; }
+.stageLaunchers { width: 100%; }
 .detailStack { display: grid; gap: 30px; }
 .stageContribution { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding-top: 9px; }
 .stageContribution .contributionHeader { flex: none; margin-bottom: 20px; }
@@ -259,8 +259,6 @@
   .stageMatrix > :last-child { font-size: 9px; gap: 6px; }
   .stageFooter { min-height: 38px; padding-top: 8px; }
   .stageFooter > p, .stageLaunchers > a { display: none; }
-  .stageLaunchers { width: 100%; gap: 12px; }
-  .stageLaunchers > button { flex: 1; justify-content: space-between; min-height: 36px; }
   .stageContribution { flex: 1; padding-top: 0; }
   .stageContribution .contributionHeader { margin-bottom: 8px; gap: 8px; }
   .stageContribution .contributionHeader .panelTitle { font-size: 14px; }
@@ -330,9 +328,6 @@
   .stageHeatmap :global(.varda-heatmap-popover) { position: fixed; inset: auto 12px calc(88px + env(safe-area-inset-bottom)); z-index: 55; width: auto; max-height: 55dvh; margin: 0; padding: 20px; overflow: auto; border: 1px solid var(--line); box-shadow: 0 8px 42px #20211f26; }
   .stageFooter { min-height: 0; padding-top: 18px; }
   .stageFooter > p { display: none; }
-  .stageLaunchers { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .stageLaunchers > a { display: inline-flex; font-size: 12px; min-height: 44px; }
-  .stageLaunchers > button { min-height: 48px; }
   .stageContribution { flex: none; min-height: 0; padding: 0; }
   .stageContribution .contributionHeader { flex-wrap: wrap; margin-bottom: 8px; }
   .stageContribution .contributionHeader .panelTitle { font-size: 18px; }
