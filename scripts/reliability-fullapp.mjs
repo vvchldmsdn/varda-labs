@@ -79,6 +79,14 @@ import type {RecoveredReturnCurve} from '@/lib/period-return-recovery';
 import data from './fixture.json';
 export default async function Page({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){const search=await searchParams;const read={...data,context:{...data.context,currency:search.currency==='USD'?'USD':'KRW'}} as DomainRead;return <BetaProvider><BetaHome initialContext={read.context} read={read}/><section aria-label="Synthetic funding" style={{maxWidth:900,margin:"40px auto",padding:24}}><ContributionFundingVisual cash={1000000} trims={400000} total={1400000} residual={200000} rows={[{key:"VOO",name:"VOO",amount:700000},{key:"KR",name:"KODEX 200",amount:500000}]}/></section><section aria-label="Synthetic recovered history" style={{maxWidth:1000,margin:'40px auto',padding:20}}><ReturnTimelineChart stored={data.returns.stored} curve={data.returns.curve as RecoveredReturnCurve}/></section></BetaProvider>}
 `);
+  const originalVisualRoute='src/app/qa-original-visual';
+  await assert.rejects(access(path.join(ROOT,originalVisualRoute)),{code:'ENOENT'});
+  await mkdir(path.join(stage,originalVisualRoute));
+  await writeFile(path.join(stage,originalVisualRoute,'page.tsx'), `
+import {PortfolioDashboard} from '@/components/portfolio-dashboard';
+import {buildHomeDesignPreview} from '@/lib/home-design-preview';
+export default function Page(){return <PortfolioDashboard data={buildHomeDesignPreview(undefined)} designPreview/>}
+`);
   return { identityBoundary: 'external verified session subject substituted only in disposable build',
     sourceIdentitySha256: createHash('sha256').update(await readFile(path.join(ROOT, 'src/lib/auth/current-session-subject.ts'))).digest('hex') };
 }
@@ -126,6 +134,7 @@ export async function main(args) {
     assert.ok(!(await readFile(path.join(ROOT,'src/app/layout.tsx'),'utf8')).includes('FullAppRefreshControl'), 'Refresh control must stay in disposable builds');
     await assert.rejects(access(path.join(ROOT,'src/app/qa-context-presentation')), { code: 'ENOENT' });
     await assert.rejects(access(path.join(ROOT,'src/app/qa-beta-visual')), { code: 'ENOENT' });
+    await assert.rejects(access(path.join(ROOT,'src/app/qa-original-visual')), { code: 'ENOENT' });
 
   }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2));

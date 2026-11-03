@@ -6,10 +6,10 @@
 .surface .amountInput:focus-within { border-color:var(--accent); box-shadow:0 1px 0 var(--accent); }
 .surface .amountInput > span { color:var(--muted); font-size:14px; }
 .surface .presets { display:flex; gap:5px; margin-top:13px; }
-.surface .presets button { padding:7px 10px; border-radius:999px; background:var(--paper); color:var(--muted); font-size:13px; white-space:nowrap; transition:color 150ms,background 150ms; }
+.surface .presets button { padding:7px 10px; border-radius:var(--cairn-ui-radius-button,10px); background:var(--paper); color:var(--muted); font-size:13px; white-space:nowrap; transition:color 150ms,background 150ms; }
 .surface .presets button:hover { background:var(--ink); color:white; }
 .surface .submitRow { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:25px; }
-.surface .calculate { display:inline-flex; align-items:center; justify-content:space-between; gap:24px; border-radius:999px; background:var(--ink); color:white; padding:12px 18px; font-size:12px; font-weight:500; }
+.surface .calculate { display:inline-flex; align-items:center; justify-content:space-between; gap:24px; border-radius:var(--cairn-ui-radius-button,10px); background:var(--ink); color:white; padding:12px 18px; font-size:12px; font-weight:500; }
 .surface .calculate:hover { background:var(--brand); }
 .surface .calculate:disabled { opacity:.75; cursor:wait; }
 .surface .hint { color:var(--faint); font-size:12px; line-height:1.7; margin-top:15px; }

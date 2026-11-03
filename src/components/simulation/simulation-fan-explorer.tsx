@@ -26,7 +26,7 @@ import chartStyles from "./simulation-path-chart.module.css";
 import detailStyles from "./simulation-path-detail.module.css";
 import { ExpandableChart } from "@/components/presentation/expandable-chart";
 import { SimulationPathCanvas } from "./simulation-path-canvas";
-import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
+import { Button as CairnButton, Field as CairnField, Input as CairnInput, Status as CairnStatus, ChoiceGroup } from "@/components/cairn-ui";
 
 const SimulationStorageManager = lazy(() => import("./simulation-storage-manager").then(module => ({ default: module.SimulationStorageManager })));
 const SimulationPathDetailPanel = lazy(() => import("./simulation-path-detail-panel"));
@@ -182,11 +182,7 @@ export function SimulationFanExplorer({
       <details className={`cairn-details ${styles.graphSettings}`}><summary>{pt("그래프 설정", "Chart settings")}</summary><div
         className={`${styles.fanControls} flex flex-wrap items-center justify-between gap-3 text-xs ${compact ? "py-1.5" : "py-3"}`}
       >
-        <div
-          className="cairn-tabs"
-          role="group"
-          aria-label={pt("경로 표시")}
-        >
+        <ChoiceGroup label={pt("경로 표시")}>
           {(
             [
               { key: "paths", label: source.kind === "all" ? "전체 경로" : "표본 경로", en: source.kind === "all" ? "All paths" : "Sample paths", icon: ChartNoAxesCombined },
@@ -204,12 +200,8 @@ export function SimulationFanExplorer({
               <SimulationText ko={label} en={en} />
             </CairnButton>
           ))}
-        </div>
-        <div
-          className="cairn-tabs"
-          role="group"
-          aria-label={pt("차트 단위")}
-        >
+        </ChoiceGroup>
+        <ChoiceGroup label={pt("차트 단위")}>
           {(
             [
               { key: "return", label: "수익률" },
@@ -221,12 +213,11 @@ export function SimulationFanExplorer({
               type="button"
               aria-pressed={unit === key}
               onClick={() => setUnit(key)}
-              className={`${compact ? "min-h-9" : "min-h-10"} border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}
             >
               <SimulationText ko={label} />
             </CairnButton>
           ))}
-        </div>
+        </ChoiceGroup>
       </div>
       </details>
       {band && !compact ? <div className={styles.fanReadout} data-fan-readout>

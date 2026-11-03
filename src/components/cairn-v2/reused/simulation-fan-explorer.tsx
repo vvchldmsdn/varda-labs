@@ -1,5 +1,5 @@
 "use client";
-import { Button as CairnButton, Field as CairnField, Input as CairnInput } from "@/components/cairn-ui";
+import { Button as CairnButton, Field as CairnField, Input as CairnInput, ChoiceGroup } from "@/components/cairn-ui";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { AreaChart, ChartNoAxesCombined, ChevronLeft, ChevronRight, X } from "./icons";
@@ -137,7 +137,7 @@ export function SimulationFanExplorer({ execution, valueDomain, large = false, c
     return (<div className={styles.surface} data-preview={preview || undefined}>
     <figure className={`${large ? styles.stageFan : "min-w-0"}`} data-research-fan-chart={execution.id} data-fan-mode={mode} data-fan-path-coverage={source.kind}>
       {!preview && <div className={styles.fanControls} aria-label="그래프 표시 설정">
-        <div className={styles.tabs} role="group" aria-label={"경로 표시"}>
+        <ChoiceGroup label="경로 표시">
           {([
             { key: "paths", label: source.kind === "all" ? "전체 경로" : "표본 경로", en: source.kind === "all" ? "All paths" : "Sample paths", icon: ChartNoAxesCombined },
             { key: "band", label: "분포 구간", en: "Distribution", icon: AreaChart },
@@ -145,15 +145,15 @@ export function SimulationFanExplorer({ execution, valueDomain, large = false, c
               <Icon size={14} aria-hidden="true"/>
               <>{label}</>
             </CairnButton>))}
-        </div>
-        <div className="cairn-tabs" role="group" aria-label={"차트 단위"}>
+        </ChoiceGroup>
+        <ChoiceGroup label="차트 단위">
           {([
             { key: "return", label: "수익률" },
             { key: "index", label: "시작값 100" },
-        ] as const).map(({ key, label }) => (<CairnButton variant="ghost" key={key} type="button" aria-pressed={unit === key} onClick={() => setUnit(key)} className={`${compact ? "min-h-9" : "min-h-10"} border-b focus-visible:outline-2 focus-visible:outline-[var(--brand)] ${unit === key ? "border-[var(--ink)] text-[var(--ink)]" : "border-transparent text-[var(--faint)]"}`}>
+        ] as const).map(({ key, label }) => (<CairnButton variant="ghost" key={key} type="button" aria-pressed={unit === key} onClick={() => setUnit(key)}>
               <>{label}</>
             </CairnButton>))}
-        </div>
+        </ChoiceGroup>
       </div>}
       {band && !compact && !preview ? <div className={styles.fanReadout} data-fan-readout>
         <p><>{displayedStep === 0 ? "현재" : `${displayedStep}단계`}</><span>{pathPoint && focusedIdentity !== null && focusedIdentity !== undefined ? `${source.kind === "all" ? "경로" : "표본"} ${focusedIdentity + 1}${selectedPath === focusedPath ? " · 선택됨" : ""}` : "분포의 세 지점"}</span></p>

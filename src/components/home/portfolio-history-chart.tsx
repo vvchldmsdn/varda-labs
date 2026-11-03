@@ -16,7 +16,8 @@ import {
   formatShortDate,
 } from "@/components/home/portfolio-format";
 import { buildMonotoneCurvePath } from "@/lib/svg-monotone-curve";
-import { Button as CairnButton, Input as CairnInput, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { useMeasuredPlot } from "@/components/use-measured-plot";
+import { Button as CairnButton, Input as CairnInput, SectionTitle as CairnSectionTitle, ChoiceGroup } from "@/components/cairn-ui";
 
 
 type HistoryPoint = Readonly<{
@@ -45,12 +46,8 @@ const RANGE_DAYS: Record<Exclude<RangeKey, "ALL">, number> = {
   "6M": 183,
 };
 
-const WIDTH = 900;
-const HEIGHT = 310;
 const PLOT_TOP = 24;
-const PLOT_BOTTOM = 258;
 const PLOT_LEFT = 14;
-const PLOT_RIGHT = 882;
 
 export function PortfolioHistoryChart({
   events,
@@ -62,6 +59,9 @@ export function PortfolioHistoryChart({
   recoveredReturn?: RecoveredReturnCurve | null;
 }) {
   const { t } = useI18n();
+  const [measured, setPlotElement] = useMeasuredPlot();
+  const WIDTH = measured.width || 900, HEIGHT = measured.height || 310;
+  const PLOT_RIGHT = WIDTH - 14, PLOT_BOTTOM = HEIGHT - 32;
   const [metric, setMetric] = useState<"value" | "return">("value");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [range, setRange] = useState<RangeKey>("ALL");
@@ -69,7 +69,7 @@ export function PortfolioHistoryChart({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeEventKey, setActiveEventKey] = useState<string | null>(null);
   const [mobileIndex, setMobileIndex] = useState(Math.max(points.length - 1, 0));
-  const geometry = useMemo(() => buildGeometry(visiblePoints), [visiblePoints]);
+  const geometry = useMemo(() => buildGeometry(visiblePoints, WIDTH, HEIGHT), [visiblePoints, WIDTH, HEIGHT]);
   const mobileActiveIndex = Math.min(
     mobileIndex,
     Math.max(visiblePoints.length - 1, 0),
@@ -91,13 +91,12 @@ export function PortfolioHistoryChart({
           <CairnSectionTitle id="portfolio-history-title" className={styles.panelTitle}><T ko="포트폴리오 흐름" en="Portfolio history"/></CairnSectionTitle>
           <p className="mt-1.5 text-[11px] text-[var(--muted)]">{metric === "return" ? "저장 수익률과 복구 기간 수익률" : <T ko="저장된 실제 평가액 추이" en="Recorded portfolio values"/>}</p>
         </div>
-        <div className={styles.chartRanges} aria-label={t("조회 기간", "Time range")}>
+        <ChoiceGroup appearance="segmented" label={t("조회 기간", "Time range")}>
           {(["1M", "3M", "6M", "ALL"] as const).map((item) => (
             <CairnButton variant="selection"
               key={item}
               type="button"
               aria-pressed={range === item}
-              className={styles.rangeButton}
               onClick={() => {
                 setRange(item);
                 setSelectedIndex(null);
@@ -106,13 +105,13 @@ export function PortfolioHistoryChart({
                 setMobileIndex(Math.max(pointsForRange(points, item).length - 1, 0));
               }}
             >
-              {item}
+              {t({"1M":"1개월","3M":"3개월","6M":"6개월","ALL":"전체"}[item], item)}
             </CairnButton>
           ))}
-        </div>
+        </ChoiceGroup>
       </div>
 
-      {recoveredReturn && <div className={styles.chartRanges} aria-label="그래프 지표" style={{ margin: '12px 0' }}><CairnButton variant="selection" type="button" aria-pressed={metric === 'value'} className={styles.rangeButton} onClick={() => setMetric('value')}>평가액</CairnButton><CairnButton variant="selection" type="button" aria-pressed={metric === 'return'} className={styles.rangeButton} onClick={() => setMetric('return')}>수익률</CairnButton></div>}
+      {recoveredReturn && <ChoiceGroup label={t("그래프 지표", "Chart metric")} style={{ margin: '12px 0' }}><CairnButton variant="selection" type="button" aria-pressed={metric === 'value'} onClick={() => setMetric('value')}>{t("평가액", "Value")}</CairnButton><CairnButton variant="selection" type="button" aria-pressed={metric === 'return'} onClick={() => setMetric('return')}>{t("수익률", "Return")}</CairnButton></ChoiceGroup>}
       {metric === 'return' && recoveredReturn ? <ReturnTimelineChart stored={points.map(p => ({date:p.date,returnPct:p.totalReturnPct}))} curve={recoveredReturn} rangeDays={range === 'ALL' ? undefined : RANGE_DAYS[range]}/> : visiblePoints.length > 1 ? (
         <>
           <div className={styles.chartReadout}>
@@ -123,6 +122,7 @@ export function PortfolioHistoryChart({
             <p><T ko="점을 선택하면 날짜가 고정됩니다." en="Select a point to pin its date."/><br /><T ko="키보드 방향키로 이력을 탐색하세요." en="Use the arrow keys to explore history."/></p>
           </div>
           <div
+            ref={setPlotElement}
             className={`varda-home-chart ${styles.historyCanvas}`}
             onPointerLeave={() => {
               setHoveredIndex(null);
@@ -134,7 +134,7 @@ export function PortfolioHistoryChart({
               aria-label={t("기간별 포트폴리오 평가액 추이", "Portfolio value over the selected period")}
               className="h-full w-full overflow-visible"
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-              preserveAspectRatio="none"
+              preserveAspectRatio="xMidYMid meet"
             >
               <line
                 x1={PLOT_LEFT}
@@ -275,7 +275,7 @@ export function PortfolioHistoryChart({
                     y={HEIGHT - 4}
                     textAnchor={index === 0 ? "start" : index === visiblePoints.length - 1 ? "end" : "middle"}
                     fill="var(--muted)"
-                    fontSize="10"
+                    fontSize="11"
                   >
                     {formatShortDate(value.date)}
                   </text>
@@ -438,7 +438,8 @@ function pointsForRange(points: readonly HistoryPoint[], range: RangeKey) {
   return filtered.length > 1 ? filtered : [...points].slice(-2);
 }
 
-function buildGeometry(points: readonly HistoryPoint[]) {
+function buildGeometry(points: readonly HistoryPoint[], width: number, height: number) {
+  const PLOT_RIGHT = width - 14, PLOT_BOTTOM = height - 32;
   if (points.length === 0) {
     return { path: "", points: [], labelIndexes: [], barWidth: 2 };
   }
@@ -453,10 +454,10 @@ function buildGeometry(points: readonly HistoryPoint[]) {
     x: PLOT_LEFT + index * xStep,
     y: PLOT_BOTTOM - ((point.totalMarketValue - lower) / (upper - lower)) * (PLOT_BOTTOM - PLOT_TOP),
   }));
-  const labelStep = Math.max(1, Math.ceil(points.length / 6));
+  const labelStep = Math.max(1, Math.ceil((points.length - 1) / Math.max(2, Math.floor(width / 130))));
   const labelIndexes = chartPoints
     .map((_, index) => index)
-    .filter((index) => index === 0 || index === points.length - 1 || index % labelStep === 0);
+    .filter((index) => index === 0 || index === points.length - 1 || (index % labelStep === 0 && index < points.length - 1 - labelStep / 2));
 
   return {
     path: buildMonotoneCurvePath(chartPoints),

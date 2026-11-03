@@ -78,6 +78,13 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.screenshot({path:path.join(output,`beta-today-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
       await page.getByRole('button',{name:'히스토리 확대',exact:true}).click();
+      const periods=dialog.getByRole('group',{name:'히스토리 기간'});
+      const quarter=periods.getByRole('button',{name:'3개월',exact:true});
+      await quarter.focus();await page.keyboard.press('Enter');await expect(quarter).toHaveAttribute('aria-pressed','true');
+      const periodTargets=await periods.getByRole('button').evaluateAll(els=>els.map(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,duration:getComputedStyle(el).transitionDuration,underlineDuration:getComputedStyle(el,'::after').transitionDuration})));
+      assert.ok(periodTargets.every(button=>button.height>=44&&button.width>=44&&button.duration==='0s'&&button.underlineDuration==='0s'),'period choices retain touch targets and reduced motion');
+      await periods.getByRole('button',{name:'전체',exact:true}).click();
+      await quarter.click();
       const history=dialog.locator('[data-history-plot] svg');await chartGeometry(history);await history.focus();await page.keyboard.press('Home');
       await expect(history).toHaveAttribute('aria-label',/2026-07-03/);await page.keyboard.press('End');await expect(history).toHaveAttribute('aria-label',/2026-10-03/);
       await page.screenshot({path:path.join(output,`beta-history-${width}.png`)});
@@ -98,6 +105,25 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await returned.getByRole('slider').focus();await page.keyboard.press('Home');for(let i=0;i<4;i++)await page.keyboard.press('ArrowRight');
       await expect(returned.getByRole('slider')).toHaveAttribute('aria-valuetext',/2026-10-02 .*종가 미확인/);
       await page.screenshot({path:path.join(output,`beta-recovered-${width}.png`)});
+    });
+  }
+  for(const [width,height] of [[1440,900],[390,844],[360,800]]) {
+    await check(`original-home-navigation-and-chart-${width}`,async()=>{
+      await page.setViewportSize({width,height});await page.emulateMedia({reducedMotion:'reduce'});
+      await page.goto(url+'/qa-original-visual');
+      const links=page.getByRole('navigation',{name:'내 자산 더 살펴보기'});
+      await expect(links.getByRole('link',{name:'추가 투자 계산',exact:true})).toHaveAttribute('href',/additional-contribution.*preview=design/);
+      const periods=page.getByRole('group',{name:'조회 기간',exact:true});
+      await periods.getByRole('button',{name:'1개월',exact:true}).click();
+      await expect(periods.getByRole('button',{name:'1개월',exact:true})).toHaveAttribute('aria-pressed','true');
+      const svg=page.getByRole('img',{name:'기간별 포트폴리오 평가액 추이',exact:true});
+      await chartGeometry(svg);
+      await periods.getByRole('button',{name:'전체',exact:true}).focus();await page.keyboard.press('Space');
+      await expect(periods.getByRole('button',{name:'전체',exact:true})).toHaveAttribute('aria-pressed','true');
+      const targets=await periods.getByRole('button').evaluateAll(els=>els.map(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})));
+      assert.ok(targets.every(r=>r.width>=44&&r.height>=44));
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await page.screenshot({path:path.join(output,`original-home-${width}.png`),fullPage:true});
     });
   }
   await check('beta-structure-short-viewport-1265',async()=>{

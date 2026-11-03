@@ -305,6 +305,10 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await check('fullapp-legacy-history-heatmap-selection-preserves-real-snapshots', async () => {
       await setIdentity(sessionTokens[2]); await page.setViewportSize({ width: 1366, height: 768 });
       await page.goto(url + '/history?scope=account%3A' + legacyAccount);
+      // Fixed historical fixtures must not age out of the default rolling 90-day window.
+      const allDates = page.getByRole('group', { name: '조회 기간', exact: true }).getByRole('button', { name: '전체', exact: true });
+      await allDates.click();
+      await expect(allDates).toHaveAttribute('aria-pressed', 'true');
       await page.getByRole('button', { name: /^기간 요약 살펴보기/ }).click();
       await expect(page.getByRole('heading', { name: '기록 리듬', exact: true })).toBeVisible();
       // The graph shows the valuation date, one day before the daily save date.
@@ -320,6 +324,8 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       await secondDate.click(); await expect(page.locator('[data-history-inspected-value]')).toContainText('1,200');
       await page.screenshot({ path: path.join(output, 'desktop-legacy-history-heatmap.png'), fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 }); await page.reload();
+      await allDates.click();
+      await expect(allDates).toHaveAttribute('aria-pressed', 'true');
       await page.getByRole('button', { name: /^기간 요약 살펴보기/ }).click();
       await firstDate.click();
       await expect(page.locator('[data-history-inspected-value]')).toContainText('1,100');

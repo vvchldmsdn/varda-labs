@@ -9,7 +9,7 @@ import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
-import { ArrowUpRight, Plus, ChartPie, Target } from "lucide-react";
+import { ArrowUpRight, Plus, ChartPie, ChartNoAxesCombined, Grid2X2, Target } from "lucide-react";
 import home from "@/components/home/dashboard-discovery.module.css";
 import styles from "@/components/home/portfolio-overview.module.css";
 
@@ -132,8 +132,8 @@ export function PortfolioDashboard({
           </section>
 
           <ActionGroup label="내 자산 더 살펴보기">
-            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산하기" en="Plan a contribution" />} description={<T ko="내 목표에 맞는 배분을 찾아요" en="Find an allocation for your targets" />} /></Link>
-            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="내 자산 비중 살펴보기" en="Explore your allocation" />} description={<T ko="목표와 얼마나 가까울까요?" en="How close are you to your targets?" />} /></Link>
+            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산" en="Plan a contribution" />} /></Link>
+            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="자산 비중 살펴보기" en="Explore your allocation" />} /></Link>
           </ActionGroup>
 
           <div className={styles.stageVisual}>
@@ -160,12 +160,12 @@ export function PortfolioDashboard({
 
 
           <footer className={styles.stageFooter}>
-            <div className={styles.stageLaunchers}>
-              <PresentationDialog label="종목별 흐름 보기" labelEn="Explore holding trends" title="종목별 흐름" titleEn="Holding trends" wide>
+            <ActionGroup label="분석 자세히 보기" className={styles.stageLaunchers}>
+              <PresentationDialog label="종목별 흐름 보기" labelEn="Explore holding trends" title="종목별 흐름" titleEn="Holding trends" triggerContent={<ActionContent icon={<Grid2X2 />} title={<T ko="종목별 흐름 보기" en="Explore holding trends" />} />} wide>
               <HoldingMovementHeatmap key={data.selectedScope.key} history={data.holdingHistory} riskHref={riskHref} structureHref={structureHref} />
               </PresentationDialog>
 
-              <PresentationDialog label="변동 근거" labelEn={"Change details"} title="오늘의 근거와 자산 흐름" titleEn={"Today's changes and their sources"} wide>
+              <PresentationDialog label="변동 근거" labelEn={"Change details"} title="오늘의 근거와 자산 흐름" titleEn={"Today's changes and their sources"} triggerContent={<ActionContent icon={<ChartNoAxesCombined />} title={<T ko="변동 근거" en="Change details" />} />} wide>
               <LocalizedElement as="aside" en={{"aria-label": "Today's changes and their sources"}} className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
               <div>
                 <div className={styles.panelHeader}>
@@ -192,7 +192,7 @@ export function PortfolioDashboard({
               </div>
               </LocalizedElement>
               </PresentationDialog>
-            </div>
+            </ActionGroup>
             <p>
               USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}
               {<T ko={data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : ""} en={translateHomeHistory(data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : "")}/>}
@@ -202,7 +202,7 @@ export function PortfolioDashboard({
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
           <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
-          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{instrumentLabel(row)}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} /></div>)}
+          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{instrumentLabel(row)}<small><T ko="보유 수량" en="Quantity" /> {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} /></div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}
       </div>

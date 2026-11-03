@@ -30,7 +30,7 @@
 .optional { min-width:0; margin:0; }
 .optional > summary { min-height:48px; padding:12px 0; cursor:pointer; color:var(--muted); font-size:13px; }
 .optional > label { margin:8px 0; }
-.link { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:12px 18px; border:1px solid var(--line); border-radius:999px; font-size:14px; color:var(--ink); text-decoration:none; transition:background 160ms; }
+.link { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:12px 18px; border:1px solid var(--line); border-radius:var(--cairn-ui-radius-button,10px); font-size:14px; color:var(--ink); text-decoration:none; transition:background 160ms; }
 .link:hover { background:var(--wash); }
 .link:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
 .archived { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }

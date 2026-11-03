@@ -1,4 +1,8 @@
-.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.actions{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.actions>.tradeAction[data-cairn-button]{min-width:48px;min-height:44px;padding:8px 12px;border:0;border-radius:6px;background:transparent;font-size:13px;font-weight:550;box-shadow:none}
+.actions>.tradeAction[data-cairn-button]+.tradeAction{position:relative;margin-left:3px}
+.actions>.tradeAction+.tradeAction::before{content:'';position:absolute;left:-3px;top:14px;bottom:14px;width:1px;background:var(--line)}
+.actions>.tradeAction[data-cairn-button]:hover:not(:disabled){background:var(--surface,#eeefea)}
 .actions>span{font-size:13px;color:var(--muted)}
 .dialog{padding:0;width:min(620px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 48px);border:1px solid var(--line);border-radius:28px;background:var(--paper);color:var(--ink);margin:auto;overflow:auto;overscroll-behavior:contain;scroll-padding-block:24px 88px}
 .dialog::backdrop{background:rgb(24 28 23/.38);backdrop-filter:blur(6px)}

@@ -41,6 +41,18 @@ References were researched September 7, 2026. They inform visual decisions; no t
 
 ## Motion contract
 
+### Controls and navigation — November 2026 refinement
+
+Use separate visual roles instead of repeating outlined pills and dark cards:
+
+- `ActionGroup` destinations use unboxed rows, small icons and trailing arrows. Descriptions are optional; omit them when the destination title is sufficient. A highlighted destination uses an accent, not a large black surface.
+- `ChoiceGroup` presents existing pressed buttons. Underlines switch views; a quiet segmented group selects chart periods. Preserve 44px targets, disabled states, keyboard focus and the caller's state. Do not layer old button shadows or tab classes on these controls.
+- Form choices retain an explicit selected border. Primary save/calculate actions remain filled; secondary actions use a quiet surface. Use the shared 10px button radius, not a capsule for every role.
+- Holding rows show the display name once and the exact quantity underneath. Buy/sell recording actions are compact, adjacent text buttons with a divider; their hit areas remain at least 44px.
+- Measure a chart's available plotting area before deriving SVG coordinates. Marker circles and date labels must keep their aspect ratio at mobile widths. Financial observations and missing-data rules remain unchanged.
+
+These shared components apply to both original routes and `/beta`. Motion is brief and nonessential; both system and in-app reduced-motion settings must disable it.
+
 Page content enters briefly without blocking navigation. Pending navigation uses a small indicator tied to Next's actual link status. Charts draw or reveal when introduced; hover and focus expose the same values. Click/pin states remain available after the pointer moves. Loading skeletons contain no fabricated financial numbers. Native dialogs retain Escape, focus and scroll-lock behavior.
 
 Respect reduced motion, coarse pointers and touch. Never move a chart axis or change a value solely for visual effect. Do not alter price, FX, flow, MA120, allocation, risk or simulation calculations to fit a graphic.
