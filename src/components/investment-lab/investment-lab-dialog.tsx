@@ -17,6 +17,7 @@ export function InvestmentLabDialog({
   icon = "info",
   size = "regular",
   compactLabel = false,
+  initialOpen = false,
 }: {
   title: string;
   titleEn?: string;
@@ -26,15 +27,21 @@ export function InvestmentLabDialog({
   icon?: "info" | "calendar" | "table";
   size?: "regular" | "wide";
   compactLabel?: boolean;
+  initialOpen?: boolean;
 }) {
   const { locale, l } = useLabI18n();
   const displayedTitle = locale === "en" && titleEn ? titleEn : l(title);
   const displayedLabel = locale === "en" && labelEn ? labelEn : l(label);
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const Icon =
     icon === "calendar" ? CalendarDays : icon === "table" ? Table2 : Info;
+
+  useEffect(() => {
+    if (!initialOpen) return;
+    if (!ref.current?.open) ref.current?.showModal();
+  }, [initialOpen]);
 
   useEffect(() => {
     if (!open) return;

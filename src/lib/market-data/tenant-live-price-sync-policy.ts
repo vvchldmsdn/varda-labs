@@ -98,7 +98,7 @@ function isFreshQuote(
   quote: TenantLivePriceQuoteEvidence | undefined,
   now: Date,
 ) {
-  if (!quote || quote.status !== "ok" || Number(quote.price) <= 0) return false;
+  if (!quote || quote.status !== "ok" || !Number.isFinite(Number(quote.price)) || Number(quote.price) <= 0) return false;
 
   const fetchedAt = timestampMilliseconds(quote.fetchedAt);
   if (!Number.isFinite(fetchedAt)) return false;

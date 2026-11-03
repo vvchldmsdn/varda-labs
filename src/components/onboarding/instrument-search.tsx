@@ -21,6 +21,7 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
 }) {
   const { t } = useI18n();
   const id = useId();
+  const input = useRef<HTMLInputElement>(null);
   const [localQuery, setLocalQuery] = useState(initialQuery);
   const query = queryValue ?? localQuery;
   const setQuery = useCallback((value: string) => { setLocalQuery(value); onQueryChange?.(value); }, [onQueryChange]);
@@ -58,7 +59,7 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
   return <div className="varda-instrument-search">
     <CairnField htmlFor={id}>{t(label?.ko ?? "어떤 종목을 가지고 있나요?", label?.en ?? "What do you hold?")}</CairnField>
     <div className="varda-instrument-search-input"><Search size={20} aria-hidden="true" />
-      <CairnInput id={id} value={query} maxLength={80} disabled={disabled} autoComplete="off"
+      <CairnInput ref={input} id={id} value={query} maxLength={80} disabled={disabled} autoComplete="off"
         placeholder={t("종목 이름 또는 티커 검색", "Search a name or ticker")}
         onChange={event => { setQuery(event.target.value); setResults([]); setStatus(event.target.value.trim() ? "loading" : "idle"); }}
         aria-describedby={`${id}-status`} />
@@ -70,7 +71,7 @@ export function InstrumentSearch({ onSelect, disabled = false, preview = false, 
         status === "idle" && manualEntryAvailable ? t("등록된 한국·미국 종목을 검색합니다. 시장과 통화는 자동으로 채워집니다.", "Search the available Korean and US catalog. Market and currency are filled in for you.") : null}
     </div>
     {results.length > 0 && <ul className="varda-instrument-results" aria-label={t("검색 결과", "Search results")}>
-      {results.map(row => <li key={row.id}><CairnButton variant="secondary" type="button" disabled={disabled} onClick={() => { onSelect(row); setQuery(""); setResults([]); setStatus("idle"); }}>
+      {results.map(row => <li key={row.id}><CairnButton variant="secondary" type="button" disabled={disabled} onClick={() => { input.current?.focus(); onSelect(row); setQuery(""); setResults([]); setStatus("idle"); }}>
         <span><strong>{instrumentLabel(row)}</strong><small>{row.market === "us" ? row.name : row.ticker} · {row.market === "korea" ? "KR" : "US"} · {row.currency}</small></span><span>{row.assetType.toUpperCase()} ↗</span>
       </CairnButton></li>)}
     </ul>}

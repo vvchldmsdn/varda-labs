@@ -1,9 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { selectLargestMovementContributor } from "../src/lib/home-metrics.ts";
+import { availableHoldingValueKrw, selectLargestMovementContributor } from "../src/lib/home-metrics.ts";
 
 describe("home metrics", () => {
+  it("distinguishes missing quote and FX evidence from a confirmed zero valuation", () => {
+    const holding = { currentPrice: 701.26, currency: "USD", valueKrw: 835_291, quantity: 0.896567 };
+    const original = structuredClone(holding);
+    assert.equal(availableHoldingValueKrw(holding, 1328), 835_291);
+    assert.equal(availableHoldingValueKrw({ ...holding, currentPrice: 0, valueKrw: 0 }, 1328), null);
+    assert.equal(availableHoldingValueKrw({ ...holding, valueKrw: 0 }, 0), null);
+    assert.equal(availableHoldingValueKrw({ ...holding, currency: "EUR" }, 1328), null);
+    assert.equal(availableHoldingValueKrw({ ...holding, valueKrw: NaN }, 1328), null);
+    assert.equal(availableHoldingValueKrw({ ...holding, valueKrw: 0, quantity: 0 }, 1328), 0);
+    assert.equal(availableHoldingValueKrw({ ...holding, currency: "KRW" }, 0), 835_291);
+    assert.deepEqual(holding, original);
+  });
   it("selects the largest absolute contribution on an all-negative day", () => {
     const holdings = [
       { name: "KODEX 200", dailyChangeKrw: 0 },

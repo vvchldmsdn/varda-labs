@@ -6,4 +6,4 @@ export function readPlanEditor(currency:Currency,amount:string,rows:PlanEditorRo
  const mapped=[];for(const row of rows){const value=parseMoneyInput(row.value,currency);if(value===null||!/^\d+(?:\.\d{1,2})?$/.test(row.target))return {ok:false,error:'평가금액과 목표 비중의 형식을 확인해 주세요.'};const [a,b='']=row.target.split('.');mapped.push({name:row.name,value,targetBps:Number(a)*100+Number(b.padEnd(2,'0'))});}
  return validatePlan({currency,amount:cash,rows:mapped,...(currency==='USD'?{version:2,asOf:now}:{})});
 }
-export const planValue=(value:number)=>String(value);
+export const planValue=(value:number,currency?:string)=>Number.isFinite(value)?new Intl.NumberFormat('ko-KR',{maximumFractionDigits:currency==='KRW'?0:2,minimumFractionDigits:currency==='USD'?2:0}).format(value):'—';

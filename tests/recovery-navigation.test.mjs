@@ -100,7 +100,7 @@ it('beta contribution card explains blocked reads without showing internal codes
     assert.doesNotMatch(html, /총 매수 배분|data-funding-amount/);
   }
   const dirty = render(read('blocked', ['target_policy_missing']), true);
-  assert.match(dirty, /입력 변경/);
+  assert.match(dirty, /변경한 금액으로 계산/);
   assert.doesNotMatch(dirty, /목표비중|target_policy_missing/);
   const ready = render({ state: 'ready', blockers: [], result: {
     cashAmountKrw: 10000, rows: [], residualCashKrw: 10000, totalAllocatedKrw: 0,

@@ -2,7 +2,10 @@
 export function betaVisualFixture(base, blank) {
   const rows = base.rows.map((row,index) => ({...row, market:index===2?'korea':'us', name:index===2?'KODEX 200':row.name, ticker:index===2?'069500':row.key, currency:'USD', quantity:0.896567, currentPrice:701.26}));
   const movements = rows.map((row,index) => ({key:row.key,name:row.name,ticker:row.ticker,account:'QA',accountLabel:'QA account',market:row.market,currency:row.currency,changeKrw:index===2?-4500:8000-index*750,returnPct:index===2?-0.5:0.04,previousValueKrw:row.valueKrw,tradeFlowKrw:0,source:'daily_position_snapshot',identityStatus:'matched'}));
+  const dates = Array.from({length:31},(_,index)=>new Date(Date.UTC(2026,8,3+index)).toISOString().slice(0,10));
+  const heatmapRows = rows.map((row,index)=>({holdingId:row.key,name:row.name,ticker:row.ticker,market:row.market,account:'QA',currentWeight:row.weight,cells:dates.map((date,day)=>({date,changePct:index===0&&day===2?null:((day+index)%7-3)/2,marketValueKrw:index===0&&day===2?null:row.valueKrw,changeKrw:null,priceChangeKrw:null,fxChangeKrw:null,basis:index===0&&day===2?'missing':'unit_value'}))}));
   return {...base,rows,domain:{...blank.domain,state:'ready',valueState:'ready',historyState:'ready',movementState:'partial',knownSubtotalKrw:base.totalKrw,
+    heatmap:{state:'partial',scopeKey:'all',currencyBasis:'KRW',currentDate:dates.at(-1),message:'합성 검증 자료 · 누락 1칸',history:{dates,rows:heatmapRows,observedCellCount:rows.length*31-1,expectedCellCount:rows.length*31,coveragePct:(rows.length*31-1)/(rows.length*31)*100}},
     historyDisplayCurrency:'KRW',comparisonDate:'2026-10-01',refreshedAt:'2026-10-03T02:00:00Z',
     scopes:[{key:'all',label:'QA portfolio',detail:'Synthetic presentation'}],
     moneyBasis:{structure:{usdKrwRate:1400,rateDate:null},dashboard:{usdKrwRate:1400,rateDate:'2026-10-02'}},

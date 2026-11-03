@@ -38,6 +38,26 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(ring.getByRole('button',{name:'069500',exact:false})).toHaveCount(0);
       const ringBox=await ring.boundingBox();assert.ok(ringBox&&Math.abs(ringBox.width-ringBox.height)<1);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      const homeHeatmap=page.locator('[data-beta-card="heatmap"]');
+      await expect(homeHeatmap.locator('[data-heatmap-cell]')).toHaveCount(248);
+      const viewport=homeHeatmap.getByRole('region',{name:'종목 흐름 · 가로 탐색',exact:true});
+      assert.equal(await viewport.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true,'inline heatmap must show all holding rows without a nested vertical scroller');
+      await homeHeatmap.locator('[data-row-index="0"][data-cell-index="0"]').focus();
+      await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
+      await expect(homeHeatmap.locator('[data-cell-index="2"][data-row-index="0"]')).toBeFocused();
+      await expect(homeHeatmap).toContainText('비교 자료 없음');
+      await homeHeatmap.getByRole('button',{name:'히트맵 선택 해제'}).click();
+      await page.getByRole('button',{name:'종목 흐름 확대',exact:true}).click();
+      const heatDialog=page.getByRole('dialog');
+      await heatDialog.getByRole('group',{name:'종목 흐름 기간'}).getByRole('button',{name:'7일',exact:true}).click();
+      await expect(heatDialog.locator('[data-heatmap-cell]')).toHaveCount(56);
+      await heatDialog.getByRole('group',{name:'종목 흐름 기간'}).getByRole('button',{name:'전체',exact:true}).click();
+      await expect(heatDialog.locator('[data-heatmap-cell]')).toHaveCount(248);
+      assert.equal(await heatDialog.getByRole('region',{name:'종목 흐름 · 가로 탐색'}).evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);
+      await page.screenshot({path:path.join(output,`beta-heatmap-${width}.png`)});
+      await page.keyboard.press('Escape');await expect(heatDialog).toHaveCount(0);
+      await expect(page.getByRole('button',{name:'종목 흐름 확대',exact:true})).toBeFocused();
+      await page.evaluate(()=>window.scrollTo(0,0));
       await page.screenshot({path:path.join(output,`beta-home-${width}.png`),fullPage:true});
       await page.getByRole('button',{name:'추가 투자 확대',exact:true}).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -46,6 +66,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(page.getByRole('button',{name:'추가 투자 확대',exact:true})).toBeFocused();
       await page.getByRole('button',{name:'현재 평가액 확대',exact:true}).click();
       const dialog=page.getByRole('dialog');await expect(dialog.locator('[data-value-detail]')).toBeVisible();
+      assert.equal(await dialog.getByRole('region',{name:'투자자산 구성 표',exact:true}).evaluate(el=>el.scrollHeight<=el.clientHeight+1),true,'value rows use the dialog scroll, not another vertical scroller');
       const ribbon=await dialog.locator('[data-value-ribbon]').boundingBox();
       const costs=await dialog.getByRole('region',{name:'투자자산 보유 수익률',exact:true}).boundingBox();
       assert.ok(ribbon&&costs&&ribbon.y<costs.y&&ribbon.y+ribbon.height<height,'composition must precede costs and appear in the opening viewport');
@@ -148,6 +169,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
     await expect(today.getByLabel('오늘 변동액 · USD',{exact:true})).toContainText('+22.86');
     await expect(today).toContainText('변동률은 KRW 기준');
     await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.04%');
+    await expect(page.locator('[data-beta-card="heatmap"]')).toContainText('KRW 기준');
   });
   await page.emulateMedia({reducedMotion:'no-preference'});
   await check('beta-composition-motion-keyboard',async()=>{

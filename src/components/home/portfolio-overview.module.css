@@ -355,7 +355,22 @@
   .evidence .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 28px; }
 }
 
-.tradeHoldings{padding:28px 0 60px}.tradeHoldings h2{font-size:20px;font-weight:550;margin-bottom:18px}.tradeHoldings>div:not(:last-child){display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding:14px 0}.tradeHoldings>div:last-child{margin-top:16px}.tradeHoldings small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.tradeHoldings {padding:28px 0 60px;}
+.tradeHoldings h2 {font-size:20px;font-weight:550;margin-bottom:14px;}
+.holdingRow {display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px 24px;border-bottom:1px solid var(--line);padding:14px 0;}
+.holdingIdentity {min-width:0;}
+.holdingIdentity strong {font-size:15px;font-weight:500;line-height:1.5;overflow-wrap:anywhere;}
+.holdingIdentity small {display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px;}
+.holdingValue {font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+.tradeHoldings > div:last-child {margin-top:16px;}
+@media(max-width:600px) {
+ .holdingRow {grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:14px 0;}
+ .holdingRow > :last-child {grid-column:2;justify-self:end;}
+ .holdingIdentity {grid-row:1/3;}
+ .holdingIdentity strong {font-size:14px;}
+ .holdingIdentity small {font-size:11px;}
+ .holdingValue {font-size:15px;}
+}
 
 .baselineSummary { font-size:12px; line-height:1.8; }
 .baselineSummary > span,.baselineSummary > p { color:var(--muted); }

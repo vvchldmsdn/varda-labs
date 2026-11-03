@@ -32,7 +32,7 @@ function RecoveryReturnContent() {
     router.push(freshReturnHref(href!));
   }
   return <aside className={styles.returnBar} data-recovery-return aria-label={t('이전 작업으로 돌아가기', 'Return to your task')}>
-    <div><strong>{t('확인 후 이전 작업을 이어가세요', 'Continue your previous task')}</strong><p>{t('돌아가면 입력한 조건으로 최신 자료를 확인합니다. 수정한 내용은 이 화면에서 먼저 저장해 주세요.', 'Return with your inputs and fresh data. Save any edits on this page before leaving.')}</p></div>
+    <div><strong>{t('확인 후 이전 작업을 이어가세요', 'Continue your previous task')}</strong><p>{t('입력한 조건을 유지하고 돌아가 최신 자료를 다시 확인합니다.', 'Return with your inputs preserved and review the latest data.')}</p></div>
     <Button type="button" variant="primary" onClick={back}>{t('입력 유지하고 돌아가기', 'Return with my inputs')}</Button>
   </aside>;
 }

@@ -127,8 +127,10 @@ export function SimulationFanExplorer({ execution, valueDomain, large = false, c
             event.preventDefault();
             selectPath(selectedPath === null ? 0 : selectedPath + (event.key === "ArrowDown" ? 1 : -1));
         }
-        else if (event.key === "Escape") {
-            leave();
+        else if (event.key === "Escape" && (selectedPath !== null || activeStep !== null || hoveredPath !== null)) {
+            event.preventDefault();
+            event.stopPropagation();
+            setHoveredPath(null);
             setSelectedPath(null);
             setSelectedStep(null);
             setActiveStep(null);
@@ -207,9 +209,13 @@ export function SimulationFanExplorer({ execution, valueDomain, large = false, c
       </div> : null}
       {!preview && <div className={styles.scrubberRow}>
         <CairnInput className={styles.scrubber} type="range" aria-label={`${executionName} 경로 시점`} min={0} max={execution.assumptions.horizon} value={Math.round(activeStep ?? execution.assumptions.horizon)} onInput={(event) => inspectStep(Number(event.currentTarget.value))} onChange={(event) => inspectStep(Number(event.target.value))} onFocus={(event) => setActiveStep(Number(event.currentTarget.value))} onBlur={() => { setActiveStep(selectedPath === null ? null : selectedStep); }} onKeyDown={(event) => {
-            if (event.key === "Escape") {
+            if (event.key === "Escape" && (selectedPath !== null || activeStep !== null || hoveredPath !== null)) {
+              event.preventDefault();
+              event.stopPropagation();
+              setHoveredPath(null);
+              setSelectedPath(null);
+              setSelectedStep(null);
                 setActiveStep(null);
-                event.currentTarget.blur();
             }
         }} aria-valuetext={band
             ? pathPoint ? `${pathPoint.stepIndex}단계, 경로 ${(focusedIdentity ?? 0) + 1}, ${format(pathPoint.indexValue)}` : `${band.stepIndex}단계, 중앙값 ${format(band.p50)}`

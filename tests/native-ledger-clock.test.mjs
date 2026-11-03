@@ -71,7 +71,7 @@ async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',c
   const findTime=()=>render().find(e=>e.props?.name==='at');
   const trade=render().find(e=>typeof e.props?.edit==='function');if(!pendingOther){trade.props.edit('quantity','1');trade.props.edit('price','100');}
   return {render,findTime,sent,advance(){monotonic+=5000;serverNow='2026-09-27T07:16:53.000Z';},
-    submit:async()=>{render().find(e=>e.type==='form').props.onSubmit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));}};
+    submit:async(controls=[])=>{render().find(e=>e.type==='form').props.onSubmit({preventDefault(){},currentTarget:{elements:controls}});await new Promise(resolve=>setImmediate(resolve));}};
 }
 
 for(const offset of [60_000,-60_000]) it(`uses server-backed defaults and validation when the device is ${offset>0?'ahead':'behind'} by one minute`,async t=>{
@@ -103,6 +103,17 @@ it('minute/date edits preserve retained event seconds and milliseconds',()=>{
 });
 
 function text(node) {if(node==null||typeof node==='boolean')return '';if(typeof node!=='object')return String(node);return Array.isArray(node)?node.map(text).join(''):text(node.props?.children);}
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) it(entry+' empty trade fields focus the first missing input without sending a record',async t=>{
+  const h=await harness(t,0,{entry}),calls=[];
+  const trade=()=>h.render().find(e=>typeof e.props?.edit==='function');
+  trade().props.edit('quantity','');trade().props.edit('price','');
+  await h.submit(['quantity','price'].map(name=>({name,validity:{valueMissing:true},closest:()=>null,focus:()=>calls.push('focus:'+name),reportValidity:()=>calls.push('report:'+name)})));
+  assert.deepEqual(calls,['focus:quantity']);
+  assert.deepEqual(trade().props.requiredErrors,['quantity','price']);
+  assert.equal(trade().props.fields.quantity,'');assert.equal(h.sent.length,0);
+  trade().props.edit('quantity','1');
+  assert.deepEqual(trade().props.requiredErrors,['price']);
+});
 for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx']) it(entry+' retains separate type drafts without leaking a buy fee into exchange',async t=>{
   const h=await harness(t,0,{entry,compact:false});
   const input=()=>h.render().find(e=>typeof e.props?.edit==='function');

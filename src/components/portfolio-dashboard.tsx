@@ -28,7 +28,7 @@ import { PortfolioRefreshButton } from "@/components/home/portfolio-refresh-butt
 import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scope-tabs";
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
-import { selectLargestMovementContributor } from "@/lib/home-metrics";
+import { availableHoldingValueKrw, selectLargestMovementContributor } from "@/lib/home-metrics";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
 import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
 import {
@@ -202,7 +202,11 @@ export function PortfolioDashboard({
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
           <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
-          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{instrumentLabel(row)}<small><T ko="보유 수량" en="Quantity" /> {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} /></div>)}
+          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id} className={styles.holdingRow}>
+            <div className={styles.holdingIdentity}><strong>{instrumentLabel(row)}</strong><small>{data.accountSummaries.find(account => account.code === row.account)?.label ?? row.account} · {row.quantity}<T ko="주" en=" shares" /></small></div>
+            <span className={styles.holdingValue}>{availableHoldingValueKrw(row, data.usdKrwRate) === null ? <T ko="평가 확인 필요" en="Value unavailable" /> : formatKrw(row.valueKrw)}</span>
+            <QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} />
+          </div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}
       </div>

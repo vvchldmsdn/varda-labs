@@ -1,0 +1,4 @@
+.loading { padding:32px clamp(24px,6vw,88px); }
+.status { max-width:720px;margin:clamp(64px,16vh,160px) auto 0;color:var(--cairn-v2-muted); }
+.placeholder { height:180px;margin-top:24px;border-top:1px solid var(--cairn-v2-line);border-bottom:1px solid var(--cairn-v2-line);background:linear-gradient(120deg,transparent,color-mix(in srgb,var(--cairn-v2-paper) 65%,transparent)); }
+@media(max-width:600px) { .placeholder { height:140px; } }

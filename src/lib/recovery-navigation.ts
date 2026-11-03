@@ -9,13 +9,15 @@ const paths = new Set([
   '/beta/portfolio/holdings/new', '/beta/portfolio/holdings/manage', '/beta/portfolio/ledger',
   '/beta/history/events', '/beta/history/snapshots', '/beta/portfolio/accounts', '/beta/portfolio/accounts/manage', '/beta/plans', '/beta/etfs', '/etfs',
 ]);
-const fields = new Set(['scope', 'account', 'accountId', 'currency', 'amount', 'cashAmountKrw',
+const fields = new Set(['scope', 'account', 'accountId', 'assetId', 'currency', 'amount', 'cashAmountKrw',
   'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window', 'effectId', 'pricePct', 'fxPct', 'scenarioRows', 'scenarioScope', 'scenarioCurrency', 'action',
   'horizon', 'end', 'start', 'period', 'metric', 'date', 'analysis', 'run', 'kodexWeight', 'basketAnchor', 'q', 'asOfDate',
   'view', 'detail', 'model', 'range', 'selectedDate', 'historyDate', 'historyPeriod', 'historyMetric', 'historySource',
   '_historyDate', '_historyPeriod', '_historyMetric', '_historyScope', '_historyCurrency', '_historyReturn', '_historyDateBasis',
   '_historyViewPeriod', '_historyViewMetric', '_historyViewScope', '_historyViewCurrency', '_nativeView', '_labDraft']);
 export const RECOVERY_FRAGMENT = '#cairn-return=';
+const ledgerPaths = new Set(['/portfolio/ledger', '/beta/portfolio/ledger']);
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export type RecoveryKind = 'targets' | 'holdings' | 'trades' | 'cash' | 'market' | 'market_review' | 'history' | 'retry';
 
 export function safeRecoveryUrl(raw: string): string | null {
@@ -24,6 +26,8 @@ export function safeRecoveryUrl(raw: string): string | null {
     const url = new URL(raw, 'https://cairn.invalid');
     if (url.origin !== 'https://cairn.invalid' || !paths.has(url.pathname)) return null;
     for (const key of [...url.searchParams.keys()]) if (!fields.has(key)) url.searchParams.delete(key);
+    const assets = url.searchParams.getAll('assetId');
+    if (!ledgerPaths.has(url.pathname) || assets.length !== 1 || !uuid.test(assets[0])) url.searchParams.delete('assetId');
     if (url.hash.startsWith(RECOVERY_FRAGMENT)) url.hash = '';
     if (url.hash && !/^#[a-zA-Z0-9_-]{1,80}$/.test(url.hash)) url.hash = '';
     return url.pathname + url.search + url.hash;
@@ -58,11 +62,13 @@ export function recoveryKind(reasons: readonly string[]): RecoveryKind {
   if (reasons.some(r => /holding|valuation|empty|account/.test(r))) return 'holdings';
   return 'retry';
 }
-export function recoveryDestination(kind: RecoveryKind, scope: string, beta: boolean): string | null {
+export function recoveryDestination(kind: RecoveryKind, scope: string, beta: boolean, reportingCurrency?: string): string | null {
   if (kind === 'retry' || kind === 'market_review') return null;
   const ledger = kind === 'trades' || kind === 'cash';
   const path = kind === 'history' ? '/history' : kind === 'targets' ? '/portfolio/targets' : ledger ? '/portfolio/ledger' : kind === 'holdings' && beta ? '/portfolio/holdings/manage' : '/portfolio/holdings';
-  const query = new URLSearchParams({ scope, currency: 'KRW' });
+  // Record entry supports either display currency. Raw history and target
+  // editors keep their existing KRW contracts; the return URL keeps its own unit.
+  const query = new URLSearchParams({ scope, currency: ledger && reportingCurrency === 'USD' ? 'USD' : 'KRW' });
   if (ledger && /^account:[0-9a-f-]{36}$/i.test(scope)) query.set('accountId', scope.slice(8));
   if (kind === 'history') query.set('detail', 'raw');
   const useBeta = beta && kind !== 'market' && kind !== 'history';

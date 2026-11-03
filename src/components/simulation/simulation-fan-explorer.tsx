@@ -154,6 +154,13 @@ export function SimulationFanExplorer({
     setSelectedPath(path === null ? null : Math.max(0, Math.min(pathCount - 1, path)));
   }
 
+  function dismissInspection() {
+    if (detailOpen) { closeDetail(); return true; }
+    if (selectedPath === null && activeStep === null && hoveredPath === null) return false;
+    setSelectedPath(null); setSelectedStep(null); setActiveStep(null); setHoveredPath(null);
+    return true;
+  }
+
   function inspectWithKeyboard(event: KeyboardEvent<SVGSVGElement>) {
     const step = Math.round(activeStep ?? execution.assumptions.horizon);
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
@@ -164,15 +171,12 @@ export function SimulationFanExplorer({
       event.preventDefault();
       selectPath(selectedPath === null ? 0 : selectedPath + (event.key === "ArrowDown" ? 1 : -1));
     } else if (event.key === "Escape") {
-      leave();
-      setSelectedPath(null);
-      setSelectedStep(null);
-      setActiveStep(null);
+      if (dismissInspection()) { event.preventDefault(); event.stopPropagation(); }
     }
   }
 
   return (
-    <ExpandableChart enabled={large && !compact} title={pt("시뮬레이션 경로", "Simulation paths")} onEscape={() => { if (!detailOpen) return false; closeDetail(); return true; }}>
+    <ExpandableChart enabled={large && !compact} title={pt("시뮬레이션 경로", "Simulation paths")} onEscape={dismissInspection}>
     <figure
       className={`${large ? styles.stageFan : "min-w-0"} ${detailStyles.host}`}
       data-research-fan-chart={execution.id}
@@ -364,8 +368,7 @@ export function SimulationFanExplorer({
           onBlur={() => { if (!detailOpen) setActiveStep(selectedPath === null ? null : selectedStep); }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
-              setActiveStep(null);
-              event.currentTarget.blur();
+              if (dismissInspection()) { event.preventDefault(); event.stopPropagation(); }
             }
           }}
           aria-valuetext={pt(band

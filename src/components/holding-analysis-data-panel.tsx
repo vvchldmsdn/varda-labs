@@ -2,12 +2,15 @@ import { ManagementText } from "@/components/i18n/management-text";
 import { HoldingAnalysisDataForm } from "@/components/holding-analysis-data-form";
 import type { ScopedHoldingAnalysisDataReadinessQueryResult } from "@/db/queries/holding-analysis-data-readiness";
 import { SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { T } from "@/components/i18n/localized-text";
 
 
 export async function HoldingAnalysisDataPanel({
   resultPromise,
+  showReadyState = false,
 }: {
   resultPromise: Promise<ScopedHoldingAnalysisDataReadinessQueryResult>;
+  showReadyState?: boolean;
 }) {
   let result: ScopedHoldingAnalysisDataReadinessQueryResult;
   try {
@@ -16,10 +19,10 @@ export async function HoldingAnalysisDataPanel({
     result = Object.freeze({ state: "unavailable" as const });
   }
 
-  return <HoldingAnalysisDataPanelView result={result} />;
+  return <HoldingAnalysisDataPanelView result={result} showReadyState={showReadyState} />;
 }
 
-export function HoldingAnalysisDataPanelView({ result }: { result: ScopedHoldingAnalysisDataReadinessQueryResult }) {
+export function HoldingAnalysisDataPanelView({ result, showReadyState = false }: { result: ScopedHoldingAnalysisDataReadinessQueryResult; showReadyState?: boolean }) {
   if (result.state !== "ready") {
     return (
       <section
@@ -31,7 +34,7 @@ export function HoldingAnalysisDataPanelView({ result }: { result: ScopedHolding
   }
 
   const actionable = result.entries.filter((entry) => entry.readiness.state !== "ready");
-  if (actionable.length === 0) return null;
+  if (actionable.length === 0) return showReadyState ? <p role="status"><T ko={result.entries.length ? "확인한 보유 종목의 과거 가격이 준비되어 있어요. 각 비교의 계산 가능 여부는 해당 결과에서 확인할 수 있어요." : "이 범위에서 과거 가격 준비 상태를 확인할 보유 종목이 없어요."} en={result.entries.length ? "Historical prices are ready for the checked holdings. Each comparison shows whether its own calculation requirements are met." : "There are no holdings to check for historical-price readiness in this scope."} /></p> : null;
 
   return (
     <section

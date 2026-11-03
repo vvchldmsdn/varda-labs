@@ -13,6 +13,6 @@ export default async function PlansPage({searchParams}:{searchParams:Promise<{sc
   // Public shell contains no saved data. The owner-checked API is the data boundary.
   const localAuthDisabled = process.env.NODE_ENV === "development" && getAuthTransportRuntimeState().state === "disabled";
   const signedIn = (await readCurrentSessionSubject()).state === "authenticated";
-  return signedIn ? <main className="varda-secondary-page"><SecondaryPageHeader /><div className="varda-content"><ContributionNextSteps journey={{scope:typeof params.scope==='string'?params.scope:'all',currency:params.currency==='USD'?'USD':'KRW',reportingCurrency:params.currency==='USD'?'USD':'KRW'}} /><PlanLibraries localAuthDisabled={localAuthDisabled} showTour={false} /></div></main>
+  return signedIn ? <main className="varda-secondary-page"><SecondaryPageHeader /><div className="varda-content"><PlanLibraries localAuthDisabled={localAuthDisabled} showTour={false} /><ContributionNextSteps compact journey={{scope:typeof params.scope==='string'?params.scope:'all',currency:params.currency==='USD'?'USD':'KRW',reportingCurrency:params.currency==='USD'?'USD':'KRW'}} /></div></main>
     : <main className={styles.page}><PublicNav /><PlanLibraries localAuthDisabled={localAuthDisabled} /></main>;
 }

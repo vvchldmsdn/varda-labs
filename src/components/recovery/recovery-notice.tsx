@@ -24,10 +24,11 @@ export function RecoveryTitle({ reasons = [], kind }: { reasons?: readonly strin
   const c = copy[kind ?? recoveryKind(reasons)];
   return <>{t(c[0], c[3])}</>;
 }
-export function RecoveryNotice({ reasons = [], kind, scope, beta = false, returnHref, draft, readForm, onRetry, details, allowResolve = true, source = 'inherited' }: {
+export function RecoveryNotice({ reasons = [], kind, scope, beta = false, returnHref, draft, readForm, onRetry, details, allowResolve = true, source = 'inherited', presentation = 'blocking' }: {
   reasons?: readonly string[]; kind?: RecoveryKind; scope?: string; beta?: boolean; returnHref?: string;
   draft?: Record<string, string | string[]>; readForm?: {id: string; fields: readonly string[]}; onRetry?: () => void; details?: string; allowResolve?: boolean;
   source?: 'current' | 'inherited';
+  presentation?: 'inline' | 'blocking';
 }) {
   const router = useRouter(), { t } = useI18n(), [pending, start] = useTransition();
   const selected = kind ?? recoveryKind(reasons), c = copy[selected];
@@ -45,17 +46,23 @@ export function RecoveryNotice({ reasons = [], kind, scope, beta = false, return
   }
   function retry() { start(() => { if (onRetry) onRetry(); else router.refresh(); }); }
   function resolve() {
-    const destination = recoveryDestination(selected, scope ?? new URLSearchParams(location.search).get('scope') ?? 'all', beta);
+    const query = new URLSearchParams(location.search);
+    const reportingCurrency = typeof draft?.currency === 'string' ? draft.currency : query.get('currency') ?? undefined;
+    const destination = recoveryDestination(selected, scope ?? query.get('scope') ?? 'all', beta, reportingCurrency);
     const href = destination && recoveryHref(destination, sourceHref());
     if (href) start(() => router.push(href));
   }
-  return <section className={styles.notice} aria-label={t('해결 방법', 'Next steps')} data-recovery-kind={selected} aria-busy={pending}>
-    <div className={styles.heading}><span className={styles.icon} aria-hidden="true"><Icon size={24} /></span><h3><RecoveryTitle kind={selected} /></h3></div>
-    <div className={styles.actions}>
+  const actions = <div className={styles.actions}>
       {(retryOnly || allowResolve) && <Button type="button" variant="primary" disabled={pending} onClick={retryOnly ? retry : resolve}>{pending ? t('확인 중…', 'Loading…') : t(c[2], c[5])}<ArrowRight size={18} aria-hidden="true" /></Button>}
       {!retryOnly && <Button type="button" variant="ghost" disabled={pending} onClick={retry}><RefreshCw size={16} aria-hidden="true" />{t('다시 조회', 'Reload')}</Button>}
-    </div>
-    {!retryOnly && allowResolve && <small>{t('현재 입력을 유지한 채 돌아올 수 있어요.', 'Return with your current inputs preserved.')}</small>}
-    <InfoDisclosure summary={t('확인이 필요한 이유', 'Why this needs attention')}><p>{t(c[1], c[4])}</p>{(details || reasons.length > 0) && <p className={styles.reason}>{details ?? [...new Set(reasons.map(reason => t(dataIssueLabel(reason), dataIssueLabel(reason, true))))].join(' · ')}</p>}{reasons.length > 0 && <details><summary>{t('진단 정보', 'Diagnostics')}</summary><code>{reasons.join(' · ')}</code></details>}</InfoDisclosure>
+    </div>;
+  const explanation = <><p>{t(c[1], c[4])}</p>{(details || reasons.length > 0) && <p className={styles.reason}>{details ?? [...new Set(reasons.map(reason => t(dataIssueLabel(reason), dataIssueLabel(reason, true))))].join(' · ')}</p>}{reasons.length > 0 && <details><summary>{t('진단 정보', 'Diagnostics')}</summary><code>{reasons.join(' · ')}</code></details>}</>;
+  const returnNote = !retryOnly && allowResolve && <small>{t('현재 입력을 유지한 채 돌아올 수 있어요.', 'Return with your current inputs preserved.')}</small>;
+  return <section className={`${styles.notice} ${presentation === 'inline' ? styles.inline : ''}`} aria-label={t('해결 방법', 'Next steps')} data-recovery-kind={selected} data-recovery-presentation={presentation} aria-busy={pending}>
+    {presentation === 'inline' ? <details className={styles.inlineDetails}><summary><RecoveryTitle kind={selected} /><span>{t('해결 방법', 'Next steps')}</span></summary>{explanation}{actions}{returnNote}</details> : <>
+      <div className={styles.heading}><span className={styles.icon} aria-hidden="true"><Icon size={24} /></span><h3><RecoveryTitle kind={selected} /></h3></div>
+      {actions}{returnNote}
+      <InfoDisclosure summary={t('확인이 필요한 이유', 'Why this needs attention')}>{explanation}</InfoDisclosure>
+    </>}
   </section>;
 }

@@ -49,6 +49,63 @@ test('service review notice provides one reread action without a collection or r
   assert.match(cash, /잔액·정산 기록 확인하기/);
 });
 
+test('partial-result recovery starts collapsed while blocking recovery keeps its action visible', async () => {
+  let retried = 0;
+  const [{ RecoveryNotice }] = await importUiWithPorts(['src/components/recovery/recovery-notice.tsx'], {
+    react: { useTransition: () => [false, action => action()] },
+    'next/navigation': { useRouter: () => ({ refresh() {}, push() {} }) },
+    '@/components/i18n/locale-provider': i18n,
+  });
+  for (const presentation of ['inline', 'blocking']) {
+    const tree = RecoveryNotice({ kind: 'retry', scope, presentation, onRetry: () => retried++ });
+    const detail = walk(tree).find(node => node.type === 'details');
+    const button = walk(tree).find(node => typeof node.props?.onClick === 'function');
+    if (presentation === 'inline') {
+      assert.ok(detail); assert.ok(!detail.props.open);
+      assert.ok(walk(detail).includes(button), 'partial-result action belongs inside its disclosure');
+    } else {
+      assert.ok(button); assert.ok(!detail || !walk(detail).includes(button), 'blocking action must not be collapsed');
+    }
+    button.props.onClick();
+  }
+  assert.equal(retried, 2);
+});
+
+test('a failed recalculation after a successful simulation still exposes retry with the edited draft', async t => {
+  let stateIndex = 0, failed = false;
+  const Notice = () => null, navigation = [];
+  const result = { composition: { rows: [], complete: false }, issues: [{ code: 'fx_missing' }],
+    simulation: { horizon: 63, paths: [], summary: { bands: [], terminal: { lossProbabilityPct: 0 } } },
+    metadata: { sources: [], bases: [] } };
+  const [{ CurrencyResearchView }] = await importUiWithPorts(['src/components/currency-research-view.tsx'], {
+    'next/link': { default: () => null },
+    react: { useState: initial => [[result, false, failed][stateIndex++] ?? initial, () => {}], useMemo: fn => fn(), useEffect() {} },
+    'next/navigation': { useRouter: () => ({ replace: href => navigation.push(href), refresh() {} }) },
+    '@/components/i18n/locale-provider': i18n,
+    '@/components/recovery/recovery-notice': { RecoveryNotice: Notice },
+    '@/components/recovery/use-navigation-draft': { useNavigationDraft: ({ initial }) => [{ ...initial, horizon: 63, step: 17, fields: ['100'] }, () => {}, false] },
+  });
+  const props = { surface: 'simulation', recoveryScope: scope, evidence: { provenance: 'owned_native_history', reportingCurrency: 'USD',
+    input: { version: 3, rows: [], asOf: '2026-10-03T00:00:00Z' }, histories: [] } };
+  const element = CurrencyResearchView(props);
+  let nodes = walk(element.type(element.props));
+  assert.equal(nodes.find(node => node.type === Notice).props.presentation, 'inline');
+  failed = true; stateIndex = 0;
+  nodes = walk(element.type(element.props));
+  const retry = nodes.find(node => node.type === Notice);
+  assert.ok(retry, 'the retained old result must not hide failed-recalculation recovery');
+  assert.equal(retry.props.kind, 'retry'); assert.equal(retry.props.presentation, 'blocking');
+  assert.equal(nodes.some(node => node.props?.id === 'research-simulation'), false);
+  const prior = globalThis.location;
+  globalThis.location = new URL(`https://local.test/simulation?scope=${scope}&currency=USD`);
+  t.after(() => { if (prior === undefined) delete globalThis.location; else globalThis.location = prior; });
+  retry.props.onRetry();
+  const returned = new URL(navigation[0], location);
+  const draft = JSON.parse(returned.searchParams.get('_nativeView'));
+  assert.equal(returned.searchParams.get('scope'), scope); assert.equal(draft.currency, 'USD');
+  assert.equal(draft.horizon, 63); assert.equal(draft.step, 17); assert.deepEqual(draft.fields, ['100']);
+});
+
 test('beta retains specific historical causes without changing execution or retaining success warnings', () => {
   const model = { execution: { status: 'unavailable', reason: 'historical_evidence_not_admitted' }, candidate: { blockers: [], instruments: [
     { admissionStatus: 'fx_incomplete', storedCoverage: { reasons: ['missing_fx'] }, provenance: { issues: [] } },

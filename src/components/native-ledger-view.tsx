@@ -8,7 +8,7 @@ import { hasUnsettledTrades, nativeDateOnlyAt, resolveNativeTrade, type NativeDa
 import { NativeLedgerTimestamp } from "@/components/native-ledger-timestamp";
 import { tradeInputFromFields } from "./native-trade-input";
 import { NativeTradeFields } from "@/components/native-trade-fields";
-import { fieldsAfterLedgerSave, resolveTradeRecordSelection } from "@/lib/trade-record-intent";
+import { fieldsAfterLedgerSave, resolveTradeRecordSelection, tradePhotoImportHref } from "@/lib/trade-record-intent";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AppNavigation } from "@/components/app-navigation";
 import { MoneyInput } from "@/components/first-visit/money-input";
@@ -108,6 +108,7 @@ export function NativeLedgerView({ initialSelection = {}, reportingCurrency = "K
   const [savedOpening, setSavedOpening] = useState(false);
   const [confirmed, setConfirmed] = useState(false), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [error, setError] = useState(""), [success, setSuccess] = useState(false), [conflict, setConflict] = useState(false);
+  const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
   const [signedOut, setSignedOut] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [draftWarning, setDraftWarning] = useState(false);
@@ -236,7 +237,7 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
     } catch(cause) {setError(cause instanceof Error?cause.message:"unavailable");}
     finally {setBusy(false);}
   }
-  function edit(name: string, value: string) { if (busy || uncertain) return; setEntryEdited(true); setFields(previous => editLedgerDraft(previous, kind, name, value, unit)); setPendingOperation(null); setSuccess(false); setError(""); }
+  function edit(name: string, value: string) { if (busy || uncertain) return; setRequiredErrors(previous => previous.filter(field => field !== name)); setEntryEdited(true); setFields(previous => editLedgerDraft(previous, kind, name, value, unit)); setPendingOperation(null); setSuccess(false); setError(""); }
   function changeKind(next: EventKind) {
     if (!account || busy || uncertain || fields.replaces || next === kind) return;
     kindDrafts.current[kind] = { accountId: account.id, fields: { ...fields } };
@@ -246,6 +247,16 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
   }
   async function submit(event: FormEvent, readNow: () => number) {
     event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const missing = Array.from(form.elements).filter((control): control is HTMLInputElement =>
+      "validity" in control && "name" in control && (control as HTMLInputElement).validity.valueMissing,
+    );
+    setRequiredErrors(missing.map(control => control.name));
+    if (missing.length) {
+      let disclosure = missing[0].closest('details');
+      while (disclosure) { disclosure.open = true; disclosure = disclosure.parentElement?.closest('details') ?? null; }
+      missing[0].focus(); return;
+    }
     if(!data || !navigator.locks) {setError("recovery_storage_unavailable");return;}
     await navigator.locks.request(`cairn:trade:${data.sessionKey}`,()=>submitLocked(event,readNow()));
   }
@@ -301,14 +312,14 @@ if (code === "net_costs_required") return t("이 거래의 수수료와 세금�
     const row = data?.trades?.find(row => row.accountId === account?.id && (row.event.type === "buy" || row.event.type === "sell") && row.event.settlementStatus === "unconfirmed" && (!compact || row.event.assetId === fields.assetId));
     if (row) startCorrection(row, true);
   }
-const label = (ko: string, en: string, name: string, type = "text") => type === "datetime-local" ? <NativeLedgerTimestamp label={t(ko,en)} name={name} value={fields[name] ?? ""} onChange={value=>edit(name,value)} /> : <CairnField>{t(ko, en)}<CairnInput name={name} type={type} step={type === "datetime-local" ? "0.001" : undefined} value={fields[name] ?? ""} onChange={event => edit(name, event.target.value)} required /></CairnField>;
-  const money = (ko: string, en: string, name: string, inCurrency: Currency, required = true) => <CairnField>{t(ko, en)} · {inCurrency}<MoneyInput aria-label={`${t(ko, en)} ${inCurrency}`} value={fields[name] ?? ""} onValueChange={value => edit(name, value)} allowDecimals={inCurrency === "USD"} required={required} placeholder="0" /></CairnField>;
+const label = (ko: string, en: string, name: string, type = "text") => type === "datetime-local" ? <NativeLedgerTimestamp compact={compact} label={t(ko,en)} name={name} value={fields[name] ?? ""} onChange={value=>edit(name,value)} /> : <CairnField error={requiredErrors.includes(name) && !fields[name]?.trim() ? t("이 항목을 입력해 주세요.", "Complete this field.") : undefined}>{t(ko, en)}<CairnInput aria-invalid={requiredErrors.includes(name) && !fields[name]?.trim() || undefined} name={name} type={type} step={type === "datetime-local" ? "0.001" : undefined} value={fields[name] ?? ""} onChange={event => edit(name, event.target.value)} required /></CairnField>;
+  const money = (ko: string, en: string, name: string, inCurrency: Currency, required = true) => <CairnField error={requiredErrors.includes(name) && !fields[name]?.trim() ? t("금액을 입력해 주세요.", "Enter the amount.") : undefined}>{t(ko, en)} · {inCurrency}<MoneyInput name={name} aria-invalid={requiredErrors.includes(name) && !fields[name]?.trim() || undefined} aria-label={`${t(ko, en)} ${inCurrency}`} value={fields[name] ?? ""} onValueChange={value => edit(name, value)} allowDecimals={inCurrency === "USD"} required={required} placeholder="0" /></CairnField>;
   const currencySelect = <CairnField>{t("통화", "Currency")}<CairnSelect className="cairn-form-select" value={fields.currency ?? "USD"} onChange={event => edit("currency", event.target.value)}><option>USD</option><option>KRW</option></CairnSelect></CairnField>;
   const accountName = (row: Account) => row.name;
-  return <div className={compact ? styles.compact : styles.page}>{!compact ? <AppNavigation activePath="/portfolio/manage" /> : null}<section id={compact ? undefined : "varda-main-content"} className={styles.body}>
+  return <div className={compact ? styles.compact : styles.page}>{!compact ? <AppNavigation activePath="/portfolio/manage" selectedScopeKey={account?.id ?? initialSelection.accountId ? `account:${account?.id ?? initialSelection.accountId}` : undefined} /> : null}<section id={compact ? undefined : "varda-main-content"} className={styles.body}>
     {!compact ? <div className={styles.heading}><CairnPageTitle>{t("매매·현금 기록", "Trades & cash")}</CairnPageTitle><Link href={accountContextHref("/", account?.id ?? initialSelection.accountId, reportingCurrency)}>{t("홈으로 →", "Home →")}</Link></div> : null}
     <p className={styles.note}>{t("증권사에서 체결한 내역을 기록해요.", "Record an executed brokerage trade.")}</p>
-    {!compact && <ActionGroup label={t("거래 입력 방법", "Trade entry options")}><Link prefetch={false} href="/portfolio/trades/import"><ActionContent title={t("사진으로 한 번에 가져오기", "Import from screenshots")} description={t("체결 내역을 확인하고 저장해요", "Review your fills, then save")} /></Link></ActionGroup>}
+    {!compact && <ActionGroup label={t("거래 입력 방법", "Trade entry options")}><Link prefetch={false} href={tradePhotoImportHref({ accountId: account?.id ?? initialSelection.accountId, assetId: fields.assetId ?? initialSelection.assetId, action: kind }, reportingCurrency)}><ActionContent title={t("사진으로 한 번에 가져오기", "Import from screenshots")} description={t("체결 내역을 확인하고 저장해요", "Review your fills, then save")} /></Link></ActionGroup>}
     {draftWarning && <CairnStatus as="p" role="status">{t("이 브라우저에서는 입력 중인 내용을 보관할 수 없어요. 창을 닫기 전에 기록을 마쳐 주세요.", "This browser cannot retain your draft. Finish the record before closing.")}</CairnStatus>}
     {loading ? <CairnStatus as="p" tone="neutral" role="status" className={styles.note}>{checking ? t("저장 여부 확인 중…", "Checking whether the record was saved…") : t("보유 정보를 확인하고 있어요…", "Loading your holdings…")}</CairnStatus> : null}
     {expiredOperation ? <CairnStatus as="p" tone="neutral" role="status">{t("입력 보관 기간이 지나 저장 여부만 확인할 수 있어요. 확인될 때까지 새 거래로 다시 입력하지 마세요.", "The draft has expired. Check this operation before entering it as a new trade.")} <CairnButton variant="secondary" type="button" onClick={() => void load()} disabled={loading}>{t("저장 여부 다시 확인", "Check save status")}</CairnButton> <CairnButton variant="secondary" type="button" onClick={()=>void retireExpiredOperation()} disabled={busy||loading}>{t("미저장 요청 종료","Close an unsaved request")}</CairnButton><small>{t("이미 저장됐다면 기록을 그대로 확인합니다.","If already saved, the record is kept.")}</small></CairnStatus> : null}
@@ -330,7 +341,7 @@ const label = (ko: string, en: string, name: string, type = "text") => type === 
         </CairnFieldset> : null}
         {["deposit", "withdraw", "dividend", "fee", "transfer", "exchange"].includes(kind) ? <div className={styles.row}>{money(kind === "exchange" ? "환전할 금액" : "금액", kind === "exchange" ? "Amount to exchange" : "Amount", "amount", currency(fields.currency ?? "USD"))}{currencySelect}</div> : null}
         {kind === "dividend" || kind === "fee" ? <CairnField>{t("해당 종목 · 선택", "Related holding · optional")}<CairnSelect className="cairn-form-select" value={fields.assetId ?? ""} onChange={event => edit("assetId", event.target.value)}><option value="">{t("계좌 공통 / 아직 모름", "Account-wide / unknown")}</option>{account.assets.filter(row => account.state!.positions.some(p => p.assetId === row.id)).map(row => <option key={row.id} value={row.id}>{instrumentLabel(row)}</option>)}</CairnSelect></CairnField> : null}
-        {kind === "buy" || kind === "sell" ? <NativeTradeFields kind={kind} fields={fields} unit={unit} quantity={positionFor(account, fields.assetId)?.quantity ?? "0"} edit={edit} /> : null}
+        {kind === "buy" || kind === "sell" ? <NativeTradeFields kind={kind} fields={fields} unit={unit} quantity={positionFor(account, fields.assetId)?.quantity ?? "0"} edit={edit} requiredErrors={requiredErrors} /> : null}
         {kind === "exchange" ? <>{fields.exchangeDirectionChanged && <p className={styles.note} role="status">{t("보내는 금액과 받는 금액을 맞바꿨어요. 통화와 수수료를 확인해 주세요.", "Debit and credit amounts were swapped. Check the currencies and fee.")}</p>}{money("실제로 받은 금액", "Amount actually received", "credit", fields.currency === "USD" ? "KRW" : "USD")}<details><summary>{t("환전 수수료", "Exchange fee")}</summary>{money("별도 차감 수수료", "Separately debited fee", "fee", currency(fields.currency ?? "USD"), false)}</details></> : null}
         {kind === "transfer" ? <CairnField>{t("받는 내 계좌", "My receiving account")}<CairnSelect className="cairn-form-select" value={fields.peerAccountId ?? ""} onChange={event => edit("peerAccountId", event.target.value)}><option value="">{t("계좌 선택", "Choose an account")}</option>{activeAccounts.filter(row => row.id !== account.id && row.state).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</CairnSelect></CairnField> : null}
         {kind === "split" ? <><div className={styles.grid}>{label("변경 후 주식 수", "Shares after split", "ratioN")}{label("변경 전 주식 수", "Shares before split", "ratioD")}</div><p className={styles.note}>{t("예: 1주가 4주가 되었다면 4와 1을 입력하세요.", "For a four-for-one split, enter 4 and 1.")}</p></> : null}

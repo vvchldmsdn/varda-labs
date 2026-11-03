@@ -96,12 +96,12 @@ function FactorTrajectory({ result, factorKey }: { result: Extract<SimulationEco
   const y = (value: number) => 220 - (value - low) / span * 180;
   const line = points.map((row, i) => `${x(i)},${y(row.p50)}`).join(" ");
   const band = [...points.map((row, i) => `${x(i)},${y(row.p90)}`), ...points.map((row, i) => `${x(i)},${y(row.p10)}`).reverse()].join(" ");
-  return <figure className="my-4"><svg viewBox="0 0 550 250" role="img" aria-label={`${factorKey} P10 P50 P90`} className="w-full overflow-visible">
+  return <figure className={`my-4 ${styles.factorTrajectory}`}>
+    <div className={styles.factorAxis}><span>{high.toFixed(2)}</span><span>{low.toFixed(2)}</span></div>
+    <svg viewBox="56 40 476 180" role="img" aria-label={`${factorKey} P10 P50 P90`} className="w-full overflow-visible">
     <line x1="56" x2="532" y1="220" y2="220" stroke="var(--line)" />
-    <text x="48" y="42" textAnchor="end" fill="var(--muted)" fontSize="11">{high.toFixed(2)}</text><text x="48" y="220" textAnchor="end" fill="var(--muted)" fontSize="11">{low.toFixed(2)}</text>
     <polygon points={band} fill="var(--brand)" opacity="0.12" /><polyline points={line} fill="none" stroke="var(--brand)" strokeWidth="2" className={styles.fanReveal} />
-    <text x="56" y="244" fill="var(--muted)" fontSize="11">0</text><text x="532" y="244" textAnchor="end" fill="var(--muted)" fontSize="11">{points.at(-1)?.stepIndex}</text>
-  </svg></figure>;
+  </svg><div className={styles.factorSteps}><span>0</span><span>{points.at(-1)?.stepIndex}<SimulationText ko="단계" en=" steps" /></span></div></figure>;
 }
 
 function EconomicReason({ reason }: { reason: string | null }) {

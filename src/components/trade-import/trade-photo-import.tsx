@@ -8,6 +8,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import { Button, Input, PageTitle, SectionHeading, Status } from "@/components/cairn-ui";
 import { forgetTrade, pendingTrade, rememberTrade } from "@/lib/trade-operation-recovery";
 import { importIssue, photoImportMessage, PhotoSaveError, savePhotoTrades, type ReviewedPhotoTrade, type TradeImportContext } from "@/lib/trade-photo-import";
+import { resolveTradeRecordSelection, tradeRecordHref, type TradeRecordHint } from "@/lib/trade-record-intent";
 import styles from "./trade-photo-import.module.css";
 
 const Review = dynamic(() => import("./trade-photo-review").then(m => m.TradePhotoReview), { loading: () => <Status as="p">검토 화면을 준비하고 있어요…</Status> });
@@ -18,13 +19,15 @@ async function request(url: string, body?: object) {
   if (!response.ok) throw new PhotoSaveError(data.error ?? "unavailable", [400, 409].includes(response.status) && data.error !== "account_changed");
   return data;
 }
-export function TradePhotoImport({ initial, preview = false }: { initial: TradeImportContext; preview?: boolean }) {
+export function TradePhotoImport({ initial, preview = false, initialSelection = {}, reportingCurrency = "KRW" }: { initial: TradeImportContext; preview?: boolean; initialSelection?: TradeRecordHint; reportingCurrency?: "KRW" | "USD" }) {
   const { t } = useI18n();
   const [context, setContext] = useState(initial), [rows, setRows] = useState<PhotoRow[]>([]), [active, setActive] = useState("");
   const [progress, setProgress] = useState<string | null>(null), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState(""), [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null), task = useRef<AbortController | null>(null), urls = useRef<string[]>([]), mounted = useRef(true), saving = useRef(false);
   const session = useRef(initial.sessionKey);
+  const selection = resolveTradeRecordSelection(initial.accounts, initialSelection);
+  const manualHref = tradeRecordHref(selection, reportingCurrency);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; task.current?.abort(); urls.current.forEach(URL.revokeObjectURL); }; }, []);
   useEffect(() => {
     if (!busy && !uncertain && !rows.some(r => r.status === "review")) return;
@@ -51,7 +54,7 @@ export function TradePhotoImport({ initial, preview = false }: { initial: TradeI
           if (!result.rows.length) { unread++; continue; }
           if (rows.length + next.length + result.rows.length > 50) { unread++; continue; }
           const photo = URL.createObjectURL(files[index]); urls.current.push(photo);
-          next = next.concat(result.rows.map(row => ({ ...row, photo, key: crypto.randomUUID(), operationId: crypto.randomUUID(), accountId: initial.accounts.length === 1 ? initial.accounts[0].id : "", assetId: "", afterEventId: "", verified: false, status: "review" as const })));
+          next = next.concat(result.rows.map(row => ({ ...row, photo, key: crypto.randomUUID(), operationId: crypto.randomUUID(), accountId: selection.accountId || (initial.accounts.length === 1 ? initial.accounts[0].id : ""), assetId: "", afterEventId: "", verified: false, status: "review" as const })));
         } catch { if (!controller.signal.aborted) unread++; }
       }
       if (mounted.current) {
@@ -95,7 +98,7 @@ export function TradePhotoImport({ initial, preview = false }: { initial: TradeI
     } finally { saving.current = false; if (mounted.current) setBusy(false); }
   }
   return <div id="varda-main-content" className={styles.content}>
-    <header className={styles.heading}><div><PageTitle>{t("사진으로 거래 기록", "Record trades from photos")}</PageTitle><p>{t("증권사 체결 내역을 한 번에 옮겨 보세요.", "Bring your brokerage fills together.")}</p></div><Link href="/portfolio/ledger" prefetch={false}>{t("직접 입력 ↗", "Enter manually ↗")}</Link></header>
+    <header className={styles.heading}><div><PageTitle>{t("사진으로 거래 기록", "Record trades from photos")}</PageTitle><p>{t("증권사 체결 내역을 한 번에 옮겨 보세요.", "Bring your brokerage fills together.")}</p></div><Link href={manualHref} prefetch={false}>{t("직접 입력 ↗", "Enter manually ↗")}</Link></header>
     {preview && <Status as="p">디자인 검증 · 예시 계좌입니다. 사진은 실제로 읽지만 저장은 하지 않습니다.</Status>}
     <section className={styles.upload}>
       <div className={styles.uploadIntro}><ImagePlus aria-hidden="true" /><SectionHeading title={t("체결 내역을 골라 주세요", "Choose your trade photos")} description={t("수량·단가가 보이는 사진이면 돼요", "Include the filled quantity and price")} /></div>
@@ -120,7 +123,7 @@ export function TradePhotoImport({ initial, preview = false }: { initial: TradeI
         </section>
       </div>
       <footer className={styles.footer}><div><strong>{t(`${savedCount}건 저장 · ${pending.length}건 남음`, `${savedCount} saved · ${pending.length} remaining`)}</strong><p>{t("순서대로 저장해요. 오류가 나면 멈춥니다.", "Saved in order; stops if a trade fails.")}</p></div><Button variant="primary" size="lg" type="button" disabled={busy || !!progress || !pending.length || !context.canWrite || (!uncertain && ready !== pending.length)} onClick={() => void save()}>{busy ? t("거래 저장 중…", "Saving trades…") : uncertain ? t("저장 확인 후 계속", "Check save and continue") : t(`확인한 ${pending.length}건 저장`, `Save ${pending.length} reviewed trades`)}</Button></footer>
-      {uncertain && <p className={styles.hint}>저장 결과가 불확실한 동안 입력을 유지합니다. 다른 미확인 거래가 있다면 <Link prefetch={false} href="/portfolio/ledger">직접 입력 화면에서 저장 여부 확인</Link>을 먼저 해 주세요.</p>}
+      {uncertain && <p className={styles.hint}>저장 결과가 불확실한 동안 입력을 유지합니다. 다른 미확인 거래가 있다면 <Link prefetch={false} href={manualHref}>직접 입력 화면에서 저장 여부 확인</Link>을 먼저 해 주세요.</p>}
     </>}
   </div>;
 }

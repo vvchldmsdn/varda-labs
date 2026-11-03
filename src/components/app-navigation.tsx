@@ -8,6 +8,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useRef, useSyncExternalStore } from "react";
 import { carryRecoveryFragment } from "@/lib/recovery-navigation";
 import { buildBetaFrontendHref } from "@/lib/frontend-beta-link";
+import { normalizeTradeRecordHint } from "@/lib/trade-record-intent";
 import betaSwitchStyles from "./mobile-beta-switch.module.css";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { LanguageSwitch } from "@/components/i18n/language-switch";
@@ -63,7 +64,8 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
   const recoveryHash = useSyncExternalStore(subscribeRecovery, recoverySnapshot, () => "");
   const menuRef = useRef<HTMLDialogElement>(null);
   const preview = process.env.NODE_ENV === "development" && params.get("preview") === "design";
-  const scope = selectedScopeKey ?? params.get("scope");
+  const accountId = normalizeTradeRecordHint({ accountId: params.getAll("accountId").length === 1 ? params.get("accountId") : undefined }).accountId;
+  const scope = selectedScopeKey ?? params.get("scope") ?? (accountId ? `account:${accountId}` : null);
   const currentPath = activePath ?? pathname;
 
   function hrefFor(path: string) {
@@ -126,7 +128,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         </Link>
         {links}
         <div className="varda-sidebar-bottom">
-          {!preview ? <Link href="/portfolio/reporting" className="varda-sidebar-account"><span aria-hidden="true">$</span><span>{t("통화별 평가", "Currency valuation")}</span></Link> : null}
+          {!preview ? <Link href={hrefFor("/portfolio/reporting")} className="varda-sidebar-account"><span aria-hidden="true">$</span><span>{t("통화별 평가", "Currency valuation")}</span></Link> : null}
           <Link href={hrefFor("/plans")} className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
           {preview ? <span className="varda-preview-label" title={t("디자인 미리보기 · 예시 데이터", "Design preview · Demo data")}><i />{t("예시")}</span> : null}
           <Link href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
@@ -183,7 +185,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
           <Link className="varda-menu-account" href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
           {!preview ? <TradeRecordLinks variant="menu" reportingCurrency={params.get("currency") === "USD" ? "USD" : "KRW"} accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
           <Link className="varda-menu-account" href={hrefFor("/plans")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
-          {!preview ? <Link className="varda-menu-account" href="/portfolio/reporting" onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
+          {!preview ? <Link className="varda-menu-account" href={hrefFor("/portfolio/reporting")} onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
           <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
             <UserRound size={18} />{t("내 계정")}<ArrowUpRight size={15} />
           </Link>

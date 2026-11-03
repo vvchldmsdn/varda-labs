@@ -56,7 +56,7 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
           selectedKey={selectedKey} hoveredKey={hoveredKey} onHover={setHoveredKey} onSelect={setSelectedKey} />
       </div>
       <div className={styles.explorer}>
-        <div className={styles.tableScroll} role="region" aria-label="투자자산 구성 표 · 가로 세로 스크롤" tabIndex={0}>
+        <div className={styles.tableScroll} role="region" aria-label="투자자산 구성 표" tabIndex={0}>
           <table>
             <thead><tr><th scope="col">종목 / 계좌</th><th scope="col" className={styles.number}>평가액 ({unit})</th><th scope="col" className={styles.number}>비중</th></tr></thead>
             <tbody>{view.rows.map(row => <tr key={row.key} data-selected={row.key === active?.key} onPointerEnter={event => {if(event.pointerType !== "touch") setHoveredKey(row.key);}} onPointerLeave={() => setHoveredKey(null)}>

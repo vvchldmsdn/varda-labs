@@ -11,8 +11,8 @@ export function defaultHomeContributionHref(params:Params):string|null {
  query.set('cashAmountKrw','1000000');
  return betaReadHref('/beta?'+query);
 }
-export async function readBetaHome(params:Params,ports:{domain:(params:Params,options:{includeHeatmap:boolean})=>Promise<DomainRead>;simulation:(params:Params)=>Promise<SimulationRead>}){
- const read=await ports.domain(params,{includeHeatmap:true});
+export async function readBetaHome(params:Params,ports:{domain:(params:Params,options:{includeHeatmap:boolean;includeCurrentValue:boolean})=>Promise<DomainRead>;simulation:(params:Params)=>Promise<SimulationRead>}){
+ const read=await ports.domain(params,{includeHeatmap:true,includeCurrentValue:true});
  // Request-local promise, never a cache across users. Original simulation port
  // repeats its own session/scope/single-owner admission; no readiness double call.
  const state=read.view.domain?.state;
