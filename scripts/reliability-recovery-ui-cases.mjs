@@ -6,6 +6,17 @@ const returnLabel = '입력 유지하고 돌아가기';
 const nativeRegion = page => page.getByRole('region', { name: '추가 투자 계획', exact: true });
 const targetNotice = surface => surface.locator('[data-recovery-kind="targets"]');
 
+async function recoveryAction(notice, name) {
+  await expect(notice).toBeVisible();
+  const disclosure = notice.locator(':scope > details');
+  if (await disclosure.count() && await disclosure.getAttribute('open') === null) {
+    await disclosure.locator(':scope > summary').click();
+  }
+  const action = notice.getByRole('button', { name, exact: true });
+  await expect(action).toBeVisible();
+  return action;
+}
+
 function assertDraft(location, pathname, draft, hash = '') {
   const current = new URL(location, 'http://127.0.0.1');
   assert.equal(current.pathname, pathname);
@@ -132,7 +143,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await page.locator('summary').filter({ hasText: /^시간대 · / }).click();
     await page.getByRole('combobox', { name: '표시 시간대', exact: true }).selectOption('UTC');
     const historyDraft = { ...historyQuery, _nativeView: JSON.stringify({ version: 1, scope, view: 'history', currency: 'KRW', zone: 'UTC', selected: '' }) };
-    await page.locator('[data-recovery-kind="trades"]').getByRole('button', { name: '거래 기록 확인하기', exact: true }).click();
+    await (await recoveryAction(page.locator('[data-recovery-kind="trades"]'), '거래 기록 확인하기')).click();
     await expect(page).toHaveURL(current => current.pathname === '/portfolio/ledger');
     await expect(page.getByRole('heading', { name: '매매·현금 기록', exact: true })).toBeVisible();
     await expect(page.getByRole('combobox', { name: '계좌', exact: true })).toHaveValue(account);
@@ -155,7 +166,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await expect(periods.getByRole('button', { name: '6개월', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const displayDraft = { mode: 'domain', scope, currency: 'KRW', _historyViewPeriod: '6M', _historyViewMetric: 'value', _historyViewScope: scope, _historyViewCurrency: 'KRW' };
     const openRecords = async expected => {
-      await page.locator('[data-recovery-kind="history"]').getByRole('button', { name: '저장 기록 확인하기', exact: true }).click();
+      await (await recoveryAction(page.locator('[data-recovery-kind="history"]'), '저장 기록 확인하기')).click();
       await expect(page).toHaveURL(current => current.pathname === '/history' && current.searchParams.get('detail') === 'raw');
       assert.equal(new URL(page.url()).pathname, '/history');
       assert.equal(new URL(page.url()).searchParams.get('detail'), 'raw');
@@ -175,9 +186,11 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await expect(metrics.getByRole('button', { name: '평가액', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await captureWidths(page, output, 'recovery-beta-live-history-return', periods.getByRole('button', { name: '6개월', exact: true }));
 
-    // Choose the metric in the real controls before the empty state hides them.
+    // Empty/error states keep these controls available for recovery.
     await metrics.getByRole('button', { name: '수익률', exact: true }).click();
     await expect(page.getByText('저장된 평가가 없습니다.', { exact: true })).toBeVisible();
+    await expect(periods.getByRole('button', { name: '6개월', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(metrics.getByRole('button', { name: '수익률', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const emptyDraft = { ...displayDraft, _historyViewMetric: 'return' };
     await openRecords(emptyDraft);
     await page.getByRole('button', { name: returnLabel, exact: true }).click();
