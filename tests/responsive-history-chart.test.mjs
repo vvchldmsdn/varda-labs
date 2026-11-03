@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import {it} from 'node:test';
 import {importUiWithPorts} from './helpers/import-ui-with-ports.mjs';
-import {returnVisualFixture} from './support/beta-visual-fixture.mjs';
+import {betaVisualFixture,returnVisualFixture} from './support/beta-visual-fixture.mjs';
+
+it('keeps required heatmap weights when the full-app visual fixture is serialized',async()=>{
+  const [fixtures,contract]=await importUiWithPorts(['src/lib/cairn-v2/fixtures.ts','src/lib/cairn-v2/read-contract.ts'],{});
+  const base=fixtures.getFixtureView({mode:'domain',scope:'all',currency:'KRW',fixture:'standard'});
+  const view=JSON.parse(JSON.stringify(betaVisualFixture(base,contract.blankDomainView('ready',''))));
+  assert.ok(view.domain.heatmap.history.rows.length>0);
+  for(const row of view.domain.heatmap.history.rows){
+    assert.ok(Number.isFinite(row.currentWeight),'required numeric field must survive JSON serialization');
+    assert.equal(row.currentWeight,base.rows.find(item=>item.key===row.holdingId).weightPct);
+  }
+});
 
 const elements = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(elements) : [tree,...elements(tree.props?.children)];
 it('reprojects history into measured dimensions while retaining null breaks and date navigation',async()=>{
