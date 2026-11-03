@@ -35,7 +35,7 @@ import { buildHoldingConnectionGraph } from "@/lib/holding-connection-graph";
 import { HoldingDatePicker } from "./holding-date-picker";
 import { MobileHoldingConnections } from "./mobile-holding-connections";
 import styles from "@/components/home/portfolio-overview.module.css";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle } from "@/components/cairn-ui";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle, ChoiceGroup } from "@/components/cairn-ui";
 
 
 type HeatmapMode = "movement" | "allocation" | "connections";
@@ -70,11 +70,11 @@ export function HoldingMovementHeatmap({
           <CairnSectionTitle id="holding-heatmap-title" className={styles.panelTitle}><T ko="종목 흐름" en="Holding history"/></CairnSectionTitle>
           <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="오늘 변동과 같은 원화 평가 기준입니다. 과거는 저장된 일별 변동입니다." en="Today uses the same KRW valuation basis as Today. Past dates show recorded daily changes."/></p>
         </div>
-        <div className={`cairn-tabs ${styles.chartRanges}`} aria-label={t("종목 흐름 보기 방식", "Holding history view")}>
+        <ChoiceGroup label={t("종목 흐름 보기 방식", "Holding history view")}>
           <ModeButton active={mode === "movement"} onClick={() => setMode("movement")}><T ko="일별 변동" en="Daily changes"/></ModeButton>
           <ModeButton active={mode === "allocation"} onClick={() => setMode("allocation")}><T ko="구성" en="Allocation"/></ModeButton>
           <ModeButton active={mode === "connections"} onClick={() => setMode("connections")}><T ko="동반 움직임" en="Co-movement"/></ModeButton>
-        </div>
+        </ChoiceGroup>
       </div>
 
       <div className={stage ? styles.stageHeatmapViewport : undefined}>
@@ -422,7 +422,6 @@ function ModeButton({
     <CairnButton variant="bare"
       type="button"
       aria-pressed={active}
-      className={styles.rangeButton}
       onClick={onClick}
     >
       {children}

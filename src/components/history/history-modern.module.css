@@ -8,7 +8,6 @@
 .heroValue { margin-top:12px; font-size:clamp(42px,5.6vw,78px); font-weight:500; line-height:1.06; letter-spacing:-.065em; font-variant-numeric:tabular-nums; }
 .heroCaption { display:flex; gap:20px; flex-wrap:wrap; margin-top:16px; color:var(--muted); font-size:12px; }
 .controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; }
-.periodControls { display:flex; flex-wrap:wrap; align-items:center; gap:20px; }
 .chartTitle { display:flex; justify-content:space-between; align-items:center; gap:16px; padding-top:24px; }
 .chartTitle h2 { font-size:12px; font-weight:500; color:var(--muted); }
 .chartTitle p { font-size:11px; }
@@ -43,11 +42,6 @@
   .heroValue { font-size:clamp(36px,10vw,46px); margin-top:20px; }
   .heroCaption { font-size:11px; gap:12px; margin-top:12px; }
   .controls { gap:10px; }
-  .periodControls { gap:8px 18px; }
-  .periodControls { width:100%; }
-  .periodControls > div:first-child { gap:20px; }
-  .periodControls :global(.varda-presentation-detail-trigger) { border:0; background:transparent; padding:0; min-height:34px; font-size:11px; }
-  .periodControls :global(.varda-presentation-detail-trigger) svg { display:none; }
   .chartTitle { padding-top:12px; }
   .chartTitle p { max-width:155px; text-align:right; font-size:10px; }
   .explorer :global(.varda-history-chart) { height:270px; }
@@ -73,11 +67,6 @@
 .heroCaption { display:block; margin-top:14px; font-size:11px; }
 .heroCaption > span { display:block; margin-top:8px; }
 .controls { display:grid; justify-content:start; gap:14px; padding:0; }
-.modeControls { display:flex; gap:4px; }
-.periodControls { display:flex; gap:22px; width:auto; }
-.periodControls > button { min-height:36px; border-bottom:1px solid transparent; color:var(--muted); font-size:12px; }
-.periodControls > button[aria-pressed="true"] { color:var(--ink); border-bottom-color:var(--ink); }
-.periodControls > button:focus-visible { outline:2px solid var(--brand); outline-offset:4px; }
 .railNote { color:var(--muted); font-size:11px; line-height:1.9; max-width:230px; }
 .plot { display:flex; flex-direction:column; min-width:0; min-height:0; }
 .chartTitle { flex:none; padding:6px 0 10px; }
@@ -104,9 +93,6 @@
   .heroCaption { grid-column:2; grid-row:1; margin:0; text-align:right; font-size:10px; }
   .heroCaption > span { margin-top:4px; }
   .controls { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .modeControls button { min-width:62px; min-height:34px; padding:6px 10px; font-size:12px; }
-  .periodControls { gap:15px; }
-  .periodControls > button { min-height:34px; font-size:11px; }
   .railNote { font-size:12px;max-width:none; }
   .plot { flex:1; min-height:0; }
   .chartTitle { padding:0 0 6px; }
@@ -137,11 +123,6 @@
   .heroCaption { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:10px; text-align:center; font-size:12px; }
   .heroCaption > span { margin:0; }
   .controls { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
-  .modeControls { flex-wrap:wrap; gap:8px; border:0; background:transparent; padding:0; }
-  .modeControls button { min-height:44px; min-width:64px; font-size:13px; padding:10px 8px; border:0; background:transparent; border-radius:0; color:var(--muted); }
-  .modeControls button[aria-pressed="true"] { color:var(--ink); font-weight:650; box-shadow:inset 0 -2px var(--brand); }
-  .periodControls { gap:16px; }
-  .periodControls > button { min-height:44px; font-size:12px; }
   .plot { flex:none; min-height:0; }
   .chartTitle { padding:0 0 12px; }
   .chartTitle h2,.chartTitle p { font-size:11px; line-height:1.6; }

@@ -71,11 +71,6 @@
 .holdingDialog[open] { animation: drawer-enter 240ms cubic-bezier(.2,.65,.25,1) both; }
 .holdingDialog::backdrop { background: #20211f45; backdrop-filter: blur(3px); }
 .chartHeading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 18px; }
-.chartRanges { display: flex; align-items: center; gap: 6px; }
-.rangeButton { min-width: 40px; min-height: 34px; border-radius: 999px; padding: 5px 11px; font-size: 11px; color: var(--muted); cursor: pointer; transition: color 160ms, background 160ms; }
-.rangeButton:hover { background: var(--wash); color: var(--ink); }
-.rangeButton[aria-pressed='true'] { color: var(--ink); background: transparent; box-shadow:inset 0 -2px var(--brand); }
-.rangeButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .chartReadout { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 24px 0 6px; }
 .chartReadout span { font-size: 10px; color: var(--muted); }
 .chartReadout strong { display: block; margin-top: 7px; font-size: 26px; font-weight: 450; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
@@ -208,8 +203,6 @@
   .chartReadout > div { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   .chartReadout strong { font-size: 19px; margin-top: 0; }
   .chartReadout p { display: none; }
-  .chartRanges { gap: 0; }
-  .rangeButton { min-width: 35px; padding-inline: 8px; }
   .heatmapPanel { padding: 20px 16px; border-radius: 14px; }
   .footer { align-items: flex-start; flex-direction: column; }
   .axisLabels { display: none; }
@@ -261,7 +254,6 @@
   .stageHeatmap > :first-child { margin-bottom: 12px; gap: 6px; }
   .stageHeatmap > :first-child > div:first-child > p { display: none; }
   .stageHeatmap .panelTitle { font-size: 14px; }
-  .stageHeatmap .rangeButton { font-size: 10px; min-width: 32px; min-height: 30px; padding-inline: 7px; }
   .stageMatrixGrid { min-width: 650px; }
   .stageMatrix .heatmapRowLabel { font-size: 10px; }
   .stageMatrix > :last-child { font-size: 9px; gap: 6px; }
@@ -332,7 +324,6 @@
   .stageHeatmap, .stageHeatmapViewport, .stageMatrix { height: auto; min-height: 0; overflow: visible; flex: none; }
   .stageHeatmap > :first-child { align-items: center; gap: 12px; margin-bottom: 14px; }
   .stageHeatmap .panelTitle { font-size: 18px; }
-  .stageHeatmap .rangeButton { min-height: 44px; min-width: 44px; padding-inline: 11px; font-size: 12px; }
   .stageMatrix .stageGridViewport, .stageMatrix > :last-child { display: none; }
   .mobileMovements { display: block; }
   .connectionDesktop { display: none; }

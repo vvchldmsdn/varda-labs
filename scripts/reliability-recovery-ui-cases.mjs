@@ -151,8 +151,8 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await expect(page.getByText('현재 평가 · 저장 전', { exact: true })).toBeVisible();
     const periods = page.getByRole('group', { name: '히스토리 기간', exact: true });
     const metrics = page.getByRole('group', { name: '히스토리 보기', exact: true });
-    await periods.getByRole('button', { name: '6M', exact: true }).click();
-    await expect(periods.getByRole('button', { name: '6M', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await periods.getByRole('button', { name: '6개월', exact: true }).click();
+    await expect(periods.getByRole('button', { name: '6개월', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const displayDraft = { mode: 'domain', scope, currency: 'KRW', _historyViewPeriod: '6M', _historyViewMetric: 'value', _historyViewScope: scope, _historyViewCurrency: 'KRW' };
     const openRecords = async expected => {
       await page.locator('[data-recovery-kind="history"]').getByRole('button', { name: '저장 기록 확인하기', exact: true }).click();
@@ -171,9 +171,9 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await page.getByRole('button', { name: returnLabel, exact: true }).click();
     await expect(page.getByText('현재 평가 · 저장 전', { exact: true })).toBeVisible();
     assertDraft(page.url(), '/beta/history', displayDraft, '#history-evidence');
-    await expect(periods.getByRole('button', { name: '6M', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(periods.getByRole('button', { name: '6개월', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(metrics.getByRole('button', { name: '평가액', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await captureWidths(page, output, 'recovery-beta-live-history-return', periods.getByRole('button', { name: '6M', exact: true }));
+    await captureWidths(page, output, 'recovery-beta-live-history-return', periods.getByRole('button', { name: '6개월', exact: true }));
 
     // Choose the metric in the real controls before the empty state hides them.
     await metrics.getByRole('button', { name: '수익률', exact: true }).click();

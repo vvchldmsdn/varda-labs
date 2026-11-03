@@ -132,8 +132,8 @@ export function PortfolioDashboard({
           </section>
 
           <ActionGroup label="내 자산 더 살펴보기">
-            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산하기" en="Plan a contribution" />} description={<T ko="내 목표에 맞는 배분을 찾아요" en="Find an allocation for your targets" />} /></Link>
-            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="내 자산 비중 살펴보기" en="Explore your allocation" />} description={<T ko="목표와 얼마나 가까울까요?" en="How close are you to your targets?" />} /></Link>
+            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산" en="Plan a contribution" />} /></Link>
+            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="자산 비중 살펴보기" en="Explore your allocation" />} /></Link>
           </ActionGroup>
 
           <div className={styles.stageVisual}>
@@ -202,7 +202,7 @@ export function PortfolioDashboard({
         </div>
         {!designPreview ? <section className={styles.tradeHoldings} aria-label="Holdings">
           <CairnSectionTitle><T ko="보유종목" en="Holdings" /></CairnSectionTitle>
-          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{instrumentLabel(row)}<small>{row.ticker} · {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} /></div>)}
+          {data.holdings.filter(row => row.market === "us" || row.market === "korea").map(row => <div key={row.id}><span>{instrumentLabel(row)}<small><T ko="보유 수량" en="Quantity" /> {row.quantity}</small></span><QuickTradeActions accountId={row.accountId ?? (data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined)} assetId={row.id} name={instrumentLabel(row)} quantity={String(row.quantity)} /></div>)}
           <QuickTradeActions accountId={data.selectedScope.kind === "account" ? data.selectedScope.accountId : undefined} />
         </section> : null}
       </div>

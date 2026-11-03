@@ -1,5 +1,5 @@
 "use client";
-import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus, InfoDisclosure, ActionGroup, ActionContent } from "@/components/cairn-ui";
+import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus, InfoDisclosure, ActionGroup, ActionContent, ChoiceGroup } from "@/components/cairn-ui";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -180,7 +180,7 @@ export function HistoryDetail({
 
           </div>
           <HistoryChart view={view} />
-          <div className={styles.periodControls} role="group" aria-label="히스토리 기간">
+          <ChoiceGroup appearance="segmented" label="히스토리 기간">
             {(["1M", "3M", "6M", "ALL"] as const).map((option) => (
               <CairnButton variant="selection"
                 key={option}
@@ -188,10 +188,10 @@ export function HistoryDetail({
                 aria-pressed={option === period}
                 onClick={() => setPeriod(option)}
               >
-                {option}
+                {{"1M":"1개월","3M":"3개월","6M":"6개월","ALL":"전체"}[option]}
               </CairnButton>
             ))}
-          </div>
+          </ChoiceGroup>
           {view.domain && sourceKinds.length > 1 && (
             <div
               className={styles.sourceTrack}

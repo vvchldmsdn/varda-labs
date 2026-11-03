@@ -32,7 +32,7 @@ import type {
   HistoryOverviewModel,
   HistoryOverviewPoint,
 } from "@/lib/history-overview";
-import { Button as CairnButton, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionGroup, ActionContent } from "@/components/cairn-ui";
+import { Button as CairnButton, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, ActionGroup, ActionContent, ChoiceGroup } from "@/components/cairn-ui";
 
 
 const RANGE_OPTIONS: readonly Readonly<{
@@ -142,13 +142,13 @@ export function HistoryTimeExplorer({
             <p className={styles.heroCaption}>{<T ko={mode === "value" ? "총평가액" : heroReturnLabel} en={translateHomeHistory(mode === "value" ? "총평가액" : heroReturnLabel)}/>}{!integratedReturn && <span className={tone(inspectedPoint?.movementKrw ?? null)}><T ko="이전 대비" en="Previous change"/> {<T ko={formatSignedKrw(inspectedPoint?.movementKrw ?? null)} en={translateHomeHistory(formatSignedKrw(inspectedPoint?.movementKrw ?? null))}/>}</span>}</p>
           </div>
           <div className={styles.controls}>
-            <div className={styles.modeControls} aria-label={t("그래프 지표", "Chart metric")}>
+            <ChoiceGroup label={t("그래프 지표", "Chart metric")}>
               <ModeButton active={mode === "value"} label={t("평가액", "Value")} onClick={() => changeMode("value")} />
               <ModeButton active={mode === "return"} disabled={!returnAvailable} label={t("수익률", "Return")} onClick={() => changeMode("return")} />
-            </div>
-            <div className={styles.periodControls} aria-label={t("조회 기간", "Time range")}>
+            </ChoiceGroup>
+            <ChoiceGroup appearance="segmented" label={t("조회 기간", "Time range")}>
               {RANGE_OPTIONS.map((option) => <CairnButton variant="selection" key={option.key} type="button" aria-pressed={range === option.key} onClick={() => changeRange(option.key)}>{<T ko={option.label} en={translateHomeHistory(option.label)}/>}</CairnButton>)}
-            </div>
+            </ChoiceGroup>
           </div>
           <p className={styles.railNote}>{scopeLabel} · {integratedReturn ? returnTimeline.filter(p => p.returnPct !== null).length : rangeSummary.pointCount}<T ko="개 관측점" en=" observations"/><br /><T ko={integratedReturn ? "저장·복구 기준 구분" : hasLiveValuation ? "오늘은 현재 평가 · 저장 전" : "저장된 평가"} en={integratedReturn ? "Recorded and reconstructed bases differ" : hasLiveValuation ? "Today is live · not saved" : "Recorded valuations"} /></p>
           {status ? <div className="text-[10px] leading-5 text-[var(--warning)]">{typeof status === "string" ? <T ko={status} en={translateHomeHistory(status)}/> : status}</div> : null}

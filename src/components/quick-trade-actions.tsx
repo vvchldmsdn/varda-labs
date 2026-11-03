@@ -26,8 +26,8 @@ export function QuickTradeActions(props: TradeSelection) {
   if (!open) return <QuickTradeWorkspace><QuickTradeActions {...props} /></QuickTradeWorkspace>;
   const { assetId, name, quantity = "0" } = props;
   return <div className={styles.actions}>
-    <CairnButton variant="secondary" type="button" onClick={event => open({ ...props, side: "buy", trigger: event.currentTarget, id: crypto.randomUUID() })} aria-label={assetId ? name + " " + t("매수", "Buy") : undefined}>{assetId ? t("매수", "Buy") : t("+ 새 종목 매수", "+ Buy a new holding")}</CairnButton>
-    {assetId && <CairnButton variant="secondary" type="button" disabled={Number(quantity) <= 0} onClick={event => open({ ...props, side: "sell", trigger: event.currentTarget, id: crypto.randomUUID() })} aria-label={name + " " + t("매도", "Sell")}>{t("매도", "Sell")}</CairnButton>}
+    <CairnButton variant="ghost" className={styles.tradeAction} type="button" onClick={event => open({ ...props, side: "buy", trigger: event.currentTarget, id: crypto.randomUUID() })} aria-label={assetId ? name + " " + t("매수", "Buy") : undefined}>{assetId ? t("매수", "Buy") : t("+ 새 종목 매수", "+ Buy a new holding")}</CairnButton>
+    {assetId && <CairnButton variant="ghost" className={styles.tradeAction} type="button" disabled={Number(quantity) <= 0} onClick={event => open({ ...props, side: "sell", trigger: event.currentTarget, id: crypto.randomUUID() })} aria-label={name + " " + t("매도", "Sell")}>{t("매도", "Sell")}</CairnButton>}
   </div>;
 }
 function QuickTradeDialog({ request, onGuardChange }: { request: TradeRequest | null; onGuardChange: (pending: boolean) => void }) {
