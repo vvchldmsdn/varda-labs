@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import styles from './action-row.module.css';
 
 /** Callers own destinations, permissions and state; this component only presents them. */
-export function ActionGroup({ label, children, className, layout = 'cards' }: { label: string; children: ReactNode; className?: string; layout?: 'cards' | 'list' }) {
+export function ActionGroup({ label, children, className, layout = 'list' }: { label: string; children: ReactNode; className?: string; layout?: 'cards' | 'list' }) {
   return <nav aria-label={label} className={[styles.group, className].filter(Boolean).join(' ')} data-cairn-actions data-layout={layout}>{children}</nav>;
 }
 

@@ -1,0 +1,11 @@
+.group[data-cairn-choice] { display:inline-flex; align-items:center; flex-wrap:wrap; width:fit-content; max-width:100%; gap:4px; padding:0; border:0; border-radius:0; background:transparent; }
+.group[data-cairn-choice][data-appearance] > [data-cairn-button] { position:relative; display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:44px; min-height:44px; padding:8px 12px; border:0; border-radius:6px; background:transparent; color:var(--cairn-ui-muted,var(--muted,#6c6d68)); font-size:13px; font-weight:450; line-height:1.4; white-space:nowrap; box-shadow:none; transform:none; transition:color 150ms,background-color 150ms; }
+.group[data-cairn-choice][data-appearance] > [data-cairn-button][aria-pressed=true] { color:var(--cairn-ui-ink,var(--ink,#20211f)); background:transparent; font-weight:600; border:0; box-shadow:none; }
+.group[data-cairn-choice][data-appearance=underline] > [data-cairn-button]::after { content:''; position:absolute; bottom:1px; inset-inline:12px; height:2px; background:currentColor; opacity:0; transform:scaleX(.6); transition:opacity 150ms,transform 150ms; }
+.group[data-cairn-choice][data-appearance=underline] > [data-cairn-button][aria-pressed=true]::after { opacity:1; transform:scaleX(1); }
+.group[data-cairn-choice][data-appearance=segmented] { padding:2px; background:var(--cairn-ui-surface,#eeefea); border-radius:9px; gap:2px; }
+.group[data-cairn-choice][data-appearance=segmented] > [data-cairn-button][aria-pressed=true] { background:var(--cairn-ui-paper,var(--paper,#f7f7f5)); }
+.group[data-cairn-choice][data-appearance] > [data-cairn-button]:focus-visible { outline:2px solid var(--cairn-ui-brand,var(--brand,#c64623)); outline-offset:2px; z-index:1; }
+@media(hover:hover) { .group[data-cairn-choice][data-appearance] > [data-cairn-button]:hover:not(:disabled) { background:color-mix(in srgb,var(--cairn-ui-ink,#20211f) 4%,transparent); color:var(--cairn-ui-ink,#20211f); } }
+@media(prefers-reduced-motion:reduce) { .group[data-cairn-choice][data-appearance] > [data-cairn-button],.group[data-cairn-choice][data-appearance] > [data-cairn-button]::after { transition:none; } }
+:global([data-reduced=true]) .group[data-cairn-choice] > [data-cairn-button],:global([data-reduced=true]) .group[data-cairn-choice] > [data-cairn-button]::after { transition:none; }

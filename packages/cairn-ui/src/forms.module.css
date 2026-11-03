@@ -33,15 +33,16 @@
 .section .sectionDescription { margin: 0; color: var(--cairn-ui-muted, #6c6d68); font-size: 12px; line-height: 1.7; }
 .button[data-cairn-button] {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; max-width: 100%; padding: 12px 18px;
-  border: 1px solid var(--cairn-ui-line, #d8dad3); border-radius: 999px; background: transparent; color: var(--cairn-ui-ink, var(--ink, #20211f));
+  border: 1px solid transparent; border-radius: var(--cairn-ui-radius-button, 10px); background: var(--cairn-ui-surface, #eeefea); color: var(--cairn-ui-ink, var(--ink, #20211f));
   font: inherit; font-size: 14px; font-weight: 500; line-height: 1.5; text-align: center; cursor: pointer; text-decoration: none; transition: background-color var(--cairn-ui-motion-fast,160ms), border-color 160ms, transform 160ms var(--cairn-ui-ease,ease-out);
 }
 .button[data-cairn-button]:hover:not(:disabled) { background: var(--cairn-ui-surface, #eeefea); border-color: #b3b8ac; }
 .button[data-cairn-button][data-variant=primary] { background: var(--cairn-ui-ink, #20211f); border-color: var(--cairn-ui-ink, #20211f); color: var(--cairn-ui-paper, #f7f7f5); }
 .button[data-cairn-button][data-variant=primary]:hover:not(:disabled) { background: #373b33; }
 .button[data-cairn-button][data-variant=danger] { border-color: #a5392840; color: #a53928; background: #a5392807; }
-.button[data-cairn-button][data-variant=ghost] { border-color: transparent; }
-.button[data-cairn-button][data-variant=selection][aria-pressed=true], .button[data-cairn-button][data-variant=selection][aria-current=true] { color: var(--cairn-ui-paper, #f7f7f5); background: var(--cairn-ui-ink, #20211f); border-color: var(--cairn-ui-ink, #20211f); }
+.button[data-cairn-button][data-variant=ghost] { border-color: transparent; background:transparent; }
+.button[data-cairn-button][data-variant=selection] { background:transparent; border-color:var(--cairn-ui-line, #d8dad3); }
+.button[data-cairn-button][data-variant=selection][aria-pressed=true], .button[data-cairn-button][data-variant=selection][aria-current=true] { color: var(--cairn-ui-ink, #20211f); background: var(--cairn-ui-surface, #eeefea); border-color:var(--cairn-ui-ink, #20211f); font-weight:600; }
 .button[data-cairn-button][data-size=sm] { min-height: 44px; padding: 9px 14px; font-size: 13px; }
 .button[data-cairn-button][data-size=lg] { min-height: 54px; padding: 14px 24px; font-size: 16px; }
 .button[data-cairn-button][data-variant=bare] { display: revert; min-height: revert; padding: revert; border: revert; border-radius: revert; background: revert; color: inherit; font: inherit; text-align: inherit; }
