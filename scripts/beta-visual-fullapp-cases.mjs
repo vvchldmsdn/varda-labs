@@ -110,7 +110,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
   for(const [width,height] of [[1440,900],[390,844],[360,800]]) {
     await check(`original-home-navigation-and-chart-${width}`,async()=>{
       await page.setViewportSize({width,height});await page.emulateMedia({reducedMotion:'reduce'});
-      await page.goto(url+'/?preview=design');
+      await page.goto(url+'/qa-original-visual');
       const links=page.getByRole('navigation',{name:'내 자산 더 살펴보기'});
       await expect(links.getByRole('link',{name:'추가 투자 계산',exact:true})).toHaveAttribute('href',/additional-contribution.*preview=design/);
       const periods=page.getByRole('group',{name:'조회 기간',exact:true});
