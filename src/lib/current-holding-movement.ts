@@ -1,6 +1,7 @@
 import {
   buildDailyPositionMovement,
   buildPreviousCloseMovement,
+  isPortfolioMovementEligibleHolding,
   type PortfolioMovementHoldingInput,
   type PortfolioMovementPositionSnapshotInput,
   type PortfolioMovementPriceSnapshotInput,
@@ -60,6 +61,18 @@ export function buildCurrentHoldingMovement(input: {
   const previous = rows.reduce((sum, row) => sum + row.previousValueKrw, 0);
   const change = rows.reduce((sum, row) => sum + row.changeKrw, 0);
   const excludedCount = Math.max(0, input.holdings.length - rows.length);
+  const includedIds = new Set(rows.map(row => row.holdingId));
+  const exclusions: PortfolioMovementExclusion[] = input.holdings.filter(holding => !includedIds.has(holding.id)).map(holding => {
+    const recorded = selected.exclusions.find(row => row.subject !== 'aggregate' && row.holdingId === holding.id);
+    if (recorded) return recorded;
+    const ticker = normalizeTicker(holding.ticker);
+    const reason = !ticker || ticker === '-' ? 'missing_quoted_instrument'
+      : !isPortfolioMovementEligibleHolding(holding) ? 'unsupported_asset_type'
+      : selected.reason === 'missing_previous_close_fallback' ? 'missing_previous_close_fallback'
+      : 'missing_comparison_evidence';
+    return { subject: 'holding', reason, source: selected.source, holdingId: holding.id, snapshotId: null,
+      ticker: holding.ticker, assetName: holding.name, account: holding.account, currency: holding.currency, valueKrw: holding.valueKrw };
+  });
   const rawChanges = rows.map(row => {
     if (row.source !== 'daily_position_snapshot') return null;
     const normalizedRow = normalized.find(snapshot => snapshot.assetId === row.holdingId);
@@ -73,5 +86,5 @@ export function buildCurrentHoldingMovement(input: {
     returnPct: rows.length && previous > 0 ? change / previous * 100 : null,
     previousValueKrw: rows.length ? previous : null, includedCount: rows.length, excludedCount,
     partial: excludedCount > 0, valuationChangeKrw: rawChange, quantityChangeKrw: rawChange === null ? null : rawChange - change,
-    rows, exclusions: selected.exclusions.filter(row => row.subject !== 'aggregate') };
+    rows, exclusions };
 }

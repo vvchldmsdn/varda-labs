@@ -17,6 +17,7 @@ export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" |
   totalKrw: number | null; fxRate: number | null;
   drift: DemoView["drift"] | undefined;
   domain?: {
+    currentValuePresentation?: import("./current-value-presentation").OriginalCurrentValuePresentation;
     recoveredReturn?: import('../period-return-recovery').RecoveredReturnCurve | null;
     investmentReturn?: import("./investment-return").InvestmentReturn;
     planning?: BetaPlanningRead;

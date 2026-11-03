@@ -58,6 +58,10 @@
 .scrubber:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
 .stageFootnote { color:var(--muted); font-size:12px; line-height:1.7; padding:24px 0 8px; }
 .economicExecution { min-width:0; }
+.factorTrajectory { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:8px; align-items:stretch; }
+.factorAxis,.factorSteps { display:flex; justify-content:space-between; color:var(--muted); font-size:14px; line-height:1.4; font-variant-numeric:tabular-nums; }
+.factorAxis { flex-direction:column; text-align:right; }
+.factorSteps { grid-column:2; }
 .startingFactors { margin:8px 0 12px; border-bottom:1px solid var(--line); }
 .startingFactors summary { min-height:44px; padding:12px 0; cursor:pointer; font-size:14px; }
 .startingFactors summary > span { margin-left:12px; color:var(--muted); font-size:12px; }

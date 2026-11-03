@@ -159,6 +159,7 @@ export default async function InvestmentLabPage({
             <Suspense fallback={<HoldingAnalysisDataPanelSkeleton />}>
               <HoldingAnalysisDataPanel
                 resultPromise={analysisDataReadinessPromise}
+                showReadyState
               />
             </Suspense>
           }

@@ -1,6 +1,7 @@
 import { unavailableHeatmap, type BetaHeatmapRead } from "./heatmap-contract";
 import { parseSaleExclusionKeys } from "../additional-contribution-sale-exclusions.ts";
 import type { BetaContext, BetaCurrency } from "./navigation";
+import type { OriginalCurrentValuePresentation } from "./current-value-presentation";
 import {
   adaptBetaRead,
   blankDomainView,
@@ -39,6 +40,7 @@ export type BetaReadPorts = {
     tenantContext: TenantContext;
   }) => Promise<TenantPortfolioAnalysisScopeContextResult>;
   dashboard: (args: ReadArgs) => Promise<DashboardData>;
+  currentValue?: (args: ReadArgs & {currency:BetaCurrency;dashboard:DashboardData}) => Promise<OriginalCurrentValuePresentation>;
   structure: (args: ReadArgs) => Promise<PortfolioStructureResult>;
   heatmap?: (args: ReadArgs & { dashboard: DashboardData }) => Promise<BetaHeatmapRead>;
   history: (args: ReadArgs) => Promise<BetaHistoryRead>;
@@ -151,6 +153,8 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
           )
       : Promise.resolve({ value: null });
     const dashboardPromise = ports.dashboard(args);
+    const currentValuePromise = ports.currentValue ? dashboardPromise.then(dashboard=>ports.currentValue!({...args,currency:context.currency,dashboard}))
+      .catch(():OriginalCurrentValuePresentation=>({kind:"unavailable"})) : null;
     const heatmapPromise = ports.heatmap
       ? dashboardPromise
           .then((dashboard) => ports.heatmap!({ ...args, dashboard }))
@@ -264,6 +268,7 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
     }
     view.domain = {
       ...view.domain!,
+      ...(currentValuePromise ? {currentValuePresentation:await currentValuePromise} : {}),
       planning: { targets, contribution: { ...contribution, selectionRows } },
     };
     if (heatmapPromise) view.domain.heatmap = await heatmapPromise;

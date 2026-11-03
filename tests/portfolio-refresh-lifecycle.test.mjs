@@ -139,6 +139,7 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     react: {
       useCallback: callback => callback,
       useEffect: callback => { effects.push(callback); },
+      useRef: initial => ({ current: initial }),
       useState: initial => [initial, value => { states.push(value); }],
       useTransition: () => [false, callback => callback()],
     },
@@ -159,11 +160,11 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
       let active = true;
       const unmount = () => { if (!active) return; active = false; cleanups.forEach(cleanup => cleanup()); activeMounts.delete(unmount); };
       activeMounts.add(unmount);
-      return { click: () => button.props.onClick(), unmount };
+      return { click: () => button.props.children[0].props.onClick(), unmount };
     },
-    mountPolling(keepCheckingHistory = false) {
+    mountPolling(keepCheckingHistory = false, startedAt, onProgress) {
       const effectStart = effects.length;
-      polling.useMarketCollectionPolling(true, undefined, keepCheckingHistory);
+      polling.useMarketCollectionPolling(true, undefined, keepCheckingHistory, startedAt, onProgress);
       const cleanups = effects.slice(effectStart).map(effect => effect()).filter(cleanup => typeof cleanup === "function");
       let active = true;
       const unmount = () => { if (!active) return; active = false; cleanups.forEach(cleanup => cleanup()); activeMounts.delete(unmount); };
@@ -172,8 +173,9 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     },
     runMountTimer() { for (const [id, { callback, delay }] of [...timeouts]) { assert.equal(delay, 0); timeouts.delete(id); callback(); } },
     runInterval() { for (const { callback, delay } of [...intervals.values()]) { assert.equal(delay, WINDOW_MS); callback(); } },
-    async runPollingInterval() { for (const { callback, delay } of [...intervals.values()]) { assert.equal(delay, 10_000); await callback(); } },
+    async runPollingInterval() { await Promise.all([...intervals.values()].map(({ callback, delay }) => { assert.equal(delay, 10_000); return callback(); })); },
     advanceBucket() { now += WINDOW_MS; },
+    get now() { return new Date(now).toISOString(); },
     setVisibility(value) { fakeDocument.visibilityState = value; },
     visibilityChange() { for (const callback of [...documentListeners.get("visibilitychange") ?? []]) callback(); },
     focus() { for (const callback of [...windowListeners.get("focus") ?? []]) callback(); },
@@ -184,6 +186,66 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
+
+function rerenderHooks() {
+  const cells = []; let cursor = 0;
+  const same = (left, right) => left?.length === right?.length && left.every((value, index) => Object.is(value, right[index]));
+  return {
+    begin() { cursor = 0; },
+    commit() { for (const cell of cells) if (cell.pending) { cell.cleanup?.(); cell.cleanup = cell.pending(); cell.pending = null; } },
+    unmount() { for (const cell of cells) cell.cleanup?.(); },
+    react: {
+      useState(initial) { const at = cursor++; cells[at] ??= { value: typeof initial === 'function' ? initial() : initial }; return [cells[at].value, next => { cells[at].value = typeof next === 'function' ? next(cells[at].value) : next; }]; },
+      useRef(initial) { const at = cursor++; cells[at] ??= { current: initial }; return cells[at]; },
+      useCallback(callback, deps) { const at = cursor++; if (!cells[at] || !same(cells[at].deps, deps)) cells[at] = { value: callback, deps }; return cells[at].value; },
+      useEffect(callback, deps) { const at = cursor++; const cell = cells[at] ??= {}; if (!same(cell.deps, deps)) { cell.pending = callback; cell.deps = deps; } },
+      useTransition: () => [false, callback => callback()],
+    },
+  };
+}
+
+it('a new queued operation never paints the previous completion before its effects or first poll', async test => {
+  const hooks = rerenderHooks(), intervals = new Map(), responses = []; let timerId = 0;
+  const start = '2026-11-03T01:00:00.000Z';
+  const descriptors = new Map(['window', 'document', 'fetch'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { setInterval(callback) { const id = ++timerId; intervals.set(id, callback); return id; }, clearInterval(id) { intervals.delete(id); } } });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { visibilityState: 'visible' } });
+  Object.defineProperty(globalThis, 'fetch', { configurable: true, value: async () => { assert.ok(responses.length); return { ok: true, json: async () => responses.shift() }; } });
+  test.mock.method(Date, 'now', () => Date.parse(start));
+  test.after(() => { hooks.unmount(); for (const [key, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; } });
+  const router = { refresh() {} };
+  const [component] = await importUiWithPorts(['src/components/home/portfolio-refresh-button.tsx'], {
+    react: hooks.react,
+    'next/navigation': { useRouter: () => router },
+    '@/components/i18n/locale-provider': { useI18n: () => ({ t: (_ko, en) => en }) },
+    '@/components/i18n/localized-text': { T: () => null },
+    '@/components/home/home-history-messages': { translateHomeHistory: value => value },
+    'lucide-react': { RefreshCw: () => null },
+  });
+  const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
+  const text = tree => tree == null ? '' : typeof tree !== 'object' ? String(tree) : Array.isArray(tree) ? tree.map(text).join('') : text(tree.props?.children);
+  const render = () => { hooks.begin(); return component.PortfolioRefreshButton({}); };
+  const progress = (state, completed, startedAt) => ({ state, startedAt, progress: { completed, total: 8, pending: 8 - completed, failed: 0, items: [] } });
+  let tree = render(); hooks.commit();
+  responses.push(progress('queued', 3, start)); tree.props.children[0].props.onClick(); await settle();
+  tree = render(); hooks.commit();
+  responses.push(progress('fresh', 8, start)); await Promise.all([...intervals.values()].map(callback => callback()));
+  tree = render(); hooks.commit();
+  assert.equal(tree.props.children[0].props.disabled, false);
+  assert.match(text(nodes(tree).find(node => node.type === 'summary')), /8\/8 checked · complete/);
+  // First retry deliberately reuses the same timestamp: generation alone must isolate it.
+  for (const startedAt of [start, '2026-11-03T01:00:01.000Z']) {
+    responses.push(progress('queued', 3, startedAt)); tree.props.children[0].props.onClick(); await settle();
+    tree = render();
+    assert.equal(tree.props.children[0].props.disabled, true, 'the first render of the new operation stays busy');
+    assert.match(text(nodes(tree).find(node => node.type === 'summary')), /3\/8 checked · in progress/);
+    assert.doesNotMatch(text(nodes(tree).find(node => node.type === 'summary')), /complete/);
+    hooks.commit();
+    responses.push(progress('fresh', 8, startedAt)); await Promise.all([...intervals.values()].map(callback => callback()));
+    tree = render(); hooks.commit();
+    assert.equal(tree.props.children[0].props.disabled, false);
+  }
+});
 
 describe("portfolio refresh lifecycle", () => {
   it("never starts collection on mount, time passing, focus, visibility or a route return", async test => {
@@ -201,6 +263,36 @@ describe("portfolio refresh lifecycle", () => {
     h.respond(0,'fresh');await settle();assert.ok(h.refreshCount>0);
     first.click();assert.equal(h.requests.length,2);h.respond(1,'queued');await settle();
     assert.equal(h.states.at(-1),'queued');
+  });
+
+  it("keeps a shared manual request for a remaining button and ignores the departed button's result", async test => {
+    const h = await refreshHarness(test, { autoRespond: false });
+    const first = h.mount(), second = h.mount();
+    first.click(); second.click(); first.unmount();
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.requests[0].options.signal.aborted, false);
+    h.respond(0, 'fresh'); await settle();
+    assert.equal(h.refreshCount, 1);
+  });
+
+  it("detaches the last button's request before a new screen can receive a previous owner's holdings", async test => {
+    const h = await refreshHarness(test, { autoRespond: false });
+    const first = h.mount(), second = h.mount();
+    first.click(); second.click(); first.unmount(); second.unmount();
+    assert.equal(h.requests[0].options.signal.aborted, true);
+    const next = h.mount(); next.click();
+    assert.equal(h.requests.length, 2);
+    const beforeLateResponse = h.states.length;
+    h.respond(0, { state: 'fresh', progress: { items: [{ label: 'OWNER_A_PRIVATE_HOLDING' }] } });
+    await settle();
+    assert.equal(h.states.length, beforeLateResponse, 'unmounted request callbacks cannot update state');
+    assert.equal(h.refreshCount, 0);
+    const companion = h.mount(); companion.click();
+    assert.equal(h.requests.length, 2, 'the previous finally cannot erase the new shared request');
+    h.respond(1, { state: 'fresh', progress: { items: [{ label: 'OWNER_B_HOLDING' }] } });
+    await settle();
+    assert.equal(h.states.some(value => JSON.stringify(value)?.includes('OWNER_A_PRIVATE_HOLDING')), false);
+    assert.equal(h.states.some(value => JSON.stringify(value)?.includes('OWNER_B_HOLDING')), true);
   });
 
   for (const state of ["synced", "partial", "fresh", "empty", "cooldown"]) {
@@ -243,6 +335,44 @@ describe("portfolio refresh lifecycle", () => {
 });
 
 describe("market collection quote and history polling", () => {
+  for (const useStartedAt of [false, true]) it(`detaches ${useStartedAt ? 'operation' : 'history'} polling after its last subscriber and ignores old receipts`, async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), receipts = [];
+    const startedAt = useStartedAt ? h.now : undefined;
+    const first = h.mountPolling(false, startedAt, value => receipts.push(['old', value]));
+    const second = h.mountPolling(false, startedAt, value => receipts.push(['old', value]));
+    h.runMountTimer();
+    const oldTick = h.runPollingInterval();
+    assert.equal(h.requests.length, 1, 'simultaneous mounted subscribers share one poll');
+    first.unmount(); assert.equal(h.requests[0].options.signal.aborted, false);
+    second.unmount(); assert.equal(h.requests[0].options.signal.aborted, true);
+    h.mountPolling(false, startedAt, value => receipts.push(['new', value])); h.runMountTimer();
+    const nextTick = h.runPollingInterval();
+    assert.equal(h.requests.length, 2);
+    h.respond(0, { state: 'fresh', progress: { items: [{ label: 'OWNER_A_PRIVATE_HOLDING' }] } });
+    await oldTick;
+    assert.deepEqual(receipts, []);
+    assert.equal(h.refreshCount, 0);
+    h.mountPolling(false, startedAt, value => receipts.push(['new', value])); h.runMountTimer();
+    const companionTick = h.runPollingInterval();
+    assert.equal(h.requests.length, 2, 'the old finally cannot erase the new poll');
+    h.respond(1, { state: 'fresh', progress: { items: [{ label: 'OWNER_B_HOLDING' }] } });
+    await Promise.all([nextTick, companionTick]);
+    assert.equal(receipts.length, 2);
+    assert.ok(receipts.every(([screen, value]) => screen === 'new' && value.progress.items[0].label === 'OWNER_B_HOLDING'));
+  });
+
+  it("continues a manually started queue beyond two minutes without another manual admission", async test => {
+    const h=await refreshHarness(test,{autoRespond:false}); h.mountPolling(false,h.now);h.runMountTimer();
+    for(let index=0;index<15;index++) {const tick=h.runPollingInterval();h.respond(index,{state:index===14?'fresh':'queued',readVersion:String(index)});await tick;}
+    assert.equal(h.requests.length,15);assert.equal(h.states.at(-1).state,'fresh');assert.equal(h.intervals.size,0);
+    assert.ok(h.requests.every(row=>{const body=JSON.parse(row.options.body);return body.reason==='poll'&&body.startedAt===h.now;}));
+  });
+  it("pauses invisible work and reports a bounded incomplete timeout rather than completion",async test=>{
+    const h=await refreshHarness(test,{responseState:'queued'});h.mountPolling(false,h.now);h.runMountTimer();
+    h.setVisibility('hidden');await h.runPollingInterval();assert.equal(h.requests.length,0);h.setVisibility('visible');
+    for(let count=0;count<180;count++)await h.runPollingInterval();
+    assert.equal(h.requests.length,180);assert.equal(h.states.at(-1).state,'waiting');assert.equal(h.intervals.size,0);
+  });
   it("refreshes changed prices and FX even when ready instrument counts stay the same", async test => {
     const h = await refreshHarness(test, { autoRespond: false });
     h.mountPolling(); h.runMountTimer();
@@ -259,7 +389,7 @@ describe("market collection quote and history polling", () => {
     h.runMountTimer();
     for (let check = 0; check < 12; check++) await h.runPollingInterval();
     assert.equal(h.requests.length, 12);
-    assert.equal(h.states.at(-1), "fresh", "history polling cannot turn confirmed fresh quotes into waiting quotes");
+    assert.equal(h.states.at(-1).state, "fresh", "history polling cannot turn confirmed fresh quotes into waiting quotes");
     assert.equal(h.refreshCount, 5, "pending history still receives its periodic and final Server Component refreshes");
     assert.equal(h.intervals.size, 0, "history polling remains bounded");
     assert.deepEqual(JSON.parse(h.requests[0].options.body), { reason: "poll" });
@@ -270,7 +400,7 @@ describe("market collection quote and history polling", () => {
     h.mountPolling();
     h.runMountTimer();
     for (let check = 0; check < 12; check++) await h.runPollingInterval();
-    assert.equal(h.states.at(-1), "fresh");
+    assert.equal(h.states.at(-1).state, "fresh");
     assert.equal(h.refreshCount, 1);
     assert.equal(h.intervals.size, 0);
   });
@@ -283,7 +413,7 @@ describe("market collection quote and history polling", () => {
       h.respond(index, {state:index === 11 ? terminal : "queued", readVersion:String(index)});
       await tick;
     }
-    assert.equal(h.states.at(-1), terminal);
+    assert.equal(h.states.at(-1).state, terminal);
     assert.equal(h.intervals.size, 0);
   });
 
@@ -292,9 +422,9 @@ describe("market collection quote and history polling", () => {
     h.mountPolling(true);
     h.runMountTimer();
     for (let check = 0; check < 11; check++) await h.runPollingInterval();
-    assert.equal(h.states.at(-1), "queued");
+    assert.equal(h.states.at(-1).state, "queued");
     await h.runPollingInterval();
-    assert.equal(h.states.at(-1), "waiting");
+    assert.equal(h.states.at(-1).state, "waiting");
     assert.equal(h.refreshCount, 5);
     assert.equal(h.intervals.size, 0);
   });

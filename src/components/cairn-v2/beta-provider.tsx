@@ -17,6 +17,10 @@ export function useBetaExistingCrudAvailable() { return useContext(BetaExistingC
 type ReadFreshness = { epoch: number; store: ReturnType<typeof createBetaReadFreshness>; observed: (receipt?: string, readEpoch?: string, displayBinding?: string) => void };
 const BetaReadFreshness = createContext<ReadFreshness | null>(null);
 const domainRoots = () => document.querySelectorAll<HTMLElement>('[data-beta-root][data-read-mode="domain"]');
+const isDomainLocation = () => {
+  const url = new URL(window.location.href);
+  return (url.pathname === "/beta" || url.pathname.startsWith("/beta/")) && url.searchParams.get("mode") === "domain";
+};
 function maskDomainRoots(masked: boolean) {
   const roots = masked ? domainRoots() : document.querySelectorAll<HTMLElement>("[data-beta-freshness-mask]");
   roots.forEach(root => {
@@ -48,11 +52,13 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
     let refreshTimer: number | undefined;
     const recheck = () => {
       checkGeneration++;
-      accessPending.current = false;
-      if (!domainRoots().length) return;
+      if (!isDomainLocation()) return;
       maskDomainRoots(true);
       const readEpoch = crypto.randomUUID();
+      // A loading fallback may temporarily remove every financial root. Still
+      // bar cached reads now, before the next financial view can commit.
       store.begin(readEpoch);
+      accessPending.current = false;
       setEpoch(value => value + 1);
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
       // Let Next finish its popstate restoration before replacing that restored URL with a fresh read request.
@@ -67,7 +73,7 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
     };
     const resume = async () => {
       const displayBinding = committedBinding.current;
-      if (!displayBinding) { recheck(); return; }
+      if (!displayBinding || !domainRoots().length) { recheck(); return; }
       const generation = ++checkGeneration;
       const href = window.location.href;
       const roots = [...domainRoots()];
@@ -75,7 +81,10 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
       try {
         const response = await fetch("/api/portfolio/read-session", { cache: "no-store", credentials: "same-origin", signal: AbortSignal.timeout(10_000) });
         const result = response.ok ? await response.json() : null;
-        if (generation !== checkGeneration || document.visibilityState !== "visible" || window.location.href !== href || roots.some(root => !root.isConnected) || roots.length !== domainRoots().length) return;
+        if (generation !== checkGeneration || document.visibilityState !== "visible") return;
+        // Navigation can finish while the session request is pending. Its old
+        // result cannot unmask the new view; require a new owned server read.
+        if (window.location.href !== href || roots.some(root => !root.isConnected) || roots.length !== domainRoots().length) { recheck(); return; }
         if (read !== committedRead.current || displayBinding !== committedBinding.current) { recheck(); return; }
         if (result?.binding === displayBinding) { accessPending.current = false; maskDomainRoots(false); }
         // Reload all server layouts after an ownership/role change. The marker
@@ -83,10 +92,10 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
         else if (response.ok) window.location.reload();
         else recheck();
       } catch {
-        if (generation === checkGeneration && document.visibilityState === "visible" && window.location.href === href) recheck();
+        if (generation === checkGeneration && document.visibilityState === "visible") recheck();
       }
     };
-    const suspend = () => { checkGeneration++; if (domainRoots().length) { suspended = true; accessPending.current = true; maskDomainRoots(true); } };
+    const suspend = () => { checkGeneration++; if (domainRoots().length || isDomainLocation()) { suspended = true; accessPending.current = true; maskDomainRoots(true); } };
     const visible = () => { if (document.visibilityState === "hidden") suspend(); else if (suspended) { suspended = false; void resume(); } };
     const focus = () => { if (suspended && document.visibilityState === "visible") { suspended = false; void resume(); } };
     const restored = (event: PageTransitionEvent) => { if (event.persisted) { suspended = false; recheck(); } };

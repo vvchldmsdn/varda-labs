@@ -514,4 +514,6 @@
 
 /* Chart dialogs reserve their first viewport for the visual. */
 .detailContent[data-detail-kind="structure"] > [data-cairn-detail-header],
+.detailContent[data-detail-kind="value"] > [data-cairn-detail-header],
+.detailContent[data-detail-kind="heatmap"] > [data-cairn-detail-header],
 .detailContent[data-detail-kind="history"] > [data-cairn-detail-header] {margin-bottom:12px;}

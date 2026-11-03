@@ -1,4 +1,5 @@
 import "./import-ports-isolation.test.mjs";
+import "./interaction-recovery.test.mjs";
 import "./ui-context-convergence.test.mjs";
 import "./native-holding-cost-read.test.mjs";
 import "./holdings-revision-rebuild.test.mjs";
@@ -434,3 +435,6 @@ import "./instrument-display.test.mjs";
 import "./manual-native-quotes.test.mjs";
 
 import './display-session.test.mjs';
+import './quote-refresh-progress.test.mjs';
+import './navigation-context-recovery.test.mjs';
+import './beta-original-current-value.test.mjs';

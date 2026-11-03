@@ -1,4 +1,6 @@
 import type {Metadata} from 'next';
+import {Suspense} from 'react';
+import BetaLoading from './loading';
 import {requireBetaFixtureAccess,betaUsesSharedService} from '@/lib/cairn-v2/server-access';
 import {betaAccountManagementAvailable} from '@/lib/cairn-v2/server-management-access';
 import {resolveCurrentTenantContext} from '@/lib/auth/current-tenant-context';
@@ -6,7 +8,10 @@ import {PortfolioReadAccessBoundary} from '@/components/portfolio-read-access-bo
 import {BetaProvider} from '@/components/cairn-v2/beta-provider';
 export const dynamic='force-dynamic';
 export const metadata:Metadata={title:'Cairn Labs · 개발용 베타',robots:{index:false,follow:false}};
-export default async function BetaLayout({children}:{children:React.ReactNode}){
+export default function BetaLayout({children}:{children:React.ReactNode}){
+ return <Suspense fallback={<BetaLoading />}><AuthorizedBetaLayout>{children}</AuthorizedBetaLayout></Suspense>;
+}
+async function AuthorizedBetaLayout({children}:{children:React.ReactNode}){
  await requireBetaFixtureAccess();
  if(await betaUsesSharedService()){
   const resolution=await resolveCurrentTenantContext();

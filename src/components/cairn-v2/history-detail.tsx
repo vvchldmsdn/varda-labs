@@ -68,8 +68,8 @@ export function HistoryDetail({
   const returnHref = selectedDate && !isCurrent ? historyReturnHref(context, selectedDate, freshness?.store.pendingEpoch(), new URLSearchParams({
     _historyDate:selectedDate,_historyPeriod:period,_historyMetric:metric,_historyScope:context.scope,_historyCurrency:context.currency,_historyReturn:"origin",
   })) : historyDisplayReturnHref(context, {period,metric}, freshness?.store.pendingEpoch());
-  const recoveryNotice = context.mode === "domain" && historyState !== "loading" && historyState !== "unauthorized" && recoveryKind && (recoveryKind === "retry" || managementAvailable)
-    ? <RecoveryNotice kind={recoveryKind} scope={context.scope} beta returnHref={returnHref} /> : null;
+  const recoveryNotice = (presentation: "inline" | "blocking") => context.mode === "domain" && historyState !== "loading" && historyState !== "unauthorized" && recoveryKind && (recoveryKind === "retry" || managementAvailable)
+    ? <RecoveryNotice presentation={presentation} kind={recoveryKind} scope={context.scope} beta returnHref={returnHref} /> : null;
   const sourceControl =
     historySource.options.length > 1 ? (
       <CairnSelect
@@ -82,14 +82,22 @@ export function HistoryDetail({
     ) : (
       <p className={styles.sourceLabel}>{view.domain ? "저장된 관측 이력" : "가상 데이터"}</p>
     );
+  const periodControls = <ChoiceGroup appearance="segmented" label="히스토리 기간">
+    {(["1M", "3M", "6M", "ALL"] as const).map((option) => (
+      <CairnButton variant="selection" key={option} type="button" aria-pressed={option === period} onClick={() => setPeriod(option)}>
+        {{"1M":"1개월","3M":"3개월","6M":"6개월","ALL":"전체"}[option]}
+      </CairnButton>
+    ))}
+  </ChoiceGroup>;
   if (stateText && !timeline.length)
     return (
       <div className={styles.surface}>
-        {sourceControl}
+        <div className={styles.toolbar}>{sourceControl}<MetricControls /></div>
         <CairnStatus as="p" className={styles.empty} role="status">
           {stateText}
         </CairnStatus>
-        {recoveryNotice}
+        {periodControls}
+        {recoveryNotice("blocking")}
       </div>
     );
   const unit = context.currency === "KRW" ? "원" : "USD";
@@ -124,7 +132,6 @@ export function HistoryDetail({
   const sourceKinds = [...new Set(families)];
   return (
     <div className={styles.surface}>
-      {recoveryNotice}
       <div className={styles.toolbar}>
         {sourceControl}
         <div className={styles.toolbarActions}>
@@ -180,18 +187,7 @@ export function HistoryDetail({
 
           </div>
           <HistoryChart view={view} />
-          <ChoiceGroup appearance="segmented" label="히스토리 기간">
-            {(["1M", "3M", "6M", "ALL"] as const).map((option) => (
-              <CairnButton variant="selection"
-                key={option}
-                type="button"
-                aria-pressed={option === period}
-                onClick={() => setPeriod(option)}
-              >
-                {{"1M":"1개월","3M":"3개월","6M":"6개월","ALL":"전체"}[option]}
-              </CairnButton>
-            ))}
-          </ChoiceGroup>
+          {periodControls}
           {view.domain && sourceKinds.length > 1 && (
             <div
               className={styles.sourceTrack}
@@ -250,6 +246,7 @@ export function HistoryDetail({
             <span>{rows.length}개 관측점 · 달력 기간</span>
           </p>
       </div>
+      {recoveryNotice(selectedValue == null ? "blocking" : "inline")}
       <footer className={styles.footer}>
         <ActionGroup label="선택 날짜 더 살펴보기" className={styles.links}>
           {view.domain && selectedDate && (

@@ -25,6 +25,11 @@ export function ContributionHome({ view, dirty = false }: { view: BetaView; dirt
       amount: result.residualCashKrw,
       color: "#dedfd8",
     });
+  if (!result) return <p className={home.pending} role="status" data-contribution-state={dirty ? 'edited' : read?.state ?? view.domain?.state}>
+    {dirty ? '변경한 금액으로 계산해 주세요' : read?.state === 'blocked' || read?.state === 'unavailable'
+      ? <RecoveryTitle reasons={read.blockers} kind={read.state === 'unavailable' ? 'retry' : undefined} />
+      : read?.message ?? '계산할 금액을 확인해 주세요'}
+  </p>;
   return (
     <div
       className={home.surface}
@@ -33,28 +38,15 @@ export function ContributionHome({ view, dirty = false }: { view: BetaView; dirt
       <div className={home.headline}>
         <div
           className={home.amount}
-          data-large={!!result && result.cashAmountKrw >= 1e9}
-          title={result ? eventNumber(result.cashAmountKrw) + " KRW" : undefined}
+          data-large={result.cashAmountKrw >= 1e9}
+          title={eventNumber(result.cashAmountKrw) + " KRW"}
         >
-          <span>
-            {result
-              ? (result.cashAmountKrw / 10000).toLocaleString("ko-KR", { maximumFractionDigits: 4 })
-              : "—"}
-          </span>
-          {result && <small>만원</small>}
+          <span>{(result.cashAmountKrw / 10000).toLocaleString("ko-KR", { maximumFractionDigits: 4 })}</span>
+          <small>만원</small>
         </div>
-        <p className={home.caption}>
-          {result
-            ? "신규 투자금 · KRW"
-            : dirty
-              ? "입력 변경 · 계산 대기"
-              : read?.state === "blocked" || read?.state === "unavailable"
-                ? <RecoveryTitle reasons={read.blockers} kind={read.state === "unavailable" ? "retry" : undefined} />
-                : (read?.message ?? "계산 대기")}
-        </p>
+        <p className={home.caption}>신규 투자금 · KRW</p>
       </div>
-      {result && (
-        <>
+      <>
           <dl className={home.summary}>
             <div>
               <dt>총 매수 배분</dt>
@@ -106,8 +98,7 @@ export function ContributionHome({ view, dirty = false }: { view: BetaView; dirt
               <span>총 재원 {eventNumber(result.totalAvailableFundsKrw)}원</span>
             </p>
           )}
-        </>
-      )}
+      </>
     </div>
   );
 }

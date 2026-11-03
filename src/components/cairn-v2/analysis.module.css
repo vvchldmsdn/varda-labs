@@ -2,6 +2,7 @@
 .workspace h2{font-size:28px;font-weight:500;margin:8px 0 14px}
 .heading{margin-bottom:18px}.intro,.workspace p,.workspace dt,.workspace small{font-size:14px;color:var(--cairn-v2-muted);line-height:1.65}
 .readState{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.readState p{margin:0}.readState[data-read-state=unavailable],.readState[data-read-state=partial]{margin-bottom:20px}
+.readState:empty{margin-bottom:0}
 .readState button,.toolbar button,.mobileNav button,.toolbar select{font:inherit;min-height:44px;color:inherit;cursor:pointer;background:transparent;border:0;border-radius:0;padding:8px 10px}
 .readState button{padding-inline:0;border-bottom:1px solid var(--cairn-v2-line);font-size:13px}
 .workspace :is(button,select,summary):focus-visible{outline:2px solid var(--cairn-v2-brand);outline-offset:3px}

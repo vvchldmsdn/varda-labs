@@ -20,7 +20,7 @@
 .ribbon {min-width:0;margin:30px 0 24px;}
 .ribbon>span {flex-grow:0;flex-shrink:0;min-width:0;height:100%;}
 .explorer {display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,250px);gap:32px;align-items:start;}
-.tableScroll {min-width:0;max-height:340px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+.tableScroll {min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;}
 .tableScroll table {width:100%;border-collapse:collapse;text-align:left;min-width:430px;font-size:12px;}
 .tableScroll th,.tableScroll td {padding:11px 10px;border-bottom:1px solid var(--cairn-v2-line);vertical-align:middle;}
 .tableScroll thead th {position:sticky;top:0;z-index:1;background:var(--cairn-v2-paper);padding-top:0;font-size:10px;font-weight:400;color:var(--cairn-v2-muted);white-space:nowrap;}
@@ -62,10 +62,10 @@
 .empty {padding:60px 0;color:var(--cairn-v2-muted);}
 .detail :is(button,a,summary):focus-visible,.tableScroll:focus-visible {outline:2px solid var(--cairn-v2-brand);outline-offset:4px;}
 @media(max-width:1000px) {.explorer {grid-template-columns:minmax(0,1fr) 210px;gap:24px;}.hero {gap:24px;}.metrics {gap:22px;}.holdingButton strong {max-width:190px;}}
-@media(max-width:760px) {.detail {gap:24px;padding-top:22px;}.hero {grid-template-columns:1fr;gap:24px;}.amount {font-size:clamp(34px,8vw,52px);}.metrics {gap:40px;}.metrics dd {font-size:25px;}.explorer {grid-template-columns:1fr;gap:25px;}.tableScroll {max-height:310px;}.selection {padding-top:0;}.selection h3 {font-size:22px;}.facts {grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 22px;}.facts>div {display:block;}.facts dd {text-align:left;margin-top:7px;}.facts .timestamp {grid-column:1/-1;}.sectionHeader {align-items:start;}.sectionHeader>span {text-align:right;}.evidenceFacts>div {grid-template-columns:1fr;gap:5px;}.ribbon {height:25px;margin-top:15px;}.holdingButton strong {max-width:180px;}}
+@media(max-width:760px) {.detail {gap:20px;padding-top:4px;}.hero {grid-template-columns:1fr;gap:24px;}.amount {font-size:clamp(34px,8vw,52px);}.metrics {gap:40px;}.metrics dd {font-size:25px;}.explorer {grid-template-columns:1fr;gap:25px;}.selection {padding-top:0;}.selection h3 {font-size:22px;}.facts {grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 22px;}.facts>div {display:block;}.facts dd {text-align:left;margin-top:7px;}.facts .timestamp {grid-column:1/-1;}.sectionHeader {align-items:start;}.sectionHeader>span {text-align:right;}.evidenceFacts>div {grid-template-columns:1fr;gap:5px;}.ribbon {height:25px;margin-top:15px;}.holdingButton strong {max-width:180px;}}
 
 @media(max-width:600px) {.tableScroll table {min-width:0;}.tableScroll th,.tableScroll td {padding-left:7px;padding-right:7px;}.holdingButton {gap:6px;}.holdingButton strong {max-width:106px;}.holdingButton small {max-width:106px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}}
-.costSection {display:grid;gap:18px;padding:24px;border:1px solid var(--cairn-v2-line);border-radius:18px;background:var(--cairn-v2-wash,#f0f1ec);}
+.costSection {display:grid;gap:18px;padding:24px 0;border-top:1px solid var(--cairn-v2-line);}
 .costNotice {font-size:12px;line-height:1.8;color:var(--cairn-v2-muted);max-width:720px;}
 .costEvidence {font-size:12px;border-top:1px solid var(--cairn-v2-line);padding-top:8px;}
 .costEvidence summary {display:flex;align-items:center;min-height:44px;cursor:pointer;}
@@ -76,4 +76,4 @@
 .costEvidence li strong {font-weight:500;}
 .costEvidence li small {display:block;color:var(--cairn-v2-muted);font-size:10px;margin-top:3px;}
 .costEvidence li>span:last-child {color:var(--cairn-v2-muted);text-align:right;white-space:nowrap;}
-@media(max-width:600px) {.costSection {padding:18px 16px;}.investmentMetrics {grid-template-columns:1fr;gap:22px;}.costEvidence li {font-size:11px;}.costEvidence li>span:last-child {white-space:normal;}}
+@media(max-width:600px) {.costSection {padding:20px 0;}.investmentMetrics {grid-template-columns:1fr;gap:22px;}.costEvidence li {font-size:11px;}.costEvidence li>span:last-child {white-space:normal;}}

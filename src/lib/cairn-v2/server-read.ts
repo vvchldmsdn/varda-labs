@@ -1,4 +1,5 @@
 import "server-only";
+import { readOriginalCurrentValue } from "./server-current-value";
 import { readRecoveredReturnCurve } from "@/db/queries/period-return-recovery";
 import { loadNativeInvestmentBasis } from "@/db/queries/native-investment-basis";
 import { investmentHoldingReturn } from "./investment-return";
@@ -17,7 +18,7 @@ import { readBetaDomain } from "./read-service";
 import { displayBindingForScopes } from "./display-session";
 export async function getBetaDomainRead(
   params: Record<string, string | string[] | undefined>,
-  options: { includeHeatmap?: boolean } = {},
+  options: { includeHeatmap?: boolean; includeCurrentValue?: boolean } = {},
 ) {
   let displayBinding: string | undefined;
   const read = await readBetaDomain(params, {
@@ -71,6 +72,7 @@ export async function getBetaDomainRead(
       return { ...history, recoveredReturn };
     },
     ...(options.includeHeatmap ? { heatmap: getBetaHeatmapRead } : {}),
+    ...(options.includeCurrentValue ? { currentValue: readOriginalCurrentValue } : {}),
   });
   return {
     ...read,

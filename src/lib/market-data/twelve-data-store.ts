@@ -16,7 +16,7 @@ export type TwelveDataHistoricalFxEvidence = { status: "disabled" | "missing" | 
 export type ProviderStoredAction = { type: "split" | "dividend"; date: string; fromFactor: string | null; toFactor: string | null; cashAmount: string | null; currency: "USD" | null; fetchedAt: string; source: "twelve_data" };
 export type TwelveDataSplitRiskQuery = { target: PriceLookupTarget; startDate: string; endDate: string; asOf: string };
 export type TwelveDataSplitRisk = { status: "disabled" | "unknown" | "provisional" | "admitted" | "conflict"; actions: ProviderStoredAction[]; refreshDue?: boolean };
-export type TwelveDataEvidence = { status: "disabled" | "missing" | "stale" | "conflict" | "admitted"; prices: ProviderStoredPrice[]; fx: (ProviderStoredFx | ProviderStoredHistoricalFx)[]; corporateActions: ProviderStoredAction[]; corporateActionCoverage: "unknown" | "complete"; analysisEligible: boolean; analysisReason?: "corporate_actions_unknown" | "corporate_action_adjustment_required"; refreshDue: boolean };
+export type TwelveDataEvidence = { status: "disabled" | "missing" | "stale" | "conflict" | "admitted"; prices: ProviderStoredPrice[]; fx: (ProviderStoredFx | ProviderStoredHistoricalFx)[]; corporateActions: ProviderStoredAction[]; corporateActionCoverage: "unknown" | "complete"; analysisEligible: boolean; analysisReason?: "corporate_actions_unknown" | "corporate_action_adjustment_required"; refreshDue: boolean; checkedAt?: string };
 const datasets = { live: "us_quote", history: "us_daily_raw", fx: "usd_krw" } as const;
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const instant = (value: unknown) => value instanceof Date ? value : new Date(String(value));
@@ -139,7 +139,9 @@ export async function queryTwelveDataEvidence(query: TwelveDataEvidenceQuery, co
   else result.prices = rows.map(row => ({ instrumentKey: String(row.instrument_key), ticker: String(row.ticker), micCode: String(row.mic_code), exchange: String(row.exchange),
     value: String(row.value), currency: "USD", observedAt: row.observed_at ? iso(row.observed_at) : null, exchangeDate: row.exchange_day == null ? null : String(row.exchange_day),
     fetchedAt: iso(row.fetched_at), source: "twelve_data", basis: "raw", session: "regular" }));
-  if (query.kind !== "history") return result;
+  // Refresh receipts use the latest check time, separately from first-known
+  // evidence and the market observation time. Financial admission is unchanged.
+  if (query.kind !== "history") return { ...result, checkedAt: iso(rows[0].last_fetched_at ?? rows[0].fetched_at) };
   const coverage: Record<string, unknown>[] = (await sqlClient.query(`select distinct on(action_type,start_date,end_date) *,start_date::text as start_day,end_date::text as end_day from market_provider_action_coverage where scope_key=$1 and identity_key=$2 and start_date<=$4::date and end_date>=$3::date
     and fetched_at<=$5::timestamptz and expires_at>clock_timestamp() order by action_type,start_date,end_date,fetched_at desc,coverage_key`, [scope(c), identity(listing), query.startDate!, query.endDate!, new Date(known).toISOString()])).map(row => ({...row,start_date:row.start_day,end_date:row.end_day}));
   const selectedByType = new Map((['split', 'dividend'] as const).map(type => [type, latestCoveragePerDay(coverage.filter(row => row.action_type === type), query.startDate!, query.endDate!)]));

@@ -15,13 +15,14 @@ async function fixture(options = {}) {
   const pending = new Map();
   const closeChecks = new Map();
   let leaseActive = false;
+  let activeJob = null;
   const tenantContext = { ownerUserId: owner };
-  const db = { select() {
+  const db = { select(fields) {
     let table;
     const builder = { from(value) { table = getTableName(value); return builder; }, where() { return builder; },
       orderBy() { return builder; }, limit() { return builder; }, then(resolve, reject) {
         events.push(`read:${table}`);
-        return Promise.resolve(table === "fx_rates" ? config.fx ? [config.fx] : [] : config.quotes).then(resolve, reject);
+        return Promise.resolve(table === "fx_rates" ? config.fx ? [config.fx] : [] : fields?.id ? config.quotes.filter(row=>row.ticker===activeJob?.ticker) : config.quotes).then(resolve, reject);
       } };
     return builder;
   } };
@@ -57,14 +58,17 @@ async function fixture(options = {}) {
       fetchKisUsdKrwFxCandidate: async input => { events.push("provider_fx"); assert.equal(input.target.ticker, "QQQ"); return {}; },
     },
     "@/lib/market-data/collection-queue": {
+      readCollectionProgress: async keys => keys.flatMap(key => config.queueStates?.filter(row=>row.key===key) ??
+        (pending.has(key) ? [{key,status:'pending',attempts:1,availableAt:null,completedAt:null,code:null}] :
+        outcomes.filter(row=>row.job.key===key).slice(-1).map(row=>({key,status:row.outcome.ok?'done':'failed',completedAt:row.completedAt,availableAt:null,attempts:1,code:null})))),
       enqueueMarketCollection: async jobs => { events.push("enqueue"); if (config.queueFailure) throw new Error(`private ${owner}`); queued.push(jobs); for (const job of normalizeCollectionJobs(jobs)) pending.set(job.key, { ...job, attempts: 1, claimToken: "test" }); return { queuedCount: jobs.length, retryAfterSeconds: 10 }; },
       maintainMarketCollection: async () => events.push("maintain"),
       hasReadyMarketCollection: async () => pending.size > 0,
-      claimMarketCollection: async () => { const job = pending.values().next().value; if (job) pending.delete(job.key); return job ?? null; },
-      finishMarketCollection: async (job, outcome) => outcomes.push({ job, outcome }),
+      claimMarketCollection: async () => { const job = pending.values().next().value; if (job) pending.delete(job.key); activeJob=job; return job ?? null; },
+      finishMarketCollection: async (job, outcome) => outcomes.push({ job, outcome, completedAt:new Date(Date.now()-1).toISOString() }),
       getMarketCollectionSummary: async () => ({ pending: pending.size }),
     },
-    "@/lib/market-data/manual-native-quotes": { manualNativeQuotes:async(targets,collect)=>{assert.deepEqual(targets,config.targets);events.push(collect?'native_manual':'native_read');return config.native??{available:false,pending:false,failed:false,version:'disabled'};} },
+    "@/lib/market-data/manual-native-quotes": { manualNativeQuotes:async(targets,collect)=>{assert.deepEqual(targets,config.targets);events.push(collect?'native_manual':'native_read');return config.native?{...config.native,items:[{id:'native:QQQ',label:'QQQ',provider:'Twelve Data',state:config.native.pending?'pending':config.native.failed?'failed':'ready',priceAsOf:null,checkedAt:null,retryAt:null}]}:{available:false,pending:false,failed:false,version:'disabled',items:[]};} },
     "@/lib/market-data/twelve-data-service": { resumeConfiguredTwelveDataService: async () => ({ status: "disabled", processed: 0, failed: 0 }) },
     "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async task => {
       if (leaseActive) return task();
@@ -72,7 +76,7 @@ async function fixture(options = {}) {
       try { return await task(); } finally { leaseActive = false; }
     } },
     "@/lib/market-data/provider-budget": { withKisCollectionDeadline: async task => { events.push("deadline"); return task(); } },
-    "@/lib/market-data/price-sync": { runMarketPriceSync: async input => { events.push("provider_live"); assert.equal(input.targetLimit, 1); assert.deepEqual(input.explicitTargets, [config.targets.find(owned => owned.ticker === input.explicitTargets[0]?.ticker)]); return { successCount: config.providerFailure ? 0 : 1, failedCount: config.providerFailure ? 1 : 0 }; } },
+    "@/lib/market-data/price-sync": { runMarketPriceSync: async input => { events.push("provider_live"); assert.equal(input.targetLimit, 1); assert.deepEqual(input.explicitTargets, [config.targets.find(owned => owned.ticker === input.explicitTargets[0]?.ticker)]); if(!config.providerFailure) config.quotes.push({...quote(),...input.explicitTargets[0]}); return { successCount: config.providerFailure ? 0 : 1, failedCount: config.providerFailure ? 1 : 0 }; } },
     "@/lib/market-data/kis-history-cache-sync": { runKisHistoryCacheSync: async () => { throw new Error("history is not authorized by this route"); } },
     "@/lib/market-data/asset-price-snapshot-repository": { applyAssetPriceSnapshotRows: async input => {
       events.push("write_close"); assert.equal(input.rows.length, 1); assert.equal(input.allowWrite, true); assert.equal(input.dryRun, false);
@@ -95,7 +99,7 @@ describe("tenant live-price enqueue and after boundary", () => {
     const first=await f.route.POST(request());assert.equal(first.status,202);assert.equal((await first.json()).state,'queued');
     assert.ok(f.events.includes('native_manual'));assert.equal(f.queued.length,0);
     f.config.native={available:true,pending:false,failed:false,version:'ready'};
-    const second=await f.route.POST(request({body:{reason:'poll'}}));assert.equal((await second.json()).state,'partial');
+    const second=await f.route.POST(request({body:{reason:'poll'}}));assert.equal((await second.json()).state,'fresh');
     assert.ok(f.events.includes('native_read'));
   });
   it('keeps successful native work visible when KIS admission fails',async()=>{
@@ -185,13 +189,15 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.ok(f.outcomes[0].outcome.retryAfterSeconds >= 15);
     assert.equal(f.events.includes("write_close"), false);
     assert.equal(f.pending.size, 1);
+      const next = await f.route.POST(request({body:{reason:'poll'}}));
+      assert.equal((await next.json()).state, 'queued', 'fresh live write cannot hide pending close revalidation');
   });
 
   it("polls an authorized owner's cached state without admitting another job or consuming an idle lease", async () => {
     const f = await fixture();
     const response = await f.route.POST(request({ body: { reason: "poll" } }));
-    assert.equal(response.status, 202);
-    assert.equal((await response.json()).state, "queued");
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).state, "partial", "missing evidence without admitted work is not a queued operation");
     assert.equal(f.queued.length, 0);
     assert.equal(f.callbacks.length, 1);
     await f.drain();
@@ -210,6 +216,26 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(f.events.filter(event => event === "deadline").length, 1);
     assert.equal(f.pending.size, 1);
     assert.equal(f.outcomes.length, 5);
+  });
+
+  it("one manual admission completes eight owned instruments across bounded worker wakes",async()=>{
+    const f=await fixture({targets:Array.from({length:8},(_,index)=>({...target,ticker:`Q${index}`}))});
+    const first=await (await f.route.POST(request())).json();assert.equal(first.state,'queued');
+    await f.drain();assert.equal(f.pending.size,3);
+    const middle=await (await f.route.POST(request({body:{reason:'poll',startedAt:first.startedAt}}))).json();
+    assert.equal(middle.state,'queued');assert.equal(middle.progress.items.filter(row=>row.state==='ready'&&row.label!=='USD/KRW').length,5);
+    await f.drain();const last=await (await f.route.POST(request({body:{reason:'poll',startedAt:first.startedAt}}))).json();
+    assert.equal(last.state,'fresh');assert.equal(last.progress.pending,0);assert.equal(last.progress.failed,0);
+    assert.equal(f.queued.length,1);assert.equal(f.events.filter(event=>event==='provider_live').length,8);
+  });
+
+  it("does not report completion while any authorized job is delayed or has exhausted retries",async()=>{
+    const key=normalizeCollectionJobs([{...target,kind:'live'}])[0].key;
+    const f=await fixture({queueStates:[{key,status:'pending',availableAt:new Date(Date.now()+60_000).toISOString(),attempts:2}]});
+    let data=await (await f.route.POST(request({body:{reason:'poll'}}))).json();
+    assert.equal(data.state,'queued');assert.equal(data.progress.items[0].state,'delayed');
+    f.config.queueStates[0].status='failed';data=await (await f.route.POST(request({body:{reason:'poll'}}))).json();
+    assert.equal(data.state,'partial');assert.equal(data.progress.failed,1);assert.equal(f.queued.length,0);
   });
 
   it("yields after one failed provider operation, leaving the FX lane for a later worker", async () => {
@@ -237,9 +263,11 @@ describe("tenant live-price enqueue and after boundary", () => {
     ["owner injection", { body: { reason: "manual", ownerUserId: "foreign" } }],
     ["ticker injection", { body: { reason: "manual", ticker: "FOREIGN" } }],
     ["non-json body", { headers: { "content-type": "text/plain" } }],
-    ["oversized body", { headers: { "content-length": "65" } }],
+    ["oversized body", { headers: { "content-length": "129" } }],
     ["invalid JSON", { body: "{" }],
     ["invalid reason", { body: { reason: "force_all" } }],
+    ["backdated operation", { body: { reason: "poll", startedAt:"2020-01-01T00:00:00.000Z" } }],
+    ["manual cutoff override", { body: { reason: "manual", startedAt:new Date().toISOString() } }],
   ]) it(`rejects ${label} before any authorization or queue work`, async () => {
     const f = await fixture();
     assert.equal((await f.route.POST(request(input))).status, 400);
@@ -266,12 +294,11 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(f.events.filter(event => event.startsWith("provider")).length, 0);
   });
 
-  for (const options of [{ configured: false }, { queueFailure: true }]) it("returns a safe 503 without claiming that failed admission was queued", async () => {
+  for (const options of [{ configured: false }, { queueFailure: true }]) it("returns per-target failure without claiming that failed admission was queued", async () => {
     const f = await fixture(options);
     const response = await f.route.POST(request());
-    assert.equal(response.status, 503);
-    assert.notEqual((await response.json()).state, "queued");
-    assert.equal(f.callbacks.length, 0);
+    assert.equal(response.status, 200);
+    const data=await response.json();assert.equal(data.state, "partial");assert.ok(data.progress.failed>0);
     assert.equal(f.events.includes("lease"), false);
   });
 });

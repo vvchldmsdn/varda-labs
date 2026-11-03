@@ -7,6 +7,23 @@ export type ClaimedCollectionJob = CollectionJob & { claimToken: string; attempt
 export type CollectionPartition = { provider: "kis"; rawCloses?: boolean; historyOnly?: boolean } | { provider: "twelve_data"; scopeHash: string };
 const KIS_PARTITION: CollectionPartition = { provider: "kis" };
 
+export type CollectionProgressRow = {
+  key: string; status: string; attempts: number; availableAt: string | null;
+  completedAt: string | null; code: string | null;
+};
+
+/** Internal read seam: keys must come from authenticated holdings and licensed
+ * server identities. Never expose global queue counts or client-supplied keys. */
+export async function readCollectionProgress(keys: readonly string[]): Promise<CollectionProgressRow[]> {
+  if (!keys.length) return [];
+  if (keys.length > 82 || keys.some(key => !/^(kis|twelve_data):[A-Za-z0-9:._-]+$/.test(key))) throw new Error("collection_identity_invalid");
+  const rows = await sqlClient.query(`select key,status,attempts,available_at,completed_at,last_code
+    from market_collection_jobs where key=any($1::text[])`, [[...new Set(keys)]]);
+  const iso = (value: unknown) => value == null ? null : new Date(String(value)).toISOString();
+  return rows.map(row => ({ key: String(row.key), status: String(row.status), attempts: Number(row.attempts),
+    availableAt: iso(row.available_at), completedAt: iso(row.completed_at), code: row.last_code == null ? null : String(row.last_code) }));
+}
+
 function partitionPrefix(partition: CollectionPartition) {
   if (partition.provider === "kis") return partition.rawCloses ? "kis:history:raw_close_v1:" : partition.historyOnly ? "kis:history:" : "kis:";
   if (partition.provider !== "twelve_data" || !/^[a-f0-9]{64}$/.test(partition.scopeHash)) throw new Error("collection_partition_invalid");

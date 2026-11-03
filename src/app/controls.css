@@ -26,6 +26,9 @@
 .cairn-timestamp details { margin-top:2px; }
 .cairn-timestamp details input { width:100%; }
 @media(max-width:480px){.cairn-timestamp > div{grid-template-columns:minmax(0,1fr)}.cairn-timestamp input{width:100%;min-width:0}}
+.cairn-timestamp[data-compact=true] > div {grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;margin-top:4px;}
+.cairn-timestamp[data-compact=true] > div > label > span {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+.cairn-timestamp[data-compact=true] input {min-width:0;width:100%;}
 .varda-reporting-control .cairn-currency-select { width:74px; }
 .varda-reporting-control .cairn-currency-select button { font-size:12px; padding-inline:8px; gap:4px; }
 @media (max-width:760px) { .cairn-form-select[class] { font-size:16px; } }

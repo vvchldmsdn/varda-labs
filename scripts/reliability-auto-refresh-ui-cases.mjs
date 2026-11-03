@@ -30,6 +30,7 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
       const page=await context.newPage(),requests=[];
       const result={name:`manual-refresh-${surface}-${viewport.width}`,status:'FAIL'};report.cases.push(result);
       try {
+        let queueComplete=false;
         await quote(200);
         await page.clock.install({time:new Date()});
         await page.route('**/api/portfolio/live-prices/sync',async route=>{
@@ -37,7 +38,7 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
           assert.equal(response.status(),200,'Actual authenticated read must succeed with fresh synthetic evidence');
           assert.match(body.readVersion,/^[a-f0-9]{64}$/);
           requests.push({reason:route.request().postDataJSON().reason,readVersion:body.readVersion});
-          await route.fulfill({response,status:202,json:{...body,state:'queued',freshTargetCount:1,targetCount:2}});
+          await route.fulfill({response,status:queueComplete?200:202,json:queueComplete?body:{...body,state:'queued',freshTargetCount:1,targetCount:2}});
         });
         const pathname=surface==='home'?'/':surface==='today'?'/today':'/beta';
         await page.goto(`${url}${pathname}?scope=account%3A${account}${surface==='beta'?'&mode=domain':''}`);
@@ -66,17 +67,25 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         await expectPrice(200);
         assert.equal(requests.length,0,'No page-view, interval or focus quote collection');
-        await page.getByRole('button',{name:/시세.*갱신|가격.*갱신|시세 새로고침|Refresh prices/}).first().click();
+        const refresh=page.getByRole('button',{name:/시세.*갱신|가격.*갱신|시세 새로고침|Refresh prices/}).first();
+        await refresh.click();
         await expect.poll(()=>requests.length).toBeGreaterThan(0);
         await page.screenshot({path:path.join(output,`auto-${surface}-${viewport.width}-before.png`),fullPage:true});
         // First receipt always refreshes; second catches equal-count price changes.
         await quote(210);await page.clock.runFor(10000);await expectPrice(210);
         await quote(220);await page.clock.runFor(10000);await expectPrice(220);
-        // Finish bounded completion checks, then route away and back without a new request.
+        // Slow queues must survive the old 12-check cutoff. Keep the operation
+        // active until a terminal receipt, then navigation/focus must stay idle.
         for(let tick=0;tick<10;tick++) {
           const before=requests.length;await page.clock.runFor(10000);
           await expect.poll(()=>requests.length).toBe(before+1);
         }
+        await expect(refresh).toBeDisabled();
+        const beforeCompletion=requests.length;
+        queueComplete=true;
+        await page.clock.runFor(10000);
+        await expect.poll(()=>requests.length).toBe(beforeCompletion+1);
+        await expect(refresh).toBeEnabled();
         const finished=requests.length;await page.clock.runFor(360000);assert.equal(requests.length,finished);
         await page.goto(`${url}/portfolio/structure?scope=account%3A${account}`);
         const onReturn=requests.length;await page.goBack();await expectPrice(220);

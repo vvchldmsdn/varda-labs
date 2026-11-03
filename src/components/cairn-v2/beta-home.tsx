@@ -2,7 +2,8 @@
 
 import { instrumentLabel } from "@/lib/instrument-display";
 import { Button as CairnButton, Status as CairnStatus, ActionGroup, ActionContent } from "@/components/cairn-ui";
-import { Grid2X2, ChartNoAxesCombined } from 'lucide-react';
+import { ChartNoAxesCombined } from 'lucide-react';
+import { HoldingHeatmap } from './holding-heatmap';
 
 import { HomeSimulation, HomeSimulationPending } from "./home-simulation";
 import type { SimulationRead } from "@/lib/cairn-v2/simulation-contract";
@@ -16,6 +17,7 @@ import { MetricControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
+import { originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
 import { useBetaView } from "./use-beta-view";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { BetaShell } from "./beta-shell";
@@ -45,6 +47,7 @@ export function BetaHome({
 }) {
   const [context, setContext] = useBetaContext(initialContext);
   const view = useBetaView(context, read);
+  const originalValue = view.domain?.currentValuePresentation ? originalCurrentValueSummary(view.domain.currentValuePresentation,context.currency) : null;
   const displayMoney = (value: number | null, currency: BetaContext["currency"], signed = false) =>
     displayReadMoney(view, value, currency, signed);
   const { selected, setSelected } = useBetaPreferences();
@@ -70,6 +73,9 @@ export function BetaHome({
   const contributionTotal = view.contribution.length
     ? view.contribution.reduce((sum, r) => sum + r.amountKrw, 0)
     : null;
+  const contributionReady = view.domain
+    ? !contributionDirty && view.domain.planning?.contribution?.state === 'ready'
+    : contributionTotal !== null;
   return (
     <BetaShell context={context} setContext={setContext} readView={view}>
       <div className={home.dashboard}>
@@ -81,11 +87,14 @@ export function BetaHome({
                 context.fixture === "large" || (view.totalKrw !== null && view.totalKrw >= 1e11)
               }
             >
-              <span>{displayMoney(view.rows.length ? view.totalKrw : null, context.currency)}</span>
+              <span>{originalValue ? originalValue.amount === null ? "—" : Number(originalValue.amount).toLocaleString("ko-KR",{maximumFractionDigits:context.currency === "USD" ? 2 : 0}) : displayMoney(view.rows.length ? view.totalKrw : null, context.currency)}</span>
               <small>{unit}</small>
             </div>
             <p className={styles.cardFootnote}>
-              {view.domain
+              {originalValue ? originalValue.coverage
+                ? `${originalValue.complete ? "투자자산 평가" : "확인 가능한 소계"} · ${originalValue.coverage.valued}/${originalValue.coverage.positions}종목 · 제외 ${originalValue.coverage.excludedPositions}종목`
+                : originalValue.amount === null ? "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : "투자자산 · 갱신 " + originalValue.asOf
+                : view.domain
                 ? (readStateText(view.domain.valueState, "보유 자산 없음") ??
                   (view.domain.valueState === "partial"
                     ? "전체 합계 확인 전"
@@ -105,7 +114,7 @@ export function BetaHome({
           <Card onOpen={open} kind="today">
             <HomeToday view={view} currency={context.currency} />
           </Card>
-          <Card onOpen={open} kind="contribution">
+          <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
             {view.domain ? (
               <ContributionHome view={view} dirty={contributionDirty} />
             ) : (
@@ -193,11 +202,13 @@ export function BetaHome({
             )}
           </Card>
 
+          <Card onOpen={open} kind="heatmap" minimal className={home.heatmap}>
+            <HoldingHeatmap view={view} compact />
+          </Card>
       </div>
       {view.rows.length > 0 && <section className={home.explore} aria-label="포트폴리오 더 살펴보기">
         <h2>내 자산, 다른 관점으로</h2>
         <ActionGroup label="포트폴리오 탐색">
-          <CairnButton variant="bare" type="button" data-beta-card="heatmap" onClick={event => open('heatmap', event.currentTarget)}><ActionContent icon={<Grid2X2 />} title="종목별 흐름 보기" description="어떤 종목이 함께 움직였을까요?" /></CairnButton>
           <CairnButton variant="bare" type="button" data-beta-card="simulation" onClick={event => open('simulation', event.currentTarget)}><ActionContent icon={<ChartNoAxesCombined />} title="시뮬레이션 살펴보기" description="현재 보유로 가능한 경로를 비교해요" /></CairnButton>
         </ActionGroup>
       </section>}

@@ -1,4 +1,4 @@
-import { InvestmentLabDateInputs } from "./investment-lab-date-inputs";
+import { InvestmentLabDateInputs, InvestmentLabPeriodForm } from "./investment-lab-date-inputs";
 import { LabText } from "./lab-text";
 import { InvestmentLabDialog } from "./investment-lab-dialog";
 import {
@@ -15,7 +15,7 @@ import {
   type PortfolioAnalysisScopeKey,
   type PortfolioAnalysisScopeQuery,
 } from "@/lib/portfolio-analysis-scope";
-import { Button as CairnButton, Form as CairnForm } from "@/components/cairn-ui";
+import { Button as CairnButton } from "@/components/cairn-ui";
 
 
 export function InvestmentLabPeriodSelector({
@@ -36,6 +36,7 @@ export function InvestmentLabPeriodSelector({
           : "기간 선택"
       }
       title="비교 기간"
+      initialOpen={period.status === "invalid" || (period.status === "unavailable" && !!period.requestedStartServiceDate)}
     >
       <section data-period-status={period.status}>
         <div className="grid gap-5">
@@ -49,7 +50,7 @@ export function InvestmentLabPeriodSelector({
             ) : null}
           </div>
 
-          <CairnForm
+          <InvestmentLabPeriodForm
             id="investment-lab-period-filter"
             action="/investment-lab"
             className="flex flex-wrap items-end gap-4"
@@ -88,7 +89,7 @@ export function InvestmentLabPeriodSelector({
                 )}
               ><LabText value=" 최신 구간 " /></InvestmentLabQueryLink>
             </div>
-          </CairnForm>
+          </InvestmentLabPeriodForm>
         </div>
 
         {period.status === "invalid" || period.status === "unavailable" ? (

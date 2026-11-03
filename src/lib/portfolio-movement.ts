@@ -125,6 +125,9 @@ export type PortfolioMovementContribution = {
 };
 
 export type PortfolioMovementExclusionReason =
+  | "missing_quoted_instrument"
+  | "unsupported_asset_type"
+  | "missing_comparison_evidence"
   | "missing_baseline_snapshot"
   | "stale_baseline_snapshot"
   | "missing_fresh_live_prices"
