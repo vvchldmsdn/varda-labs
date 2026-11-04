@@ -2,6 +2,7 @@
 export function dataIssueLabel(code: string, english = false): string {
   if (/target.*missing|targets_required/.test(code)) return english ? "Set target weights first." : "목표비중을 먼저 설정해 주세요.";
   if (/cash_not_observed/.test(code)) return english ? "No cash balance has been recorded." : "현금 잔액 기록이 없습니다.";
+  if (code === "fractional_value_not_dated") return english ? "The fractional holding needs a native price and valuation date." : "소수점 보유분의 원본 가격과 평가 날짜가 필요합니다.";
   if (code === 'corporate_action_ledger_mismatch') return english ? 'Corporate actions and recorded shares do not match. Review your records.' : '기업행사와 기록된 수량이 달라 거래 기록 확인이 필요합니다.';
   if (/corporate_action/.test(code)) return english ? 'Corporate-action evidence needs service review. Collecting prices alone does not resolve it.' : '분할·병합 등 기업행사 자료를 서비스에서 확인해야 합니다. 가격 수집만으로 해결되지 않습니다.';
   if (/price.*conflict|paired_history_conflict|historical_evidence_conflict|conflicting_provider_binding/.test(code)) return english ? 'Price sources conflict and need service review.' : '가격 출처가 서로 달라 서비스의 확인이 필요합니다.';

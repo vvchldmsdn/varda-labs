@@ -78,9 +78,13 @@ export default async function PortfolioStructurePage({
   const selectedScope = scopeContext.resolution.scope;
   if (params.currency === "USD" || await requiresNativePortfolioSurface(resolution.tenantContext, scopeContext.resolution.scope)) {
     const reporting = params.currency === "USD" ? "USD" : "KRW";
-    const evidence = await getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting);
+    const asOf = new Date();
+    const [evidence, investmentEvidence] = await Promise.all([
+      getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting, {asOf, collect:false}),
+      getTrackedCurrencyEvidence(resolution.tenantContext, selectedScope, reporting, {asOf, collect:false, investmentsOnly:true}),
+    ]);
     const research = await getOwnedCurrencyResearchInput(resolution.tenantContext, selectedScope, reporting, { valuationEvidence: evidence, calculation: "risk_only" });
-    return <CurrencyPortfolioSurface surface="structure" evidence={evidence} research={research} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
+    return <CurrencyPortfolioSurface surface="structure" evidence={evidence} investmentEvidence={investmentEvidence} research={research} scopes={scopeContext.catalog.scopes} selectedScope={selectedScope} contributionPolicy={evidence.contributionPolicy} />;
   }
   const now = new Date();
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;

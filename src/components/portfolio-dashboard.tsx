@@ -29,6 +29,7 @@ import { PortfolioAnalysisScopeTabs } from "@/components/portfolio-analysis-scop
 import { PortfolioPrimaryNavigation } from "@/components/portfolio-primary-navigation";
 import { PresentationDialog } from "@/components/presentation/presentation-dialog";
 import { availableHoldingValueKrw, selectLargestMovementContributor } from "@/lib/home-metrics";
+import { originalCurrentComposition } from "@/lib/cairn-v2/current-value-presentation";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
 import { buildPortfolioTargetNavigation } from "@/lib/portfolio-target-navigation";
 import {
@@ -46,6 +47,7 @@ export function PortfolioDashboard({
   data: DashboardData;
   designPreview?: boolean;
 }) {
+  const currentComposition = originalCurrentComposition({kind:"legacy",data}, "KRW")!;
   const movementReady = data.dataHealth.movementReady;
   const baselineIsDelayed = data.dataHealth.movementReason === "stale_baseline_snapshot";
   const todayChangeKrw = movementReady ? data.todayChangeKrw ?? 0 : null;
@@ -106,9 +108,9 @@ export function PortfolioDashboard({
           <div className={home.overview}>
           <section className={`${styles.stageSummary} ${home.summary}`} aria-labelledby="portfolio-overview-title">
             <div className={styles.balance}>
-              <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko="투자자산 평가액" en="Invested asset value"/></span>
-              <strong>{<T ko={formatKrw(data.totalValueKrw)} en={translateHomeHistory(formatKrw(data.totalValueKrw))}/>}</strong>
-              <p><T ko={`${data.holdings.length}개 보유 종목 · ${data.accountSummaries.length}개 계좌`} en={`${data.holdings.length} holdings · ${data.accountSummaries.length} accounts`}/></p>
+              <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko={currentComposition.complete ? "투자자산 평가액" : "확인 가능한 소계"} en={currentComposition.complete ? "Invested asset value" : "Verified subtotal"}/></span>
+              <strong>{currentComposition.amount === null ? "—" : <T ko={formatKrw(Number(currentComposition.amount))} en={translateHomeHistory(formatKrw(Number(currentComposition.amount)))}/>}</strong>
+              <p><T ko={`보유 ${currentComposition.counts.positions}건 · ${data.accountSummaries.length}개 계좌${currentComposition.counts.excluded ? ` · 평가 제외 ${currentComposition.counts.excluded}건` : ""}`} en={`${currentComposition.counts.positions} holdings · ${data.accountSummaries.length} accounts${currentComposition.counts.excluded ? ` · ${currentComposition.counts.excluded} excluded` : ""}`}/></p>
             </div>
             <dl className={styles.summaryMetric}>
               <dt><T ko="오늘 변동" en="Today"/></dt>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { calculatePlan, createPlanDraft, parseDraft, PLAN_STORAGE_KEY, SAMPLE_PLAN, type PlanDraft, type PlanInput } from "@/lib/investment-plan";
+import { clearPublicUserAllocationWorkspaces } from "@/lib/user-allocation-comparison";
 import { trackFirstVisit } from "@/lib/first-visit-events";
 import { analyzeQuickPortfolio, parseQuickDraft, QUICK_STORAGE_KEY, type QuickInput } from "@/lib/quick-portfolio";
 import { Decimal, moneyFromMinor, parseMoneyInput, type Currency } from "@/lib/money";
@@ -92,7 +93,14 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
     for (const cookie of planReturnIntentCookies("allocation", location.protocol === "https:")) document.cookie = cookie;
     router.push("/plans");
   }
-  function clear() { try { localStorage.removeItem(PLAN_STORAGE_KEY); } catch {} for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie; setRows(emptyRows()); setAmount(""); setAsOf(new Date().toISOString()); setVersioned(true); setResult(null); setDraft(null); setError(""); setQuickBlocked(false); setStorageNote("이 브라우저의 임시 입력을 삭제했습니다."); }
+  function clear() {
+    let cleared = true;
+    try { localStorage.removeItem(PLAN_STORAGE_KEY); if (localStorage.getItem(PLAN_STORAGE_KEY) !== null) cleared = false; } catch { cleared = false; }
+    try { if (!clearPublicUserAllocationWorkspaces(sessionStorage)) cleared = false; } catch { cleared = false; }
+    if (!cleared) { setStorageNote("임시 입력 삭제에 실패했습니다. 브라우저 저장 권한을 확인하고 다시 시도해 주세요."); return; }
+    for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
+    setRows(emptyRows()); setAmount(""); setAsOf(new Date().toISOString()); setVersioned(true); setResult(null); setDraft(null); setError(""); setQuickBlocked(false); setStorageNote("이 브라우저의 임시 입력을 삭제했습니다.");
+  }
   const storageEnglish: Record<string, string> = {
     "목표 비중과 이번 투자금만 더하면 돼요.": "Add your target weights and this month’s investment.",
     "이 브라우저에서 계산한 입력을 복원했습니다.": "Your previous inputs are restored.",
@@ -101,6 +109,7 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
     "계산한 입력을 이 브라우저에 최대 24시간 임시 보관합니다.": "Your inputs stay in this browser for up to 24 hours.",
     "임시 저장에 실패했습니다. 결과는 볼 수 있지만 인증 후 입력 복원이 불가능합니다. 브라우저 저장을 허용한 뒤 다시 계산해 주세요.": "The result is visible, but inputs could not be kept for sign-in. Allow browser storage and calculate again.",
     "이 브라우저의 임시 입력을 삭제했습니다.": "The temporary inputs were removed from this browser.",
+    "임시 입력 삭제에 실패했습니다. 브라우저 저장 권한을 확인하고 다시 시도해 주세요.": "Temporary inputs could not all be removed. Check browser storage permissions and try again.",
   };
   const currencyLocked = Boolean(draft || amount.trim() || rows.some(row => row.value.trim()));
   const storageFailed = /실패|사용할 수 없/.test(storageNote);

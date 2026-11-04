@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createQuickDraft, parseQuickDraft, QUICK_INSTRUMENTS, QUICK_STORAGE_KEY, validateQuickPortfolio, type QuickDraft, type QuickInput } from "@/lib/quick-portfolio";
 import { parseMoneyInput, type Currency } from "@/lib/money";
 import { trackFirstVisit } from "@/lib/first-visit-events";
@@ -10,11 +10,14 @@ import { MoneyInput } from "./money-input";
 import { QuickResults, formatQuickTimestamp } from "./quick-results";
 import { ContinueWithPortfolio } from "./portfolio-activation";
 import { ACTIVATION_STORAGE_KEY } from "@/lib/portfolio-activation";
+import { parseQuickWorkspace, QUICK_WORKSPACE_KEY, QUICK_WORKSPACE_TTL, type QuickWorkspaceRow } from "@/lib/quick-portfolio-workspace";
+import { emptyAmountImport, quickAmountRowIssue, type QuickAmountRow } from "@/lib/quick-amount-import";
+import { QuickAmountImportPanel } from "./quick-amount-import";
 import styles from "./quick-portfolio.module.css";
 import { Button as CairnButton, Field as CairnField, Fieldset as CairnFieldset, Form as CairnForm, Input as CairnInput, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
 
-type Row = { key: string; name: string; value: string; instrumentId: string | null; inputCurrency: Currency };
+type Row = QuickWorkspaceRow;
 const blank = (key: string, inputCurrency: Currency = "KRW"): Row => ({ key, name: "", value: "", instrumentId: null, inputCurrency });
 const timeZones = ["Asia/Seoul", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London", "UTC"];
 const inputErrors: Record<string, string> = {
@@ -43,6 +46,9 @@ export function QuickPortfolio({ signedIn = false, initialSaved, preview = false
   const [fxChanged, setFxChanged] = useState(false);
   const [error, setError] = useState("");
   const [storageWarning, setStorageWarning] = useState<"blocked" | "expired" | "save" | "delete" | "">("");
+  const [importing, setImporting] = useState(emptyAmountImport);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [workspaceExpiry, setWorkspaceExpiry] = useState(0);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -55,10 +61,46 @@ export function QuickPortfolio({ signedIn = false, initialSaved, preview = false
           setDraft(stored); setResult(stored.input); setDirty(false);
           localStorage.setItem(QUICK_STORAGE_KEY, JSON.stringify(stored));
         } else localStorage.removeItem(QUICK_STORAGE_KEY);
+        const workspace = parseQuickWorkspace(localStorage.getItem(QUICK_WORKSPACE_KEY));
+        if (workspace && workspace.baseDraftId === (stored?.id ?? null)) {
+          setRows(workspace.rows); setCurrency(workspace.currency); setTimeZone(workspace.timeZone);
+          setFxRate(workspace.fxRate); setFxChanged(workspace.fxChanged); setDirty(workspace.dirty); setImporting(workspace.importing);
+          if (workspace.dirty) setResult(null);
+          setWorkspaceExpiry(workspace.expiresAt);
+        } else localStorage.removeItem(QUICK_WORKSPACE_KEY);
       } catch { setStorageWarning("blocked"); }
+      setWorkspaceExpiry(current => current || Date.now() + QUICK_WORKSPACE_TTL);
+      setWorkspaceReady(true);
     });
     return () => cancelAnimationFrame(frame);
   }, [initialSaved]);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+    try {
+      if (!rows.some(row => row.name || row.value) && !importing.text && !importing.rows.length) { localStorage.removeItem(QUICK_WORKSPACE_KEY); return; }
+      if (workspaceExpiry <= Date.now()) {
+        if (!parseQuickWorkspace(localStorage.getItem(QUICK_WORKSPACE_KEY))) localStorage.removeItem(QUICK_WORKSPACE_KEY);
+        return;
+      }
+      localStorage.setItem(QUICK_WORKSPACE_KEY, JSON.stringify({ version: 1, expiresAt: workspaceExpiry, baseDraftId: draft?.id ?? null,
+        rows, currency, timeZone, fxRate, fxChanged, dirty, importing }));
+    } catch {
+      const frame = requestAnimationFrame(() => setStorageWarning("blocked"));
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [workspaceReady, workspaceExpiry, rows, currency, timeZone, fxRate, fxChanged, dirty, importing, draft]);
+
+  useEffect(() => {
+    if (!workspaceReady || !workspaceExpiry) return;
+    const timer = setTimeout(() => {
+      try {
+        if (!parseQuickWorkspace(localStorage.getItem(QUICK_WORKSPACE_KEY))) localStorage.removeItem(QUICK_WORKSPACE_KEY);
+        if (!parseQuickDraft(localStorage.getItem(QUICK_STORAGE_KEY))) setStorageWarning("expired");
+      } catch {}
+    }, Math.max(0, workspaceExpiry - Date.now()));
+    return () => clearTimeout(timer);
+  }, [workspaceReady, workspaceExpiry]);
 
   useEffect(() => {
     if (!draft) return;
@@ -69,14 +111,29 @@ export function QuickPortfolio({ signedIn = false, initialSaved, preview = false
     return () => clearTimeout(timer);
   }, [draft]);
 
-  function changed() { trackFirstVisit("portfolio_input_started"); setDirty(true); setResult(null); setError(""); }
+  const renewWorkspace = useCallback(() => {
+    const now = Date.now();
+    if (workspaceExpiry <= now) setWorkspaceExpiry(now + QUICK_WORKSPACE_TTL);
+  }, [workspaceExpiry]);
+  function changed() { renewWorkspace(); trackFirstVisit("portfolio_input_started"); setDirty(true); setResult(null); setError(""); }
   function update(key: string, patch: Partial<Row>) { changed(); setRows(current => current.map(row => row.key === key ? { ...row, ...patch } : row)); }
+  function importAmounts(incoming: QuickAmountRow[]) {
+    if (!incoming.length || incoming.some(quickAmountRowIssue)) { setError("자산 이름과 금액을 확인해 주세요."); return false; }
+    const kept = rows.filter(row => row.name.trim() || row.value);
+    if (kept.length + incoming.length > 12) { setError("자산을 1~12개 입력해 주세요."); return false; }
+    const names = [...kept, ...incoming].map(row => row.name.trim().toLocaleLowerCase());
+    if (new Set(names).size !== names.length) { setError("같은 자산은 금액을 합치거나 이름을 구분해 주세요."); return false; }
+    changed(); setRows([...kept, ...incoming.map(row => ({ key: crypto.randomUUID(), name: row.name.trim(), value: row.value, inputCurrency: row.currency as Currency, instrumentId: null }))]);
+    requestAnimationFrame(() => document.getElementById("quick-input-form")?.focus());
+    return true;
+  }
   function changeCurrency(next: Currency) {
     changed(); setCurrency(next);
     // A reporting preference never reinterprets an amount the visitor already entered.
     setRows(current => current.map(row => !row.name.trim() && !row.value ? { ...row, inputCurrency: next } : row));
   }
   function calculate(newReference = false) {
+    renewWorkspace();
     // Edits retain their original reference time. A new dated calculation
     // requires an explicit reference-time action or new FX assumption.
     const asOf = !newReference && !fxChanged && draft?.input.asOf ? draft.input.asOf : new Date().toISOString();
@@ -96,8 +153,9 @@ export function QuickPortfolio({ signedIn = false, initialSaved, preview = false
     requestAnimationFrame(() => document.getElementById("quick-result")?.focus());
   }
   function clear() {
-    setRows([blank("0", currency)]); setDraft(null); setResult(null); setError(""); setDirty(true); setFxRate(""); setFxChanged(false);
-    try { localStorage.removeItem(QUICK_STORAGE_KEY); localStorage.removeItem(ACTIVATION_STORAGE_KEY); setStorageWarning(""); } catch { setStorageWarning("delete"); }
+    setRows([blank("0", currency)]); setDraft(null); setResult(null); setError(""); setDirty(true); setFxRate(""); setFxChanged(false); setImporting(emptyAmountImport());
+    setWorkspaceExpiry(Date.now() + QUICK_WORKSPACE_TTL);
+    try { localStorage.removeItem(QUICK_STORAGE_KEY); localStorage.removeItem(QUICK_WORKSPACE_KEY); localStorage.removeItem(ACTIVATION_STORAGE_KEY); setStorageWarning(""); } catch { setStorageWarning("delete"); }
   }
   const warning = storageWarning === "blocked" ? t("임시 저장이 차단되어 있어요. 새로고침하면 입력이 사라집니다.", "Browser storage is blocked. Refreshing will clear your input.")
     : storageWarning === "expired" ? t("24시간 보관이 끝났어요. 다시 계산하면 입력을 보관할 수 있어요.", "Your 24-hour draft expired. Calculate again to keep these inputs.")
@@ -107,8 +165,10 @@ export function QuickPortfolio({ signedIn = false, initialSaved, preview = false
   return <section className={styles.workspace}>
     <CairnPageTitle>{t("어떤 자산을 가지고 있나요?", "What do you own?")}</CairnPageTitle>
     <p>{t("정확하지 않아도 괜찮아요.", "Approximate amounts are enough to start.")}</p>
-    <div className={styles.grid}>
-      <CairnForm className={styles.form} onSubmit={event => { event.preventDefault(); calculate(); }} noValidate>
+    {warning ? <CairnStatus as="p" tone="neutral" role="status" className={styles.note}>{warning}</CairnStatus> : null}
+    <QuickAmountImportPanel draft={importing} onChange={value => { renewWorkspace(); setImporting(value); setError(""); }} onConfirm={importAmounts} submissionError={error ? t(error, inputErrors[error] ?? "Check your inputs and try again.") : ""} />
+    <div className={styles.grid} hidden={importing.method !== "manual"} style={importing.method !== "manual" ? { display: "none" } : undefined}>
+      <CairnForm id="quick-input-form" tabIndex={-1} className={styles.form} onSubmit={event => { event.preventDefault(); calculate(); }} noValidate>
         <div className={styles.preferences}><CairnField>{t("분석 기준 통화", "Analyze in")}<CairnSelect value={currency} onChange={event => changeCurrency(event.target.value as Currency)}><option value="KRW">KRW ₩</option><option value="USD">USD $</option></CairnSelect></CairnField><span>{t("입력 금액의 통화는 각 자산에서 선택해요.", "Choose each amount’s currency below.")}</span></div>
         {rows.map((row, index) => {
           const matches = row.name.trim().length && !row.instrumentId ? QUICK_INSTRUMENTS.filter(item => `${item.name} ${item.ticker}`.toLowerCase().includes(row.name.trim().toLowerCase())).slice(0, 4) : [];
@@ -128,9 +188,8 @@ export function QuickPortfolio({ signedIn = false, initialSaved, preview = false
         {error ? <CairnStatus as="p" tone="danger" role="alert" className={styles.error}>{t(error, inputErrors[error] ?? "Check your inputs and try again.")}</CairnStatus> : null}
         <div className={styles.actions}><CairnButton variant="primary" className={styles.primary} type="submit">{t("구성 확인하기", "See my portfolio")}</CairnButton></div>
         <details className={styles.method}><summary>{t("표시 시간대 · 입력 보관", "Time zone and saved inputs")}</summary><CairnField className={styles.timeZone}>{t("표시 시간대", "Display time zone")}<CairnSelect value={timeZone} onChange={event => { changed(); setTimeZone(event.target.value); }}>{zones.map(zone => <option key={zone} value={zone}>{zone}</option>)}</CairnSelect></CairnField><p>{draft?.input.asOf ? t(`입력 기준: ${formatQuickTimestamp(draft.input.asOf, timeZone)}`, `Inputs as of ${formatQuickTimestamp(draft.input.asOf, timeZone)}`) : t("첫 계산 시각을 입력 기준으로 보관해요.", "The first calculation sets the reference time for your inputs.")}</p><p>{t("수정해도 원래 기준 시각을 유지해요. 서비스 기록은 한국시간 오전 7시에 구분합니다.", "Edits keep their original reference time. The service day changes at 07:00 Asia/Seoul.")}</p>{draft ? <CairnButton variant="secondary" type="button" className={styles.referenceUpdate} onClick={() => calculate(true)}>{fxRate ? t("현재 시각과 이 가정 환율로 다시 계산", "Use current time and confirm this rate") : t("현재 시각으로 다시 계산", "Use current reference time")}</CairnButton> : null}<p>{t("입력은 이 브라우저에 24시간 보관하며 ‘입력 지우기’로 삭제할 수 있어요. 로그인해 저장한 입력은 내 기록에서 삭제할 수 있습니다.", "Inputs stay in this browser for 24 hours and can be cleared above. Inputs saved to your account can be deleted in My records.")}</p></details>
-        {warning ? <CairnStatus as="p" tone="neutral" role="status" className={styles.note}>{warning}</CairnStatus> : null}
       </CairnForm>
-      <div id="quick-result" tabIndex={-1}>{result ? <QuickResults input={result} compact action={!storageWarning && draft ? <ContinueWithPortfolio draft={draft} signedIn={signedIn} preview={preview} /> : null} /> : <section className={styles.empty}><CairnSectionTitle>{t("내 자산이 한눈에.", "Your portfolio at a glance.")}</CairnSectionTitle><Link href="/demo/home">{t("입력 전에 샘플 체험하기 →", "Explore the sample first →")}</Link></section>}</div>
+      <div id="quick-result" tabIndex={-1}>{result ? <QuickResults input={result} compact action={!storageWarning && draft ? <ContinueWithPortfolio draft={draft} signedIn={signedIn} preview={preview} /> : null} nextAction={!storageWarning && draft ? <Link href="/try?mode=personal&from=quick">{t("투자금을 추가하면 어떻게 달라질까요? →", "How would new money change this? →")}</Link> : null} /> : <section className={styles.empty}><CairnSectionTitle>{t("내 자산이 한눈에.", "Your portfolio at a glance.")}</CairnSectionTitle><Link href="/demo/home">{t("입력 전에 샘플 체험하기 →", "Explore the sample first →")}</Link></section>}</div>
     </div>
   </section>;
 }

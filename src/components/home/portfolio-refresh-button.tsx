@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
 import { Button as CairnButton } from "@/components/cairn-ui";
 import type { QuoteRefreshResponse } from "@/lib/market-data/quote-refresh-progress";
+import { readRefreshOperation, retainRefreshOperation, type QuoteRefreshOperation } from "@/lib/market-data/quote-refresh-operation";
 
 
 type SyncState = "idle" | "syncing" | "fresh" | "partial" | "cooldown" | "queued" | "waiting" | "error";
@@ -18,6 +19,7 @@ type SyncResponse = QuoteRefreshResponse;
 
 let activeSyncRequest: { promise: Promise<SyncResponse>; controller: AbortController } | null = null;
 let mountedRefreshButtons = 0;
+let manualGeneration = 0;
 
 export function PortfolioRefreshButton({
   compact = false,
@@ -33,29 +35,59 @@ export function PortfolioRefreshButton({
   const [collectionGeneration, setCollectionGeneration] = useState(0);
   const [receipt, setReceipt] = useState<SyncResponse | null>(null);
   const [startedAt, setStartedAt] = useState<string | undefined>();
+  const [operation, setOperation] = useState<QuoteRefreshOperation>();
+  const attempt = useRef(0);
   const mounted = useRef<{ active: boolean } | null>(null);
   useEffect(() => {
     if (designPreview) return;
     const lifetime = { active: true };
     mounted.current = lifetime;
     mountedRefreshButtons++;
+    const resumeController = new AbortController();
+    const resumeAttempt = attempt.current;
+    const resumeGeneration = manualGeneration;
+    let stored: QuoteRefreshOperation | null = null;
+    try { stored = readRefreshOperation(sessionStorage); } catch {}
+    if (stored) {
+      // No stored labels or amounts are rendered. The server must first check
+      // the current owner and the frozen target set. This never admits new work.
+      void requestLivePriceSync(stored, resumeController.signal).then(result => {
+        if (!lifetime.active || attempt.current !== resumeAttempt || manualGeneration !== resumeGeneration) return;
+        if (result.state === "operation_ended") { try { if (JSON.stringify(readRefreshOperation(sessionStorage)) === JSON.stringify(stored)) retainRefreshOperation(sessionStorage, null); } catch {} setSyncState("waiting"); return; }
+        setReceipt(result); setStartedAt(result.startedAt); setOperation(result.operation);
+        setSyncState(result.state === "queued" ? "queued" : result.state === "partial" ? "partial" : ["fresh", "synced", "empty"].includes(result.state ?? "") ? "fresh" : "error");
+        startTransition(() => router.refresh());
+      }).catch(() => { if (lifetime.active && attempt.current === resumeAttempt && manualGeneration === resumeGeneration) setSyncState("error"); });
+    }
     return () => {
       lifetime.active = false;
+      resumeController.abort();
       if (--mountedRefreshButtons === 0) {
         activeSyncRequest?.controller.abort();
         activeSyncRequest = null;
       }
     };
-  }, [designPreview]);
-  const progressChanged = useCallback((data: SyncResponse) => setReceipt(data), []);
-  const collectionState = useMarketCollectionPolling((syncState === "queued" || Boolean(receipt?.comparison?.pending)) && !designPreview, collectionGeneration, false, startedAt, progressChanged);
-  const displayState = syncState === "queued" && collectionState === "partial" ? "partial" : syncState === "queued" && ["fresh", "empty"].includes(collectionState ?? "") ? "fresh" : syncState === "queued" && collectionState === "waiting" ? "waiting" : syncState;
+  }, [designPreview, router]);
+  const progressChanged = useCallback((data: SyncResponse) => {
+    if (data.state === "operation_ended") { setReceipt(null); setOperation(undefined); setSyncState("waiting"); }
+    else setReceipt(data);
+  }, []);
+  const followCollection = syncState !== "waiting" && (syncState === "queued" || Boolean(receipt?.progress?.pending) || Boolean(receipt?.comparison?.pending));
+  const collectionState = useMarketCollectionPolling(followCollection && !designPreview, collectionGeneration, false, startedAt, progressChanged, operation);
+  const polledState = collectionState === "waiting" ? "waiting" : syncState === "queued" && collectionState === "partial" ? "partial" : syncState === "queued" && ["fresh", "empty"].includes(collectionState ?? "") ? "fresh" : syncState;
+  // Shared work can become pending again while comparison prices are checked.
+  // The latest item receipt outranks an earlier completion, but cannot reopen
+  // a stopped polling window or replace an active manual request/error.
+  const displayState: SyncState = ["syncing", "error", "cooldown", "waiting"].includes(polledState) || !receipt?.progress ? polledState
+    : receipt.progress.pending > 0 ? "queued" : receipt.progress.failed > 0 ? "partial" : "fresh";
   const pending = syncState === "syncing" || displayState === "queued" || refreshPending;
 
   const sync = useCallback(
     async () => {
       const lifetime = mounted.current;
       if (!lifetime?.active) return;
+      attempt.current++;
+      manualGeneration++;
       setSyncState("syncing");
       setReceipt(null);
 
@@ -64,6 +96,8 @@ export function PortfolioRefreshButton({
         if (!lifetime.active) return;
         setReceipt(result);
         setStartedAt(result.startedAt ?? new Date().toISOString());
+        setOperation(result.operation);
+        try { retainRefreshOperation(sessionStorage, result.operation ?? null); } catch {}
 
         if (result.state === "synced") setSyncState("fresh");
         else if (result.state === "queued") {
@@ -142,19 +176,20 @@ export function PortfolioRefreshButton({
   );
 }
 
-function requestLivePriceSync() {
-  if (activeSyncRequest) return activeSyncRequest.promise;
+function requestLivePriceSync(operation?: QuoteRefreshOperation, signal?: AbortSignal) {
+  if (!operation && activeSyncRequest) return activeSyncRequest.promise;
 
   const controller = new AbortController();
   const request = fetch("/api/portfolio/live-prices/sync", {
     method: "POST",
     cache: "no-store",
     credentials: "same-origin",
-    signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+    signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]),
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reason: "manual" }),
+    body: JSON.stringify(operation ? { reason: "poll", startedAt: operation.startedAt, operation } : { reason: "manual" }),
   })
     .then(async (response) => {
+      if (operation && [400, 401, 403, 409].includes(response.status)) return { state: "operation_ended" } as SyncResponse;
       const body = (await response.json()) as SyncResponse;
       if (!response.ok && body.state !== "cooldown") {
         throw new Error("Live price sync failed");
@@ -165,7 +200,7 @@ function requestLivePriceSync() {
       if (activeSyncRequest?.promise === request) activeSyncRequest = null;
     });
 
-  activeSyncRequest = { promise: request, controller };
+  if (!operation) activeSyncRequest = { promise: request, controller };
   return request;
 }
 

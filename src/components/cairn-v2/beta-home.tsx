@@ -17,7 +17,7 @@ import { MetricControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
-import { originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
+import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
 import { useBetaView } from "./use-beta-view";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { BetaShell } from "./beta-shell";
@@ -48,6 +48,12 @@ export function BetaHome({
   const [context, setContext] = useBetaContext(initialContext);
   const view = useBetaView(context, read);
   const originalValue = view.domain?.currentValuePresentation ? originalCurrentValueSummary(view.domain.currentValuePresentation,context.currency) : null;
+  const composition = view.domain?.currentValuePresentation ? originalCurrentComposition(view.domain.currentValuePresentation, context.currency) : null;
+  const compositionRequested = !!view.domain?.currentValuePresentation;
+  const allocationEntries = compositionRequested ? composition?.positions.flatMap((row, index) => row.displayWeightPct === null || row.displayWeightPct <= 0 ? [] : [{
+    key: row.key, name: instrumentLabel(row), weightPct: row.displayWeightPct,
+    color: ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
+  }]) ?? [] : view.rows.map(row => ({key:row.key,name:instrumentLabel(row),weightPct:row.weightPct,color:row.color}));
   const displayMoney = (value: number | null, currency: BetaContext["currency"], signed = false) =>
     displayReadMoney(view, value, currency, signed);
   const { selected, setSelected } = useBetaPreferences();
@@ -69,7 +75,7 @@ export function BetaHome({
     resume(); window.addEventListener('hashchange', resume);
     return () => window.removeEventListener('hashchange', resume);
   }, []);
-  const active = view.rows.find((r) => r.key === selected) ?? view.rows[0];
+  const active = allocationEntries.find((r) => r.key === selected) ?? allocationEntries[0];
   const contributionTotal = view.contribution.length
     ? view.contribution.reduce((sum, r) => sum + r.amountKrw, 0)
     : null;
@@ -92,7 +98,7 @@ export function BetaHome({
             </div>
             <p className={styles.cardFootnote}>
               {originalValue ? originalValue.coverage
-                ? `${originalValue.complete ? "투자자산 평가" : "확인 가능한 소계"} · ${originalValue.coverage.valued}/${originalValue.coverage.positions}종목 · 제외 ${originalValue.coverage.excludedPositions}종목`
+                ? `${originalValue.complete ? "투자자산 평가" : "확인 가능한 소계"} · 보유 ${originalValue.coverage.valued}/${originalValue.coverage.positions}건 · 제외 ${originalValue.coverage.excludedPositions}건`
                 : originalValue.amount === null ? "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : "투자자산 · 갱신 " + originalValue.asOf
                 : view.domain
                 ? (readStateText(view.domain.valueState, "보유 자산 없음") ??
@@ -169,32 +175,28 @@ export function BetaHome({
             <TargetDriftHome view={view} onOpen={(trigger) => open("drift", trigger)} />
           </div>
 
-          <Card onOpen={open} kind="structure" className={!view.rows.length ? home.noHoldings : undefined}>
-            {view.domain?.excluded.length ? (
+          <Card onOpen={open} kind="structure" className={!allocationEntries.length ? home.noHoldings : undefined}>
+            {compositionRequested && composition && !composition.complete ? <p className={styles.cardFootnote}>확인된 소계 내 비중 · 제외 {composition.counts.excluded}건</p> : null}
+            {!compositionRequested && view.domain?.excluded.length ? (
               <p className={styles.cardFootnote}>
                 확인 가능한 소계 {displayMoney(view.domain.knownSubtotalKrw, context.currency)}{" "}
                 {context.currency} · 제외 {view.domain.excluded.length}종목 · 소계 내 비중
               </p>
             ) : null}
-            {view.domain && view.domain.nonInvestmentCount > 0 && (
+            {!compositionRequested && view.domain && view.domain.nonInvestmentCount > 0 && (
               <p className={styles.cardFootnote}>
                 투자자산 소계 내 비중 · 비투자자산 {view.domain.nonInvestmentCount}개 별도
               </p>
             )}
-            {readStateText(view.domain?.valueState, "보유 종목 없음") || !view.rows.length ? (
+            {(compositionRequested ? !allocationEntries.length : readStateText(view.domain?.valueState, "보유 종목 없음") || !view.rows.length) ? (
               <CairnStatus as="p" className={styles.empty} role="status">
-                {readStateText(view.domain?.valueState, "보유 종목 없음") ?? "보유 종목 없음"}
+                {compositionRequested ? composition ? composition.counts.positions ? "평가할 수 있는 보유자산이 없어요. 확대하여 필요한 자료를 확인해 주세요." : "보유 자산 없음" : "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : readStateText(view.domain?.valueState, "보유 종목 없음") ?? "보유 종목 없음"}
               </CairnStatus>
             ) : (
               <div className={styles.homeRing}>
                 <PortfolioAllocationRing
                   compositionOnly={!!view.domain}
-                  entries={view.rows.map((r) => ({
-                    key: r.key,
-                    name: instrumentLabel(r),
-                    weightPct: r.weightPct,
-                    color: r.color,
-                  }))}
+                  entries={allocationEntries}
                   selectedKey={active?.key ?? ""}
                   onSelect={setSelected}
                 />

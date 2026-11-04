@@ -438,3 +438,8 @@ import './display-session.test.mjs';
 import './quote-refresh-progress.test.mjs';
 import './navigation-context-recovery.test.mjs';
 import './beta-original-current-value.test.mjs';
+import './current-investment-composition.test.mjs';
+import './quote-refresh-operation.test.mjs';
+import './quick-amount-import.test.mjs';
+import './quick-amount-import-ui.test.mjs';
+import './user-allocation-comparison.test.mjs';

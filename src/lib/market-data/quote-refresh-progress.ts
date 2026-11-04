@@ -1,4 +1,5 @@
 import type { CollectionProgressRow } from "./collection-queue";
+import type { QuoteRefreshOperation } from "./quote-refresh-operation";
 
 export type QuoteRefreshItem = {
   id: string; label: string; provider: string;
@@ -9,6 +10,7 @@ export type QuoteRefreshProgress = {
   items: QuoteRefreshItem[]; total: number; completed: number; pending: number; failed: number;
 };
 export type QuoteRefreshResponse = {
+  operation?: QuoteRefreshOperation;
   state?: string; startedAt?: string; readVersion?: string; retryAfterSeconds?: number;
   connectionUnavailable?: boolean;
   freshTargetCount?: number; targetCount?: number; progress?: QuoteRefreshProgress;

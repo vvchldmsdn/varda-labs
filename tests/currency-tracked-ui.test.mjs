@@ -30,11 +30,11 @@ describe("owned portfolio currency view", () => {
     const evidence = trackedCurrencyFixture();
     for (const reporting of ['KRW','USD']) {
       const only = { ...evidence, reporting };
-      assert.match(textOf(View({ evidence: only, surface: 'structure' })), /1 investments · Cash excluded/);
+      assert.match(textOf(View({ evidence: only, surface: 'structure' })), /1 investment positions · Cash excluded/);
       const withCash = structuredClone(only);
       withCash.current.positions.push({ id:'cash',ownerId:evidence.ownerId,kind:'cash',name:'Cash',observation:null,unsupportedReason:'cash_not_observed' });
       const html = textOf(View({ evidence: withCash, surface: 'structure' }));
-      assert.match(html,/1 investments · Includes 1 cash entries · Cash balance needs verification/);
+      assert.match(html,/1 investment positions · Includes 1 cash entries · Cash balance needs verification/);
       assert.match(html,/Subtotal with evidence/);
       assert.equal(buildTrackedCurrencyPortfolio(withCash).current.complete,false);
     }
@@ -115,14 +115,19 @@ describe("owned portfolio currency view", () => {
     assert.equal(trigger.props.accountId, "owned-account");
     assert.match(textOf(tree), /1 × \$1,100.00/);
   });
-  it("draws no normalized ring and permits no allocation form when scope or FX is incomplete", async () => {
+  it("labels partial rings as verified-subtotal shares and still blocks incomplete allocation", async () => {
     const View = await importView();
     for (const evidence of [
       { ...trackedCurrencyFixture(), reporting: "KRW", fx: [] },
       { ...trackedCurrencyFixture(), current: { ...trackedCurrencyFixture().current, scopeComplete: false } },
     ]) {
       const tree = View({ evidence, contributionPolicy });
-      assert.equal(walk(tree).some(node => node.type === ring || node.type === "form"), false);
+      assert.equal(walk(tree).some(node => node.type === "form"), false);
+      const report=buildTrackedCurrencyPortfolio(evidence);
+      const allocation=walk(tree).find(node => node.type === ring);
+      assert.equal(!!allocation,report.current.coverage.valued>0);
+      if(allocation)assert.match(textOf(tree),/Shares of the verified subtotal/);
+      assert.ok(report.current.positions.every(row=>row.weightPct===null));
       assert.match(textOf(tree), /Subtotal with evidence/);
       assert.match(textOf(tree), /full total and weights are unavailable/);
       assert.doesNotMatch(textOf(tree), /100\.00%/);

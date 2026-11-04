@@ -5,6 +5,8 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import { intlLocale, type Locale } from "@/lib/i18n/locale";
 import styles from "./first-visit.module.css";
 import { SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
+import { UserAllocationComparison } from "@/components/additional-contribution/user-allocation-comparison";
+import { publicUserAllocationBasis, publicUserAllocationIdentity } from "@/lib/user-allocation-comparison";
 
 
 export function planErrorCopy(error: string, currency: Currency, locale: Locale) {
@@ -29,6 +31,8 @@ export function PlanResults({ input, sample = false }: { input: PlanInput; sampl
   const calculation = calculatePlan(input);
   if (!calculation.ok) return <CairnStatus as="p" tone="danger" role="alert">{planErrorCopy(calculation.error, input.currency, locale)}</CairnStatus>;
   const { rows, totalAllocated, residualCash } = calculation;
+  const comparisonBasis = publicUserAllocationBasis(input);
+  const comparisonIdentity = publicUserAllocationIdentity(input);
   const money = (value: number) => formatMoney(value, input.currency, intlLocale(locale));
   const reached = rows.every(row => Math.abs(row.afterPct - row.targetPct) < 0.01);
   return <section className={styles.results} aria-label={sample ? t("샘플 계산 결과", "Sample allocation") : t("내 계산 결과", "My allocation")}>
@@ -41,6 +45,7 @@ export function PlanResults({ input, sample = false }: { input: PlanInput; sampl
       <div className={styles.stats}><span>{t("현재", "Now")} {row.beforePct === null ? "—" : `${row.beforePct.toFixed(2)}%`} → {t("배분 후", "After")} {row.afterPct.toFixed(2)}%</span><span>{t("목표", "Target")} {row.targetPct.toFixed(2)}% · {t("차이", "Gap")} {(row.afterPct - row.targetPct).toFixed(2)}{t("%p", " pp")}</span></div>
     </article>)}</div>
     <p>{t("배분 합계", "Allocated")} {money(totalAllocated)} · {t("남는 현금", "Cash left")} {money(residualCash)}</p>
+    {comparisonBasis && comparisonIdentity && <UserAllocationComparison basis={comparisonBasis} amount={String(input.amount)} currency={input.currency} scope="public-plan" publicIdentity={`${sample ? 'sample' : 'personal'}:${comparisonIdentity}`} />}
     <details><summary>{t("계산 방법과 한계", "How this works")}</summary><p>{t("목표까지 부족한 금액이 큰 자산에 더 많이 배분합니다. 이미 비중이 높은 자산은 팔지 않으므로, 새 투자금만으로 목표에 도달하지 못할 수 있어요.", "New money is split in proportion to each asset’s shortfall. Nothing is sold, so new money alone may not reach every target.")}</p><p>{t(`입력한 ${input.currency} 금액으로 계산한 계획입니다. 실제 매수 수량·환전·세금·수수료는 반영하지 않습니다. ${input.currency === "USD" ? "센트" : "원"} 단위로 배분한 뒤 남은 금액은 현금으로 표시합니다.`, `This plan uses the entered ${input.currency} values. Trade quantities, currency exchange, taxes and fees are not included. Allocations use ${input.currency === "USD" ? "cents" : "whole won"}; any remainder stays in cash.`)}</p></details>
   </section>;
 }

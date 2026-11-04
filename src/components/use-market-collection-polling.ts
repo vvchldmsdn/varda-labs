@@ -3,21 +3,25 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MANUAL_REFRESH_MAX_CHECKS, type QuoteRefreshResponse } from "@/lib/market-data/quote-refresh-progress";
 import { quoteRefreshPollDelay } from "@/lib/market-data/quote-refresh-polling-policy";
+import { readRefreshOperation, retainRefreshOperation, type QuoteRefreshOperation } from "@/lib/market-data/quote-refresh-operation";
 
 type WakeOutcome = { state: string; signature: string; data?: QuoteRefreshResponse };
 type PollingOutcome = { state: string; generation: unknown; startedAt?: string; keepCheckingHistory: boolean };
 const waking = new Map<string, { promise: Promise<WakeOutcome>; controller: AbortController }>();
 const subscribers = new Map<string, number>();
-function wakeCollection(startedAt?: string): Promise<WakeOutcome> {
-  const key = startedAt ?? "history";
+function wakeCollection(startedAt?: string, operation?: QuoteRefreshOperation): Promise<WakeOutcome> {
+  const key = operation ? JSON.stringify(operation) : startedAt ?? "history";
   const existing = waking.get(key);
   if (existing) return existing.promise;
   const controller = new AbortController();
   const request = fetch("/api/portfolio/live-prices/sync", {
     method: "POST", cache: "no-store", credentials: "same-origin",
     signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "poll", ...(startedAt ? { startedAt } : {}) }),
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "poll", ...(startedAt ? { startedAt } : {}), ...(operation ? { operation } : {}) }),
   }).then(async response => {
+    if (operation && [400, 401, 403, 409].includes(response.status)) {
+      return { state: "operation_ended", signature: "operation_ended", data: { state: "operation_ended" } };
+    }
     if (!response.ok) return { state: "unavailable", signature: "unavailable" };
     const data = await response.json() as QuoteRefreshResponse;
     const state = data.state ?? "unavailable";
@@ -31,13 +35,13 @@ function wakeCollection(startedAt?: string): Promise<WakeOutcome> {
 
 /** Visible UI only. Explicit quote operations may finish a bounded slow queue;
  * history checks retain their shorter window. Neither creates new demand. */
-export function useMarketCollectionPolling(active: boolean, generation?: unknown, keepCheckingHistory = false, startedAt?: string, onProgress?: (data: QuoteRefreshResponse) => void) {
+export function useMarketCollectionPolling(active: boolean, generation?: unknown, keepCheckingHistory = false, startedAt?: string, onProgress?: (data: QuoteRefreshResponse) => void, operation?: QuoteRefreshOperation) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<PollingOutcome | null>(null);
   useEffect(() => {
     if (!active) return;
-    const key = startedAt ?? "history";
+    const key = operation ? JSON.stringify(operation) : startedAt ?? "history";
     subscribers.set(key, (subscribers.get(key) ?? 0) + 1);
     let cancelled = false, count = 0, previousSignature = "", previousReadVersion = "", unchangedChecks = 0, lastState = "queued";
     let lastData: QuoteRefreshResponse | undefined;
@@ -52,8 +56,13 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
       }
       if (document.visibilityState !== "visible") { timer = window.setTimeout(tick, 10_000); return; }
       count++;
-      const { state, signature, data } = await wakeCollection(startedAt);
+      const { state, signature, data } = await wakeCollection(startedAt, operation);
       if (cancelled) return;
+      if (state === "operation_ended") {
+        // A late response from an old operation must never clear a newer one.
+        try { if (JSON.stringify(readRefreshOperation(sessionStorage)) === JSON.stringify(operation)) retainRefreshOperation(sessionStorage, null); } catch {}
+        onProgress?.({ state }); recordOutcome("waiting"); return;
+      }
       if (data) { lastData = data; onProgress?.(data); }
       else if (lastData) onProgress?.({ ...lastData, connectionUnavailable: true });
       // This endpoint reports current quotes only. History readiness remains a
@@ -87,7 +96,7 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
         waking.delete(key);
       }
     };
-  }, [active, router, generation, keepCheckingHistory, startedAt, onProgress]);
+  }, [active, router, generation, keepCheckingHistory, startedAt, onProgress, operation]);
   // A new operation must not render the previous operation's terminal state,
   // even before its effects run or its first poll finishes.
   return active && outcome && Object.is(outcome.generation, generation) && outcome.startedAt === startedAt && outcome.keepCheckingHistory === keepCheckingHistory ? outcome.state : null;
