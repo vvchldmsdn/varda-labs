@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { TENANT_LIVE_PRICE_SYNC_POLICY } from "../src/lib/market-data/tenant-live-price-sync-policy.ts";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
+import { MANUAL_REFRESH_MAX_CHECKS } from "../src/lib/market-data/quote-refresh-progress.ts";
+import { quoteRefreshPollDelay } from "../src/lib/market-data/quote-refresh-polling-policy.ts";
 
 const WINDOW_MS = TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds;
 
@@ -171,10 +173,11 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
       activeMounts.add(unmount);
       return { unmount };
     },
-    runMountTimer() { for (const [id, { callback, delay }] of [...timeouts]) { assert.equal(delay, 0); timeouts.delete(id); callback(); } },
+    runMountTimer() { for (const [id, { callback, delay }] of [...timeouts]) { if (delay !== 0) continue; timeouts.delete(id); callback(); } },
     runInterval() { for (const { callback, delay } of [...intervals.values()]) { assert.equal(delay, WINDOW_MS); callback(); } },
-    async runPollingInterval() { await Promise.all([...intervals.values()].map(({ callback, delay }) => { assert.equal(delay, 10_000); return callback(); })); },
+    async runPollingInterval() { await Promise.all([...timeouts].map(([id,{callback,delay}])=>{assert.ok(delay>=2_000&&delay<=60_000);timeouts.delete(id);return callback();})); },
     advanceBucket() { now += WINDOW_MS; },
+    advanceTime(ms) { now += ms; },
     get now() { return new Date(now).toISOString(); },
     setVisibility(value) { fakeDocument.visibilityState = value; },
     visibilityChange() { for (const callback of [...documentListeners.get("visibilitychange") ?? []]) callback(); },
@@ -208,7 +211,7 @@ it('a new queued operation never paints the previous completion before its effec
   const hooks = rerenderHooks(), intervals = new Map(), responses = []; let timerId = 0;
   const start = '2026-11-03T01:00:00.000Z';
   const descriptors = new Map(['window', 'document', 'fetch'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: { setInterval(callback) { const id = ++timerId; intervals.set(id, callback); return id; }, clearInterval(id) { intervals.delete(id); } } });
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout(callback) { const id = ++timerId; intervals.set(id, () => {intervals.delete(id);return callback();}); return id; }, clearTimeout(id) { intervals.delete(id); } } });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: { visibilityState: 'visible' } });
   Object.defineProperty(globalThis, 'fetch', { configurable: true, value: async () => { assert.ok(responses.length); return { ok: true, json: async () => responses.shift() }; } });
   test.mock.method(Date, 'now', () => Date.parse(start));
@@ -335,6 +338,34 @@ describe("portfolio refresh lifecycle", () => {
 });
 
 describe("market collection quote and history polling", () => {
+  it("honors delayed-only retries and server wait hints without slowing other active instruments",()=>{
+    const now=Date.now(),delayed={state:'delayed',retryAt:new Date(now+120_000).toISOString()};
+    assert.equal(quoteRefreshPollDelay({progress:{items:[delayed]}},0,now),30_000);
+    assert.equal(quoteRefreshPollDelay({progress:{items:[delayed,{state:'running'}]}},0,now),2_000);
+    assert.equal(quoteRefreshPollDelay({retryAfterSeconds:15},0,now),15_000);
+    assert.equal(quoteRefreshPollDelay(undefined),10_000);
+  });
+  it("shows completed quotes while separately following comparison evidence, then stops all polling",async test=>{
+    const h=await refreshHarness(test,{autoRespond:false});h.mountPolling(false,h.now);
+    for(const [index,pending] of [2,1,0].entries()) {
+      const tick=h.runPollingInterval();h.respond(index,{state:'fresh',readVersion:`prices-close-${index}`,comparison:{pending,failed:0}});await tick;
+      assert.equal(h.states.at(-1).state,'fresh');
+      if(pending)assert.equal([...h.timeouts.values()][0].delay,10_000);
+    }
+    assert.equal(h.refreshCount,3);assert.equal(h.timeouts.size,0);
+  });
+  it("retains completed quotes across a failed comparison check and timeout while reporting connection trouble",async test=>{
+    const h=await refreshHarness(test,{autoRespond:false}),receipts=[];h.mountPolling(false,h.now,data=>receipts.push(data));
+    let tick=h.runPollingInterval();h.respond(0,{state:'fresh',readVersion:'quotes-done',comparison:{pending:1,failed:0}});await tick;
+    tick=h.runPollingInterval();h.reject(1);await tick;
+    assert.equal(h.states.at(-1).state,'fresh');assert.equal(receipts.at(-1).connectionUnavailable,true);
+    tick=h.runPollingInterval();h.respond(2,{state:'fresh',readVersion:'quotes-done',comparison:{pending:1,failed:0}});await tick;
+    assert.equal(receipts.at(-1).connectionUnavailable,undefined);
+    tick=h.runPollingInterval();h.respond(3,{state:'service_unavailable'},false);await tick;
+    assert.equal(h.states.at(-1).state,'fresh');assert.equal(receipts.at(-1).connectionUnavailable,true);
+    h.advanceTime(30*60_000+1);await h.runPollingInterval();
+    assert.equal(h.states.at(-1).state,'fresh');assert.equal(h.timeouts.size,0);assert.equal(h.refreshCount,1);
+  });
   for (const useStartedAt of [false, true]) it(`detaches ${useStartedAt ? 'operation' : 'history'} polling after its last subscriber and ignores old receipts`, async test => {
     const h = await refreshHarness(test, { autoRespond: false }), receipts = [];
     const startedAt = useStartedAt ? h.now : undefined;
@@ -370,8 +401,22 @@ describe("market collection quote and history polling", () => {
   it("pauses invisible work and reports a bounded incomplete timeout rather than completion",async test=>{
     const h=await refreshHarness(test,{responseState:'queued'});h.mountPolling(false,h.now);h.runMountTimer();
     h.setVisibility('hidden');await h.runPollingInterval();assert.equal(h.requests.length,0);h.setVisibility('visible');
-    for(let count=0;count<180;count++)await h.runPollingInterval();
-    assert.equal(h.requests.length,180);assert.equal(h.states.at(-1).state,'waiting');assert.equal(h.intervals.size,0);
+    for(let count=0;count<MANUAL_REFRESH_MAX_CHECKS;count++)await h.runPollingInterval();
+    assert.equal(h.requests.length,MANUAL_REFRESH_MAX_CHECKS);assert.equal(h.states.at(-1).state,'waiting');assert.equal(h.timeouts.size,0);
+  });
+  it("checks new manual work after two seconds, backs off unchanged receipts, and refreshes only changed evidence",async test=>{
+    const h=await refreshHarness(test,{autoRespond:false});h.mountPolling(false,h.now);
+    assert.equal([...h.timeouts.values()][0].delay,2_000);
+    for(let index=0;index<13;index++) {
+      const tick=h.runPollingInterval();
+      h.respond(index,{state:'queued',readVersion:'same-price',freshTargetCount:index===1?1:2,targetCount:8});await tick;
+    }
+    assert.equal(h.refreshCount,1,'job status and count changes alone do not reload the whole page');
+    assert.equal([...h.timeouts.values()][0].delay,10_000);
+    const tick=h.runPollingInterval();h.respond(13,{state:'queued',readVersion:'new-fx'});await tick;
+    assert.equal(h.refreshCount,2);assert.equal([...h.timeouts.values()][0].delay,2_000);
+    h.advanceTime(30*60_000+1);await h.runPollingInterval();
+    assert.equal(h.requests.length,14);assert.equal(h.states.at(-1).state,'waiting');assert.equal(h.timeouts.size,0);
   });
   it("refreshes changed prices and FX even when ready instrument counts stay the same", async test => {
     const h = await refreshHarness(test, { autoRespond: false });

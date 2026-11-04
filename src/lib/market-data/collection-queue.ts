@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { sqlClient } from "@/db/client";
-import { MARKET_COLLECTION_POLICY, normalizeCollectionJobs, type CollectionInput, type CollectionJob, type CollectionLane } from "@/lib/market-data/collection-policy";
+import { MARKET_COLLECTION_POLICY, latestCloseCollectionJob, normalizeCollectionJobs, type CollectionInput, type CollectionJob, type CollectionLane } from "@/lib/market-data/collection-policy";
 
 export type ClaimedCollectionJob = CollectionJob & { claimToken: string; attempts: number };
 export type CollectionPartition = { provider: "kis"; rawCloses?: boolean; historyOnly?: boolean } | { provider: "twelve_data"; scopeHash: string };
@@ -34,6 +34,12 @@ function partitionPrefix(partition: CollectionPartition) {
 export async function enqueueMarketCollection(inputs: readonly CollectionInput[]) {
   const jobs = normalizeCollectionJobs(inputs);
   return enqueueJobs(jobs);
+}
+
+/** A successful, server-authorized live job owns this durable follow-up. The
+ * captured close date must survive a worker restart across the market cutoff. */
+export async function enqueueLatestCloseCollection(target: Pick<CollectionJob, "ticker" | "market" | "currency">, priceDate: string) {
+  return enqueueJobs([latestCloseCollectionJob(target, priceDate)]);
 }
 
 /** Only the authenticated cron's server-side holdings scan calls this seam. */
@@ -168,7 +174,12 @@ const CLAIM_SQL = `with candidate as (
     (status = 'pending' and available_at <= now() or status = 'running' and leased_until <= now())
     and attempts < $3::integer
     and starts_with(key,$4)
-  order by case when $5='quotes' and kind in ('live','fx') or $5='history' and kind='history' then 0 when $5='all' then 0 else 1 end,
+  order by case
+    when $5='quotes' and kind='history' and greatest(enqueued_at,available_at)<now()-interval '5 minutes'
+      and not exists (select 1 from market_collection_jobs recent where starts_with(recent.key,$4)
+        and recent.kind='history' and (recent.status='running' or recent.last_code is not null)
+        and recent.updated_at>now()-interval '1 minute') then -1
+    when $5='quotes' and kind in ('live','fx') or $5='history' and kind='history' then 0 when $5='all' then 0 else 1 end,
     (case when starts_with(key,'kis:') then greatest(enqueued_at,available_at) else enqueued_at end)
       - case when kind in ('live','fx') then interval '30 seconds' else interval '0 seconds' end, key
   for update skip locked limit 1

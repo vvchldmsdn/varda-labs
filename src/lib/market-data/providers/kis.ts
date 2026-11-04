@@ -3,6 +3,7 @@ import { pairKisHistory, mergeKisPairedHistory } from "./kis-paired-history";
 import { isFinalizedKisPriceEvidence } from "@/lib/shared-domain/market-data/kis-history-finalization";
 import { isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 import { fetchKisWithBudget } from "@/lib/market-data/provider-budget";
+import { KisExchangeHints } from "./kis-exchange-hints";
 
 import { createHash } from "node:crypto";
 
@@ -81,6 +82,7 @@ type EnvReader = Record<string, string | undefined>;
 const DEFAULT_KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 const MOCK_KIS_BASE_URL = "https://openapivts.koreainvestment.com:29443";
 const US_EXCHANGES = KIS_US_EXCHANGES;
+const exchangeHints = new KisExchangeHints();
 
 export function getKisProviderPolicy(env: EnvReader = process.env): KisProviderPolicy {
   const missingEnvKeys = KIS_REQUIRED_ENV_KEYS.filter(
@@ -152,7 +154,7 @@ export async function fetchKisUsdKrwFxCandidate({
   if (!ticker) throw new Error("KIS USD/KRW quote target is missing");
 
   const token = await getKisAccessToken(config, session);
-  const exchanges = target.exchange ? [target.exchange] : [...US_EXCHANGES];
+  const exchanges = exchangeHints.order(config.baseUrl, ticker, target.exchange);
   const errors: string[] = [];
 
   for (const [index, exchange] of exchanges.entries()) {
@@ -181,7 +183,10 @@ export async function fetchKisUsdKrwFxCandidate({
           })
         : { ok: false as const, error: `provider_http_${response.status}` };
 
-      if (parsed.ok) return parsed.candidate;
+      if (parsed.ok) {
+        exchangeHints.remember(config.baseUrl, ticker, exchange);
+        return parsed.candidate;
+      }
       errors.push(`${exchange}:${parsed.error}`);
     } catch (error) {
       if (isProviderCollectionDeferred(error)) throw error;
@@ -755,7 +760,7 @@ async function fetchUsLiveQuote(
 ): Promise<KisLiveRow> {
   const errors: string[] = [];
 
-  for (const exchange of US_EXCHANGES) {
+  for (const exchange of exchangeHints.order(config.baseUrl, target.ticker)) {
     try {
       const params = new URLSearchParams({
         AUTH: "",
@@ -780,6 +785,7 @@ async function fetchUsLiveQuote(
       const price = normalizePositiveDecimal(output?.last);
 
       if (price) {
+        exchangeHints.remember(config.baseUrl, target.ticker, exchange);
         return {
           price,
           source: `kis_overseas_price:${exchange}`,
@@ -851,7 +857,7 @@ async function fetchUsClose(
 ): Promise<KisHistoryRow> {
   const errors: string[] = [];
 
-  for (const exchange of US_EXCHANGES) {
+  for (const exchange of exchangeHints.order(config.baseUrl, target.ticker)) {
     try {
       const params = new URLSearchParams({
         AUTH: "",
@@ -883,6 +889,10 @@ async function fetchUsClose(
         "clos",
       );
       if (row) {
+        // Old historical windows cannot overwrite a current listing hint.
+        if (Date.now() - Date.parse(`${row.date}T00:00:00Z`) < 7 * 86_400_000) {
+          exchangeHints.remember(config.baseUrl, target.ticker, exchange);
+        }
         return {
           ...row,
           source: `kis_overseas_dailyprice:${exchange}`,

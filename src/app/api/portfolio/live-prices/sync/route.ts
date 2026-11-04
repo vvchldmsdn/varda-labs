@@ -13,8 +13,9 @@ import { enqueueMarketCollection, readCollectionProgress } from "@/lib/market-da
 import { scheduleMarketCollection } from "@/lib/market-data/collection-worker";
 import { livePriceReadVersion } from "@/lib/market-data/live-price-read-version";
 import { manualNativeQuotes } from "@/lib/market-data/manual-native-quotes";
-import { normalizeCollectionJobs, type CollectionInput } from "@/lib/market-data/collection-policy";
+import { latestCloseCollectionJob, normalizeCollectionJobs, type CollectionInput } from "@/lib/market-data/collection-policy";
 import { refreshItem, refreshProgress, refreshProgressState } from "@/lib/market-data/quote-refresh-progress";
+import { closeCalendarReferenceDateForAsset, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -35,7 +36,6 @@ export async function POST(request: Request) {
     const readAt = new Date().toISOString();
     const [quotes, fxEvidence, native] = await Promise.all([getCurrentKisQuoteEvidence(targets), getCurrentUsdKrwEvidence(), manualNativeQuotes(targets, reason === "manual", startedAt).catch(() => ({available:false,pending:false,failed:true,version:"unavailable",items:[]}))]);
     const plan = planTenantLivePriceSync({ targets, quotes });
-    const readVersion = livePriceReadVersion(targets, quotes, fxEvidence, native.version);
     // A manual click does not force another provider request for a fresh shared quote.
     const fxPlan = planTenantLiveFxSync({ currencies: targets.map(t => t.currency), evidence: fxEvidence, reason: "page_view" });
     const fxTarget = selectKisUsdKrwQuoteTarget({ targets, quotes });
@@ -43,7 +43,23 @@ export async function POST(request: Request) {
     const finish = async (body: Record<string, unknown>, status = 200, headers: Record<string, string> = {}) => {
       const required = configured ? normalizeCollectionJobs(plan.targets.map(target => ({ ...target, kind: "live" as const }))) : [];
       if (configured && fxPlan.hasUsdExposure && fxTarget) required.push(...normalizeCollectionJobs([{ kind: "fx", ticker: fxTarget.ticker, market: "us", currency: "USD" }]));
-      const queued = await readCollectionProgress(required.map(job => job.key));
+      const keysAt = (at: string) => required.filter(job => job.kind === "live").map(job => latestCloseCollectionJob(job,
+        closeCalendarReferenceDateForAsset(job, resolveSnapshotCycle(new Date(at)).snapshotDate)).key);
+      const currentCloseKeys = keysAt(readAt);
+      const previousCloseKeys = keysAt(startedAt).filter(key => !currentCloseKeys.includes(key));
+      const closeKeys = [...currentCloseKeys, ...previousCloseKeys];
+      // At most one 07:00 boundary fits a validated manual operation. Keep the
+      // earlier captured jobs visible without widening either bounded read.
+      const queued = (await Promise.all([
+        readCollectionProgress([...required.map(job => job.key), ...currentCloseKeys]),
+        previousCloseKeys.length ? readCollectionProgress(previousCloseKeys) : [],
+      ])).flat();
+      const closes = queued.filter(job => closeKeys.includes(job.key));
+      const comparison = { pending: closes.filter(job => job.status === "pending" || job.status === "running").length,
+        failed: closes.filter(job => job.status === "failed").length };
+      // Include durable close completion in read invalidation so today's change
+      // can catch up after quotes are already usable. Missing prices remain null.
+      const comparisonVersion = closes.filter(job => job.status === "done").map(job => `${job.key}:${job.completedAt}`).sort().join("|");
       const cutoff = Date.parse(startedAt) - TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds;
       const items = required.map(job => {
         const quote = quotes.filter(row => row.ticker.toUpperCase() === job.ticker && row.market.toLowerCase() === job.market && row.currency.toUpperCase() === job.currency)
@@ -65,7 +81,12 @@ export async function POST(request: Request) {
         id: `unsupported:${target.market}:${target.ticker}`, label: target.ticker, provider: "", valid: false, fresh: false, startedAt, supported: false }));
       const progress = refreshProgress(items);
       const state = refreshProgressState(progress);
-      return response({ ...body, state, startedAt, progress, readVersion, targetCount: targets.length }, state === "queued" ? 202 : status >= 400 ? status : 200, headers);
+      // A short progress interval is safe: polls only read owned work and resume
+      // the existing queue. They do not admit new quotes or bypass provider limits.
+      const retryAfterSeconds = 2;
+      return response({ ...body, retryAfterSeconds, state, startedAt, progress, comparison,
+        readVersion: livePriceReadVersion(targets, quotes, fxEvidence, `${native.version}:${comparisonVersion}`), targetCount: targets.length }, state === "queued" ? 202 : status >= 400 ? status : 200,
+        { ...headers, ...(state === "queued" ? { "Retry-After": String(retryAfterSeconds) } : {}) });
     };
     const jobs: CollectionInput[] = plan.staleTargets.map(target => ({ ...target, kind: "live" }));
     if (fxPlan.shouldRefresh && fxTarget) jobs.push({ kind: "fx", ticker: fxTarget.ticker, market: "us", currency: "USD" });

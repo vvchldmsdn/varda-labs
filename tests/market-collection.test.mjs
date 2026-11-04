@@ -51,10 +51,10 @@ async function workerFixture() {
       operation("history",targets[0].ticker);return {failedCount:0,fetchedRowCount:1,conflictCount:0,retryableRevisionCount:0};
     }},
     "@/lib/market-data/fx-refresh-job":{runUsdKrwFxCandidateJob:async()=>({ok:true})},
-    "@/lib/market-data/latest-close-revalidation":{revalidateLatestClose:async()=>{}},
+    "@/lib/market-data/latest-close-revalidation":{revalidateLatestClose:async({target,priceDate})=>{operation("close",target.ticker);assert.equal(priceDate,"2026-10-28");}},
     "@/lib/market-data/twelve-data-service":{resumeConfiguredTwelveDataService:()=>assert.fail("Another provider was not scheduled")},
     "@/lib/market-data/close-gap-sync":{syncMissingRawCloses:async job=>{operation("raw",job.ticker);return {complete:true};}},
-    "@/lib/snapshots/market-calendar":{resolveSnapshotCycle:()=>({snapshotDate:"2026-10-29"})},
+    "@/lib/snapshots/market-calendar":{resolveSnapshotCycle:()=>({snapshotDate:"2026-10-29"}),closeCalendarReferenceDateForAsset:()=>"2026-10-28"},
   });
   return {...runtime,worker,state};
 }
@@ -118,15 +118,15 @@ describe("durable market collection and distributed provider budgets",()=>{
     assert.equal(await queue.claimMarketCollection({provider:"kis"},"quotes"),null);
     assert.equal((await pg.query("select enqueued_at < now()-interval '3 hours' as original_age from market_collection_jobs where ticker='OLD'")).rows[0].original_age,true);
   });
-  it("services live and FX before aged failing history, while still stopping after each provider failure",async()=>{
+  it("services live and FX before recent failing history, while still stopping after each provider failure",async()=>{
     const {queue,worker,pg,state}=await workerFixture();
     await queue.enqueueMarketCollection(Array.from({length:17},(_,i)=>historyTarget(`H${String(i).padStart(2,"0")}`)));
-    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '4 hours',available_at=now()-interval '4 hours'");
+    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '2 minutes',available_at=now()-interval '2 minutes'");
     await queue.enqueueMarketCollection([...Array.from({length:14},(_,i)=>target(`L${String(i).padStart(2,"0")}`)),target("L00","fx")]);
     state.failure=kind=>kind==="history"?new Error("synthetic_history_endpoint_unavailable"):null;
     const first=await worker.drainMarketCollection();
-    assert.equal(first.processed,3);assert.equal(first.failed,1);
-    assert.deepEqual(state.operations.map(row=>row.kind),["fx","live","history"]);
+    assert.equal(first.processed,16);assert.equal(first.failed,1);
+    assert.deepEqual(state.operations.map(row=>row.kind),["fx",...Array(14).fill("live"),"history"]);
     for(let wake=1;wake<8;wake++){
       const before=state.operations.length;
       const result=await worker.drainMarketCollection();
@@ -139,18 +139,50 @@ describe("durable market collection and distributed provider budgets",()=>{
     assert.equal(state.operations.filter(row=>row.kind==="fx").length,1);
     assert.equal((await pg.query("select count(*)::integer as n from market_collection_jobs where kind in ('live','fx') and status='done'")).rows[0].n,15);
   });
-  it("offers history every third turn when both lanes are ready and falls back without wasting a turn",async()=>{
+  it("finishes a normal quote batch and still offers history a turn during a larger batch",async()=>{
     const {queue,worker,state}=await workerFixture();
-    await queue.enqueueMarketCollection([...Array.from({length:6},(_,i)=>target(`L${i}`)),historyTarget("H0"),historyTarget("H1")]);
-    const result=await worker.drainMarketCollection({maximumJobs:8});
-    assert.equal(result.processed,8);
-    assert.deepEqual(state.operations.map(row=>row.kind),["live","live","history","live","live","history","live","live"]);
+    await queue.enqueueMarketCollection([...Array.from({length:25},(_,i)=>target(`L${i}`)),historyTarget("H0"),historyTarget("H1")]);
+    const result=await worker.drainMarketCollection({maximumJobs:22});
+    assert.equal(result.processed,22);
+    assert.deepEqual(state.operations.map(row=>row.kind),[...Array(20).fill("live"),"history","live"]);
     for(const kind of ["history","live"]){
       const runtime=await workerFixture();
       await runtime.queue.enqueueMarketCollection(Array.from({length:5},(_,i)=>kind==="history"?historyTarget(`H${i}`):target(`L${i}`)));
-      assert.equal((await runtime.worker.drainMarketCollection()).processed,5);
+      assert.equal((await runtime.worker.drainMarketCollection({maximumJobs:5})).processed,5);
       assert.deepEqual(runtime.state.operations.map(row=>row.kind),Array(5).fill(kind));
     }
+  });
+  it("durably separates close failures from completed quotes and resumes the captured close date",async()=>{
+    const {queue,worker,pg,state}=await workerFixture();
+    await queue.enqueueMarketCollection([target("VOO")]);
+    await worker.drainMarketCollection({maximumJobs:1});
+    const rows=(await pg.query("select key,status,start_date::text as date from market_collection_jobs order by kind")).rows;
+    assert.equal(rows.length,2);assert.equal(rows[0].status,"pending");assert.equal(rows[0].date,"2026-10-28");
+    assert.equal(rows[1].status,"done");
+    state.failure=kind=>kind==="close"?new Error("close_unavailable"):null;
+    await worker.drainMarketCollection();
+    assert.deepEqual(state.operations.map(row=>row.kind),["live","close"]);
+    assert.equal((await pg.query("select status from market_collection_jobs where kind='live'")).rows[0].status,"done");
+    assert.equal((await pg.query("select status from market_collection_jobs where kind='history'")).rows[0].status,"pending");
+    // A restarted wake shares the same durable job rather than inventing another close.
+    await queue.enqueueLatestCloseCollection(target("VOO"),"2026-10-28");
+    assert.equal((await pg.query("select count(*)::int as n from market_collection_jobs")).rows[0].n,2);
+    assert.equal(await queue.claimMarketCollection({provider:"kis",historyOnly:true}),null,"backoff is preserved");
+    state.failure=null;await pg.exec("update market_collection_jobs set available_at=now() where kind='history'");
+    await worker.drainMarketCollection({partition:{provider:"kis",historyOnly:true}});
+    assert.equal((await pg.query("select count(*)::int as n from market_collection_jobs where status='done'")).rows[0].n,2);
+    await assert.rejects(queue.enqueueLatestCloseCollection(target(),"2026-02-30"),/date_invalid/);
+  });
+  it("rescues aged history across short worker wakes without letting a history backlog monopolize quotes",async()=>{
+    const {queue,worker,pg,state}=await workerFixture();
+    await queue.enqueueMarketCollection([historyTarget('H0'),historyTarget('H1'),...Array.from({length:10},(_,i)=>target(`Q${i}`))]);
+    await pg.exec("update market_collection_jobs set enqueued_at=now()-interval '6 minutes',available_at=now()-interval '6 minutes' where kind='history'");
+    // Even a wake that fits only one operation cannot reset the queue's age guard.
+    for(let i=0;i<5;i++)await worker.drainMarketCollection({maximumJobs:1});
+    assert.deepEqual(state.operations.map(row=>row.kind),['history','live','live','live','live']);
+    await pg.exec("update market_collection_jobs set updated_at=now()-interval '61 seconds' where kind='history' and status='done'");
+    await worker.drainMarketCollection({maximumJobs:1});
+    assert.equal(state.operations.at(-1).kind,'history');
   });
   it("keeps dedicated history and raw-close workers inside their original partitions",async()=>{
     const {queue,worker,pg,state}=await workerFixture();

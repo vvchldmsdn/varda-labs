@@ -11,14 +11,16 @@ import { closeCalendarReferenceDateForAsset, resolveSnapshotCycle } from "@/lib/
 type CloseTarget = Pick<CollectionJob, "ticker" | "market" | "currency">;
 
 /** Reconcile provider revisions of the latest shared close, never personal snapshot history. */
-export async function revalidateLatestClose({ target, provider, now = new Date() }: {
+export async function revalidateLatestClose({ target, provider, now = new Date(), priceDate = closeCalendarReferenceDateForAsset(target, resolveSnapshotCycle(now).snapshotDate) }: {
   target: CloseTarget;
   provider: MarketDataProvider;
   now?: Date;
+  priceDate?: string;
 }) {
   if (provider.name !== "kis") throw new Error("latest_close_requires_kis");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(priceDate) || !Number.isFinite(Date.parse(priceDate)) || new Date(priceDate).toISOString().slice(0, 10) !== priceDate ||
+      priceDate > closeCalendarReferenceDateForAsset(target, resolveSnapshotCycle(now).snapshotDate)) throw new Error("latest_close_date_invalid");
   return withKisCollectionLease(async () => {
-    const priceDate = closeCalendarReferenceDateForAsset(target, resolveSnapshotCycle(now).snapshotDate);
     const instrumentKey = `${target.market}:${target.currency}:${target.ticker}`;
     const [evidence] = await sqlClient.query(`select
       (select fetched_at from asset_price_snapshots where market=$1 and currency=$2 and ticker=$3 and date=$4::text::date

@@ -10,9 +10,11 @@ export type QuoteRefreshProgress = {
 };
 export type QuoteRefreshResponse = {
   state?: string; startedAt?: string; readVersion?: string; retryAfterSeconds?: number;
+  connectionUnavailable?: boolean;
   freshTargetCount?: number; targetCount?: number; progress?: QuoteRefreshProgress;
+  comparison?: { pending: number; failed: number };
 };
-export const MANUAL_REFRESH_MAX_CHECKS = 180;
+export const MANUAL_REFRESH_MAX_CHECKS = 900;
 export function refreshItem(input: {
   id: string; label: string; provider: string; fresh: boolean; valid: boolean;
   priceAsOf?: string | null; checkedAt?: string | null; job?: CollectionProgressRow;
@@ -23,8 +25,8 @@ export function refreshItem(input: {
   // slow queue. A queue success alone never supplies a missing/invalid price.
   const collected = input.valid && job?.status === "done" &&
     Date.parse(job.completedAt ?? "") >= Date.parse(input.startedAt);
-  // A live quote can be written before the job's close revalidation finishes.
-  // The durable job remains authoritative until all of its work terminates.
+  // The quote write can precede its durable completion. Historical close work
+  // has its own job and must not hold this quote in the running state.
   const completedAfterRead = job?.status === "done" && input.readAt !== undefined && Date.parse(job.completedAt ?? "") >= Date.parse(input.readAt);
   const state = input.supported === false ? "unavailable" : completedAfterRead ? "running" :
     job?.status === "failed" ? "failed" : job?.status === "running" ? "running" :

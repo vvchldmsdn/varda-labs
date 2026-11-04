@@ -2,6 +2,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MANUAL_REFRESH_MAX_CHECKS, type QuoteRefreshResponse } from "@/lib/market-data/quote-refresh-progress";
+import { quoteRefreshPollDelay } from "@/lib/market-data/quote-refresh-polling-policy";
 
 type WakeOutcome = { state: string; signature: string; data?: QuoteRefreshResponse };
 type PollingOutcome = { state: string; generation: unknown; startedAt?: string; keepCheckingHistory: boolean };
@@ -38,34 +39,46 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
     if (!active) return;
     const key = startedAt ?? "history";
     subscribers.set(key, (subscribers.get(key) ?? 0) + 1);
-    let cancelled = false, inFlight = false, count = 0, previousSignature = "";
+    let cancelled = false, count = 0, previousSignature = "", previousReadVersion = "", unchangedChecks = 0, lastState = "queued";
+    let lastData: QuoteRefreshResponse | undefined;
     const maximum = startedAt && !keepCheckingHistory ? MANUAL_REFRESH_MAX_CHECKS : 12;
+    const manual = Boolean(startedAt) && !keepCheckingHistory;
+    let timer: number;
     const recordOutcome = (state: string) => setOutcome({ state, generation, startedAt, keepCheckingHistory });
-    const timer = window.setInterval(async () => {
-      if (document.visibilityState !== "visible" || count >= maximum || inFlight) return;
+    const tick = async () => {
+      if (cancelled || count >= maximum) return;
       if (startedAt && Date.now() - Date.parse(startedAt) > 30 * 60_000) {
-        recordOutcome("waiting"); window.clearInterval(timer); return;
+        recordOutcome(["fresh", "partial", "empty"].includes(lastState) ? lastState : "waiting"); return;
       }
+      if (document.visibilityState !== "visible") { timer = window.setTimeout(tick, 10_000); return; }
       count++;
-      inFlight = true;
       const { state, signature, data } = await wakeCollection(startedAt);
-      inFlight = false;
       if (cancelled) return;
-      if (data) onProgress?.(data);
+      if (data) { lastData = data; onProgress?.(data); }
+      else if (lastData) onProgress?.({ ...lastData, connectionUnavailable: true });
       // This endpoint reports current quotes only. History readiness remains a
       // server-read concern; continuing its refreshes must not relabel fresh quotes.
       const complete = ["fresh", "partial", "empty"].includes(state);
-      recordOutcome(count >= maximum && !complete ? "waiting" : state);
+      // A lost follow-up connection cannot undo this operation's confirmed
+      // quotes. Keep their result; report the connection problem separately.
+      if (state !== "unavailable" || !["fresh", "partial", "empty"].includes(lastState)) lastState = state;
+      recordOutcome(count >= maximum && !["fresh", "partial", "empty"].includes(lastState) ? "waiting" : lastState);
       // Refresh changed evidence too: equal ready counts can hide price/FX updates.
       // History progresses in separate 30s checks.
-      if (state !== "unavailable" && (signature !== previousSignature || keepCheckingHistory && (count % 3 === 1 || count === 12))) {
+      const readVersion = data?.readVersion ?? signature;
+      if (state !== "unavailable" && (readVersion !== previousReadVersion || keepCheckingHistory && (count % 3 === 1 || count === 12))) {
         startTransition(() => router.refresh());
       }
+      if (state !== "unavailable") previousReadVersion = readVersion;
+      unchangedChecks = signature === previousSignature ? unchangedChecks + 1 : 0;
       previousSignature = signature;
-      if (count >= maximum || !keepCheckingHistory && complete) window.clearInterval(timer);
-    }, 10_000);
+      if (count < maximum && (keepCheckingHistory || !complete || Boolean(data?.comparison?.pending))) {
+        timer = window.setTimeout(tick, manual && !complete ? quoteRefreshPollDelay(data, unchangedChecks) : 10_000);
+      }
+    };
+    timer = window.setTimeout(tick, manual ? 2_000 : 10_000);
     return () => {
-      cancelled = true; window.clearInterval(timer);
+      cancelled = true; window.clearTimeout(timer);
       const remaining = (subscribers.get(key) ?? 1) - 1;
       if (remaining) subscribers.set(key, remaining);
       else {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTableName } from "drizzle-orm";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
-import { normalizeCollectionJobs } from "../src/lib/market-data/collection-policy.ts";
+import { latestCloseCollectionJob, normalizeCollectionJobs } from "../src/lib/market-data/collection-policy.ts";
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const target = { ticker: "QQQ", market: "us", currency: "USD" };
@@ -58,6 +58,7 @@ async function fixture(options = {}) {
       fetchKisUsdKrwFxCandidate: async input => { events.push("provider_fx"); assert.equal(input.target.ticker, "QQQ"); return {}; },
     },
     "@/lib/market-data/collection-queue": {
+      enqueueLatestCloseCollection: async (target,date) => {const job=latestCloseCollectionJob(target,date);pending.set(job.key,{...job,attempts:1,claimToken:'test'});},
       readCollectionProgress: async keys => keys.flatMap(key => config.queueStates?.filter(row=>row.key===key) ??
         (pending.has(key) ? [{key,status:'pending',attempts:1,availableAt:null,completedAt:null,code:null}] :
         outcomes.filter(row=>row.job.key===key).slice(-1).map(row=>({key,status:row.outcome.ok?'done':'failed',completedAt:row.completedAt,availableAt:null,attempts:1,code:null})))),
@@ -83,7 +84,7 @@ async function fixture(options = {}) {
       config.closeFetchedAt = input.rows[0].fetchedAt;
       return { failedCount: 0, conflictCount: 0, updatedCount: 1 };
     } },
-    "@/lib/market-data/fx-refresh-job": { runUsdKrwFxCandidateJob: async () => ({ ok: true }) },
+    "@/lib/market-data/fx-refresh-job": { runUsdKrwFxCandidateJob: async () => {config.fx=fx();return {ok:true};} },
   });
   return { route, events, queued, callbacks, outcomes, config, pending,
     async drain() { for (const callback of callbacks.splice(0)) await callback(); } };
@@ -132,7 +133,7 @@ describe("tenant live-price enqueue and after boundary", () => {
     const f = await fixture({ fx: null });
     const response = await f.route.POST(request());
     assert.equal(response.status, 202);
-    assert.equal(response.headers.get("Retry-After"), "10");
+    assert.equal(response.headers.get("Retry-After"), "2");
     assert.equal(response.headers.get("Cache-Control"), "no-store");
     const body = await response.json();
     assert.equal(body.state, "queued");
@@ -145,7 +146,7 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.doesNotMatch(JSON.stringify([body, jobs]), /owner|account|quantity|credential|aaaaaaaa/i);
     await f.drain();
     assert.deepEqual(f.events.filter(event => event.startsWith("provider") || event === "lease"), ["lease", "provider_live", "provider_fx"]);
-    assert.equal(f.outcomes.length, 2);
+    assert.equal(f.outcomes.length, 3);
     assert.ok(f.outcomes.every(result => result.outcome.ok));
   });
 
@@ -170,7 +171,7 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(f.events.includes("provider_live"), false);
   });
 
-  it("revalidates a stale shared close only after the queued live update and before marking work complete", async () => {
+  it("revalidates a stale shared close in a separate job after completing the live update", async () => {
     const f = await fixture({ closeFetchedAt: null });
     assert.equal((await f.route.POST(request())).status, 202);
     assert.equal(f.events.includes("provider_close"), false);
@@ -181,16 +182,16 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(f.events.filter(event => event === "lease").length, 1);
   });
 
-  it("does not mark a successful live refresh complete when close revalidation failed", async () => {
+  it("keeps successful quotes complete and reports close revalidation failure separately", async () => {
     const f = await fixture({ closeFetchedAt: null, closeFailure: true, fx: null });
     await f.route.POST(request()); await f.drain();
-    assert.deepEqual(f.events.filter(event => event.startsWith("provider")), ["provider_live", "provider_close"]);
-    assert.equal(f.outcomes.length, 1); assert.equal(f.outcomes[0].outcome.ok, false);
-    assert.ok(f.outcomes[0].outcome.retryAfterSeconds >= 15);
+    assert.deepEqual(f.events.filter(event => event.startsWith("provider")), ["provider_live", "provider_fx", "provider_close"]);
+    assert.equal(f.outcomes.length, 3); assert.equal(f.outcomes[0].outcome.ok, true);
+    assert.equal(f.outcomes[2].outcome.ok,false);assert.ok(f.outcomes[2].outcome.retryAfterSeconds >= 15);
     assert.equal(f.events.includes("write_close"), false);
-    assert.equal(f.pending.size, 1);
-      const next = await f.route.POST(request({body:{reason:'poll'}}));
-      assert.equal((await next.json()).state, 'queued', 'fresh live write cannot hide pending close revalidation');
+    assert.equal(f.pending.size, 0);
+    const next = await (await f.route.POST(request({body:{reason:'poll'}}))).json();
+    assert.equal(next.state,'fresh');assert.equal(next.comparison.failed,1);
   });
 
   it("polls an authorized owner's cached state without admitting another job or consuming an idle lease", async () => {
@@ -206,25 +207,23 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(f.events.filter(event => event.startsWith("provider")).length, 0);
   });
 
-  it("caps one after worker at five jobs and leaves the remaining shared job pending", async () => {
+  it("does not pause at five jobs when the bounded worker still has execution time", async () => {
     const f = await fixture({ targets: Array.from({ length: 6 }, (_, index) => ({ ...target, ticker: `Q${index}` })) });
     const response = await f.route.POST(request());
     assert.equal(response.status, 202);
     assert.equal((await response.json()).queuedTargetCount, 6);
     await f.drain();
-    assert.equal(f.events.filter(event => event === "provider_live").length, 5);
+    assert.equal(f.events.filter(event => event === "provider_live").length, 6);
     assert.equal(f.events.filter(event => event === "deadline").length, 1);
-    assert.equal(f.pending.size, 1);
-    assert.equal(f.outcomes.length, 5);
+    assert.equal(f.pending.size, 0);
+    assert.equal(f.outcomes.length, 12);
   });
 
   it("one manual admission completes eight owned instruments across bounded worker wakes",async()=>{
     const f=await fixture({targets:Array.from({length:8},(_,index)=>({...target,ticker:`Q${index}`}))});
     const first=await (await f.route.POST(request())).json();assert.equal(first.state,'queued');
-    await f.drain();assert.equal(f.pending.size,3);
-    const middle=await (await f.route.POST(request({body:{reason:'poll',startedAt:first.startedAt}}))).json();
-    assert.equal(middle.state,'queued');assert.equal(middle.progress.items.filter(row=>row.state==='ready'&&row.label!=='USD/KRW').length,5);
-    await f.drain();const last=await (await f.route.POST(request({body:{reason:'poll',startedAt:first.startedAt}}))).json();
+    await f.drain();assert.equal(f.pending.size,0);
+    const last=await (await f.route.POST(request({body:{reason:'poll',startedAt:first.startedAt}}))).json();
     assert.equal(last.state,'fresh');assert.equal(last.progress.pending,0);assert.equal(last.progress.failed,0);
     assert.equal(f.queued.length,1);assert.equal(f.events.filter(event=>event==='provider_live').length,8);
   });
@@ -236,6 +235,18 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(data.state,'queued');assert.equal(data.progress.items[0].state,'delayed');
     f.config.queueStates[0].status='failed';data=await (await f.route.POST(request({body:{reason:'poll'}}))).json();
     assert.equal(data.state,'partial');assert.equal(data.progress.failed,1);assert.equal(f.queued.length,0);
+  });
+  it("keeps the original comparison job visible across the 07:00 cutoff",async t=>{
+    const startedAt="2026-09-10T21:59:00.000Z";
+    t.mock.timers.enable({apis:['Date'],now:new Date("2026-09-10T22:01:00.000Z")});
+    const key=latestCloseCollectionJob(target,"2026-09-09").key;
+    const f=await fixture({quotes:[quote()],queueStates:[{key,status:'pending',availableAt:"2026-09-10T22:15:00.000Z",attempts:1}]});
+    let data=await (await f.route.POST(request({body:{reason:'poll',startedAt}}))).json();
+    assert.equal(data.state,'fresh');assert.equal(data.comparison.pending,1);
+    const before=data.readVersion;
+    f.config.queueStates[0]={key,status:'done',completedAt:"2026-09-10T22:00:59.000Z",attempts:1};
+    data=await (await f.route.POST(request({body:{reason:'poll',startedAt}}))).json();
+    assert.equal(data.comparison.pending,0);assert.notEqual(data.readVersion,before);
   });
 
   it("yields after one failed provider operation, leaving the FX lane for a later worker", async () => {

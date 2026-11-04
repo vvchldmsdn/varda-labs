@@ -86,13 +86,40 @@ describe("tracked owner provider integration with isolated boundary ports", () =
 });
 
 describe("existing worker independently resumes the Twelve Data partition", () => {
+  it("coalesces wakes per provider without making an idle KIS lane wait for busy Twelve Data",async()=>{
+    const scheduled=[],td=Promise.withResolvers(),kis=Promise.withResolvers();let kisWakes=0,tdWakes=0;
+    const [worker]=await importWithPorts(['src/lib/market-data/collection-worker.ts'],{
+      'next/server':{after:callback=>scheduled.push(callback)},
+      '@/db/client':{db:{}},'@/db/schema':{fxRates:{},livePriceQuotes:{}},
+      '@/lib/market-data/collection-queue':{
+        enqueueLatestCloseCollection:async()=>{},claimMarketCollection:async()=>null,finishMarketCollection:async()=>{},getMarketCollectionSummary:async()=>({}),
+        maintainMarketCollection:async()=>{kisWakes++;if(kisWakes>1)await kis.promise;},hasReadyMarketCollection:async()=>false,
+      },
+      '@/lib/market-data/kis-refresh-lease':{KisRefreshLeaseBusyError:class extends Error{},withKisCollectionLease:task=>task()},
+      '@/lib/market-data/price-sync':{runMarketPriceSync:async()=>{}},
+      '@/lib/market-data/kis-history-cache-sync':{runKisHistoryCacheSync:async()=>{}},
+      '@/lib/market-data/providers/kis':{createKisMarketDataProvider:()=>({}),createKisProviderRequestSession:()=>({}),fetchKisUsdKrwFxCandidate:async()=>({}),getKisProviderPolicy:()=>({configured:false})},
+      '@/lib/market-data/fx-refresh-job':{runUsdKrwFxCandidateJob:async()=>{}},
+      '@/lib/market-data/provider-budget':{withKisCollectionDeadline:task=>task()},
+      '@/lib/market-data/latest-close-revalidation':{revalidateLatestClose:async()=>{}},
+      '@/lib/market-data/close-gap-sync':{syncMissingRawCloses:async()=>{}},
+      '@/lib/market-data/twelve-data-service':{resumeConfiguredTwelveDataService:async()=>{tdWakes++;await td.promise;}},
+    });
+    worker.scheduleMarketCollection();const first=scheduled.shift()();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(kisWakes,1);assert.equal(tdWakes,1);
+    worker.scheduleMarketCollection();const second=scheduled.shift()();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(kisWakes,2);assert.equal(tdWakes,1,'busy provider does not stall the other lane');
+    worker.scheduleMarketCollection();const third=scheduled.shift()();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(kisWakes,2);assert.equal(tdWakes,1,'in-flight wakes are deduplicated per provider');
+    kis.resolve();td.resolve();await Promise.all([first,second,third]);
+  });
   it("runs the configured resumer even when KIS queue is idle or its availability check fails", async () => {
     for (const fail of [false, true]) {
       const scheduled = []; let resumed = 0;
       const [worker] = await importWithPorts(["src/lib/market-data/collection-worker.ts"], {
         "next/server": { after: callback => scheduled.push(callback) },
         "@/db/client": { db: {} }, "@/db/schema": { fxRates: {}, livePriceQuotes: {} },
-        "@/lib/market-data/collection-queue": { claimMarketCollection: async () => null, finishMarketCollection: async () => {}, getMarketCollectionSummary: async () => ({}), maintainMarketCollection: async () => {}, hasReadyMarketCollection: async () => { if (fail) throw new Error("isolated_kis_unavailable"); return false; } },
+        "@/lib/market-data/collection-queue": { enqueueLatestCloseCollection: async () => {}, claimMarketCollection: async () => null, finishMarketCollection: async () => {}, getMarketCollectionSummary: async () => ({}), maintainMarketCollection: async () => {}, hasReadyMarketCollection: async () => { if (fail) throw new Error("isolated_kis_unavailable"); return false; } },
         "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async callback => callback() },
         "@/lib/market-data/price-sync": { runMarketPriceSync: async () => {} },
         "@/lib/market-data/kis-history-cache-sync": { runKisHistoryCacheSync: async () => {} },
