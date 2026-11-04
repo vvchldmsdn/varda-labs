@@ -206,15 +206,23 @@ describe("latest shared close revalidation", () => {
     await queue.enqueueMarketCollection([{ ...target, kind: "live" }]);
     let result = await worker.drainMarketCollection();
     assert.equal(result.failed, 1);
-    let state = (await f.pg.query("select status,attempts,available_at>clock_timestamp() as backed_off,last_code from market_collection_jobs")).rows[0];
+    assert.equal((await f.pg.query("select status from market_collection_jobs where kind='live'")).rows[0].status,"done");
+    let state = (await f.pg.query("select status,attempts,available_at>clock_timestamp() as backed_off,last_code from market_collection_jobs where kind='history'")).rows[0];
     assert.equal(state.status, "pending"); assert.equal(state.attempts, 1); assert.equal(state.backed_off, true);
     assert.equal(state.last_code, "provider_unavailable"); assert.equal(liveCalls, 1); assert.equal(f.calls(), 1);
     f.setRows([f.row()]);
     await f.pg.exec("update market_collection_jobs set available_at=clock_timestamp()-interval '1 second'");
     result = await worker.drainMarketCollection();
-    state = (await f.pg.query("select status from market_collection_jobs")).rows[0];
+    state = (await f.pg.query("select status from market_collection_jobs where kind='history'")).rows[0];
     assert.equal(result.failed, 0); assert.equal(state.status, "done");
     assert.equal(liveCalls, 1); assert.equal(f.calls(), 2); assert.equal(Number((await f.stored())[0].close_price), 315.34);
+  });
+  it("keeps an explicitly queued close date when a worker resumes after the cutoff",async()=>{
+    const f=await fixture({now:new Date("2026-09-10T21:59:00Z")});
+    const later=new Date("2026-09-10T22:01:00Z");
+    assert.equal((await f.revalidation.revalidateLatestClose({target,provider:f.provider,now:later,priceDate:f.date})).priceDate,f.date);
+    assert.equal((await f.stored())[0].date,f.date);
+    for(const date of ["2026-02-30","2026-09-12"])await assert.rejects(f.revalidation.revalidateLatestClose({target,provider:f.provider,now:later,priceDate:date}),/date_invalid/);
   });
 });
 

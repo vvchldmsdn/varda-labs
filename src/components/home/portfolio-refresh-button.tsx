@@ -48,7 +48,7 @@ export function PortfolioRefreshButton({
     };
   }, [designPreview]);
   const progressChanged = useCallback((data: SyncResponse) => setReceipt(data), []);
-  const collectionState = useMarketCollectionPolling(syncState === "queued" && !designPreview, collectionGeneration, false, startedAt, progressChanged);
+  const collectionState = useMarketCollectionPolling((syncState === "queued" || Boolean(receipt?.comparison?.pending)) && !designPreview, collectionGeneration, false, startedAt, progressChanged);
   const displayState = syncState === "queued" && collectionState === "partial" ? "partial" : syncState === "queued" && ["fresh", "empty"].includes(collectionState ?? "") ? "fresh" : syncState === "queued" && collectionState === "waiting" ? "waiting" : syncState;
   const pending = syncState === "syncing" || displayState === "queued" || refreshPending;
 
@@ -125,8 +125,10 @@ export function PortfolioRefreshButton({
       </summary>
       <div className="absolute right-0 top-full z-50 mt-2 max-h-80 w-[min(340px,calc(100vw-32px))] overflow-y-auto border border-[var(--line)] bg-[var(--paper)] p-4 text-[var(--ink)] shadow-sm">
         <p className="mb-3">{t("종목·환율 조회 결과", "Quote and exchange-rate checks")}</p>
+        {receipt.comparison && receipt.comparison.pending > 0 && <p role="status" className="mb-3">{t("시세는 먼저 반영해요. 오늘 변동의 비교 기준은 확인 대기 중이에요.", "Quotes update first. Comparison prices for today's change are awaiting verification.")}</p>}
+        {receipt.comparison && receipt.comparison.failed > 0 && <p role="status" className="mb-3">{t("일부 종목의 비교 기준을 확인하지 못했어요.", "Some comparison prices could not be checked.")}</p>}
         {displayState === "waiting" && <p role="status" className="mb-3">{t("확인 시간이 길어져 멈췄어요. 완료되지 않은 항목은 다시 갱신할 수 있어요.", "Checking timed out. You can retry the remaining items.")}</p>}
-        {collectionState === "unavailable" && <p role="status">{t("연결을 다시 확인하고 있어요.", "Retrying the connection.")}</p>}
+        {(collectionState === "unavailable" || receipt.connectionUnavailable) && <p role="status">{t("연결을 확인하지 못했어요.", "The connection could not be checked.")}</p>}
         <ul>{receipt.progress.items.map(item => <li key={item.id} className="border-t border-[var(--line)] py-2">
           <div className="flex justify-between gap-3"><span>{item.label} <small>{item.provider}</small></span><span>{t(...progressLabel(item.state))}</span></div>
           {item.priceAsOf && <p className="mt-1 text-[var(--muted)]">{t("가격 기준", "Price as of")} {formatTime(item.priceAsOf)}</p>}

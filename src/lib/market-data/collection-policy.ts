@@ -10,10 +10,10 @@ export type CollectionJob = Readonly<{
 }>;
 
 export const MARKET_COLLECTION_POLICY = Object.freeze({
-  maximumEnqueueTargets: 40, maximumWorkerJobs: 5, workerBudgetMs: 40_000,
+  maximumEnqueueTargets: 40, maximumWorkerJobs: 40, workerBudgetMs: 40_000,
   jobLeaseSeconds: 180, maximumAttempts: 6, historyWindowDays: 90,
   pollAfterSeconds: 10, maximumPendingJobs: 10_000,
-  quoteClaimsBeforeHistory: 2,
+  quoteClaimsBeforeHistory: 20,
 } as const);
 
 /** No accounts, quantities, owner identifiers or provider credentials enter this queue. */
@@ -48,6 +48,13 @@ export function normalizeCollectionJobs(inputs: readonly CollectionInput[]): Col
 
 export function collectionRetrySeconds(attempt: number, random = Math.random()) {
   return Math.min(3600, 15 * 2 ** Math.min(8, Math.max(0, attempt - 1))) + Math.floor(Math.max(0, Math.min(1, random)) * 10);
+}
+
+export function latestCloseCollectionJob(target: Pick<CollectionJob, "ticker" | "market" | "currency">, priceDate: string): CollectionJob {
+  const [identity] = normalizeCollectionJobs([{ ...target, kind: "live" }]);
+  dateMilliseconds(priceDate);
+  return { ...identity, kind: "history", startDate: priceDate, endDate: priceDate,
+    key: ["kis:history:latest_close_v1", identity.market, identity.currency, identity.ticker, priceDate, priceDate].join(":") };
 }
 
 export function isProviderCollectionDeferred(error: unknown): error is Error & { retryAfterSeconds: number } {

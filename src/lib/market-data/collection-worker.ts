@@ -3,26 +3,33 @@ import { after } from "next/server";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fxRates, livePriceQuotes } from "@/db/schema";
-import { claimMarketCollection, finishMarketCollection, getMarketCollectionSummary, hasReadyMarketCollection, maintainMarketCollection, type ClaimedCollectionJob } from "@/lib/market-data/collection-queue";
+import { claimMarketCollection, enqueueLatestCloseCollection, finishMarketCollection, getMarketCollectionSummary, hasReadyMarketCollection, maintainMarketCollection, type ClaimedCollectionJob } from "@/lib/market-data/collection-queue";
 import { MARKET_COLLECTION_POLICY, collectionRetrySeconds, isProviderCollectionDeferred } from "@/lib/market-data/collection-policy";
 import { KisRefreshLeaseBusyError, withKisCollectionLease } from "@/lib/market-data/kis-refresh-lease";
 import { runMarketPriceSync } from "@/lib/market-data/price-sync";
 import { runKisHistoryCacheSync } from "@/lib/market-data/kis-history-cache-sync";
 import { createKisMarketDataProvider, createKisProviderRequestSession, fetchKisUsdKrwFxCandidate, getKisProviderPolicy } from "@/lib/market-data/providers/kis";
 import { runUsdKrwFxCandidateJob } from "@/lib/market-data/fx-refresh-job";
-import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { closeCalendarReferenceDateForAsset, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { withKisCollectionDeadline } from "@/lib/market-data/provider-budget";
 import { revalidateLatestClose } from "@/lib/market-data/latest-close-revalidation";
 import { resumeConfiguredTwelveDataService } from "@/lib/market-data/twelve-data-service";
 import { syncMissingRawCloses } from './close-gap-sync';
 import type { CollectionPartition } from './collection-queue';
 
-/** Durable queue owns the work. A terminated after callback is recoverable. */
+let scheduledKis: Promise<unknown> | undefined;
+let scheduledTwelveData: Promise<unknown> | undefined;
+
+/** Durable queue owns the work. A terminated after callback is recoverable.
+ * Frequent progress reads share a warm-instance wake; the DB lease still owns
+ * cross-instance exclusion. Every after callback awaits the shared lifetime. */
 export function scheduleMarketCollection(before?:()=>Promise<unknown>) {
   after(async () => {
     if(before)await before().catch(()=>undefined);
     // Each partition resumes even if the other is idle, disabled, cooling down, or fails.
-    await Promise.allSettled([drainMarketCollection(), resumeConfiguredTwelveDataService()]);
+    scheduledKis ??= drainMarketCollection().finally(() => { scheduledKis = undefined; });
+    scheduledTwelveData ??= resumeConfiguredTwelveDataService().finally(() => { scheduledTwelveData = undefined; });
+    await Promise.allSettled([scheduledKis, scheduledTwelveData]);
   });
 }
 
@@ -39,7 +46,8 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
       const session = createKisProviderRequestSession();
       const provider = createKisMarketDataProvider(session);
       while (processed < Math.min(40,options.maximumJobs??MARKET_COLLECTION_POLICY.maximumWorkerJobs) && Date.now() < deadline) {
-        // Give interactive quotes/FX the first turns, then offer history a turn.
+        // Finish a normal portfolio's quotes/FX before slow history. Larger
+        // batches still offer history a turn; dedicated history wakes are unchanged.
         // The queue falls back immediately when a preferred lane has no ready work.
         // Provider failures/deadlines still stop this wake; this is not a quota guarantee.
         const preferredLane = partition.provider === "kis" && !partition.historyOnly && !partition.rawCloses
@@ -58,7 +66,11 @@ export async function drainMarketCollection(options: {partition?:CollectionParti
                 explicitTargets: [{ ticker: job.ticker, market: job.market, currency: job.currency }] });
               ok = result.successCount === 1 && result.failedCount === 0;
             }
-            if (ok) await revalidateLatestClose({ target: job, provider });
+            if (ok) await enqueueLatestCloseCollection(job,
+              closeCalendarReferenceDateForAsset(job, resolveSnapshotCycle(new Date()).snapshotDate));
+          } else if (job.kind === "history" && job.key.startsWith("kis:history:latest_close_v1:") && job.startDate === job.endDate && job.startDate) {
+            await revalidateLatestClose({ target: job, provider, priceDate: job.startDate });
+            ok = true;
           } else if(job.kind==='history'&&job.key.startsWith('kis:history:raw_close_v1:')){
             const result=await syncMissingRawCloses(job,provider);
             ok=result.complete;failureCode='raw_close_still_missing';
