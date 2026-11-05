@@ -28,8 +28,9 @@ export async function runBrowserCases({admin,worker,tenant,report,output}) {
  const entry=path.join(output,'entry.tsx'),bundle=path.join(output,'ui.js');
  await writeFile(entry,`import React from 'react';import{createRoot}from'react-dom/client';import{NativeLedgerView}from'${path.join(ROOT,'src/components/native-ledger-view.tsx').replaceAll('\\','/')}';createRoot(document.getElementById('root')!).render(<NativeLedgerView compact initialSelection={{accountId:'${account}',assetId:'${asset}',action:'buy'}}/>);`);
  await build({entryPoints:[entry],outfile:bundle,bundle:true,platform:'browser',format:'iife',jsx:'automatic',tsconfig:path.join(ROOT,'tsconfig.json'),define:{'process.env.NODE_ENV':'"production"'},loader:{'.module.css':'local-css'},plugins:[{name:'shell-only-ports',setup(b){
-  b.onResolve({filter:/^(next\/link|next\/navigation|@\/components\/app-navigation)$/},a=>({path:a.path,namespace:'shell'}));
-  b.onLoad({filter:/.*/,namespace:'shell'},a=>({loader:'jsx',resolveDir:ROOT,contents:a.path==='next/link'?`import React from 'react';export default function Link(p){return <a {...p}/>}`:a.path==='next/navigation'?`export const usePathname=()=>'/portfolio/ledger';export const useSearchParams=()=>new URLSearchParams();export const useRouter=()=>({push:()=>{},refresh:()=>{}});`:`export function AppNavigation(){return null;}`}));
+  b.onResolve({filter:/^(next\/link|next\/image|next\/navigation|@\/components\/app-navigation)$/},a=>({path:a.path,namespace:'shell'}));
+  // This fixture has no Next compiler/runtime; actual Next image handling is covered by full-app journeys.
+  b.onLoad({filter:/.*/,namespace:'shell'},a=>({loader:'jsx',resolveDir:ROOT,contents:a.path==='next/link'?`import React from 'react';export default function Link(p){return <a {...p}/>}`:a.path==='next/image'?`import React from 'react';export default function Image({unoptimized,priority,fill,loader,quality,placeholder,blurDataURL,...props}){return <img {...props}/>}`:a.path==='next/navigation'?`export const usePathname=()=>'/portfolio/ledger';export const useSearchParams=()=>new URLSearchParams();export const useRouter=()=>({push:()=>{},refresh:()=>{}});`:`export function AppNavigation(){return null;}`}));
  }}]});
  let blockNextCommit=true;
  const server=createServer(async(req,res)=>{
@@ -50,10 +51,12 @@ export async function runBrowserCases({admin,worker,tenant,report,output}) {
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const url=`http://127.0.0.1:${server.address().port}`,browser=await chromium.launch({headless:true});
  let activePage;
- async function check(name,fn){const c={name,status:'FAIL'};report.cases.push(c);try{await fn();c.status='PASS';}catch(error){await activePage?.screenshot({path:path.join(output,'failure.png'),fullPage:true});c.visibleText=await activePage?.locator('body').innerText();throw error;}}
+ const pageErrors=[];
+ async function check(name,fn){const c={name,status:'FAIL'};report.cases.push(c);try{await fn();assert.deepEqual(pageErrors,[],'Browser runtime errors');c.status='PASS';}catch(error){await activePage?.screenshot({path:path.join(output,'failure.png'),fullPage:true});c.visibleText=await activePage?.locator('body').innerText();c.pageErrors=[...pageErrors];throw error;}}
  try {
   const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();
   activePage=page;
+  page.on('pageerror',error=>pageErrors.push(error.message));
   await context.route('**/*',async route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
   await page.goto(url);
   await check('browser-commit-response-lost-refresh-relogin-exactly-one',async()=>{

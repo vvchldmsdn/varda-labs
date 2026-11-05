@@ -1,0 +1,22 @@
+.entry{min-width:0;border-bottom:1px solid var(--line);padding:0 0 12px;margin-bottom:8px}
+.trigger{display:inline-flex;align-items:center;gap:8px}
+.review{display:grid;gap:18px;padding:18px 0 4px;min-width:0;animation:reveal 150ms ease-out}
+.review h3{margin:0;font-size:20px;font-weight:500;letter-spacing:-.03em;line-height:1.4}
+.note{font-size:13px;color:var(--muted);line-height:1.6;margin:0;overflow-wrap:anywhere}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;min-width:0}
+.amount input[data-cairn-control]{font-size:23px;min-height:56px;font-variant-numeric:tabular-nums}
+.mode,.actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.mode button{flex:1}
+.confirm{display:flex!important;align-items:flex-start;gap:10px!important;line-height:1.6;font-size:13px!important}
+.confirm input[data-cairn-control]{flex:none;width:19px;min-height:19px;height:19px;padding:0;margin-top:2px}
+.photo{min-width:0;font-size:13px;border-bottom:1px solid var(--line)}
+.photo summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.photo img{width:100%;height:auto;max-height:380px;object-fit:contain;display:block;margin:0 0 14px}
+.progress{display:grid;gap:12px;padding:16px 0}.progress progress{width:100%;height:4px;accent-color:var(--accent)}
+.issue{color:var(--danger,#bb3e25);font-size:13px;line-height:1.6;margin:0}
+.actions{justify-content:space-between;padding-top:4px}.actions>button:first-child{min-width:130px}
+.success{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin:8px 0 0}
+@keyframes reveal{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:380px){.pair{grid-template-columns:1fr}.review{gap:16px}.actions>button{flex:1}}
+@media(prefers-reduced-motion:reduce){.review{animation:none}}
+:global([data-reduced=true]) .review{animation:none}

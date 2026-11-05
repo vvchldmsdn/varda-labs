@@ -4,11 +4,38 @@ import {importWithPorts} from './helpers/import-with-ports.mjs';
 import {createNativePortfolioState,applyNativeEvent,projectNativeInvestmentEvent,resolveNativeTrade,nativeCostAmounts} from '../src/lib/native-portfolio-ledger.ts';
 import {investmentEventKey} from '../src/lib/native-investment-basis.ts';
 import {tradeEntryKey,saveTradeEntry,readTradeEntry,clearTradeEntry} from '../src/lib/trade-entry-draft.ts';
-import {editLedgerDraft,freshLedgerKindDraft} from '../src/lib/ledger-form-draft.ts';
+import {editLedgerDraft,freshLedgerKindDraft,applyTradePhotoFields} from '../src/lib/ledger-form-draft.ts';
+import {existingPhotoFillTrades} from '../src/lib/trade-photo-ledger.ts';
 const [input] = await importWithPorts(['src/components/native-trade-input.ts'],{});
 const at='2026-10-01T00:00:00Z';
 const opening=()=>createNativePortfolioState({accountId:'account',at,cash:{KRW:'0',USD:'0'},positions:[]}).state;
 const fill=(type,quantity,total)=>({id:'fill',sequence:1,at:'2026-10-02T00:00:00Z',source:'synthetic',...input.tradeInputFromFields(type,{inputMode:'execution_total',quantity,executionTotal:total,memo:'실제 체결 확인'},'USD','asset')});
+
+test('applying a reviewed photo preserves decimals without inheriting old cash, fees or a correction target',()=>{
+  const previous={assetId:'old',at,assetType:'etf',quantity:'7',inputMode:'net',netTotal:'100',fee:'2',tax:'1',memo:'old draft',replaces:'old-entry',historyMode:'yes',notInOpening:'yes',afterEventId:'old-order',reason:'old reason'};
+  const photo={quantity:'0.896567',price:'701.263896',executionTotal:'',inputMode:'execution',timePrecision:'date_only',tradeDate:'2026-10-02',currency:'USD'};
+  const fields=applyTradePhotoFields(previous,'asset',photo);
+  assert.equal(fields.at,at);assert.equal(fields.quantity,'0.896567');assert.equal(fields.historyMode,'yes');
+  for(const key of ['netTotal','fee','tax','memo','replaces','notInOpening','afterEventId','reason'])assert.equal(fields[key],undefined);
+  assert.equal(previous.quantity,'7');assert.equal(previous.netTotal,'100');
+  const event=input.tradeInputFromFields('buy',fields,'USD','asset');
+  assert.equal(event.settlementStatus,'unconfirmed');assert.equal(event.price,'701.263896');assert.equal(event.settlement,undefined);assert.equal(event.fee,undefined);
+  const total=applyTradePhotoFields(previous,'asset',{...photo,price:'',inputMode:'execution_total',executionTotal:'10'});
+  assert.equal(input.tradeInputFromFields('buy',total,'USD','asset').executionTotal.amount,'10');
+});
+
+test('photo duplicate evidence is scoped to the account and uses execution currency and Korean trade dates',()=>{
+  const buy={type:'buy',at:'2026-11-04T16:00:00Z',assetId:'VOO',quantity:'0.896567',currency:'USD',price:'701.263896'};
+  const rows=existingPhotoFillTrades([
+    {accountId:'A',event:buy}, {accountId:'B',event:buy},
+    {accountId:'A',event:{type:'deposit',at:buy.at,amount:'10'}},
+    {accountId:'A',event:{...buy,price:undefined,dateEvidence:{reportedDate:'2026-11-04'},executionTotal:{amount:'628.91',currency:'USD'}}},
+    {accountId:'A',event:{...buy,price:undefined,executionTotal:{amount:'1000000',currency:'KRW'},executionUnitPrice:{amount:'1000',currency:'KRW'}}},
+  ],'A');
+  assert.equal(rows.length,3);assert.equal(rows[0].date,'2026-11-05');assert.equal(rows[0].price,'701.263896');
+  assert.equal(rows[1].date,'2026-11-04');assert.equal(rows[1].executionTotal,'628.91');
+  assert.equal(rows[2].executionTotal,undefined);assert.equal(rows[2].price,undefined);
+});
 
 test('settlement controls return to the explicit execution total without using a retained per-share price',()=>{
   const original={inputMode:'execution_total',quantity:'0.896567',executionTotal:'628.91',price:'10',memo:'retained'};
