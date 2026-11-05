@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { expect } from '@playwright/test';
 import { resolveSnapshotCycle, buildCycleForSnapshotDate } from '../src/lib/snapshots/market-calendar.ts';
+import { refreshProgress, refreshProgressState } from '../src/lib/market-data/quote-refresh-progress.ts';
 
 /** Disposable PostgreSQL only. Keep the real authenticated API read receipt and
  * App Router rendering; model the provider's asynchronous queue with a response
@@ -30,15 +31,22 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
       const page=await context.newPage(),requests=[];
       const result={name:`manual-refresh-${surface}-${viewport.width}`,status:'FAIL'};report.cases.push(result);
       try {
-        let queueComplete=false;
+        let queueComplete=false,acceptedOperation;
         await quote(200);
         await page.clock.install({time:new Date()});
         await page.route('**/api/portfolio/live-prices/sync',async route=>{
           const response=await route.fetch(),body=await response.json();
           assert.equal(response.status(),200,'Actual authenticated read must succeed with fresh synthetic evidence');
           assert.match(body.readVersion,/^[a-f0-9]{64}$/);
+          if(route.request().postDataJSON().reason==='manual')acceptedOperation=body.operation;
+          else assert.deepEqual(route.request().postDataJSON().operation,acceptedOperation,'Polls retain the accepted owner and targets');
           requests.push({reason:route.request().postDataJSON().reason,readVersion:body.readVersion});
-          await route.fulfill({response,status:queueComplete?200:202,json:queueComplete?body:{...body,state:'queued',freshTargetCount:1,targetCount:2}});
+          // Keep item progress and the summary consistent. A queued summary
+          // over an already-complete receipt is not a real server response.
+          assert.ok(body.progress.items.length>0,'The real receipt must contain the owned synthetic holding');
+          const progress=refreshProgress(body.progress.items.map((item,index)=>!queueComplete&&index===0?{...item,state:'running'}:item));
+          const receipt=queueComplete?body:{...body,state:refreshProgressState(progress),progress,retryAfterSeconds:10,freshTargetCount:0};
+          await route.fulfill({response,status:queueComplete?200:202,json:receipt});
         });
         const pathname=surface==='home'?'/':surface==='today'?'/today':'/beta';
         await page.goto(`${url}${pathname}?scope=account%3A${account}${surface==='beta'?'&mode=domain':''}`);
@@ -88,8 +96,16 @@ export async function runAutoRefreshUiCases({admin,browser,owner,identityToken,u
         await expect(refresh).toBeEnabled();
         const finished=requests.length;await page.clock.runFor(360000);assert.equal(requests.length,finished);
         await page.goto(`${url}/portfolio/structure?scope=account%3A${account}`);
+        await page.waitForLoadState('networkidle');
         const onReturn=requests.length;await page.goBack();await expectPrice(220);
-        await page.clock.runFor(360000);assert.equal(requests.length,onReturn);
+        // Each mounted refresh control verifies the saved owner and result.
+        // Navigation must never admit new work or keep polling a final result.
+        await page.waitForLoadState('networkidle');
+        assert.ok(requests.length>onReturn,'Returning checks the saved operation');
+        assert.ok(requests.slice(finished).every(request=>request.reason==='poll'));
+        await expect(refresh).toBeEnabled();
+        const afterRestore=requests.length;
+        await page.clock.runFor(360000);assert.equal(requests.length,afterRestore);
         assert.equal(requests.filter(r=>r.reason==='manual').length,1);
         assert.equal(requests.some(r=>r.reason==='page_view'),false);
         await page.screenshot({path:path.join(output,`auto-${surface}-${viewport.width}-after.png`),fullPage:true});
