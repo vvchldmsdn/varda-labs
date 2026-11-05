@@ -11,7 +11,7 @@ const fx = () => ({ usdKrw: "1400", status: "ok", fetchedAt: new Date() });
 
 async function fixture(options = {}) {
   const config = { targets: [target], quotes: [], fx: fx(), authorized: true, configured: true, closeFetchedAt: new Date(), ...options };
-  const events = [], queued = [], callbacks = [], outcomes = [];
+  const events = [], queued = [], callbacks = [], outcomes = [], nativeReads = [];
   const pending = new Map();
   const closeChecks = new Map();
   let leaseActive = false;
@@ -69,7 +69,7 @@ async function fixture(options = {}) {
       finishMarketCollection: async (job, outcome) => outcomes.push({ job, outcome, completedAt:new Date(Date.now()-1).toISOString() }),
       getMarketCollectionSummary: async () => ({ pending: pending.size }),
     },
-    "@/lib/market-data/manual-native-quotes": { manualNativeQuotes:async(targets,collect)=>{assert.deepEqual(targets,config.targets);events.push(collect?'native_manual':'native_read');return config.native?{...config.native,items:[{id:'native:QQQ',label:'QQQ',provider:'Twelve Data',state:config.native.pending?'pending':config.native.failed?'failed':'ready',priceAsOf:null,checkedAt:null,retryAt:null}]}:{available:false,pending:false,failed:false,version:'disabled',items:[]};} },
+    "@/lib/market-data/manual-native-quotes": { manualNativeQuotes:async(targets,collect)=>{for(const requested of targets)assert.ok(config.targets.some(owned=>JSON.stringify(owned)===JSON.stringify(requested)));nativeReads.push({targets:structuredClone(targets),collect});events.push(collect?'native_manual':'native_read');return config.native?{...config.native,items:[{id:'native:QQQ',label:'QQQ',provider:'Twelve Data',state:config.native.pending?'pending':config.native.failed?'failed':'ready',priceAsOf:null,checkedAt:null,retryAt:null}]}:{available:false,pending:false,failed:false,version:'disabled',items:[]};} },
     "@/lib/market-data/twelve-data-service": { resumeConfiguredTwelveDataService: async () => ({ status: "disabled", processed: 0, failed: 0 }) },
     "@/lib/market-data/kis-refresh-lease": { KisRefreshLeaseBusyError: class extends Error {}, withKisCollectionLease: async task => {
       if (leaseActive) return task();
@@ -86,7 +86,7 @@ async function fixture(options = {}) {
     } },
     "@/lib/market-data/fx-refresh-job": { runUsdKrwFxCandidateJob: async () => {config.fx=fx();return {ok:true};} },
   });
-  return { route, events, queued, callbacks, outcomes, config, pending,
+  return { route, events, queued, callbacks, outcomes, config, pending, tenantContext, nativeReads,
     async drain() { for (const callback of callbacks.splice(0)) await callback(); } };
 }
 
@@ -143,7 +143,8 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(jobs.length, 2);
     assert.ok(jobs.every(job => Object.keys(job).sort().join() === "currency,kind,market,ticker"));
     assert.ok(jobs.every(job => job.ticker === "QQQ"));
-    assert.doesNotMatch(JSON.stringify([body, jobs]), /owner|account|quantity|credential|aaaaaaaa/i);
+    assert.match(body.operation.ownerBinding, /^[a-f0-9]{64}$/);
+    assert.doesNotMatch(JSON.stringify([body, jobs]), /ownerUserId|account|quantity|credential|aaaaaaaa/i);
     await f.drain();
     assert.deepEqual(f.events.filter(event => event.startsWith("provider") || event === "lease"), ["lease", "provider_live", "provider_fx"]);
     assert.equal(f.outcomes.length, 3);
@@ -311,5 +312,87 @@ describe("tenant live-price enqueue and after boundary", () => {
     assert.equal(response.status, 200);
     const data=await response.json();assert.equal(data.state, "partial");assert.ok(data.progress.failed>0);
     assert.equal(f.events.includes("lease"), false);
+  });
+});
+
+describe("frozen manual quote continuation", () => {
+  it("finishes the original eight instruments after a holding is added without admitting it on poll", async () => {
+    const original = Array.from({ length: 8 }, (_, i) => ({ ...target, ticker: `Q${i}` }));
+    const f = await fixture({ targets: original });
+    const first = await (await f.route.POST(request())).json();
+    assert.deepEqual(first.operation.targets, original);
+    assert.equal(first.operation.startedAt, first.startedAt);
+    await f.drain();
+    f.config.targets = [...original, { ...target, ticker: "NEW" }];
+    const next = await (await f.route.POST(request({ body: { reason: "poll", operation: first.operation } }))).json();
+    assert.equal(next.state, "fresh");
+    assert.equal(next.targetCount, 8);
+    assert.equal(next.progress.pending, 0);
+    assert.equal(next.progress.failed, 0);
+    assert.deepEqual(next.operation, first.operation);
+    assert.deepEqual(f.nativeReads.at(-1), { targets: original, collect: false });
+    assert.equal(f.queued.length, 1);
+    assert.equal(f.queued.flat().some(job => job.ticker === "NEW"), false);
+    assert.equal(next.progress.items.some(item => item.label === "NEW"), false);
+  });
+
+  it("keeps the original bounded scope even if later additions exceed the manual target cap", async () => {
+    const f = await fixture({ quotes: [quote()] });
+    const first = await (await f.route.POST(request())).json();
+    f.config.targets.push(...Array.from({ length: 40 }, (_, i) => ({ ...target, ticker: `NEW${i}` })));
+    const next = await (await f.route.POST(request({ body: { reason: "poll", operation: first.operation } }))).json();
+    assert.equal(next.state, "fresh"); assert.equal(next.targetCount, 1);
+    assert.equal(next.targetLimitExceeded, undefined);
+    assert.equal(f.queued.length, 0);
+  });
+
+  for (const changed of ["owner", "role", "holding removal", "instrument substitution"]) it(`ends continuation after ${changed} before quote reads or queue wake`, async () => {
+    const f = await fixture();
+    const first = await (await f.route.POST(request())).json();
+    f.events.length = 0; f.callbacks.length = 0;
+    if (changed === "owner") f.tenantContext.ownerUserId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    if (changed === "role") f.tenantContext.role = "viewer";
+    if (changed === "holding removal") f.config.targets = [];
+    if (changed === "instrument substitution") f.config.targets = [{ ...target, market: "kr", currency: "KRW" }];
+    const result = await f.route.POST(request({ body: { reason: "poll", operation: first.operation } }));
+    assert.equal(result.status, 409);
+    assert.deepEqual(await result.json(), { state: "operation_scope_changed" });
+    assert.deepEqual(f.events, changed === "owner" || changed === "role" ? ["auth"] : ["auth", "owner_targets"]);
+    assert.equal(f.callbacks.length, 0);
+    assert.equal(f.nativeReads.length, 1);
+  });
+
+  it("preserves the admitted FX representative when new exchange evidence would select another ticker", async () => {
+    const f = await fixture({ targets: [{ ...target, ticker: "AAA" }, target], fx: null });
+    const first = await (await f.route.POST(request())).json();
+    assert.equal(first.operation.fxTicker, "AAA");
+    const admittedFx = f.queued.flat().find(job => job.kind === "fx");
+    assert.equal(admittedFx.ticker, "AAA");
+    f.config.quotes = [{ ...quote(), source: "kis_overseas_price:NAS" }];
+    const next = await (await f.route.POST(request({ body: { reason: "poll", operation: first.operation } }))).json();
+    const fxProgress = next.progress.items.find(item => item.label === "USD/KRW");
+    assert.equal(next.operation.fxTicker, "AAA");
+    assert.equal(fxProgress.id, normalizeCollectionJobs([admittedFx])[0].key);
+    assert.equal(fxProgress.state, "pending");
+    assert.equal(f.queued.flat().filter(job => job.kind === "fx").length, 1);
+  });
+
+  for (const [label, rewrite] of [
+    ["manual continuation injection", value => ({ reason: "manual", operation: value })],
+    ["cutoff mismatch", value => ({ reason: "poll", startedAt: new Date(Date.parse(value.startedAt) - 1).toISOString(), operation: value })],
+    ["foreign FX representative", value => ({ reason: "poll", operation: { ...value, fxTicker: "FOREIGN" } })],
+    ["holding metadata", value => ({ reason: "poll", operation: { ...value, targets: [{ ...target, accountId: "other" }] } })],
+  ]) it(`rejects ${label} before owner or quote access`, async () => {
+    const f = await fixture();
+    const first = await (await f.route.POST(request())).json();
+    f.events.length = 0; f.callbacks.length = 0;
+    const result = await f.route.POST(request({ body: rewrite(first.operation) }));
+    assert.equal(result.status, 400); assert.deepEqual(f.events, []); assert.equal(f.callbacks.length, 0);
+  });
+
+  it("rejects an oversized actual request body even without content-length", async () => {
+    const f = await fixture();
+    const result = await f.route.POST(request({ body: `{"reason":"poll","padding":"${"x".repeat(8192)}"}` }));
+    assert.equal(result.status, 400); assert.deepEqual(f.events, []); assert.equal(f.callbacks.length, 0);
   });
 });

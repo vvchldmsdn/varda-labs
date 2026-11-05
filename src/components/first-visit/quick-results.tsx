@@ -16,7 +16,7 @@ export function formatQuickTimestamp(at: string, timeZone: string) {
   return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
 }
 
-export function QuickResults({ input, action, compact = false }: { input: QuickInput; action?: ReactNode; compact?: boolean }) {
+export function QuickResults({ input, action, nextAction, compact = false }: { input: QuickInput; action?: ReactNode; nextAction?: ReactNode; compact?: boolean }) {
   const { locale, t } = useI18n();
   const result = analyzeQuickPortfolio(input);
   const [selected, setSelected] = useState("0");
@@ -41,6 +41,7 @@ export function QuickResults({ input, action, compact = false }: { input: QuickI
       {result.rows.map(item => <article key={item.key}><span>{item.name}</span><div><strong>{money(item.value, item.inputCurrency)}</strong>{item.reportingValue === null ? <small>{t("환율 확인 필요", "Exchange rate needed")}</small> : item.inputCurrency !== input.currency ? <small>{money(item.reportingValue)}</small> : null}</div></article>)}
       <p className={styles.note}>{t(`전체 ${result.rows.length}개 중 ${result.excluded.length}개 자산의 환산 근거가 부족해요. 입력은 모두 보관됩니다.`, `${result.excluded.length} of ${result.rows.length} assets need exchange-rate evidence. All original inputs are kept.`)}</p>
     </div>}
+    {result.complete && nextAction ? <div className={styles.actions}>{nextAction}</div> : null}
     {result.complete ? compact ? <details className={styles.method}><summary>{t("자산 종류 · 거래통화", "Asset classes and trading currencies")}</summary>{breakdown}</details> : breakdown : null}
     <details className={styles.method}><summary>{t("어디까지 알 수 있나요?", "What these numbers mean")}</summary>
       <p>{t("비중은 같은 기준 통화의 자산 금액 ÷ 입력 범위의 총액입니다. 선택한 종목만 분류하며, 직접 쓴 이름은 미확인으로 남깁니다.", "Weights divide each asset’s value by the total in one analysis currency. Only selected instruments are classified; unverified names stay unidentified.")}</p>

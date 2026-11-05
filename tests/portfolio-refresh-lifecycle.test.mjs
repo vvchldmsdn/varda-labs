@@ -4,6 +4,7 @@ import { TENANT_LIVE_PRICE_SYNC_POLICY } from "../src/lib/market-data/tenant-liv
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import { MANUAL_REFRESH_MAX_CHECKS } from "../src/lib/market-data/quote-refresh-progress.ts";
 import { quoteRefreshPollDelay } from "../src/lib/market-data/quote-refresh-polling-policy.ts";
+import { REFRESH_OPERATION_KEY } from "../src/lib/market-data/quote-refresh-operation.ts";
 
 const WINDOW_MS = TENANT_LIVE_PRICE_SYNC_POLICY.freshnessMilliseconds;
 
@@ -103,6 +104,7 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
       if (storageFailure === "write") throw new Error("Storage quota unavailable");
       storage.set(key, value);
     },
+    removeItem(key) { storage.delete(key); },
   };
   const fakeWindow = {
     ...listenerPort(windowListeners),
@@ -115,9 +117,10 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     if (storageFailure === "access") throw new Error("Storage is unavailable in this browser");
     return fakeStorage;
   } });
-  const descriptors = new Map(["window", "document", "fetch"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-  const response = (state, ok = true) => ({ ok, json: async () => typeof state === 'string' ? { state } : state });
+  const descriptors = new Map(["window", "document", "fetch", "sessionStorage"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const response = (state, ok = true, status = ok ? 200 : 503) => ({ ok, status, json: async () => typeof state === 'string' ? { state } : state });
   Object.defineProperty(globalThis, "window", { value: fakeWindow, configurable: true, writable: true });
+  Object.defineProperty(globalThis, "sessionStorage", { configurable: true, get: () => fakeWindow.sessionStorage });
   Object.defineProperty(globalThis, "document", { value: fakeDocument, configurable: true, writable: true });
   Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: (url, options) => {
     const request = { url, options };
@@ -164,9 +167,9 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
       activeMounts.add(unmount);
       return { click: () => button.props.children[0].props.onClick(), unmount };
     },
-    mountPolling(keepCheckingHistory = false, startedAt, onProgress) {
+    mountPolling(keepCheckingHistory = false, startedAt, onProgress, operation) {
       const effectStart = effects.length;
-      polling.useMarketCollectionPolling(true, undefined, keepCheckingHistory, startedAt, onProgress);
+      polling.useMarketCollectionPolling(true, undefined, keepCheckingHistory, startedAt, onProgress, operation);
       const cleanups = effects.slice(effectStart).map(effect => effect()).filter(cleanup => typeof cleanup === "function");
       let active = true;
       const unmount = () => { if (!active) return; active = false; cleanups.forEach(cleanup => cleanup()); activeMounts.delete(unmount); };
@@ -183,12 +186,126 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     visibilityChange() { for (const callback of [...documentListeners.get("visibilitychange") ?? []]) callback(); },
     focus() { for (const callback of [...windowListeners.get("focus") ?? []]) callback(); },
     get listenerCount() { return [...documentListeners.values(), ...windowListeners.values()].reduce((sum, entries) => sum + entries.size, 0); },
-    respond(index, state = "fresh", ok = true) { requests[index].resolve(response(state, ok)); },
+    respond(index, state = "fresh", ok = true, status = ok ? 200 : 503) { requests[index].resolve(response(state, ok, status)); },
     reject(index) { requests[index].reject(new Error("Network unavailable")); },
   };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
+
+const continuation = (startedAt, marker = "a") => ({ ownerBinding: marker.repeat(64), startedAt,
+  targets: Array.from({ length: 8 }, (_, i) => ({ ticker: `Q${i}`, market: "us", currency: "USD" })), fxTicker: "Q0" });
+const continuationReceipt = (operation, state = "queued", completed = 3) => ({ state, operation, startedAt: operation.startedAt,
+  progress: { completed, total: 8, pending: 8 - completed, failed: 0, items: [] } });
+
+describe("quote operation navigation restoration", () => {
+  it("restores a captured operation only through an authorized poll and does not render stored financial data", async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), operation = continuation(h.now);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(operation));
+    h.mount();
+    assert.equal(h.requests.length, 1);
+    assert.deepEqual(JSON.parse(h.requests[0].options.body), { reason: "poll", startedAt: operation.startedAt, operation });
+    assert.equal(h.states.some(value => value?.progress || value?.targets), false, "stored hints cannot paint before server validation");
+    const receipt = continuationReceipt(operation);
+    h.respond(0, receipt); await settle();
+    assert.ok(h.states.includes(receipt)); assert.equal(h.states.at(-1), "queued");
+    assert.ok(h.refreshCount > 0);
+    assert.equal(h.requests.some(row => JSON.parse(row.options.body).reason === "manual"), false);
+  });
+
+  it("continues the same manual operation after unmounting and mounting the shared button again", async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), operation = continuation(h.now);
+    const first = h.mount(); first.click();
+    h.respond(0, continuationReceipt(operation)); await settle();
+    assert.deepEqual(JSON.parse(h.storage.get(REFRESH_OPERATION_KEY)), operation);
+    first.unmount(); h.mount();
+    assert.equal(h.requests.length, 2);
+    assert.deepEqual(JSON.parse(h.requests[1].options.body), { reason: "poll", startedAt: operation.startedAt, operation });
+    h.respond(1, continuationReceipt(operation, "fresh", 8)); await settle();
+    assert.equal(h.states.at(-1), "fresh");
+    assert.equal(h.requests.filter(row => JSON.parse(row.options.body).reason === "manual").length, 1);
+  });
+
+  it("ends a saved operation on changed owner or scope without exposing its receipt or starting a new collection", async test => {
+    const h = await refreshHarness(test, { autoRespond: false });
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(continuation(h.now)));
+    h.mount(); h.respond(0, { state: "operation_scope_changed" }, false, 409); await settle();
+    assert.equal(h.storage.has(REFRESH_OPERATION_KEY), false);
+    assert.equal(h.states.some(value => value?.progress || value?.targets), false);
+    assert.equal(h.states.at(-1), "waiting");
+    assert.equal(h.requests.length, 1);
+  });
+
+  it("aborts a leaving screen's restore request and ignores its late receipt on the next screen", async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), oldOperation = continuation(h.now), oldReceipt = continuationReceipt(oldOperation);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(oldOperation));
+    const first = h.mount(); first.unmount();
+    assert.equal(h.requests[0].options.signal.aborted, true);
+    h.storage.delete(REFRESH_OPERATION_KEY); h.mount();
+    h.respond(0, oldReceipt); await settle();
+    assert.equal(h.states.includes(oldReceipt), false);
+    assert.equal(h.refreshCount, 0);
+  });
+
+  for (const rejected of [false, true]) it(`does not let a late ${rejected ? "rejected" : "successful"} restoration replace a newer manual operation`, async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), oldOperation = continuation(h.now);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(oldOperation));
+    const screen = h.mount();
+    h.advanceTime(1000); const newOperation = continuation(h.now), newReceipt = continuationReceipt(newOperation);
+    screen.click(); assert.equal(h.requests.length, 2);
+    h.respond(1, newReceipt); await settle();
+    const stateCount = h.states.length, oldReceipt = continuationReceipt(oldOperation, "fresh", 8);
+    h.respond(0, rejected ? { state: "operation_scope_changed" } : oldReceipt, !rejected, rejected ? 409 : 200); await settle();
+    assert.equal(h.states.length, stateCount);
+    assert.deepEqual(JSON.parse(h.storage.get(REFRESH_OPERATION_KEY)), newOperation);
+    assert.equal(h.states.includes(oldReceipt), false);
+  });
+
+  for (const rejected of [false, true]) it(`ignores another mounted button's late ${rejected ? "rejected" : "successful"} restoration after a new manual operation`, async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), oldOperation = continuation(h.now);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(oldOperation));
+    const first = h.mount(); h.mount();
+    assert.equal(h.requests.length, 2);
+    h.advanceTime(1000); const newOperation = continuation(h.now), newReceipt = continuationReceipt(newOperation);
+    first.click(); h.respond(2, newReceipt); await settle();
+    const stateCount = h.states.length, oldReceipt = continuationReceipt(oldOperation, "fresh", 8);
+    h.respond(1, rejected ? { state: "operation_scope_changed" } : oldReceipt, !rejected, rejected ? 409 : 200); await settle();
+    assert.deepEqual(JSON.parse(h.storage.get(REFRESH_OPERATION_KEY)), newOperation);
+    assert.equal(h.states.length, stateCount, "the other button must ignore its obsolete restoration too");
+    h.respond(0, oldReceipt); await settle();
+    assert.equal(h.states.includes(oldReceipt), false);
+  });
+
+  it("does not erase a newer saved operation when an older poll is rejected", async test => {
+    const h = await refreshHarness(test, { autoRespond: false }), oldOperation = continuation(h.now);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(oldOperation));
+    const progress = [];
+    h.mountPolling(false, oldOperation.startedAt, value => progress.push(value), oldOperation);
+    const pending = h.runPollingInterval();
+    h.advanceTime(1000); const newOperation = continuation(h.now);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(newOperation));
+    h.respond(0, { state: "operation_scope_changed" }, false, 409); await pending;
+    assert.deepEqual(JSON.parse(h.storage.get(REFRESH_OPERATION_KEY)), newOperation);
+    assert.deepEqual(progress, [{ state: "operation_ended" }]);
+    assert.equal(h.timeouts.size, 0);
+  });
+
+  it("never restores expired, corrupt, or preview hints automatically", async test => {
+    const h = await refreshHarness(test);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(continuation(new Date(Date.parse(h.now) - 30 * 60_000 - 1).toISOString())));
+    h.mount().unmount(); assert.equal(h.requests.length, 0);
+    h.storage.set(REFRESH_OPERATION_KEY, "{"); h.mount().unmount(); assert.equal(h.requests.length, 0);
+    h.storage.set(REFRESH_OPERATION_KEY, JSON.stringify(continuation(h.now)));
+    h.mount({ designPreview: true }).unmount(); assert.equal(h.requests.length, 0);
+  });
+
+  for (const storageFailure of ["access", "read", "write"]) it(`keeps explicit refresh usable when browser storage fails at ${storageFailure}`, async test => {
+    const h = await refreshHarness(test, { autoRespond: false, storageFailure });
+    const screen = h.mount(); assert.equal(h.requests.length, 0);
+    screen.click(); h.respond(0, continuationReceipt(continuation(h.now), "fresh", 8)); await settle();
+    assert.equal(h.states.at(-1), "fresh"); assert.ok(h.refreshCount > 0);
+  });
+});
 
 function rerenderHooks() {
   const cells = []; let cursor = 0;
@@ -248,6 +365,49 @@ it('a new queued operation never paints the previous completion before its effec
     tree = render(); hooks.commit();
     assert.equal(tree.props.children[0].props.disabled, false);
   }
+});
+
+for (const initialState of ['fresh', 'partial']) it(`a ${initialState} receipt follows later pending items without claiming completion or reopening a timed-out window`, async test => {
+  const hooks = rerenderHooks(), timers = new Map(), responses = []; let timerId = 0;
+  const start = '2026-11-03T01:00:00.000Z'; let now = Date.parse(start);
+  const descriptors = new Map(['window', 'document', 'fetch'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout(callback) { const id = ++timerId; timers.set(id, () => { timers.delete(id); return callback(); }); return id; }, clearTimeout(id) { timers.delete(id); } } });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { visibilityState: 'visible' } });
+  Object.defineProperty(globalThis, 'fetch', { configurable: true, value: async () => { assert.ok(responses.length); return { ok: true, json: async () => responses.shift() }; } });
+  test.mock.method(Date, 'now', () => now);
+  test.after(() => { hooks.unmount(); for (const [key, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; } });
+  const router = { refresh() {} };
+  const [component] = await importUiWithPorts(['src/components/home/portfolio-refresh-button.tsx'], {
+    react: hooks.react, 'next/navigation': { useRouter: () => router },
+    '@/components/i18n/locale-provider': { useI18n: () => ({ t: (_ko, en) => en }) },
+    '@/components/i18n/localized-text': { T: () => null },
+    '@/components/home/home-history-messages': { translateHomeHistory: value => value }, 'lucide-react': { RefreshCw: () => null },
+  });
+  const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
+  const text = tree => tree == null ? '' : typeof tree !== 'object' ? String(tree) : Array.isArray(tree) ? tree.map(text).join('') : text(tree.props?.children);
+  const render = () => { hooks.begin(); const tree = component.PortfolioRefreshButton({}); hooks.commit(); return tree; };
+  const receipt = (state, completed, pending, failed = 0, comparisonPending = 1) => ({ state, startedAt: start, progress: { completed, total: 8, pending, failed, items: [] }, comparison: { pending: comparisonPending, failed: 1 } });
+  const summary = tree => text(nodes(tree).find(node => node.type === 'summary'));
+  const tick = async response => { if (response) responses.push(response); await Promise.all([...timers.values()].map(callback => callback())); return render(); };
+  let tree = render();
+  responses.push(receipt(initialState, initialState === 'fresh' ? 8 : 7, 0, initialState === 'fresh' ? 0 : 1));
+  tree.props.children[0].props.onClick(); await settle(); tree = render();
+  assert.match(summary(tree), initialState === 'fresh' ? /8\/8 checked · complete/ : /7\/8 checked · incomplete/);
+  tree = await tick(receipt('queued', 3, 5, 0, 0));
+  assert.match(summary(tree), /3\/8 checked · in progress/); assert.doesNotMatch(summary(tree), /complete/);
+  assert.equal(tree.props.children[0].props.disabled, true);
+  assert.equal(timers.size, 1, 'unfinished quotes keep polling even after comparison work ends');
+  tree = await tick(receipt('partial', 6, 0, 2));
+  assert.match(summary(tree), /6\/8 checked · incomplete/); assert.equal(tree.props.children[0].props.disabled, false);
+  tree = await tick(receipt('fresh', 8, 0));
+  assert.match(summary(tree), /8\/8 checked · complete/);
+  assert.match(text(tree), /Comparison prices for today's change are awaiting verification/);
+  assert.match(text(tree), /Some comparison prices could not be checked/);
+  tree = await tick(receipt('queued', 3, 5, 0, 0)); assert.match(summary(tree), /in progress/);
+  now += 30 * 60_000 + 1; tree = await tick();
+  assert.match(summary(tree), /3\/8 checked · paused/); assert.doesNotMatch(summary(tree), /in progress|complete/);
+  assert.equal(tree.props.children[0].props.disabled, false); assert.equal(timers.size, 0);
+  render(); assert.equal(timers.size, 0, 'pending receipt does not restart a stopped polling window');
 });
 
 describe("portfolio refresh lifecycle", () => {

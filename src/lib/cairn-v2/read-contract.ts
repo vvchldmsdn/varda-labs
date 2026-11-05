@@ -13,7 +13,7 @@ export type DemoView = ReturnType<typeof getFixtureView>;
 export type ReadState = "ready" | "empty" | "partial" | "unavailable" | "unauthorized" | "loading";
 export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" | "history"> & {
   history: (DemoView["history"][number] & { storageSnapshotDate?: string; valueSegment?: string; segment?: string; source?: string; rowKind?: string; account?: string; includedAccounts?: string[] })[];
-  rows: (Omit<DemoView["rows"][number], "targetPct" | "ticker" | "market"> & { targetPct: number | null; ticker?: string | null; market?: string | null; currency?: string; priceAsOf?: string | null; quantity?: number; currentPrice?: number })[];
+  rows: (Omit<DemoView["rows"][number], "targetPct" | "ticker" | "market"> & { targetPct: number | null; ticker?: string | null; market?: string | null; currency?: string; priceAsOf?: string | null; priceSource?: string | null; quantity?: number; currentPrice?: number })[];
   totalKrw: number | null; fxRate: number | null;
   drift: DemoView["drift"] | undefined;
   domain?: {

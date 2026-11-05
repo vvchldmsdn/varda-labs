@@ -16,6 +16,8 @@ import { manualNativeQuotes } from "@/lib/market-data/manual-native-quotes";
 import { latestCloseCollectionJob, normalizeCollectionJobs, type CollectionInput } from "@/lib/market-data/collection-policy";
 import { refreshItem, refreshProgress, refreshProgressState } from "@/lib/market-data/quote-refresh-progress";
 import { closeCalendarReferenceDateForAsset, resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
+import { parseRefreshOperation, refreshTargetKey, type QuoteRefreshOperation } from "@/lib/market-data/quote-refresh-operation";
+import { quoteRefreshOwnerBinding } from "@/lib/market-data/quote-refresh-owner-binding";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +30,14 @@ export async function POST(request: Request) {
   const resolution = await resolveCurrentTenantContext();
   if (!resolution.ok) return response({ state: "session_unavailable" }, resolution.failure.httpStatus);
   try {
-    const targets = await getTenantLivePriceTargets(resolution.tenantContext);
+    // Re-resolve ownership on every continuation before reading any quote or
+    // waking the queue. This marker only prevents cross-session continuation.
+    const ownerBinding = quoteRefreshOwnerBinding(resolution.tenantContext);
+    if (input.operation && input.operation.ownerBinding !== ownerBinding) return response({ state: "operation_scope_changed" }, 409);
+    const owned = await getTenantLivePriceTargets(resolution.tenantContext);
+    const byKey = new Map(owned.map(target => [refreshTargetKey(target), target]));
+    if (input.operation?.targets.some(target => !byKey.has(refreshTargetKey(target)))) return response({ state: "operation_scope_changed" }, 409);
+    const targets = input.operation ? input.operation.targets.map(target => byKey.get(refreshTargetKey(target))!) : owned;
     if (targets.length > TENANT_LIVE_PRICE_SYNC_POLICY.maximumTargetCount) {
       if (reason === "poll") { scheduleMarketCollection(); return response({ state: "queued", targetLimitExceeded: true, retryAfterSeconds: 10 }, 202); }
       return response({ state: "target_limit_exceeded", targetCount: targets.length, maximumTargetCount: TENANT_LIVE_PRICE_SYNC_POLICY.maximumTargetCount }, 409);
@@ -38,7 +47,11 @@ export async function POST(request: Request) {
     const plan = planTenantLivePriceSync({ targets, quotes });
     // A manual click does not force another provider request for a fresh shared quote.
     const fxPlan = planTenantLiveFxSync({ currencies: targets.map(t => t.currency), evidence: fxEvidence, reason: "page_view" });
-    const fxTarget = selectKisUsdKrwQuoteTarget({ targets, quotes });
+    const fxTarget = input.operation ? targets.find(target => target.market.toLowerCase() === "us" && target.ticker.toUpperCase() === input.operation!.fxTicker) : selectKisUsdKrwQuoteTarget({ targets, quotes });
+    const operation = input.operation ?? (reason === "manual" ? {
+      ownerBinding, startedAt, targets: [...byKey.values()].map(target => ({ ticker: target.ticker.toUpperCase(), market: target.market.toLowerCase(), currency: target.currency.toUpperCase() })),
+      fxTicker: fxTarget?.ticker.toUpperCase() ?? null,
+    } : undefined);
     const configured = getKisProviderPolicy().configured;
     const finish = async (body: Record<string, unknown>, status = 200, headers: Record<string, string> = {}) => {
       const required = configured ? normalizeCollectionJobs(plan.targets.map(target => ({ ...target, kind: "live" as const }))) : [];
@@ -84,7 +97,7 @@ export async function POST(request: Request) {
       // A short progress interval is safe: polls only read owned work and resume
       // the existing queue. They do not admit new quotes or bypass provider limits.
       const retryAfterSeconds = 2;
-      return response({ ...body, retryAfterSeconds, state, startedAt, progress, comparison,
+      return response({ ...body, retryAfterSeconds, state, startedAt, progress, comparison, ...(operation ? { operation } : {}),
         readVersion: livePriceReadVersion(targets, quotes, fxEvidence, `${native.version}:${comparisonVersion}`), targetCount: targets.length }, state === "queued" ? 202 : status >= 400 ? status : 200,
         { ...headers, ...(state === "queued" ? { "Retry-After": String(retryAfterSeconds) } : {}) });
     };
@@ -171,7 +184,7 @@ async function getCurrentUsdKrwEvidence() {
   return row ?? null;
 }
 
-async function readRefreshReason(request: Request): Promise<{ reason: RefreshReason; startedAt: string } | null> {
+async function readRefreshReason(request: Request): Promise<{ reason: RefreshReason; startedAt: string; operation?: QuoteRefreshOperation } | null> {
   const url = new URL(request.url);
   if (url.search !== "") return null;
   if (request.headers.get("origin") !== url.origin) return null;
@@ -188,24 +201,29 @@ async function readRefreshReason(request: Request): Promise<{ reason: RefreshRea
   const contentLength = request.headers.get("content-length");
   if (
     contentLength !== null &&
-    (!/^(?:0|[1-9][0-9]*)$/.test(contentLength) || Number(contentLength) > 128)
+    (!/^(?:0|[1-9][0-9]*)$/.test(contentLength) || Number(contentLength) > 8192)
   ) {
     return null;
   }
 
   let body: unknown;
   try {
-    body = await request.json();
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).length > 8192) return null;
+    body = JSON.parse(raw);
   } catch {
     return null;
   }
 
-  if (!isRecord(body) || Object.keys(body).some(key => key !== "reason" && key !== "startedAt")) return null;
+  if (!isRecord(body) || Object.keys(body).some(key => !["reason", "startedAt", "operation"].includes(key))) return null;
   if (body.reason !== "page_view" && body.reason !== "manual" && body.reason !== "poll") return null;
   if (body.startedAt !== undefined && (body.reason !== "poll" || typeof body.startedAt !== "string" ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(body.startedAt) || !Number.isFinite(Date.parse(body.startedAt)) ||
     Date.parse(body.startedAt) > Date.now() + 60_000 || Date.now() - Date.parse(body.startedAt) > 31 * 60_000)) return null;
-  return { reason: body.reason, startedAt: typeof body.startedAt === "string" ? body.startedAt : new Date().toISOString() };
+  const operation = body.operation === undefined ? undefined : parseRefreshOperation(body.operation);
+  if (body.operation !== undefined && (!operation || body.reason !== "poll" || body.startedAt !== undefined && body.startedAt !== operation.startedAt)) return null;
+  if (!operation && contentLength !== null && Number(contentLength) > 128) return null;
+  return { reason: body.reason, startedAt: operation?.startedAt ?? (typeof body.startedAt === "string" ? body.startedAt : new Date().toISOString()), ...(operation ? { operation } : {}) };
 }
 
 function response(

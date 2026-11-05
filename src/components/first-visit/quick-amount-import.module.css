@@ -1,0 +1,19 @@
+.importer{margin-block:24px;color:var(--ink)}
+.methods{display:flex;gap:20px;border-bottom:1px solid var(--line)}
+.methods button{border:0;border-radius:0;min-height:48px;padding:8px 2px;background:transparent;color:var(--muted);font-size:15px;box-shadow:none}
+.methods button[aria-pressed=true]{color:var(--ink);border-bottom:2px solid var(--ink)}
+.stage{max-width:680px;padding-top:28px;animation:enter 180ms ease-out}
+.stage h2{font-size:clamp(22px,3vw,28px);line-height:1.4;letter-spacing:-.04em;margin-bottom:12px}
+.stage p{line-height:1.7;color:var(--muted);font-size:14px;margin-block:10px 18px}
+.stage label{display:grid;gap:8px;min-width:0;color:var(--muted);font-size:13px}
+.stage input,.stage select{min-width:0;width:100%;min-height:46px;border:0;border-radius:0;border-bottom:1px solid var(--line);padding:8px 0;background:transparent;font-size:16px;color:var(--ink)}
+.textarea{width:100%;min-height:170px;padding:14px 0;resize:vertical;border:0;border-block:1px solid var(--line);border-radius:0;background:transparent;color:var(--ink);font:inherit;font-size:16px;line-height:1.8;margin-bottom:16px}
+.row{display:grid;grid-template-columns:minmax(100px,1.2fr) minmax(90px,1fr) 82px 40px;gap:12px;padding-block:18px;border-bottom:1px solid var(--line);align-items:end}
+.row>button{min-height:46px}.row .issue{grid-column:1/-1;color:var(--negative-strong,#b63935);margin:0;font-size:13px}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-block:22px}
+.upload{padding-block:10px}.stage .note{font-size:12px}.progress{margin-block:20px}.progress progress{display:block;width:100%;accent-color:var(--accent)}
+.stage [aria-invalid=true]{border-color:var(--negative-strong,#b63935)}
+.stage input:focus-visible,.stage select:focus-visible,.textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@keyframes enter{from{opacity:.5;transform:translateX(6px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.row{grid-template-columns:minmax(0,1fr) 82px 36px;gap:10px}.row .name{grid-column:1/3}.row>button{grid-column:3;grid-row:1/3}.actions>button:first-child{width:100%;min-height:48px}.stage{padding-top:22px}.methods{gap:24px}}
+@media(prefers-reduced-motion:reduce){.stage{animation:none}}

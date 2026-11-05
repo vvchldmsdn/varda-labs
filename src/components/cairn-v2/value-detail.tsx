@@ -14,6 +14,7 @@ import { StatusPill } from "./ui/atoms";
 import { formatNumber, formatPercent } from "./ui/format";
 import { instrumentLabel } from "@/lib/instrument-display";
 import { CompositionBar } from "@/components/portfolio/composition-bar";
+import { isManualValuationSource } from "@/lib/current-investment-composition";
 
 // Limited presentation reuse: portfolio overview's value hierarchy and the
 // original structure HoldingEvidenceTable/selected holding roles. All figures,
@@ -44,8 +45,8 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
         {partial && <p className={styles.basis}>전체 합계 확인 전 · 평가 제외 자산 별도</p>}
       </div>
       <dl className={styles.metrics}>
-        <div><dt>평가에 포함</dt><dd>{view.rows.length}<small>종목</small></dd></div>
-        <div><dt>평가 제외</dt><dd>{domain.excluded.length}<small>종목</small></dd></div>
+        <div><dt>평가에 포함</dt><dd>{view.rows.length}<small>건</small></dd></div>
+        <div><dt>평가 제외</dt><dd>{domain.excluded.length}<small>건</small></dd></div>
       </dl>
     </div>
 
@@ -76,7 +77,7 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
           <p className={styles.selectedValue}>{money(active.valueKrw)}<small>{unit}</small></p>
           <dl className={styles.facts}>
             <div><dt>수량</dt><dd>{snapshotDecimal(active.quantity)}<small>개</small></dd></div>
-            <div><dt>원본 가격</dt><dd>{snapshotDecimal(active.currentPrice)}<small>{active.currency ?? "통화 미제공"}</small></dd></div>
+            <div><dt>{isManualValuationSource(active.priceSource) ? "직접 입력한 가격" : "원본 가격"}</dt><dd>{snapshotDecimal(active.currentPrice)}<small>{active.currency ?? "통화 미제공"}</small></dd></div>
             <div><dt>소계 내 비중</dt><dd title={String(active.weightPct) + "%"}>{active.weightPct.toFixed(2)}<small>%</small></dd></div>
             <div className={styles.timestamp}><dt>가격 관측</dt><dd>{active.priceAsOf ? <time dateTime={active.priceAsOf}>{active.priceAsOf}</time> : "미제공"}</dd></div>
           </dl>

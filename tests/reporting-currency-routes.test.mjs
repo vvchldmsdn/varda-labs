@@ -25,18 +25,19 @@ async function route(path, { authenticated = true, native = true } = {}) {
   }
   const calls = [];
   const requests = [];
+  const valuations = [];
   ports["@/components/currency-portfolio-surface"] = { CurrencyPortfolioSurface: Surface };
   ports["@/lib/auth/current-tenant-context"] = { resolveCurrentTenantContext: async () => authenticated ? { ok: true, tenantContext: tenant } : { ok: false, failure: { code: "unauthenticated" } } };
   ports["@/db/queries/portfolio-analysis-scopes"] = { getReadOnlyTenantPortfolioAnalysisScopeContext: async args => { assert.equal(args.tenantContext, tenant); calls.push("scope"); return { state: "ready", resolution: { state: "resolved", scope }, catalog: { scopes: [scope] } }; } };
   ports["@/db/queries/native-portfolio-ledger"] = { requiresNativePortfolioSurface: async value => { assert.equal(value, tenant); calls.push("native"); return native; } };
-  ports["@/db/queries/currency-tracked-portfolio"] = { getTrackedCurrencyEvidence: async (value, selected, currency) => { assert.equal(value, tenant); assert.equal(selected, scope); calls.push(`valuation:${currency}`); return { ...trackedCurrencyFixture(), reporting: currency }; } };
+  ports["@/db/queries/currency-tracked-portfolio"] = { getTrackedCurrencyEvidence: async (value, selected, currency, options) => { assert.equal(value, tenant); assert.equal(selected, scope); calls.push(`valuation:${currency}`); const evidence = { ...trackedCurrencyFixture(), reporting: currency }; valuations.push({ currency, options, evidence }); return evidence; } };
   ports["@/db/queries/currency-research"] = { getOwnedCurrencyResearchInput: async (value, selected, currency, options) => { assert.equal(value, tenant); assert.equal(selected, scope); calls.push(`research:${currency}`); requests.push({ currency, options }); return null; } };
   ports["@/lib/simulation-model-selection"] = { resolveSimulationPathModel };
   ports["@/lib/simulation-page-controls"] = { buildSimulationPageControls };
   ports["@/lib/snapshots/market-calendar"] = { resolveSnapshotCycle };
   ports["next/navigation"] = { redirect: path => { throw new Error(`redirect:${path}`); } };
   const [module] = await importUiWithPorts([file], ports);
-  return { Page: module.default, calls, requests };
+  return { Page: module.default, calls, requests, valuations };
 }
 
 describe("reporting currency on existing owned routes", () => {
@@ -77,14 +78,20 @@ describe("reporting currency on existing owned routes", () => {
     await Page({ searchParams: Promise.resolve({ currency: "USD", model: "bootstrap", horizon: "126", end: "2026-09-12" }) });
     assert.deepEqual(requests, [{ currency: "USD", options: { horizon: 126, endServiceDate: "2026-09-12" } }]);
   });
-  it("connects native Structure risk to the exact scoped valuation already loaded for composition", async () => {
-    const { Page, calls, requests } = await route("portfolio/structure/");
+  it("keeps native Structure risk on the exact account valuation and displays investment-only composition at the same time", async () => {
+    const { Page, calls, requests, valuations } = await route("portfolio/structure/");
     const tree = await Page({ searchParams: Promise.resolve({ currency: "USD" }) });
-    assert.equal(calls.filter(call => call === "valuation:USD").length, 1);
+    assert.equal(calls.filter(call => call === "valuation:USD").length, 2);
     assert.equal(requests.length, 1);
     assert.equal(requests[0].options.valuationEvidence, tree.props.evidence);
     assert.equal(requests[0].options.calculation, "risk_only");
-    assert.ok(tree.props.evidence, "missing research keeps the base native composition");
+    assert.equal(tree.props.evidence, valuations[0].evidence);
+    assert.equal(valuations[0].options.investmentsOnly, undefined, "cash-inclusive research scope is unchanged");
+    assert.equal(tree.props.investmentEvidence, valuations[1].evidence);
+    assert.equal(valuations[1].options.investmentsOnly, true, "current display follows the home investment scope");
+    assert.equal(valuations[0].options.asOf, valuations[1].options.asOf);
+    assert.ok(valuations.every(read => read.options.collect === false), "opening structure never requests quote collection");
+    assert.ok(tree.props.investmentEvidence, "missing research keeps the current investment composition");
   });
   it("keeps invalid native selections unavailable without silently substituting defaults", async () => {
     for (const [query, reason] of [[{ horizon: "252" }, "invalid_horizon"], [{ end: "2099-01-01" }, "invalid_end_date"], [{ end: ["2026-09-01", "2026-09-02"] }, "invalid_end_date"], [{ model: "unknown" }, "invalid_model"]]) {

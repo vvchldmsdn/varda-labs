@@ -25,6 +25,8 @@ import styles from "./beta.module.css";
 import { CairnSelect } from "./reused/cairn-select";
 import evidence from "./reused/holding-evidence.module.css";
 import { dataIssueLabel } from "@/lib/data-issue-presentation";
+import { originalCurrentComposition } from "@/lib/cairn-v2/current-value-presentation";
+import { compositionPriceTime } from "@/lib/current-investment-composition";
 
 function StructureDetail({
   view,
@@ -39,20 +41,35 @@ function StructureDetail({
   const displayMoney = (n: number | null, c: BetaContext["currency"], signed = false) =>
     displayReadMoney(view, n, c, signed);
   const { selected, setSelected, structureView, setStructureView } = useBetaPreferences();
-  const stateText = readStateText(view.domain?.valueState, "보유 종목 없음");
+  const currentRead = view.domain?.currentValuePresentation;
+  const composition = currentRead ? originalCurrentComposition(currentRead, context.currency) : null;
+  const compositionRequested = !!currentRead;
+  const formatAmount = (amount: number | string | null) => compositionRequested
+    ? amount === null ? "—" : Number(amount).toLocaleString("ko-KR", {maximumFractionDigits:context.currency === "USD" ? 2 : 0})
+    : displayMoney(amount === null ? null : Number(amount), context.currency);
+  const rows = compositionRequested ? composition?.positions.flatMap((row, index) => row.value === null || row.displayWeightPct === null ? [] : [{
+    ...row, amount: row.value, weightPct: row.displayWeightPct, targetPct: null,
+    color: ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
+  }]) ?? [] : view.rows.map(row => ({...row,amount:row.valueKrw,manuallyEntered:false}));
+  const excluded = compositionRequested ? composition?.positions.filter(row=>row.value === null) ?? [] : view.domain?.excluded ?? [];
+  const amount = compositionRequested ? composition?.amount ?? null : view.rows.length ? view.totalKrw : null;
+  const stateText = compositionRequested ? !composition ? "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : !composition.counts.positions ? "보유 자산 없음" : null
+    : readStateText(view.domain?.valueState, "보유 종목 없음");
   if (stateText)
     return (
       <p className={styles.empty} role="status">
         {stateText}
       </p>
     );
-  const active = view.rows.find((r) => r.key === selected) ?? view.rows[0];
-  const mapRows = new Map(view.rows.map(row => [row.key, row]));
+  const active = rows.find((r) => r.key === selected) ?? rows[0];
+  const activeEvidence = composition?.positions.find(row=>row.key===active?.key);
+  const activePriceTime = activeEvidence ? compositionPriceTime(activeEvidence) : {label:"가격 관측",value:active?.priceAsOf};
+  const mapRows = new Map(rows.map(row => [row.key, row]));
   const mapRects = structureView === "map"
-    ? layoutPortfolioTreemap(view.rows.map(row => ({ key: row.key, value: row.weightPct })), 100, 100)
+    ? layoutPortfolioTreemap(rows.map(row => ({ key: row.key, value: row.weightPct })), 100, 100)
     : [];
   const target =
-    view.domain?.planning?.targets.state === "ready"
+    (!compositionRequested || currentRead?.kind === "legacy" && composition?.complete) && view.domain?.planning?.targets.state === "ready"
       ? view.domain.planning.targets.rows.find((row) => row.key === active?.key)
       : null;
   return (
@@ -76,32 +93,32 @@ function StructureDetail({
           </button>
         </div>
       </div>
-      {view.domain && view.domain.excluded.length > 0 && (
+      {view.domain && (excluded.length > 0 || composition && !composition.complete) && (
         <p className={styles.muted}>
-          확인 가능한 소계 {displayMoney(view.domain.knownSubtotalKrw, context.currency)}{" "}
-          {context.currency} · 소계 내 비중 · 제외 {view.domain.excluded.length}종목
+          확인 가능한 소계 {formatAmount(compositionRequested ? amount : view.domain.knownSubtotalKrw)}{" "}
+          {context.currency} · 소계 내 비중 · 제외 {excluded.length}건
         </p>
       )}
-      {!!view.domain?.excluded.length && <details className={structureLayout.exclusions}><summary>제외 종목 확인</summary>{view.domain.excluded.map((r, i) => (
+      {!!excluded.length && <details className={structureLayout.exclusions}><summary>제외된 보유 {excluded.length}건 확인</summary>{excluded.map((r, i) => (
         <p key={i} className={styles.muted}>
-          제외: {instrumentLabel(r)} · {r.currency} · {dataIssueLabel(r.reason)}
+          제외: {instrumentLabel(r)}{r.currency ? ` · ${r.currency}` : ""} · {dataIssueLabel(r.reason ?? "valuation_incomplete")}
         </p>
       ))}</details>}
       <div className={structureLayout.layout}>
         <aside className={structureLayout.summary}>
           <p className={styles.muted}>
-            {view.domain?.excluded.length
-              ? "전체 합계 확인 전"
+            {excluded.length || composition && !composition.complete
+              ? "확인 가능한 소계"
               : view.domain
                 ? "전체 투자자산 평가액"
                 : "전체 자산 평가액"}
           </p>
           <p className={structureLayout.total}>
-            {displayMoney(view.rows.length ? view.totalKrw : null, context.currency)}{" "}
+            {formatAmount(amount)}{" "}
             {context.currency === "KRW" ? "원" : "USD"}
           </p>
-          <p className={styles.muted}>보유 종목</p>
-          <p>{view.rows.length}개</p>
+          <p className={styles.muted}>보유 건수</p>
+          <p>{composition?.counts.positions ?? view.rows.length}건{composition && composition.counts.unidentifiedPositions === 0 ? ` · ${composition.counts.instruments}종목` : ""}</p>
           <p className={styles.muted}>목표비중</p>
           <p>{view.domain ? view.domain.planning?.targets.state === "ready" ? "설정됨" : targetMessage(view) : view.rows.length ? "가상 설정됨" : "없음"}</p>
         </aside>
@@ -109,7 +126,7 @@ function StructureDetail({
           {structureView === "ring" ? (
             <PortfolioAllocationRing
               compositionOnly={!!view.domain}
-              entries={view.rows.map((r) => ({
+              entries={rows.map((r) => ({
                 key: r.key,
                 name: instrumentLabel(r),
                 weightPct: r.weightPct,
@@ -149,7 +166,7 @@ function StructureDetail({
           <CairnSelect
             label="상세 종목 선택"
             value={active?.key ?? ""}
-            options={view.rows.map((row) => ({
+            options={rows.map((row) => ({
               value: row.key,
               label: (instrumentLabel(row)) + " · " + row.weightPct.toFixed(2) + "%",
             }))}
@@ -159,21 +176,22 @@ function StructureDetail({
           {active ? (
             <>
               <h3>{instrumentLabel(active)}</h3>
-              <p className={evidence.holdingIdentity}>{active.ticker ?? active.key}</p>
+              {active.ticker && <p className={evidence.holdingIdentity}>{active.ticker}</p>}
               <p className={styles.muted}>
-                {view.domain ? "소유 계좌" : "가상 계좌"} {active.account} ·{" "}
-                {active.currency ?? "USD"}
-                {view.domain && <> · 가격 관측 {active.priceAsOf ?? "미제공"}</>}
+                {active.account ? `${view.domain ? "소유 계좌" : "가상 계좌"} ${active.account} · ` : ""}
+                {active.currency ?? "통화 확인 필요"}
+                {view.domain && <> · {activePriceTime.label} {activePriceTime.value ?? "미제공"}</>}
+                {active.manuallyEntered && <> · 직접 입력한 가격</>}
               </p>
               <dl className={evidence.holdingFacts}>
                 <div>
                   <dt>평가액</dt>
                   <dd>
-                    {displayMoney(active.valueKrw, context.currency)} {context.currency}
+                    {formatAmount(active.amount)} {context.currency}
                   </dd>
                 </div>
                 <div>
-                  <dt>현재 비중</dt>
+                  <dt>{composition && !composition.complete ? "확인된 소계 내 비중" : "현재 비중"}</dt>
                   <dd>{active.weightPct.toFixed(2)}%</dd>
                 </div>
                 <div>
@@ -200,7 +218,7 @@ function StructureDetail({
                 <p className={evidence.holdingNote}>
                   {target
                     ? "저장한 목표비중 기준"
-                    : targetMessage(view)}
+                    : compositionRequested && currentRead?.kind === "tracked" ? "목표와의 차이는 목표비중 화면에서 확인하세요." : targetMessage(view)}
                 </p>
               )}
               {!view.domain && (

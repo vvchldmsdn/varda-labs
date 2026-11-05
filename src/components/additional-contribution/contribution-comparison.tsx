@@ -14,6 +14,7 @@ import { ContributionEffectTracking, type EffectTrackingProps } from './contribu
 import { ContributionJourneyNav } from './contribution-journey';
 import { comparisonDraft, comparisonDraftQuery, contributionBackHref, contributionJourneyHref, type ComparisonDraft } from '@/lib/contribution-journey';
 import { useNavigationDraft } from '@/components/recovery/use-navigation-draft';
+import { UserAllocationComparison } from './user-allocation-comparison';
 
 const won = (n: number) => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(n);
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${won(Math.abs(n))}`;
@@ -76,6 +77,7 @@ export function ContributionComparisonView({ basis, initialAmount = '1000000', i
         <Field label="비교 시점"><Select value={horizon} onChange={event => setHorizon(event.target.value)}><option value="10">10일 뒤</option><option value="30">30일 뒤</option><option value="90">90일 뒤</option></Select></Field>
         <p>동일 종목 · 동일 진입 가격<br />신규 투자금만 · 매도 없이 비교</p>
       </section>
+      <UserAllocationComparison basis={basis} amount={amount} currency={currency} ownerKey={tracking?.sessionKey} scope={scope} />
       {comparison.status !== 'ready' ? comparison.reason === 'invalid_amount' ? <Status tone="warning">{reasonLabel(comparison.reason)}</Status> : <RecoveryNotice reasons={[comparison.reason]} scope={scope} beta={beta} returnHref={returnHref} draft={recoveryDraft} onRetry={() => router.refresh()} details={reasonLabel(comparison.reason)} /> : <>
         <div className={styles.sectionHeading}><SectionHeading title="01. 투자금을 어떻게 나누나요?" description="설정한 비율대로 매수하거나, 기존 보유의 부족 비중과 확인된 조정 근거를 반영합니다." /></div>
         <div className={styles.plans}>
