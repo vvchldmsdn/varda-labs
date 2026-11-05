@@ -40,11 +40,27 @@ export function parseTradePhoto(lines: BalanceTextLine[], width: number, height:
   const rows: TradePhotoCandidate[] = []; let excluded = 0;
   if (width <= 0 || height <= 0 || lines.length > 4000) return { rows, excluded };
   const sorted = lines.filter(line => line.text.trim()).toSorted((a, b) => center(a) - center(b) || a.bbox.x0 - b.bbox.x0);
-  const starts = sorted.filter(line => /^(매수|매도)(?:\s|$)/.test(line.text.trim()) && !/접수|처리|완료|가능/.test(line.text));
-  for (let index = 0; index < starts.length && rows.length < 50; index++) {
-    const start = starts[index], end = starts[index + 1]?.bbox.y0 ?? height;
-    const block = sorted.filter(line => center(line) >= start.bbox.y0 && center(line) < end);
-    if (block.some(line => /자동취소|취소완료|미체결/.test(compact(line.text))) || /취소/.test(start.text)) { excluded++; continue; }
+  const markers = sorted.filter(line => /^(매수|매도)(?:\s|$|(?=접수|처리|완료|체결|가능|취소|미체결))/.test(line.text.trim()));
+  // The receipt -> processing -> completed strip describes ONE order. Keep its
+  // same-row markers together; pending cards still bound the preceding card.
+  const groups: BalanceTextLine[][] = [];
+  for (const marker of markers) {
+    const prior = groups.at(-1);
+    if (prior && Math.abs(center(marker) - center(prior[0])) <= Math.max(12, (prior[0].bbox.y1 - prior[0].bbox.y0) * .65)) prior.push(marker);
+    else groups.push([marker]);
+  }
+  for (let index = 0; index < groups.length && rows.length < 50; index++) {
+    const group = groups[index];
+    if (new Set(group.map(line => compact(line.text).slice(0, 2))).size !== 1) continue;
+    const candidates = group.filter(line => !/접수|처리|가능|예약|대기/.test(compact(line.text)));
+    const start = candidates.find(line => /완료|체결/.test(line.text)) ?? candidates[0];
+    if (!start) continue;
+    const top = Math.min(...group.map(line => line.bbox.y0)), end = groups[index + 1]?.[0].bbox.y0 ?? height;
+    const block = sorted.filter(line => center(line) >= top && center(line) < end);
+    const cancelled = /취소/.test(start.text) || block.some(line => /자동취소|취소완료/.test(compact(line.text)));
+    const partialCancellation = cancelled && block.some(line => /부분체결|일부체결/.test(compact(line.text)));
+    const unfilled = block.some(line => /미체결/.test(compact(line.text).replace(/미체결(?:수량|금액|잔량)/g, "")));
+    if (unfilled || (cancelled && !partialCancellation)) { excluded++; continue; }
     const quantityHeader = block.find(line => /체결수량/.test(compact(line.text)));
     if (!quantityHeader) continue;
     const detail = block.some(line => /체결가격|체결단가|주문일시/.test(compact(line.text)));
@@ -64,14 +80,20 @@ export function parseTradePhoto(lines: BalanceTextLine[], width: number, height:
     const rawGross = field(/체결금액/), gross = tradePhotoNumber(rawGross) ?? "";
     let price = tradePhotoNumber(rawPrice) ?? "";
     let priceSource: TradePhotoCandidate["priceSource"] = price ? "reported" : "missing";
+    // A completed status (including a progress strip) is not itself evidence of
+    // a fill. Partial cancellation needs an explicit positive executed portion.
+    if ((group.length > 1 || /완료|체결/.test(start.text) || partialCancellation) && (!quantity || (!price && !gross))) {
+      if (partialCancellation) excluded++;
+      continue;
+    }
     // A list's left column is the LIMIT ORDER price. Derive only from the actual fill columns.
     if (!detail && quantity && gross) {
       try { price = tradePhotoNumber(Decimal.from(gross).div(quantity).toExactString()) ?? ""; if (price) priceSource = "derived"; } catch { /* Recurring averages need an explicit price; never round it. */ }
     }
     const date = block.map(line => tradePhotoDate(line.text)).find(Boolean) ?? "";
     const firstField = block.find(line => /주문일시|주문금액|체결가격|체결단가/.test(compact(line.text)))?.bbox.y0 ?? quantityHeader.bbox.y0;
-    const labels = block.filter(line => line !== start && line.bbox.y0 < firstField && line.bbox.x0 < width * .7 &&
-      /[가-힣A-Za-z]/.test(line.text) && !/예약|주문|체결|결제|소수점|완료|정정|취소|USD|KRW|계좌|확인|국내|해외|일반/.test(compact(line.text)) && !tradePhotoDate(line.text));
+    const labels = block.filter(line => !group.includes(line) && line.bbox.y0 < firstField && line.bbox.x0 < width * .7 &&
+      /[가-힣A-Za-z]/.test(line.text) && !/^(접수|처리|대기|가능)$/.test(compact(line.text)) && !/예약|주문|체결|결제|소수점|완료|정정|취소|USD|KRW|계좌|확인|국내|해외|일반/.test(compact(line.text)) && !tradePhotoDate(line.text));
     const nameLines = detail && labels.length ? labels.filter(line => line.bbox.y0 <= labels[0].bbox.y1) : labels;
     const label = nameLines.map(line => line.text.trim()).join(" · ").slice(0, 120);
     // No usable fill evidence: don't fabricate a blank transaction from a clipped card.

@@ -405,6 +405,7 @@ import "./native-legacy-trade-projection.test.mjs";
 import "./balance-photo.test.mjs";
 import "./contribution-comparison.test.mjs";
 import "./trade-photo.test.mjs";
+import "./trade-photo-fill.test.mjs";
 import "./trade-photo-replay.test.mjs";
 import "./first-day-replay.test.mjs";
 import './contribution-effect.test.mjs';

@@ -35,3 +35,14 @@ export function freshLedgerKindDraft(fields: Fields, kind: string): Fields {
   if (kind === "buy" || kind === "sell") for (const key of ["timePrecision", "tradeDate"]) if (fields[key] !== undefined) result[key] = fields[key];
   return result;
 }
+
+/** A reviewed photo starts a new execution, never reuses another draft's cash,
+ * correction target, fees or confirmations. The caller retains the old draft
+ * until the user explicitly applies the photo. */
+export function applyTradePhotoFields(previous: Fields, assetId: string, photo: Fields): Fields {
+  return {
+    at: previous.at ?? "", assetType: previous.assetType ?? "etf",
+    ...photo, assetId, settlementMode: "none",
+    ...(previous.historyMode ? { historyMode: "yes" } : {}),
+  };
+}

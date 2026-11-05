@@ -16,7 +16,7 @@ const ports = {'next/link':{default:()=>null},'@/components/app-navigation':{App
   '@/components/cairn-v2/reused/native-trade-fields':{NativeTradeFields:()=>null},
   '@/components/cairn-v2/reused/money-input':{MoneyInput:()=>null},
   '@/components/cairn-v2/reused/native-locale':{useI18n:()=>({t:(ko,en)=>en,locale:'en'})}};
-const [ui] = await importUiWithPorts(['src/components/native-ledger-view.tsx'],ports);
+const [ui,betaUi] = await importUiWithPorts(['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'],ports);
 function build(at, nowMs, extra={}) { return ui.buildNativeLedgerMutation({account,kind:'buy',fields:{at,assetId,quantity:'1',inputMode:'total',total:'100'},lots:[],operationId:accountId,newAssetId:assetId,confirmed:false,nowMs,...extra}); }
 function globalValue(t,name,value) { const original=Object.getOwnPropertyDescriptor(globalThis,name); Object.defineProperty(globalThis,name,{value,configurable:true,writable:true}); t.after(()=>{if(original) Object.defineProperty(globalThis,name,original);else delete globalThis[name];}); }
 function deviceClock(t,offset) {const RealDate=Date; globalValue(t,'Date',class extends RealDate {constructor(...args){super(...(args.length ? args : [serverMs+offset]));} static now(){return serverMs+offset;}});}
@@ -49,8 +49,9 @@ function hooks() {
 }
 // Real view event handlers with only browser/network ports substituted. Remote
 // authenticated browser QA separately covers the actual provider/session/writer.
-async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[],loseResponse=false,pendingOther=false,otherAccount=false}={}) {
+async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',compact=true,trades=[],loseResponse=false,pendingOther=false,otherAccount=false,snapshotAt,postFailure={error:'conflict',status:409}}={}) {
   deviceClock(t,offset);let monotonic=1000,serverNow=SERVER;const sent=[];
+  const loadedAccount=snapshotAt?{...account,state:{...account.state,at:snapshotAt}}:account;
   t.mock.method(performance,'now',()=>monotonic);
   const values=new Map();globalValue(t,'localStorage',{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)});
   if(pendingOther){
@@ -62,8 +63,8 @@ async function harness(t,offset,{entry='src/components/native-ledger-view.tsx',c
   }
   globalValue(t,'navigator',{locks:{request:async(_name,callback)=>callback()}});
   t.mock.method(globalThis,'fetch',async(_url,options)=>{
-    if(options.method==='POST') {const request=JSON.parse(options.body);sent.push(request);if(pendingOther)return Response.json({status:request.mutation?'created':'committed'});if(loseResponse){if(request.mutation)throw new Error('lost_response');return Response.json({status:'committed'});}return Response.json({error:'conflict'},{status:409});}
-    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:pendingOther||otherAccount?[account,{...account,id:"33333333-3333-4333-8333-333333333333",assets:[],state:{...account.state,positions:[]}}]:[account],canWrite:true,ordering:[],trades});
+    if(options.method==='POST') {const request=JSON.parse(options.body);sent.push(request);if(pendingOther)return Response.json({status:request.mutation?'created':'committed'});if(loseResponse){if(request.mutation)throw new Error('lost_response');return Response.json({status:'committed'});}return Response.json({error:postFailure.error},{status:postFailure.status});}
+    return Response.json({serverNow,sessionKey:'a'.repeat(64),accounts:pendingOther||otherAccount?[loadedAccount,{...account,id:"33333333-3333-4333-8333-333333333333",assets:[],state:{...account.state,positions:[]}}]:[loadedAccount],canWrite:true,ordering:[],trades});
   });
   const h=hooks();const [view]=await importUiWithPorts([entry],{...ports,react:h.react});
   const render=()=>{h.begin();return elements(view.NativeLedgerView({compact,initialSelection:{accountId,assetId,action:'buy'}}));};
@@ -203,4 +204,76 @@ for(const entry of ['src/components/native-ledger-view.tsx','src/components/cair
  assert.equal(amount('Amount to exchange USD').props.value,'');assert.equal(amount('Amount actually received KRW').props.value,'');
  selectKind('cost_basis');assert.equal(h.render().find(e=>typeof e.props?.onValueChange==='function').props.value,'');
  assert.ok(h.sent.every(row=>!row.mutation),'recovery may look up a pending request, never create a new transaction');
+});
+
+for(const [surface,view] of [['original',ui],['beta',betaUi]]) it(surface+' rejects new trades before the recorded snapshot and requires historical confirmation without changing execution evidence',()=>{
+ const snapshotAt='2026-09-27T07:16:40.000Z',previous='2026-09-27T07:16:39.999Z';
+ const scopedAccount={...account,state:{...account.state,at:snapshotAt}};
+ const fields={at:previous,assetId,quantity:'0.896567',price:'701.263896',inputMode:'execution',currency:'USD',memo:'Verified execution'};
+ const make=(kind,patch={})=>view.buildNativeLedgerMutation({account:scopedAccount,kind,fields:{...fields,...patch},lots:[],operationId:accountId,newAssetId:assetId,confirmed:false,nowMs:serverMs});
+ for(const kind of ['buy','sell']){
+  assert.throws(()=>make(kind),/event_precedes_recorded_snapshot/);
+  assert.throws(()=>make(kind,{timePrecision:'date_only',tradeDate:'2026-09-26'}),/event_precedes_recorded_snapshot/);
+  assert.equal(make(kind,{at:snapshotAt}).event.at,snapshotAt,'the snapshot boundary itself remains allowed');
+  assert.equal(make(kind,{at:SERVER}).event.at,SERVER);
+  assert.throws(()=>make(kind,{historyMode:'yes',notInOpening:''}),/opening_confirmation_required/);
+  const historical=make(kind,{historyMode:'yes',notInOpening:'yes',reason:'A missing execution'});
+  assert.equal(historical.event.at,previous);assert.equal(historical.event.quantity,'0.896567');
+  assert.equal(historical.event.price,'701.263896');
+  assert.deepEqual(historical.history,{reason:'A missing execution',notInOpening:true});
+ }
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' preserves the full trade draft and opens historical confirmation before dispatching a past execution',async t=>{
+ const h=await harness(t,0,{entry,snapshotAt:SERVER});
+ const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+ const manual=nativeLedgerLocalTime(Date.parse('2026-09-26T07:15:00.123Z'));
+ for(const [key,value] of Object.entries({at:manual,timePrecision:'exact',quantity:'0.896567',price:'701.263896',memo:'Keep this draft',notInOpening:'yes',reason:'Old confirmation'}))input().props.edit(key,value);
+ const before={...input().props.fields};
+ await h.submit();
+ assert.equal(h.sent.length,0,'a past execution must not be sent as a new current-state mutation');
+ const after=input().props.fields;
+ for(const [key,value] of Object.entries(before))if(!['historyMode','notInOpening','reason'].includes(key))assert.equal(after[key],value,key+' must remain unchanged');
+ assert.equal(after.historyMode,'yes');assert.equal(after.notInOpening,'');
+ assert.equal(after.reason,'Add a missing trade from a photo or manual input');
+ const disclosure=h.render().find(e=>e.type==='details'&&elements(e).some(child=>child.type==='summary'&&text(child)==='Historical trade entry / correction'));
+ assert.equal(disclosure.props.open,true);
+ assert.match(text(h.render()),/Choose historical trade entry to recalculate/);
+ await h.submit();assert.equal(h.sent.length,0,'the fresh opening-balance confirmation cannot be skipped');
+ assert.equal(input().props.fields.quantity,'0.896567');assert.equal(input().props.fields.memo,'Keep this draft');
+ input().props.edit('notInOpening','yes');await h.submit();
+ assert.equal(h.sent.length,1);assert.equal(h.sent[0].mutation.event.at,new Date(manual).toISOString());
+ assert.equal(h.sent[0].mutation.event.quantity,'0.896567');assert.equal(h.sent[0].mutation.history.notInOpening,true);
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' does not rewrite an unresolved dispatched operation into a historical trade',async t=>{
+ const h=await harness(t,0,{entry,snapshotAt:SERVER,postFailure:{error:'event_precedes_recorded_snapshot',status:500}});
+ const input=()=>h.render().find(e=>typeof e.props?.edit==='function');
+ input().props.edit('memo','Uncertain original request');
+ const before={...input().props.fields};await h.submit();
+ assert.equal(h.sent.length,1);assert.equal(h.sent[0].mutation.event.at,SERVER);
+ assert.deepEqual(input().props.fields,before,'pending evidence must stay exactly as dispatched');
+ assert.equal(input().props.fields.historyMode,undefined);
+ assert.match(text(h.render()),/The save result is uncertain/);
+ assert.ok(h.render().some(e=>e.type==='button'&&text(e)==='Check save / retry'));
+});
+
+for(const entry of ['src/components/native-ledger-view.tsx','src/components/cairn-v2/reused/native-ledger-view.tsx'])it(entry+' applies the reviewed photo side and exact amounts, then focuses the form quantity after the photo entry remounts',async t=>{
+ const frames=[],focus=[];
+ globalValue(t,'requestAnimationFrame',callback=>{frames.push(callback);return frames.length;});
+ const h=await harness(t,0,{entry});
+ const photo=()=>h.render().find(e=>typeof e.props?.onApply==='function'&&e.props.accountId===accountId);
+ const beforeKey=photo().key;
+ h.render().find(e=>e.type==='form').props.ref.current={querySelector(selector){focus.push(selector);return {focus(){focus.push('quantity focused');}};}};
+ photo().props.onOpenChange(true);
+ const fields={quantity:'0.896567',price:'701.263896',executionTotal:'',currency:'USD',inputMode:'execution',executionInputMode:'execution',timePrecision:'exact',tradeDate:'2026-09-27',at:nativeLedgerLocalTime(serverMs)};
+ photo().props.onApply({assetId,side:'sell',fields});
+ const trade=h.render().find(e=>typeof e.props?.edit==='function');
+ assert.equal(trade.props.kind,'sell');assert.equal(trade.props.fields.assetId,assetId);
+ for(const [name,value] of Object.entries(fields))assert.equal(trade.props.fields[name],value,name+' must retain the reviewed photo value');
+ assert.notEqual(photo().key,beforeKey,'changing buy to sell remounts the photo entry');
+ assert.deepEqual(focus,[],'focus waits for the updated trade inputs to render');
+ assert.equal(frames.length,1);frames.shift()();
+ assert.deepEqual(focus,['input[name="quantity"]','quantity focused']);
+ assert.equal(h.sent.length,0,'applying the photo fills the form without recording a trade');
 });

@@ -66,3 +66,4 @@
 @media(max-width:760px){.page{padding-left:0}.body{padding:32px 20px 140px}.heading{align-items:flex-start}.heading h1{font-size:30px}.grid,.executionFields{grid-template-columns:1fr}.row{grid-template-columns:minmax(0,1fr) 100px;gap:12px}.form{gap:20px}.body .executionFields input[data-cairn-control]{font-size:30px}.actions>.primary{width:100%}.options>summary>span{max-width:62%}}
 @media(max-width:359px){.body{padding-inline:16px}.heading{gap:12px}.heading h1{font-size:27px}.cash{gap:16px}.row{grid-template-columns:1fr}.body .executionFields input[data-cairn-control]{font-size:27px}}
 @media(prefers-reduced-motion:reduce){.page *,.compact *{animation:none!important;transition:none!important}}
+.body [hidden]{display:none!important}

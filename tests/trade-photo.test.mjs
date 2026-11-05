@@ -10,6 +10,54 @@ test('detail reads actual fill quantity/price, not order quantity or settlement 
  const {rows}=parseTradePhoto([...detail(),line('10월 28일 체결금액의 결제가 완료됩니다.',100,400,700)],1000,2000);assert.equal(rows.length,1);
  assert.deepEqual(rows[0],{label:'마이크로소프트',side:'buy',date:'2026-10-26',quantity:'0.633088',price:'527.92',currency:'USD',gross:'334.22',priceSource:'reported'});
 });
+test('completed and executed headings require positive fill quantity and actual fill price or amount',()=>{
+ for(const heading of ['매수 완료','매도 완료','매수 체결','매수완료','매도체결']){
+  const lines=detail().map(l=>l.text==='매수 소수점'?{...l,text:heading}:l);
+  const result=parseTradePhoto(lines,1000,2000);
+  assert.equal(result.rows.length,1,heading);
+  assert.equal(result.rows[0].side,heading.startsWith('매도')?'sell':'buy');
+  assert.equal(result.rows[0].quantity,'0.633088');assert.equal(result.rows[0].price,'527.92');
+  assert.equal(parseTradePhoto(lines.filter(l=>!['0.633088주'].includes(l.text)),1000,2000).rows.length,0);
+  assert.equal(parseTradePhoto(lines.filter(l=>!['527.92USD','334.22USD'].includes(l.text)),1000,2000).rows.length,0);
+ }
+});
+test('a completed heading may carry exact fill total without inventing a repeating unit price',()=>{
+ const result=parseTradePhoto([line('매수 완료',50,200),line('VOO',50,300),line('체결수량',450,450),line('체결금액',700,450),line('3주',450,500),line('10.00USD',700,500)],1000,2000);
+ assert.equal(result.rows.length,1);assert.equal(result.rows[0].quantity,'3');assert.equal(result.rows[0].gross,'10');assert.equal(result.rows[0].price,'');
+});
+test('receipt-processing-completed markers on one status strip create one reviewed fill only',()=>{
+ const strip=[line('매수 접수',50,200),line('매수 처리',350,201),line('매수 완료',650,199)];
+ const body=detail().slice(1);
+ const result=parseTradePhoto([...strip,...body],1000,2000);
+ assert.equal(result.rows.length,1);assert.equal(result.rows[0].label,'마이크로소프트');assert.equal(result.rows[0].quantity,'0.633088');
+ assert.equal(parseTradePhoto([...strip,...body.filter(l=>l.text!=='0.633088주')],1000,2000).rows.length,0);
+ assert.equal(parseTradePhoto([...strip.slice(0,2),...body],1000,2000).rows.length,0);
+ const splitLabels=[line('매수',50,200),line('매수',350,200),line('매수',650,200),line('접수',50,235),line('처리',350,235),line('완료',650,235)];
+ const splitResult=parseTradePhoto([...splitLabels,...body],1000,2000);
+ assert.equal(splitResult.rows.length,1);assert.equal(splitResult.rows[0].label,'마이크로소프트');
+});
+test('available and pending headings are not fills and prevent borrowing a following card’s values',()=>{
+ for(const heading of ['매수 가능','매도가능','매수 접수','매도 처리','매수 대기']){
+  assert.equal(parseTradePhoto(detail().map(l=>l.text==='매수 소수점'?{...l,text:heading}:l),1000,2000).rows.length,0,heading);
+ }
+ const incomplete=[line('매수 완료',50,100),line('VOO',50,150),line('체결수량',50,200)];
+ const pending=detail().map(l=>({...l,text:l.text==='매수 소수점'?'매수 접수':l.text,bbox:{...l.bbox,y0:l.bbox.y0+200,y1:l.bbox.y1+200}}));
+ assert.equal(parseTradePhoto([...incomplete,...pending],1000,2200).rows.length,0);
+});
+test('explicit partial-fill cancellation admits only its positive executed quantity',()=>{
+ const partial=detail().map(l=>l.text==='매수 소수점'?{...l,text:'매수 일부체결 취소'}:l);
+ const result=parseTradePhoto(partial,1000,2000);
+ assert.equal(result.rows.length,1);assert.equal(result.rows[0].quantity,'0.633088');
+ for(const replacement of ['0주','O.633088주']){
+  const invalid=partial.map(l=>l.text==='0.633088주'?{...l,text:replacement}:l);
+  assert.equal(parseTradePhoto(invalid,1000,2000).rows.length,0);
+ }
+ assert.equal(parseTradePhoto(partial.filter(l=>!['527.92USD','334.22USD'].includes(l.text)),1000,2000).rows.length,0);
+ assert.equal(parseTradePhoto([...partial,line('미체결',50,1200)],1000,2000).rows.length,0);
+ assert.equal(parseTradePhoto([...partial,line('미체결수량',50,1200),line('0주',700,1200)],1000,2000).rows.length,1);
+ // A cancellation with no explicit partial-fill status remains ambiguous.
+ assert.equal(parseTradePhoto(partial.map(l=>l.text==='매수 일부체결 취소'?{...l,text:'매수 취소완료'}:l),1000,2000).rows.length,0);
+});
 test('list derives execution average from fill columns, never uses the limit order price',()=>{
  const result=parseTradePhoto([line('매수 정정',50,200),line('2026.09.21',750,200),line('VXUS',50,270),line('주문',50,450),line('체결수량',450,450),line('체결금액',700,450),line('86.6800USD X 7주',50,500,300),line('7주',450,500),line('606.6900USD',700,500)],1000,2000);
  assert.equal(result.rows[0].price,'86.67');assert.equal(result.rows[0].priceSource,'derived');

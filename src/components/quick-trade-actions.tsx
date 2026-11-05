@@ -6,13 +6,14 @@ import { Suspense, createContext, useContext, useEffect, useId, useRef, useState
 import { Check, X } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
+import type { Currency } from "@/lib/money";
 import motion from "@/components/onboarding/entry-motion.module.css";
 import styles from "./quick-trade-actions.module.css";
 import { Button as CairnButton, IconButton, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 
 const Ledger = dynamic(() => import("./native-ledger-view").then(module => module.NativeLedgerView));
-type TradeSelection = { accountId?: string; assetId?: string; name?: string; quantity?: string };
+type TradeSelection = { accountId?: string; assetId?: string; name?: string; quantity?: string; reportingCurrency?: Currency };
 type TradeRequest = TradeSelection & { side: "buy" | "sell"; trigger: HTMLElement; id: string };
 const TradeContext = createContext<((request: TradeRequest) => void) | null>(null);
 /** Kept above the legacy/native home branch so a refreshed portfolio cannot unmount an open record. */
@@ -31,7 +32,7 @@ export function QuickTradeActions(props: TradeSelection) {
   </div>;
 }
 function QuickTradeDialog({ request, onGuardChange }: { request: TradeRequest | null; onGuardChange: (pending: boolean) => void }) {
-  const { accountId, assetId, name } = request ?? {};
+  const { accountId, assetId, name, reportingCurrency } = request ?? {};
   const { t } = useI18n();
   const router = useRouter(), dialog = useRef<HTMLDialogElement>(null), trigger = useRef<HTMLElement | null>(null);
   const title = useId();
@@ -63,7 +64,7 @@ function QuickTradeDialog({ request, onGuardChange }: { request: TradeRequest | 
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={title} onKeyDown={containFocus} onCancel={event => { if (busy) event.preventDefault(); }} onClick={event => { if (!busy && event.target === event.currentTarget) dialog.current?.close(); }} onClose={() => { setOpened(false); if (!pending) setAction(null); if (trigger.current?.isConnected) trigger.current.focus(); else document.querySelector<HTMLElement>("main button:not(:disabled),main a[href]")?.focus(); }}>
       <div className={styles.shell}>
         <header><div><CairnSectionTitle id={title}>{name ?? t("새 종목", "New holding")} · {t("거래 기록", "Trade record")}</CairnSectionTitle></div><IconButton disabled={busy} onClick={() => dialog.current?.close()} label={t("닫기", "Close")} title={t("닫기", "Close")}><X size={20} /></IconButton></header>
-        {action ? <Suspense fallback={<CairnStatus as="p" tone="neutral" role="status">{t("거래 입력을 준비하고 있어요…", "Loading trade form…")}</CairnStatus>}><Ledger key={attempt} compact onBusyChange={setBusy} onPendingChange={value => { setPending(value); onGuardChange(value); }} newInstrument={!assetId} initialSelection={{ accountId, assetId, action }} onSaved={() => { setPending(false); onGuardChange(false); setBusy(false); setSaved(true); router.refresh(); dialog.current?.close(); setAction(null); }} /></Suspense> : null}
+        {action ? <Suspense fallback={<CairnStatus as="p" tone="neutral" role="status">{t("거래 입력을 준비하고 있어요…", "Loading trade form…")}</CairnStatus>}><Ledger key={attempt} compact reportingCurrency={reportingCurrency} onBusyChange={setBusy} onPendingChange={value => { setPending(value); onGuardChange(value); }} newInstrument={!assetId} initialSelection={{ accountId, assetId, action }} onSaved={() => { setPending(false); onGuardChange(false); setBusy(false); setSaved(true); router.refresh(); dialog.current?.close(); setAction(null); }} /></Suspense> : null}
       </div>
     </dialog>
   </div>;
