@@ -123,7 +123,7 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
   },[draft]);
   async function save() {
     if (lock.current || access !== "ready" || !sessionKey.current || !draft || !confirmed || draft.expiresAt <= Date.now()) return;
-    lock.current=true; setPending(true); setError(""); const token = generation.current;
+    lock.current=true; setPending(true); setError(""); const token = generation.current, actor = sessionKey.current;
     try {
       const response=await fetch("/api/investment-plans",{method:"POST",headers:{"Content-Type":"application/json","X-Cairn-Plan-Session":sessionKey.current},body:JSON.stringify({id:draft.id,input:draft.input})});
       if (token !== generation.current) return;
@@ -139,7 +139,7 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
       trackFirstVisit("plan_saved",data.id);
       try { const current=parseDraft(localStorage.getItem(PLAN_STORAGE_KEY)); if(current?.id===draft.id) localStorage.removeItem(PLAN_STORAGE_KEY); } catch {}
       for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
-      setDraft(null); await load(); setMessage("계획을 저장했습니다. 실제 보유자산이나 거래로 등록하지 않았습니다.");
+      setDraft(null); await load(); if (sessionKey.current === actor) setMessage("계획을 저장했습니다. 실제 보유자산이나 거래로 등록하지 않았습니다.");
     } catch {if (token === generation.current) setError("연결이 끊겼습니다. 같은 입력으로 다시 저장하면 중복 생성하지 않습니다.");}
     finally {lock.current=false;setPending(false);}
   }
@@ -151,12 +151,12 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
     } catch {setError("계정 연결을 확인하지 못했습니다. 입력은 유지됩니다.");}finally{lock.current=false;setPending(false);}
   }
   async function remove(id:string) {
-    if(lock.current || access !== "ready" || !sessionKey.current)return;lock.current=true;setPending(true);const token=generation.current;
+    if(lock.current || access !== "ready" || !sessionKey.current)return;lock.current=true;setPending(true);const token=generation.current,actor=sessionKey.current;
     try {
       const response=await fetch("/api/investment-plans",{method:"DELETE",headers:{"Content-Type":"application/json","X-Cairn-Plan-Session":sessionKey.current},body:JSON.stringify({id})});
       if(token!==generation.current)return;
       if(!response.ok){const failure=await response.json().catch(()=>({error:"unknown"}));if(token!==generation.current)return;if(failure.error==="account_changed" || response.status===401 || response.status===403 || failure.error==="identity_unlinked"){await load();return;}if(response.status!==404||failure.error!=="plan_not_found")throw new Error();}
-      if(selected?.id===id)setSelected(null);setMessage("저장한 계획을 삭제했습니다.");await load();
+      await load();if(sessionKey.current===actor)setMessage("저장한 계획을 삭제했습니다.");
     }catch{if(token===generation.current)setError("삭제하지 못했습니다. 다시 시도해 주세요.");}finally{lock.current=false;setPending(false);}
   }
   function reuse(plan:SavedPlan,holdings=false){if(access!=="ready"||!sessionKey.current)return;try{localStorage.setItem(PLAN_STORAGE_KEY,JSON.stringify(createPlanDraft(plan.input)));router.push(holdings?"/portfolio/holdings/new?from=plan":"/try?mode=personal");}catch{setError("입력을 옮기지 못했습니다. 브라우저 저장을 허용해 주세요.");}}

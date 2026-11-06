@@ -16,6 +16,7 @@ import { fillSettledTrade } from './reliability-trade-ui-helpers.mjs';
 import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
 import { runAutoRefreshUiCases } from './reliability-auto-refresh-ui-cases.mjs';
 import { runOnboardingQaCases } from './reliability-onboarding-qa-cases.mjs';
+import { runSavedPlanFeedbackCases } from './reliability-saved-plan-feedback-cases.mjs';
 
 /** Neon wire transport only. The app's SQL, tenant roles, transactions and RLS are unchanged. */
 export function createSqlBridge({ worker, tenant, connectionStrings, token }) {
@@ -583,6 +584,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
         assert.equal(after.positions[0].quantity, action === 'buy' ? expectedBuy : before.positions[0].quantity);
       }
     });
+    await runSavedPlanFeedbackCases({page,check,url});
     await runAutoRefreshUiCases({admin,browser,owner:autoRefreshOwner,identityToken:sessionTokens[3],url,output,report});
     await runOnboardingQaCases({page,check,admin,setIdentity,token:sessionTokens[2],owner:legacyOwner,url,output});
     report.fullApp = { url, mode: 'Next production build and real App Router; no design preview', data: 'synthetic local PostgreSQL; unchanged app query/writer/RLS',
