@@ -32,7 +32,7 @@ export function BalancePhotoPanel({ onAdd, remaining, disabled, preview = false,
   useEffect(() => { if (disabled && task.current) { generation.current++; task.current.abort(); task.current = null; queueMicrotask(() => setProgress(null)); } }, [disabled]);
   function update(key: string, change: Partial<BalanceReviewRow>) { setRows(previous => previous.map(row => row.key === key ? { ...row, verified: false, ...change } : row)); setError(""); }
   function clearPreview() { if (previewUrl.current) URL.revokeObjectURL(previewUrl.current); previewUrl.current = undefined; setPhoto(undefined); }
-  function clear() { clearPreview(); setRows([]); setActive(""); setReplacing(false); }
+  function clear() { clearPreview(); onDraftChange?.([]); setRows([]); setActive(""); setReplacing(false); }
   function remove(key: string) { const next = rows.filter(row => row.key !== key); setRows(next); if (active === key) setActive(next[0]?.key ?? ""); if (!next.length) onProvide?.(); }
   async function recognize(file: File) {
     const request = ++generation.current; task.current?.abort(); const controller = new AbortController(); task.current = controller;
