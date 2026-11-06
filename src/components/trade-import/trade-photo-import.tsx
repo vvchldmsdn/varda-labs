@@ -1,11 +1,13 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { ImagePlus } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { Button, Input, PageTitle, SectionHeading, Status } from "@/components/cairn-ui";
+import { readPhotoDraft, savePhotoDraft } from "@/lib/trade-photo-draft";
+import { tradeEntryStorage } from "@/lib/trade-entry-draft";
 import { forgetTrade, pendingTrade, rememberTrade } from "@/lib/trade-operation-recovery";
 import { importIssue, photoImportMessage, PhotoSaveError, savePhotoTrades, type ReviewedPhotoTrade, type TradeImportContext } from "@/lib/trade-photo-import";
 import { resolveTradeRecordSelection, tradeRecordHref, type TradeRecordHint } from "@/lib/trade-record-intent";
@@ -25,9 +27,33 @@ export function TradePhotoImport({ initial, preview = false, initialSelection = 
   const [progress, setProgress] = useState<string | null>(null), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState(""), [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null), task = useRef<AbortController | null>(null), urls = useRef<string[]>([]), mounted = useRef(true), saving = useRef(false);
-  const session = useRef(initial.sessionKey);
+  const session = useRef(initial.sessionKey), revoked = useRef(false);
+  const [restored,setRestored]=useState(false),[storageFailed,setStorageFailed]=useState(false),[checking,setChecking]=useState(false);
+  const [accountContexts,setAccountContexts]=useState<Record<string,TradeImportContext>>({});
+  const requested=useRef(new Set<string>());
+  const revokeSubject=useCallback(()=>{
+    revoked.current=true;task.current?.abort();urls.current.forEach(URL.revokeObjectURL);urls.current=[];
+    setRestored(false);setRows([]);setProgress(null);setAccountContexts({});
+    setContext({...initial,accounts:[],entries:[],canWrite:false,complete:false});
+  },[initial]);
+  function requireSubject(){if(revoked.current)throw new Error('account_changed');}
+  const accountContext=(accountId:string):TradeImportContext => accountContexts[accountId] ?? ((!context.scopeAccountId || context.scopeAccountId===accountId) && context.complete ? context : {...context,complete:false,scopeAccountId:accountId,entries:[]});
+  const checkHistory=useCallback(async(accountId:string)=>{
+    if(!accountId||preview||revoked.current)return;
+    requested.current.add(accountId);setChecking(true);setError("");
+    try{const fresh=await request('/api/portfolio/ledger?view=import&accountId='+encodeURIComponent(accountId)) as TradeImportContext;
+      if(revoked.current)return;
+      if(fresh.sessionKey!==session.current)throw new Error('account_changed');
+      if(mounted.current){setAccountContexts(old=>({...old,[accountId]:fresh}));setContext(fresh);}
+    }catch(cause){if(mounted.current){if(cause instanceof Error&&['account_changed','sign_in_required','account_unavailable'].includes(cause.message))revokeSubject();setError(photoImportMessage(cause instanceof Error?cause.message:'unavailable'));}}
+    finally{if(mounted.current)setChecking(false);}
+  },[preview,revokeSubject]);
+  useEffect(()=>{const frame=requestAnimationFrame(()=>{const saved=readPhotoDraft(tradeEntryStorage(),session.current);if(saved){setRows(saved.rows.map(row=>({...row,photo:''})));setActive(saved.active);setMessage('검토하던 거래를 복원했어요. 원본 사진은 보관하지 않습니다.');}try{setUncertain(!!pendingTrade(localStorage,session.current));}catch{setUncertain(true);}setRestored(true);});return()=>cancelAnimationFrame(frame)},[]);
+  useEffect(()=>{if(restored&&!preview)setStorageFailed(!savePhotoDraft(tradeEntryStorage(),session.current,rows,active));},[rows,active,restored,preview]);
+  useEffect(()=>{for(const accountId of new Set(rows.filter(row=>row.status==='review').map(row=>row.accountId))){if(accountId&&!requested.current.has(accountId))void checkHistory(accountId);}},[rows,checkHistory]);
   const selection = resolveTradeRecordSelection(initial.accounts, initialSelection);
-  const manualHref = tradeRecordHref(selection, reportingCurrency);
+  const activeRow = rows.find(row=>row.key===active);
+  const manualHref = tradeRecordHref(activeRow ? resolveTradeRecordSelection(context.accounts,{accountId:activeRow.accountId,assetId:activeRow.assetId,action:activeRow.side}) : selection, reportingCurrency);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; task.current?.abort(); urls.current.forEach(URL.revokeObjectURL); }; }, []);
   useEffect(() => {
     if (!busy && !uncertain && !rows.some(r => r.status === "review")) return;
@@ -35,9 +61,9 @@ export function TradePhotoImport({ initial, preview = false, initialSelection = 
     window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
   }, [rows, busy, uncertain]);
   const current = rows.find(r => r.key === active);
-  const editable = !busy && !uncertain && progress === null;
+  const editable = !busy && !uncertain && progress === null && (preview || context.accounts.length > 0);
   const pending = rows.filter(r => r.status === "review"), savedCount = rows.filter(r => r.status === "saved").length;
-  const ready = pending.filter(r => !importIssue(r, context, rows)).length;
+  const ready = pending.filter(r => !importIssue(r, accountContext(r.accountId), rows)).length;
   function change(patch: Partial<ReviewedPhotoTrade>) { setRows(previous => previous.map(r => r.key === active ? { ...r, verified: false, ...patch } : r)); setError(""); }
   async function readPhotos(files: File[]) {
     if (!editable || files.length > 10 || rows.length >= 50) { setError("한 번에 사진 10장, 거래 50건까지 확인할 수 있어요."); return; }
@@ -57,48 +83,61 @@ export function TradePhotoImport({ initial, preview = false, initialSelection = 
           next = next.concat(result.rows.map(row => ({ ...row, photo, key: crypto.randomUUID(), operationId: crypto.randomUUID(), accountId: selection.accountId || (initial.accounts.length === 1 ? initial.accounts[0].id : ""), assetId: "", afterEventId: "", verified: false, status: "review" as const })));
         } catch { if (!controller.signal.aborted) unread++; }
       }
-      if (mounted.current) {
+      if (mounted.current && !revoked.current) {
         // Keep successful photos if a later photo fails or recognition is cancelled.
         next.sort((a, b) => a.date.localeCompare(b.date)); setRows(previous => [...previous, ...next]); if (!active) setActive(next[0]?.key ?? "");
         setMessage(`${next.length}건을 검토 목록에 담았어요.${excluded ? ` 미체결·취소 ${excluded}건은 제외했어요.` : ""}${unread ? ` ${unread}장은 읽지 못했거나 한도를 넘었어요. 체결 상세 사진으로 다시 선택해 주세요.` : ""}${controller.signal.aborted ? " 인식은 중단했어요." : ""}`);
       }
-    } catch { if (mounted.current) setError("인식 도구를 준비하지 못했어요. 연결을 확인하고 사진을 다시 선택해 주세요."); }
+    } catch { if (mounted.current && !revoked.current) setError("인식 도구를 준비하지 못했어요. 연결을 확인하고 사진을 다시 선택해 주세요."); }
     finally { if (mounted.current) setProgress(null); task.current = null; }
   }
+  function clearCompleted() {
+    if (busy || uncertain || pending.length) return;
+    try { if (pendingTrade(localStorage, session.current)) {setUncertain(true);return;} } catch {setUncertain(true);return;}
+    if (!savePhotoDraft(tradeEntryStorage(), session.current, [], '')) {setStorageFailed(true);return;}
+    urls.current.forEach(URL.revokeObjectURL);urls.current=[];requested.current.clear();setAccountContexts({});
+    setRows([]);setActive('');setMessage('새 거래 사진을 선택해 주세요. 저장된 거래 기록은 그대로입니다.');
+  }
   async function save() {
+    if (revoked.current) return;
     if (preview || saving.current || !navigator.locks) { setError(preview ? "디자인 검증 화면에서는 거래를 저장하지 않습니다." : "이 브라우저에서는 안전한 동시 저장을 지원하지 않아요. 최신 브라우저로 다시 시도해 주세요."); return; }
     saving.current = true; setBusy(true); setError(""); setMessage("");
     try {
       await navigator.locks.request(`cairn:trade:${session.current}`, async () => {
+        requireSubject();
         await savePhotoTrades(rows, session.current, {
-          context: async () => {
-            const fresh = await request("/api/portfolio/ledger?view=import") as TradeImportContext;
+          context: async (accountId) => {
+            requireSubject();
+            const fresh = await request("/api/portfolio/ledger?view=import"+(accountId?"&accountId="+encodeURIComponent(accountId):"")) as TradeImportContext;
+            requireSubject();
             if (fresh.sessionKey !== session.current) throw new Error("account_changed");
-            if (mounted.current) setContext(fresh); return fresh;
+            if (mounted.current) {setContext(fresh);if(accountId)setAccountContexts(old=>({...old,[accountId]:fresh}));} return fresh;
           },
           pending: () => pendingTrade(localStorage, session.current),
           remember: value => rememberTrade(localStorage, value),
           forget: id => forgetTrade(localStorage, session.current, id),
           lookup: async operationId => {
+            requireSubject();
             const result = await request("/api/portfolio/ledger", { sessionKey: session.current, operationId });
+            requireSubject();
             if (!["committed", "cancelled", "unconfirmed"].includes(result.status)) throw new Error("unavailable");
             return result.status;
           },
-          post: async mutation => { const result = await request("/api/portfolio/ledger", { sessionKey: session.current, mutation }); if (!["created", "existing"].includes(result.status)) throw new Error("unavailable"); },
-        }, key => { if (mounted.current) setRows(previous => previous.map(r => r.key === key ? { ...r, status: "saved" } : r)); });
+          post: async mutation => { requireSubject();const result = await request("/api/portfolio/ledger", { sessionKey: session.current, mutation }); requireSubject();if (!["created", "existing"].includes(result.status)) throw new Error("unavailable"); },
+        }, key => { if (mounted.current && !revoked.current) setRows(previous => previous.map(r => r.key === key ? { ...r, status: "saved" } : r)); });
       });
-      if (mounted.current) { setUncertain(false); setMessage("확인한 거래를 저장했어요. 보유 수량과 체결금액이 반영됐습니다."); }
+      if (mounted.current && !revoked.current) { setUncertain(false); setMessage("확인한 거래를 저장했어요. 보유 수량과 체결금액이 반영됐습니다."); }
     } catch (cause) {
       if (mounted.current) {
         const code = cause instanceof Error ? cause.message : "unavailable";
-        if (["account_changed", "sign_in_required", "account_unavailable"].includes(code)) { urls.current.forEach(URL.revokeObjectURL); urls.current = []; setRows([]); setContext({ ...initial, accounts: [], entries: [], canWrite: false }); }
+        if (["account_changed", "sign_in_required", "account_unavailable"].includes(code)) revokeSubject();
         setError(photoImportMessage(code));
         try { setUncertain(!!pendingTrade(localStorage, session.current)); } catch { setUncertain(true); }
       }
     } finally { saving.current = false; if (mounted.current) setBusy(false); }
   }
   return <div id="varda-main-content" className={styles.content}>
-    <header className={styles.heading}><div><PageTitle>{t("사진으로 거래 기록", "Record trades from photos")}</PageTitle><p>{t("증권사 체결 내역을 한 번에 옮겨 보세요.", "Bring your brokerage fills together.")}</p></div><Link href={manualHref} prefetch={false}>{t("직접 입력 ↗", "Enter manually ↗")}</Link></header>
+    <header className={styles.heading}><div><PageTitle>{t("사진으로 거래 기록", "Record trades from photos")}</PageTitle><p>{t("증권사 체결 내역을 한 번에 옮겨 보세요.", "Bring your brokerage fills together.")}</p></div><Link href={manualHref} prefetch={false} onClick={()=>{if(restored&&!preview)savePhotoDraft(tradeEntryStorage(),session.current,rows,active);}}>{t("직접 입력 ↗", "Enter manually ↗")}</Link></header>
     {preview && <Status as="p">디자인 검증 · 예시 계좌입니다. 사진은 실제로 읽지만 저장은 하지 않습니다.</Status>}
     <section className={styles.upload}>
       <div className={styles.uploadIntro}><ImagePlus aria-hidden="true" /><SectionHeading title={t("체결 내역을 골라 주세요", "Choose your trade photos")} description={t("수량·단가가 보이는 사진이면 돼요", "Include the filled quantity and price")} /></div>
@@ -109,8 +148,10 @@ export function TradePhotoImport({ initial, preview = false, initialSelection = 
     <ol className={styles.steps} aria-label={t("거래 가져오기 순서", "Import steps")}><li aria-current={!rows.length ? "step" : undefined}><span>1</span>{t("사진 선택", "Choose")}</li><li aria-current={pending.length ? "step" : undefined}><span>2</span>{t("체결 확인", "Review")}</li><li aria-current={savedCount > 0 && !pending.length ? "step" : undefined}><span>3</span>{t("기록 저장", "Save")}</li></ol>
     {progress && <Status as="div">사진을 읽고 있어요 · {progress} <Button variant="ghost" onClick={() => task.current?.abort()}>인식 중단</Button></Status>}
     {message && <Status as="p" tone="success">{message}</Status>}{error && <Status as="p" tone="danger" role="alert">{error}</Status>}
-    {!context.complete && <Status as="p" tone="warning">{photoImportMessage("incomplete_history")}</Status>}
+    {storageFailed&&<Status as="p" tone="warning">검토 내용을 임시 보관하지 못했어요. 이 화면을 나가기 전에 브라우저 저장 권한을 확인해 주세요.</Status>}
+    {current?.accountId&&<div className={styles.hint}><Button variant="ghost" disabled={busy||checking} onClick={()=>void checkHistory(current.accountId)}>{checking?'이력 확인 중…':'계좌 이력 다시 확인'}</Button>{!accountContext(current.accountId).complete&&!checking&&<><Status as="p" tone="warning">{photoImportMessage(accountContexts[current.accountId]?'incomplete_history':'history_not_loaded')}</Status><Link href={manualHref}>직접 입력에서 확인 ↗</Link></>}</div>}
     {rows.length === 0 ? <p className={styles.empty}>{t("현금 출금액 없이, 체결금액으로 기록해요. 기존 기록은 유지돼요.", "Record execution amounts without cash settlement. Existing records stay intact.")}</p> : <>
+      {!pending.length&&<Button variant="ghost" disabled={busy||uncertain} onClick={clearCompleted}>완료 목록 비우고 새 사진 가져오기</Button>}
       <div className={styles.stats}><span>{t("확인 대기", "To review")}<strong>{pending.length}</strong></span><span>{t("저장 준비", "Ready")}<strong>{ready}</strong></span><span>{t("저장 완료", "Saved")}<strong>{savedCount}</strong></span></div>
       <div className={styles.layout}>
         <section className={styles.list} aria-label={t("사진에서 읽은 거래 목록", "Trades read from photos")}><SectionHeading title={t("확인할 거래", "Review trades")} description={t("날짜순 · 같은 날은 체결순", "By date, then execution order")} />{rows.map((row, i) => <div key={row.key} className={styles.row} data-active={row.key === active} data-state={row.status}>
@@ -118,8 +159,8 @@ export function TradePhotoImport({ initial, preview = false, initialSelection = 
           {row.status === "review" && <div className={styles.reorder}><Button size="sm" variant="ghost" aria-label={`${i + 1}번 거래 위로`} disabled={!editable || i === 0} onClick={() => setRows(previous => { const next = [...previous]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; return next.map(r => ({ ...r, verified: r.status === "review" ? false : r.verified })); })}>↑</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => { setActive(row.key); setRows(previous => previous.map(r => r.key === row.key ? { ...r, status: "excluded", verified: false } : r)); }}>제외</Button></div>}
         </div>)}</section>
         <section aria-label="선택한 거래 검토" className={styles.detail}>
-          {current && <><details className={styles.photo}><summary>원본 사진과 비교</summary><Image unoptimized src={current.photo} alt="체결 내역 확인용 원본 사진" width={945} height={2048} /></details>
-          {current.status === "review" ? <Review key={current.key} row={current} queue={rows} context={context} disabled={!editable} change={change} /> : <Status as="p">{current.status === "saved" ? "이 거래는 저장됐어요. 다시 등록하지 않습니다." : "검토 목록에서 제외한 거래입니다."}{current.status === "excluded" && <Button variant="ghost" disabled={!editable} onClick={() => change({ status: "review" })}>다시 확인</Button>}</Status>}</>}
+          {current && <>{current.photo?<details className={styles.photo}><summary>원본 사진과 비교</summary><Image unoptimized src={current.photo} alt="체결 내역 확인용 원본 사진" width={945} height={2048} /></details>:<p className={styles.hint}>복원한 검토 내용입니다. 원본 사진은 기기에 보관된 사진과 대조해 주세요.</p>}
+          {current.status === "review" ? <Review key={current.key} row={current} queue={rows} context={accountContext(current.accountId)} disabled={!editable} change={change} /> : <Status as="p">{current.status === "saved" ? "이 거래는 저장됐어요. 다시 등록하지 않습니다." : "검토 목록에서 제외한 거래입니다."}{current.status === "excluded" && <Button variant="ghost" disabled={!editable} onClick={() => change({ status: "review" })}>다시 확인</Button>}</Status>}</>}
         </section>
       </div>
       <footer className={styles.footer}><div><strong>{t(`${savedCount}건 저장 · ${pending.length}건 남음`, `${savedCount} saved · ${pending.length} remaining`)}</strong><p>{t("순서대로 저장해요. 오류가 나면 멈춥니다.", "Saved in order; stops if a trade fails.")}</p></div><Button variant="primary" size="lg" type="button" disabled={busy || !!progress || !pending.length || !context.canWrite || (!uncertain && ready !== pending.length)} onClick={() => void save()}>{busy ? t("거래 저장 중…", "Saving trades…") : uncertain ? t("저장 확인 후 계속", "Check save and continue") : t(`확인한 ${pending.length}건 저장`, `Save ${pending.length} reviewed trades`)}</Button></footer>

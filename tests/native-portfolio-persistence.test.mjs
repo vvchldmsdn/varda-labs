@@ -430,6 +430,9 @@ it('keeps current cash, quantity, costs and new writes after the native event wi
   const query=f.batches.at(-1).commands[2];
   const exported=(await f.pg.query(query.text,query.params)).rows;
   assert.deepEqual(exported,[{complete:false,rows:[]}],'over-cap query returns metadata, not 10,001 full-state JSON objects');
+  const importAll=await f.queries.readNativeImportLedger({ownerUserId:owner});assert.equal(importAll.entriesComplete,false);
+  const importPeer=await f.queries.readNativeImportLedger({ownerUserId:owner},peer);assert.equal(importPeer.entriesComplete,true);assert.ok(importPeer.accounts.every(a=>a.id!==foreign));assert.ok(importPeer.entries.every(e=>e.accountId===peer));
+  const importOwn=await f.queries.readNativeImportLedger({ownerUserId:owner},account);assert.equal(importOwn.entriesComplete,false);
   let evidence=await f.evidence(later), report=f.valuation.buildTrackedCurrencyPortfolio(evidence);
   assert.equal(report.current.total,'11251'); assert.equal(report.current.positions.find(p=>p.id===asset).cost,'600');
   assert.equal(evidence.current.positions.find(p=>p.id===asset).observation.quantity,'10.000000');

@@ -44,12 +44,21 @@ export async function readSnapshotCutoffObservations(snapshotDate: string): Prom
 }
 
 /** An unchanged daily FX cache value is still a new receipt, never a new tick. */
-export async function preserveUnchangedCutoffFx(candidate: FxRateCandidate) {
+export async function preserveUnchangedCutoffFx(candidate: FxRateCandidate, expected: { id: string; usdKrw: string | number | null; source: string | null; observedAt: Date | null; fetchedAt: Date | null; rateKind: string | null; status: string | null; isSample: boolean }) {
   const observation = fxObservationWrite(candidate);
-  await sqlClient.query("select record_snapshot_cutoff_fx($1,$2::date,$3::numeric,$4::timestamptz,$5,$6::timestamptz)", [
+  // Lock and compare the evidence before archiving the receipt. A rejected race
+  // must not leak into the immutable cutoff archive through this no-update path.
+  const rows = await sqlClient.query(`with admitted as materialized (
+    select id from fx_rates where id=$7::uuid and usdkrw=$8::numeric
+    and source is not distinct from $9 and observed_at is not distinct from $10::timestamptz
+    and fetched_at is not distinct from $11::timestamptz and rate_kind is not distinct from $12
+    and status is not distinct from $13 and is_sample=$14 and legacy_base44_id is null for update
+  ) select record_snapshot_cutoff_fx($1,$2::date,$3::numeric,$4::timestamptz,$5,$6::timestamptz) from admitted`, [
     candidate.source, candidate.rateDate, candidate.usdKrw, observation.observedAt?.toISOString() ?? null,
-    observation.rateKind, candidate.fetchedAt,
+    observation.rateKind, candidate.fetchedAt, expected.id, String(expected.usdKrw), expected.source,
+    expected.observedAt?.toISOString() ?? null, expected.fetchedAt?.toISOString() ?? null, expected.rateKind, expected.status, expected.isSample,
   ]);
+  if (!rows.length) throw new Error('fx_receipt_changed');
 }
 function date(value: unknown) { return value instanceof Date ? new Date(value.getTime()) : new Date(String(value)); }
 function dateOrNull(value: unknown) { return value == null ? null : date(value); }

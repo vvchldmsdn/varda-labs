@@ -74,13 +74,16 @@ export async function runGuidedHoldingsQa({page,check,admin,owner,account,url,ou
       await expect(search).toHaveValue('QAFU');
       await form.getByRole('button',{name:/QAFUND.*QA 보유 6/}).click();
       await form.getByRole('button',{name:'확인 목록으로 가져오기',exact:true}).click();
+      await expect(form.getByRole('button',{name:'QA 보유 6 목록에서 제거',exact:true})).toBeVisible();
       await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
       await page.reload();await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
+      await expect(form.getByRole('button',{name:'QA 보유 6 목록에서 제거',exact:true})).toBeVisible();
       await expect(form).toContainText('매입가가 없는 종목은 평가액만 표시해요.');
       await capture(page,output,'guided-final-review-'+beta,width,height);
       // Leaving the screen is not a write, and returning restores the reviewed draft.
       const before=(await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,selectedAccount])).rows;
       await page.goto(url+'/portfolio/manage');await page.goBack();
+      await expect(form.getByRole('button',{name:'QA 보유 6 목록에서 제거',exact:true})).toBeVisible();
       await expect(form.getByLabel('QA 보유 6 보유 수량',{exact:true})).toHaveValue('0.896567');
       assert.deepEqual((await admin.query('select id,quantity::text from assets where canonical_owner_user_id=$1 and account_id=$2 order by id',[owner,selectedAccount])).rows,before);
       await form.getByRole('button',{name:'QA 보유 6 목록에서 제거',exact:true}).click();

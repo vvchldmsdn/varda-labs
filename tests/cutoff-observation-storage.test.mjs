@@ -146,3 +146,43 @@ it('durable FX worker refreshes an unchanged receipt once, then reuses it withou
   assert.equal((await pg.query('select fetched_at from fx_rates where date=$1',[rateDate])).rows[0].fetched_at.toISOString(),staleReceipt);
   assert.equal((await pg.query("select status from market_collection_jobs where key='kis:fx:USD:KRW'")).rows[0].status,'pending');
 });
+
+it('dated FX reference survives same-value and changed undated KIS refreshes including cutoff evidence', async () => {
+  const rateDate='2026-01-02', observedAt=receipt('21:56:00'), fetchedAt=receipt('21:57:00');
+  const candidate={provider:'er-api-open',pair:'USD/KRW',rateDate,usdKrw:'1400',source:'er-api_open_access',status:'ok',fetchedAt,providerTimestamp:observedAt};
+  await runtime.fx.runUsdKrwFxCandidateJob({candidate,dryRun:false,acceptExistingVardaRow:true});
+  const before=(await pg.query('select * from fx_rates where date=$1',[rateDate])).rows[0];
+  const archived=(await pg.query('select count(*)::int n from snapshot_cutoff_fx_observations')).rows[0].n;
+  for(const usdKrw of ['1400','1410']) {
+    const result=await runtime.fx.runUsdKrwFxCandidateJob({candidate:{...candidate,provider:'kis',source:'kis_overseas_price_detail:NAS',providerTimestamp:undefined,usdKrw,fetchedAt:receipt('21:59:00')},dryRun:false,acceptExistingVardaRow:true,refreshUnchangedReceipt:true});
+    assert.equal(result.ok,true);assert.equal(result.plannedWrite.reason,'dated_reference_preserved');assert.deepEqual(result.plannedWrite.plannedWrites,{insert:0,update:0,skip:1,blocked:0});
+    assert.deepEqual((await pg.query('select * from fx_rates where date=$1',[rateDate])).rows[0],before);
+  }
+  assert.equal((await pg.query('select count(*)::int n from snapshot_cutoff_fx_observations')).rows[0].n,archived);
+  const invalid=await runtime.fx.runUsdKrwFxCandidateJob({candidate:{...candidate,usdKrw:'0',providerTimestamp:undefined},dryRun:false});
+  assert.equal(invalid.ok,false);assert.equal(invalid.plannedWrite.reason,'invalid_candidate_usdkrw');
+  assert.deepEqual((await pg.query('select * from fx_rates where date=$1',[rateDate])).rows[0],before);
+  assert.equal((await runtime.fx.runUsdKrwFxCandidateJob({candidate:{...candidate,usdKrw:'1420',fetchedAt:receipt('22:01:00'),providerTimestamp:receipt('22:00:00')},dryRun:false})).status,'written');
+});
+it('a competing dated FX write prevents a stale undated overwrite by compare-and-swap', async () => {
+  const rateDate='2026-01-03', candidate={provider:'kis',pair:'USD/KRW',rateDate,usdKrw:'1300',source:'kis_overseas_price_detail:NAS',status:'ok',fetchedAt:receipt('21:57:00')};
+  await runtime.fx.runUsdKrwFxCandidateJob({candidate,dryRun:false});
+  const real=drizzle(pg);let raced=false;
+  const proxy=new Proxy(real,{get(target,key){if(key==='select')return (...args)=>({from:table=>({where:async condition=>{const rows=await real.select(...args).from(table).where(condition);if(!raced){raced=true;await pg.query("update fx_rates set usdkrw=1400,source='er-api_open_access',observed_at=$1,rate_kind='daily_reference',fetched_at=$1 where date=$2",[receipt('21:58:00'),rateDate]);}return rows;}})});const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+  const [writer]=await importWithPorts(['src/lib/market-data/fx-refresh-job.ts'],{'@/db/client':{db:proxy,sqlClient:runtime.sqlClient}});
+  await assert.rejects(writer.runUsdKrwFxCandidateJob({candidate:{...candidate,usdKrw:'1310',fetchedAt:receipt('21:59:00')},dryRun:false}),/FX write target/);
+  const stored=(await pg.query('select usdkrw,source,rate_kind from fx_rates where date=$1',[rateDate])).rows[0];assert.equal(Number(stored.usdkrw),1400);assert.equal(stored.rate_kind,'daily_reference');assert.equal(stored.source,'er-api_open_access');
+});
+
+it('same-value FX races cannot archive a rejected receipt with or without cache renewal', async () => {
+ for(const refreshUnchangedReceipt of [true,false]) {
+  const rateDate=refreshUnchangedReceipt?'2026-01-04':'2026-01-05';
+  const candidate={provider:'kis',pair:'USD/KRW',rateDate,usdKrw:'1300',source:'kis_overseas_price_detail:NAS',status:'ok',fetchedAt:receipt('21:57:00')};
+  await runtime.fx.runUsdKrwFxCandidateJob({candidate,dryRun:false});
+  const real=drizzle(pg);let raced=false;
+  const proxy=new Proxy(real,{get(target,key){if(key==='select')return (...args)=>({from:table=>({where:async condition=>{const rows=await real.select(...args).from(table).where(condition);if(!raced){raced=true;await pg.query("update fx_rates set usdkrw=1300,source='er-api_open_access',observed_at=$1,rate_kind='daily_reference',fetched_at=$1 where date=$2",[receipt('21:58:00'),rateDate]);}return rows;}})});const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+  const [writer]=await importWithPorts(['src/lib/market-data/fx-refresh-job.ts'],{'@/db/client':{db:proxy,sqlClient:runtime.sqlClient}});
+  await assert.rejects(writer.runUsdKrwFxCandidateJob({candidate:{...candidate,fetchedAt:receipt('21:59:00')},dryRun:false,acceptExistingVardaRow:true,refreshUnchangedReceipt}),/fx_receipt_changed/);
+  const rejected=await pg.query('select count(*)::int n from snapshot_cutoff_fx_observations where rate_date=$1 and fetched_at=$2',[rateDate,receipt('21:59:00')]);assert.equal(rejected.rows[0].n,0);
+ }
+});

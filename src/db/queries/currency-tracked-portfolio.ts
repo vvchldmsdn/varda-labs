@@ -1,4 +1,5 @@
 import "server-only";
+import { isCollectionPriceSource } from '@/lib/quote-time-basis';
 import { getReadOnlyTenantPortfolioDashboardSources } from "./portfolio-dashboard";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
@@ -40,7 +41,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
     // Do not admit a new provider without the matching licensing/admission path.
     const enteredCurrentPrice = options.investmentsOnly && source === "user_entered_onboarding" && quoteType === "manual";
     if ((!enteredCurrentPrice && (!source?.startsWith("kis") || !["live", "close"].includes(quoteType ?? ""))) || !source || !observedAt || !fetchedAt || observedAt > now || fetchedAt > now || observedAt > fetchedAt || status !== "ok") return base;
-    return { ...base, observation: { quantity: asset.quantity, price: quote?.price ?? asset.currentPrice, currency: asset.currency, at, priceObservedAt: observedAt.toISOString(), priceFetchedAt: fetchedAt.toISOString(), basis: "raw", source } };
+    return { ...base, observation: { quantity: asset.quantity, price: quote?.price ?? asset.currentPrice, currency: asset.currency, at, priceObservedAt: observedAt.toISOString(), priceFetchedAt: fetchedAt.toISOString(), timestampBasis: isCollectionPriceSource(source) ? 'collection' : 'provider', basis: "raw", source } };
   });
   const evidence: TrackedPortfolioEvidence = { ownerId: tenant.ownerUserId, reporting, asOf: at,
     current: { at, source: "owned_native_asset_and_kis_quote", positions, scopeComplete: false },

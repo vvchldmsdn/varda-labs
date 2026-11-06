@@ -75,7 +75,12 @@ export function HoldingImportPanel({ onAdd, remaining, disabled, preview = false
       <CairnButton variant="primary" type="button" disabled={disabled || currencyConflict || rows.some(row => !row.instrument) || rows.length > remaining} onClick={() => {
         if (currencyConflict) { setError("currency"); return; }
         const added = onAdd(rows.map(row => ({ key: crypto.randomUUID(), instrumentId: row.instrument!.id, name: row.instrument!.name, ticker: row.instrument!.ticker, market: row.instrument!.market, assetType: row.instrument!.assetType, quantity: row.quantity, averageCost: row.averageCost, currentPrice: "" })));
-        if (added) { setRows([]); setText(""); setError(null); } else { setError("queue"); }
+        if (added) {
+          // Clear the source draft in the same update as the review list. A
+          // reload must not persist the accepted rows with an unconsumed source.
+          onDraftChange?.({ text: "", rows: [] });
+          setRows([]); setText(""); setError(null);
+        } else { setError("queue"); }
       }}>{t("확인 목록으로 가져오기", "Add to review list")}</CairnButton>
     </>}
     <p className={styles.note}>{t("기기에서 읽기 · 확인 목록에 담은 뒤 저장해요.", "Read on this device · Save after checking your review list.")}</p>

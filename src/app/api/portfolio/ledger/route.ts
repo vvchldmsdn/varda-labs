@@ -4,7 +4,7 @@ import { releaseOwnerAllowed } from "@/lib/release-admission";
 import { readCurrentSessionSubject } from "@/lib/auth/current-session-subject";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { isSameOriginAuthRequest, readBoundedAuthBody } from "@/lib/auth/auth-request-validation";
-import { readNativeLedger, readNativeOperation, cancelNativeOperation, validNativeMutation, writeNativeMutation } from "@/db/queries/native-portfolio-ledger";
+import { readNativeLedger, readNativeImportLedger, readNativeOperation, cancelNativeOperation, validNativeMutation, writeNativeMutation } from "@/db/queries/native-portfolio-ledger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const response = (body: object, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" } });
@@ -17,11 +17,14 @@ async function context() {
 }
 export async function GET(request: Request) {
   try {
-    const search = new URL(request.url).search;
-    if (search && search !== "?view=import") return response({ error: "invalid_request" }, 400);
+    const params = new URL(request.url).searchParams;
+    const importing = params.get('view') === 'import';
+    const accountId = params.get('accountId') ?? undefined;
+    if ([...params.keys()].some(k => !['view','accountId'].includes(k) || params.getAll(k).length !== 1)
+      || (params.size > 0 && !importing) || (accountId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(accountId))) return response({ error: "invalid_request" }, 400);
     const auth = await context(); if (auth instanceof Response) return auth;
-    const ledger = await readNativeLedger(auth.tenant);
-    if (search) return response({ serverNow: new Date().toISOString(), sessionKey: auth.sessionKey,
+    const ledger = importing ? await readNativeImportLedger(auth.tenant, accountId) : await readNativeLedger(auth.tenant);
+    if (importing) return response({ serverNow: new Date().toISOString(), sessionKey: auth.sessionKey, scopeAccountId: accountId,
       canWrite: releaseOwnerAllowed(process.env, "NATIVE_LEDGER", auth.tenant.ownerUserId),
       complete: ledger.accountsComplete && ledger.entriesComplete, accounts: ledger.accounts,
       entries: photoImportEntries(ledger.entries) });

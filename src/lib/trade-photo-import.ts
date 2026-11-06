@@ -5,7 +5,7 @@ import type { NativeMutation, NativeStoredAccount, NativeStoredEntry } from "@/d
 import type { PendingTrade } from "./trade-operation-recovery";
 
 export type ImportEntry = { id: string; operationId: string; accountId: string; type: string; at: string; date: string; dateOnly?: boolean; assetId?: string; quantity?: string };
-export type TradeImportContext = { sessionKey: string; serverNow: string; canWrite: boolean; complete: boolean; accounts: NativeStoredAccount[]; entries: ImportEntry[] };
+export type TradeImportContext = { sessionKey: string; serverNow: string; canWrite: boolean; complete: boolean; scopeAccountId?: string; accounts: NativeStoredAccount[]; entries: ImportEntry[] };
 export type ReviewedPhotoTrade = TradePhotoCandidate & { key: string; operationId: string; accountId: string; assetId: string; verified: boolean; afterEventId: string; status: "review" | "saved" | "excluded" };
 export const koreaTradeDay = (at: string) => new Date(Date.parse(at) + 9 * 3600000).toISOString().slice(0, 10);
 export function photoImportEntries(entries: NativeStoredEntry[]): ImportEntry[] {
@@ -27,6 +27,7 @@ export function samePhotoTrade(a: Pick<ReviewedPhotoTrade, "accountId" | "assetI
   try { return !!a.assetId && a.accountId === b.accountId && a.assetId === b.assetId && a.side === b.side && a.date === b.date && Decimal.from(a.quantity).compare(b.quantity) === 0; } catch { return false; }
 }
 export function importIssue(row: ReviewedPhotoTrade, context: TradeImportContext, queue: ReviewedPhotoTrade[] = []): string | null {
+  if (context.scopeAccountId && context.scopeAccountId !== row.accountId) return 'history_not_loaded';
   if (!context.complete) return "incomplete_history";
   if (!context.canWrite) return "write_unavailable";
   const account = context.accounts.find(a => a.id === row.accountId && a.active !== false);
@@ -72,7 +73,7 @@ export class PhotoSaveError extends Error {
   constructor(code: string, definite = false) { super(code); this.definite = definite; }
 }
 export type PhotoSavePort = {
-  context(): Promise<TradeImportContext>;
+  context(accountId?: string): Promise<TradeImportContext>;
   pending(): PendingTrade | { operationId: string } | null;
   remember(value: PendingTrade): void; forget(operationId: string): void;
   lookup(operationId: string): Promise<"committed" | "cancelled" | "unconfirmed">;
@@ -82,17 +83,22 @@ export type PhotoSavePort = {
  * A retry sends the retained exact payload, never a new financial operation. */
 export async function savePhotoTrades(queue: ReviewedPhotoTrade[], sessionKey: string, port: PhotoSavePort, saved: (key: string) => void) {
   const selected = queue.filter(row => row.status === "review");
-  let context = await port.context();
+  if (!selected.length) return;
+  let context = await port.context(selected[0].accountId);
   if (context.sessionKey !== sessionKey) throw new Error("account_changed");
   const pending = port.pending();
   if (pending && !selected.some(row => row.operationId === ("mutation" in pending ? pending.mutation.operationId : pending.operationId))) throw new Error("recovery_pending");
   for (const row of selected) {
+    context = await port.context(row.accountId);
+    if (context.sessionKey !== sessionKey) throw new Error('account_changed');
     if (context.entries.some(e => e.operationId === row.operationId)) continue;
     const issue = importIssue(row, context, queue); if (issue) throw new Error(issue);
   }
   for (const row of selected) {
-    context = await port.context();
-    if (context.sessionKey !== sessionKey || !context.complete || !context.canWrite) throw new Error("account_changed");
+    context = await port.context(row.accountId);
+    if (context.sessionKey !== sessionKey) throw new Error("account_changed");
+    if (!context.complete || (context.scopeAccountId && context.scopeAccountId !== row.accountId)) throw new Error('incomplete_history');
+    if (!context.canWrite) throw new Error('write_unavailable');
     if (context.entries.some(e => e.operationId === row.operationId)) { port.forget(row.operationId); saved(row.key); continue; }
     const retained = port.pending();
     let mutation: NativeMutation;
@@ -113,5 +119,5 @@ export async function savePhotoTrades(queue: ReviewedPhotoTrade[], sessionKey: s
 }
 
 export function photoImportMessage(code: string): string {
-  return ({ incomplete_history: "전체 거래 이력을 확인하지 못했어요. 중복 검사를 위해 잠시 후 다시 시도해 주세요.", write_unavailable: "현재 이 계좌의 거래 저장을 사용할 수 없어요.", opening_required: "시작 잔고를 확인한 계좌를 선택해 주세요.", instrument_required: "이 계좌에 등록된 종목을 선택해 주세요. 새 종목은 직접 거래 입력에서 등록할 수 있어요.", currency_mismatch: "체결 단가의 통화와 선택한 종목의 통화가 달라요. 사진에서 확인해 주세요.", invalid_amount: "체결 수량과 단가를 확인해 주세요. 수량은 소수점 6자리까지 입력합니다.", invalid_date: "실제 체결일을 확인해 주세요. 오늘 거래는 날짜만으로 처리할 수 있는 시점 이후에 등록하거나 직접 입력에서 정확한 시각을 입력해 주세요.", included_in_opening: "시작 잔고 날짜 이전·당일 거래입니다. 시작 잔고에 이미 포함된 거래를 추가하면 수량이 중복돼요.", duplicate_record: "같은 계좌·종목·날짜·수량의 거래가 이미 있어요. 중복이 아닌 별도 체결이라면 직접 입력에서 기록을 대조해 주세요.", duplicate_photo: "목록에 같은 거래가 있어요. 사진이 겹쳤는지 확인하고 하나를 제외해 주세요.", review_required: "사진과 종목·체결일·수량·단가를 대조한 뒤 확인해 주세요.", ordering_required: "같은 날 거래 순서를 지정해 주세요. 순서를 알 수 없다면 정확한 체결 시각을 확인해 주세요.", recovery_pending: "저장 여부를 확인 중인 거래가 있어요. 직접 거래 입력 화면에서 먼저 확인해 주세요.", operation_cancelled: "종료된 저장 요청입니다. 사진을 다시 읽고 기록 여부를 확인해 주세요.", conflict: "다른 창에서 계좌 정보가 바뀌었어요. 다시 확인한 후 저장해 주세요.", account_changed: "로그인 또는 계좌 상태가 바뀌었어요. 새로고침 후 다시 확인해 주세요.", historical_replay_invalid: "이후 기록과 수량이 맞지 않아요. 체결일과 같은 날 거래 순서를 확인해 주세요.", historical_order_required: "같은 날 거래 순서를 확인해 주세요.", historical_order_invalid: "선택한 거래 순서가 기존 기록과 맞지 않아요.", historical_scope_too_large: "재계산 범위가 거래 500건 또는 연결 계좌 8개를 넘었어요. 기존 기록은 유지됩니다.", event_precedes_recorded_snapshot: "과거 평가 이후 거래를 재계산하지 못했어요. 직접 거래 입력에서 확인해 주세요." } as Record<string, string>)[code] ?? "저장을 완료하지 못했어요. 완료된 건은 유지되며, 저장 여부 확인 후 같은 요청으로 이어갑니다.";
+  return ({ history_not_loaded: "선택한 계좌의 이력을 확인해 주세요.", incomplete_history: "이 계좌의 전체 이력이 확인 범위를 넘었어요. 사진 저장은 중복 검사를 마친 뒤 가능하며, 직접 입력에서 기록을 대조할 수 있어요.", write_unavailable: "현재 이 계좌의 거래 저장을 사용할 수 없어요.", opening_required: "시작 잔고를 확인한 계좌를 선택해 주세요.", instrument_required: "이 계좌에 등록된 종목을 선택해 주세요. 새 종목은 직접 거래 입력에서 등록할 수 있어요.", currency_mismatch: "체결 단가의 통화와 선택한 종목의 통화가 달라요. 사진에서 확인해 주세요.", invalid_amount: "체결 수량과 단가를 확인해 주세요. 수량은 소수점 6자리까지 입력합니다.", invalid_date: "실제 체결일을 확인해 주세요. 오늘 거래는 날짜만으로 처리할 수 있는 시점 이후에 등록하거나 직접 입력에서 정확한 시각을 입력해 주세요.", included_in_opening: "시작 잔고 날짜 이전·당일 거래입니다. 시작 잔고에 이미 포함된 거래를 추가하면 수량이 중복돼요.", duplicate_record: "같은 계좌·종목·날짜·수량의 거래가 이미 있어요. 중복이 아닌 별도 체결이라면 직접 입력에서 기록을 대조해 주세요.", duplicate_photo: "목록에 같은 거래가 있어요. 사진이 겹쳤는지 확인하고 하나를 제외해 주세요.", review_required: "사진과 종목·체결일·수량·단가를 대조한 뒤 확인해 주세요.", ordering_required: "같은 날 거래 순서를 지정해 주세요. 순서를 알 수 없다면 정확한 체결 시각을 확인해 주세요.", recovery_pending: "저장 여부를 확인 중인 거래가 있어요. 직접 거래 입력 화면에서 먼저 확인해 주세요.", operation_cancelled: "종료된 저장 요청입니다. 사진을 다시 읽고 기록 여부를 확인해 주세요.", conflict: "다른 창에서 계좌 정보가 바뀌었어요. 다시 확인한 후 저장해 주세요.", account_changed: "로그인 또는 계좌 상태가 바뀌었어요. 새로고침 후 다시 확인해 주세요.", historical_replay_invalid: "이후 기록과 수량이 맞지 않아요. 체결일과 같은 날 거래 순서를 확인해 주세요.", historical_order_required: "같은 날 거래 순서를 확인해 주세요.", historical_order_invalid: "선택한 거래 순서가 기존 기록과 맞지 않아요.", historical_scope_too_large: "재계산 범위가 거래 500건 또는 연결 계좌 8개를 넘었어요. 기존 기록은 유지됩니다.", event_precedes_recorded_snapshot: "과거 평가 이후 거래를 재계산하지 못했어요. 직접 거래 입력에서 확인해 주세요." } as Record<string, string>)[code] ?? "저장을 완료하지 못했어요. 완료된 건은 유지되며, 저장 여부 확인 후 같은 요청으로 이어갑니다.";
 }

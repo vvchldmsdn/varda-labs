@@ -1,4 +1,5 @@
 "use client";
+import { isCollectionPriceSource } from "@/lib/quote-time-basis";
 import { InfoDisclosure } from "@/components/cairn-ui";
 import { useId, useState } from "react";
 import Link from "next/link";
@@ -79,7 +80,7 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
             <div><dt>수량</dt><dd>{snapshotDecimal(active.quantity)}<small>개</small></dd></div>
             <div><dt>{isManualValuationSource(active.priceSource) ? "직접 입력한 가격" : "원본 가격"}</dt><dd>{snapshotDecimal(active.currentPrice)}<small>{active.currency ?? "통화 미제공"}</small></dd></div>
             <div><dt>소계 내 비중</dt><dd title={String(active.weightPct) + "%"}>{active.weightPct.toFixed(2)}<small>%</small></dd></div>
-            <div className={styles.timestamp}><dt>가격 관측</dt><dd>{active.priceAsOf ? <time dateTime={active.priceAsOf}>{active.priceAsOf}</time> : "미제공"}</dd></div>
+            <div className={styles.timestamp}><dt>{isCollectionPriceSource(active.priceSource) ? "시세 수집 시각" : "가격 관측"}</dt><dd>{(isCollectionPriceSource(active.priceSource) ? active.priceAsOf : active.priceAsOf) ?? "미제공"}</dd></div>
           </dl>
         </section>}
       </div>

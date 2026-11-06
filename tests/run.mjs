@@ -1,3 +1,4 @@
+import "./product-review-recovery.test.mjs";
 import "./import-ports-isolation.test.mjs";
 import "./interaction-recovery.test.mjs";
 import "./ui-context-convergence.test.mjs";
