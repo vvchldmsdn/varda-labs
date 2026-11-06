@@ -84,15 +84,34 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<SavedPlan | null>(null);
   const lock = useRef(false);
+  const generation = useRef(0), controller = useRef<AbortController | null>(null), sessionKey = useRef("");
+  const invalidateRequest = useCallback(() => { generation.current++; controller.current?.abort(); sessionKey.current = ""; }, []);
+  const conceal = useCallback(() => {
+    invalidateRequest();
+    setAccess("checking"); setPlans([]); setSelected(null); setConfirmed(false); setMessage("");
+  }, [invalidateRequest]);
   const load = useCallback(async () => {
-    setLoading(true);
-    try { const response = await fetch("/api/investment-plans", { cache: "no-store" });
-      if(response.status===401){setAccess("guest");setPlans([]);return;}
-      if(response.status===409){setAccess("unlinked");setPlans([]);return;}
-      if (!response.ok) { const failure = await response.json().catch(()=>({})); setUnavailableReason(failure.error === "auth_provider_unavailable" ? localAuthDisabled ? "local" : "auth" : "service"); throw new Error(); } const data = await response.json(); setPlans(data.plans); setAccess("ready"); setError(""); }
-    catch { setAccess("unavailable");setError(""); }
-    finally { setLoading(false); }
-  }, [localAuthDisabled]);
+    conceal(); const token = generation.current;
+    const abort = new AbortController(); controller.current = abort; setLoading(true);
+    try {
+      const response = await fetch("/api/investment-plans", { cache: "no-store", signal: abort.signal });
+      const data = await response.json();
+      if (token !== generation.current || abort.signal.aborted) return;
+      if (response.status === 401) { setAccess("guest"); return; }
+      if (response.status === 409) { setAccess("unlinked"); return; }
+      if (!response.ok || typeof data.sessionKey !== "string" || !Array.isArray(data.plans)) {
+        setUnavailableReason(data.error === "auth_provider_unavailable" ? localAuthDisabled ? "local" : "auth" : "service");
+        setAccess("unavailable"); return;
+      }
+      sessionKey.current = data.sessionKey; setPlans(data.plans); setAccess("ready"); setError("");
+    } catch { if (token === generation.current && !abort.signal.aborted) { setAccess("unavailable"); setError(""); } }
+    finally { if (token === generation.current) setLoading(false); }
+  }, [conceal, localAuthDisabled]);
+  useEffect(() => {
+    const focus = () => { void load(); }, visibility = () => { if (document.visibilityState === "visible") focus(); else conceal(); };
+    window.addEventListener("focus", focus); document.addEventListener("visibilitychange", visibility);
+    return () => { invalidateRequest(); window.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", visibility); };
+  }, [load, conceal, invalidateRequest]);
   useEffect(() => {
     const frame=requestAnimationFrame(()=>{try { const value = parseDraft(localStorage.getItem(PLAN_STORAGE_KEY)); setDraft(value); if (!value) localStorage.removeItem(PLAN_STORAGE_KEY); } catch { setError("이 브라우저의 임시 입력을 복원하지 못했습니다. 계산 화면에서 다시 확인해 주세요."); } void load();});
     return()=>cancelAnimationFrame(frame);
@@ -103,23 +122,25 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
     return()=>clearTimeout(timer);
   },[draft]);
   async function save() {
-    if (lock.current || !draft || !confirmed || draft.expiresAt <= Date.now()) return;
-    lock.current=true; setPending(true); setError("");
+    if (lock.current || access !== "ready" || !sessionKey.current || !draft || !confirmed || draft.expiresAt <= Date.now()) return;
+    lock.current=true; setPending(true); setError(""); const token = generation.current;
     try {
-      const response=await fetch("/api/investment-plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:draft.id,input:draft.input})});
+      const response=await fetch("/api/investment-plans",{method:"POST",headers:{"Content-Type":"application/json","X-Cairn-Plan-Session":sessionKey.current},body:JSON.stringify({id:draft.id,input:draft.input})});
+      if (token !== generation.current) return;
       if (!response.ok) {
         const failure=await response.json().catch(()=>({error:"unknown"}));
-        if(response.status===401){setAccess("guest");setPlans([]);setSelected(null);}
-        if(failure.error==="identity_unlinked"){setAccess("unlinked");setConfirmed(false);}
+        if (token !== generation.current) return;
+        if(failure.error==="account_changed" || response.status===401 || response.status===403 || failure.error==="identity_unlinked"){await load();return;}
         setError(response.status===401 ? "로그인이 만료되었습니다. 입력을 유지한 채 다시 로그인해 주세요." : failure.error==="plan_limit" ? "계획은 최대 50개까지 저장할 수 있습니다. 이전 계획을 삭제한 뒤 다시 저장해 주세요." : "계획을 저장하지 못했습니다. 입력은 유지됩니다. 다시 시도하거나 내 계획 목록을 확인해 주세요."); return;
       }
       const data=await response.json();
+      if (token !== generation.current) return;
       // The id is stable across retries; success is emitted only after the server confirms it.
       trackFirstVisit("plan_saved",data.id);
       try { const current=parseDraft(localStorage.getItem(PLAN_STORAGE_KEY)); if(current?.id===draft.id) localStorage.removeItem(PLAN_STORAGE_KEY); } catch {}
       for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
-      setSelected({id:data.id,input:draft.input,createdAt:new Date().toISOString()});setDraft(null);setMessage("계획을 저장했습니다. 실제 보유자산이나 거래로 등록하지 않았습니다."); await load();
-    } catch {setError("연결이 끊겼습니다. 같은 입력으로 다시 저장하면 중복 생성하지 않습니다.");}
+      setDraft(null); await load(); setMessage("계획을 저장했습니다. 실제 보유자산이나 거래로 등록하지 않았습니다.");
+    } catch {if (token === generation.current) setError("연결이 끊겼습니다. 같은 입력으로 다시 저장하면 중복 생성하지 않습니다.");}
     finally {lock.current=false;setPending(false);}
   }
   async function prepare() {
@@ -130,14 +151,15 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
     } catch {setError("계정 연결을 확인하지 못했습니다. 입력은 유지됩니다.");}finally{lock.current=false;setPending(false);}
   }
   async function remove(id:string) {
-    if(lock.current)return;lock.current=true;setPending(true);
+    if(lock.current || access !== "ready" || !sessionKey.current)return;lock.current=true;setPending(true);const token=generation.current;
     try {
-      const response=await fetch("/api/investment-plans",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
-      if(!response.ok){const failure=await response.json().catch(()=>({error:"unknown"}));if(response.status!==404||failure.error!=="plan_not_found")throw new Error();}
+      const response=await fetch("/api/investment-plans",{method:"DELETE",headers:{"Content-Type":"application/json","X-Cairn-Plan-Session":sessionKey.current},body:JSON.stringify({id})});
+      if(token!==generation.current)return;
+      if(!response.ok){const failure=await response.json().catch(()=>({error:"unknown"}));if(token!==generation.current)return;if(failure.error==="account_changed" || response.status===401 || response.status===403 || failure.error==="identity_unlinked"){await load();return;}if(response.status!==404||failure.error!=="plan_not_found")throw new Error();}
       if(selected?.id===id)setSelected(null);setMessage("저장한 계획을 삭제했습니다.");await load();
-    }catch{setError("삭제하지 못했습니다. 다시 시도해 주세요.");}finally{lock.current=false;setPending(false);}
+    }catch{if(token===generation.current)setError("삭제하지 못했습니다. 다시 시도해 주세요.");}finally{lock.current=false;setPending(false);}
   }
-  function reuse(plan:SavedPlan,holdings=false){try{localStorage.setItem(PLAN_STORAGE_KEY,JSON.stringify(createPlanDraft(plan.input)));router.push(holdings?"/portfolio/holdings/new?from=plan":"/try?mode=personal");}catch{setError("입력을 옮기지 못했습니다. 브라우저 저장을 허용해 주세요.");}}
+  function reuse(plan:SavedPlan,holdings=false){if(access!=="ready"||!sessionKey.current)return;try{localStorage.setItem(PLAN_STORAGE_KEY,JSON.stringify(createPlanDraft(plan.input)));router.push(holdings?"/portfolio/holdings/new?from=plan":"/try?mode=personal");}catch{setError("입력을 옮기지 못했습니다. 브라우저 저장을 허용해 주세요.");}}
   function authIntent(){for (const cookie of planReturnIntentCookies("allocation", location.protocol === "https:")) document.cookie = cookie;}
   function cancelAuthIntent(){for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;}
   if (hideEmpty && !draft && !plans.length && !selected && !error && !message) return null;
@@ -151,7 +173,7 @@ export function PlanLibrary({ localAuthDisabled = false, hideEmpty = false, show
     {access==="ready"&&draft?<><CairnField className={styles.confirmation}><CairnInput type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{text("지금 로그인한 내 계정에 입력한 내용을 투자계획으로 저장합니다.")}</CairnField><div className={styles.actions}><CairnButton variant="primary" className={`cairn-primary ${styles.primary}`} disabled={!confirmed||pending} onClick={save}>{pending?text("저장 중…"):text("확인한 계획 저장")}</CairnButton><Link href="/try?mode=personal">{text("입력 수정")}</Link></div></>:null}
     {draft?<PlanResults input={draft.input}/>:null}
     {draft?<p className={styles.privacy}>{text("이름·평가금액·목표 비중·투자금을 저장합니다. 실제 보유자산 등록은 별도이며, 저장한 계획은 여기서 삭제할 수 있어요.")}</p>:null}
-    {selected?<section className={styles.saved}><CairnSectionTitle>{text("저장한 계획")}</CairnSectionTitle><PlanResults input={selected.input}/><div className={styles.actions}><CairnButton variant="primary" className={`cairn-primary ${styles.primary}`} onClick={()=>reuse(selected)}>{text("다음 투자 계획 계산하기")}</CairnButton><CairnButton variant="secondary" className={`cairn-secondary ${styles.secondary}`} onClick={()=>reuse(selected,true)}>{text("이 자산을 실제 보유종목으로 등록")}</CairnButton></div><p className={styles.privacy}>{text("이름과 계획 금액을 참고하고, 실제 종목과 수량을 확인하면 시세·변동 추적을 시작할 수 있습니다. 평가금액으로 수량이나 매입단가를 추정하지 않습니다. 계좌가 없다면 첫 계좌도 필요합니다.")}</p><Link href="/plans">{text("실제 자산 등록은 나중에")}</Link></section>:null}
+    {access==="ready"&&selected?<section className={styles.saved}><CairnSectionTitle>{text("저장한 계획")}</CairnSectionTitle><PlanResults input={selected.input}/><div className={styles.actions}><CairnButton variant="primary" className={`cairn-primary ${styles.primary}`} onClick={()=>reuse(selected)}>{text("다음 투자 계획 계산하기")}</CairnButton><CairnButton variant="secondary" className={`cairn-secondary ${styles.secondary}`} onClick={()=>reuse(selected,true)}>{text("이 자산을 실제 보유종목으로 등록")}</CairnButton></div><p className={styles.privacy}>{text("이름과 계획 금액을 참고하고, 실제 종목과 수량을 확인하면 시세·변동 추적을 시작할 수 있습니다. 평가금액으로 수량이나 매입단가를 추정하지 않습니다. 계좌가 없다면 첫 계좌도 필요합니다.")}</p><Link href="/plans">{text("실제 자산 등록은 나중에")}</Link></section>:null}
     {access==="ready"?<><div className={styles.actions}><CairnButton variant="secondary" className={`cairn-secondary ${styles.secondary}`} disabled={pending} onClick={()=>void load()}>{text("저장 목록 다시 확인")}</CairnButton><Link href="/try?mode=personal">{text("다음 투자금 계산")}</Link></div>{!loading&&!plans.length&&!error?<p>{text("아직 저장한 계획이 없습니다.")}</p>:null}{plans.map(plan=><article key={plan.id}><CairnSectionTitle>{new Date(plan.createdAt).toLocaleString(intlLocale(locale))} · {plan.input.rows.length}{t("개 자산의 계획", " holdings plan")}</CairnSectionTitle><p className={styles.privacy}>{plan.input.rows.map(row=>row.name).join(" · ")}</p><div className={styles.actions}><CairnButton variant="secondary" onClick={()=>setSelected(plan)}>{text("계획 보기")}</CairnButton><CairnButton variant="secondary" onClick={()=>reuse(plan)}>{text("이 입력으로 다시 계산")}</CairnButton><details><summary>{text("삭제")}</summary><p>{text("계정에서 이 계획을 삭제합니다. 되돌릴 수 없습니다.")}</p><CairnButton variant="secondary" disabled={pending} onClick={()=>void remove(plan.id)}>{text("계획 삭제 확인")}</CairnButton></details></div></article>)}</>:null}
   </div>{showTour ? <aside className={styles.planPreview}><ProductTour /></aside> : null}</section>;
 }

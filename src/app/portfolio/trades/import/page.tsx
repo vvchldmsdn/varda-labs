@@ -19,7 +19,7 @@ export default async function TradeImportPage({ searchParams }: { searchParams: 
     const symbols = ["VOO", "MSFT", "VXUS", "SCHD", "QQQ", "AMZN", "V", "TSM", "TMDX"];
     initial = { sessionKey: "a".repeat(64), serverNow: "2026-10-28T12:00:00Z", canWrite: true, complete: true, entries: [], accounts: [{ id: accountId, name: "예시 증권 계좌", active: true, state: { version: 1, accountId, startedAt: "2026-09-01T00:00:00Z", at: "2026-09-01T00:00:00Z", sequence: 0, cash: { USD: "0", KRW: "0" }, positions: [] }, assets: symbols.map((ticker, i) => ({ id: `22222222-2222-4222-8222-${String(i + 1).padStart(12, "0")}`, ticker, name: ticker, quantity: "10", currency: "USD", market: "us", assetType: "etf", archived: false })) }] };
   } else {
-    const context = await readTradePhotoImportContext();
+    const context = await readTradePhotoImportContext(initialSelection.accountId);
     if (!context) redirect("/auth/sign-in?returnTo=" + encodeURIComponent(tradePhotoImportHref(initialSelection, reportingCurrency)));
     initial = context;
   }

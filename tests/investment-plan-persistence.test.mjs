@@ -1,3 +1,4 @@
+import {createHash} from "node:crypto";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { readFileSync } from "node:fs";
@@ -10,8 +11,9 @@ const id = "11111111-1111-4111-8111-111111111111";
 const input = { currency: "KRW", amount: 500000, rows: [{ name: "My first fund", value: 900000, targetBps: 10000 }] };
 const pg = new PGlite();
 let route, queries, resolution, failure;
+const sessionKey = () => createHash("sha256").update(`investment-plans\0synthetic\0${resolution?.tenantContext?.ownerUserId}\0${resolution?.tenantContext?.ownerUserId}`).digest("hex");
 const request = (method, body, headers = {}) => new Request("https://local.test/api/investment-plans", {
-  method, headers: { origin: "https://local.test", "content-type": "application/json", ...headers },
+  method, headers: { origin: "https://local.test", "content-type": "application/json", "X-Cairn-Plan-Session":sessionKey(), ...headers },
   ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
 });
 const asTenant = (text, params = [], tenant = owner) => pg.transaction(async tx => {
@@ -42,6 +44,7 @@ describe("isolated investment plan persistence", () => {
     } };
     [route, queries] = await importWithPorts(["src/app/api/investment-plans/route.ts", "src/db/queries/investment-plans.ts"], {
       "@/db/tenant-client": { getTenantSqlClient: () => sqlClient },
+      "@/lib/auth/current-session-subject": {readCurrentSessionSubject:async()=>({state:"authenticated",provider:"synthetic",providerSubject:resolution?.tenantContext?.ownerUserId})},
       "@/lib/auth/current-tenant-context": { resolveCurrentTenantContext: async () => resolution },
     });
   });
@@ -52,6 +55,15 @@ describe("isolated investment plan persistence", () => {
   });
   after(async () => pg.close());
 
+  it("rejects an absent or previously displayed account session before writing", async () => {
+    const old = (await (await route.GET(request("GET"))).json()).sessionKey;
+    assert.ok(old);
+    for(const key of ["", "wrong"]) assert.equal((await route.POST(request("POST", {id,input}, {"X-Cairn-Plan-Session":key}))).status,409);
+    resolution = {ok:true,tenantContext:{ownerUserId:other,role:"user"}};
+    assert.equal((await route.POST(request("POST", {id,input}, {"X-Cairn-Plan-Session":old}))).status,409);
+    assert.equal((await route.DELETE(request("DELETE", {id}, {"X-Cairn-Plan-Session":old}))).status,409);
+    assert.equal((await route.POST(request("POST", {id,input}))).status,201);
+  });
   it("persists the authenticated owner's immutable plan and makes identical retries idempotent", async () => {
     const first = await route.POST(request("POST", { id, input }));
     assert.equal(first.status, 201);
@@ -75,7 +87,7 @@ describe("isolated investment plan persistence", () => {
   it("protects list, delete, insertion and updates across tenants at the database boundary", async () => {
     await route.POST(request("POST", { id, input }));
     resolution = { ok: true, tenantContext: { ownerUserId: other, role: "user" } };
-    assert.deepEqual(await (await route.GET(request("GET"))).json(), { plans: [] });
+    assert.deepEqual(await (await route.GET(request("GET"))).json(), { plans: [], sessionKey:sessionKey() });
     assert.equal((await route.DELETE(request("DELETE", { id }))).status, 404);
     assert.deepEqual(await asTenant("select * from investment_plans", [], other), []);
     await assert.rejects(asTenant("insert into investment_plans(owner_user_id,id,input_json,engine_version) values($1,$2,$3,'deficit_proportional_capped_v1')", [owner, id, JSON.stringify(input)], other), /row-level security/);
@@ -96,7 +108,7 @@ describe("isolated investment plan persistence", () => {
   it("fails closed for stale sessions after app-user deactivation and for missing tenant settings", async () => {
     await route.POST(request("POST", { id, input }));
     await pg.query("update app_users set status='disabled' where id=$1", [owner]);
-    assert.deepEqual(await (await route.GET(request("GET"))).json(), { plans: [] });
+    assert.deepEqual(await (await route.GET(request("GET"))).json(), { plans: [], sessionKey:sessionKey() });
     assert.equal((await route.POST(request("POST", { id, input }))).status, 403);
     assert.equal((await route.DELETE(request("DELETE", { id }))).status, 404);
     assert.deepEqual(await asTenant("select * from investment_plans", [], ""), []);
@@ -145,7 +157,7 @@ describe("isolated investment plan persistence", () => {
     failure = false;
     assert.equal((await route.POST(request("POST", { id, input }))).status, 201);
     assert.deepEqual(await (await route.DELETE(request("DELETE", { id }))).json(), { deleted: true });
-    assert.deepEqual(await (await route.GET(request("GET"))).json(), { plans: [] });
+    assert.deepEqual(await (await route.GET(request("GET"))).json(), { plans: [], sessionKey:sessionKey() });
     assert.equal((await route.DELETE(request("DELETE", { id }))).status, 404);
   });
 });

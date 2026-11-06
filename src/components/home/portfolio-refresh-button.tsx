@@ -166,6 +166,7 @@ export function PortfolioRefreshButton({
         <ul>{receipt.progress.items.map(item => <li key={item.id} className="border-t border-[var(--line)] py-2">
           <div className="flex justify-between gap-3"><span>{item.label} <small>{item.provider}</small></span><span>{t(...progressLabel(item.state))}</span></div>
           {item.priceAsOf && <p className="mt-1 text-[var(--muted)]">{t("가격 기준", "Price as of")} {formatTime(item.priceAsOf)}</p>}
+          {item.priceCollectedAt && <p className="mt-1 text-[var(--muted)]">{t("시세 수집", "Quote collected")} {formatTime(item.priceCollectedAt)}</p>}
           {item.checkedAt && <p className="text-[var(--muted)]">{t("조회", "Checked")} {formatTime(item.checkedAt)}</p>}
           {item.retryAt && <p className="text-[var(--muted)]">{t("재시도 예정", "Next retry")} {formatTime(item.retryAt)}</p>}
         </li>)}</ul>

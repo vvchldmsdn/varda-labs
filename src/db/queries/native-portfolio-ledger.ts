@@ -86,6 +86,22 @@ export async function readNativeLedger(tenant: TenantContext, accountId?: string
     entries: (entriesComplete ? result[2][0].rows : []) as NativeStoredEntry[], snapshots: (historyComplete ? result[3][0].rows : []) as { accountId: string; evidence: unknown }[] };
 }
 
+/** Import needs account choices, but duplicate/order evidence only for the account
+ * being reviewed. Keep bounded reads and RLS; snapshots are not trade evidence. */
+export async function readNativeImportLedger(tenant: TenantContext, accountId?: string) {
+  if (!UUID.test(tenant.ownerUserId) || (accountId && !UUID.test(accountId))) throw new Error('native_invalid_scope');
+  const result = await getTenantSqlClient().transaction(tx => [
+    tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
+    tx.query(NATIVE_ACCOUNTS_QUERY, [tenant.ownerUserId, null]),
+    tx.query(NATIVE_ENTRIES_QUERY, [tenant.ownerUserId, accountId ?? null]),
+  ], { isolationLevel: 'RepeatableRead', readOnly: true });
+  const accounts = result[1].slice(0, 200) as NativeStoredAccount[];
+  const accountsComplete = result[1].length <= 200;
+  const entriesComplete = result[2][0]?.complete === true;
+  return { accounts, accountsComplete, entriesComplete,
+    entries: (entriesComplete ? result[2][0].rows : []) as NativeStoredEntry[] };
+}
+
 /** Private reconstruction input only. Invalid quantities/valuations never return
  * through readNativeLedger; the cutoff builder may reuse immutable market quotes. */
 export async function readNativeSnapshotObservations(tenant:TenantContext,accountId:string) {

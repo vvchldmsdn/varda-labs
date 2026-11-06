@@ -22,6 +22,7 @@ it("reuses scoped source reader and keeps original native decimal amounts",async
   const {result,passed}=await load(sources());assert.equal(passed.tenantContext.ownerUserId,owner);assert.deepEqual(passed.scope,scope);
   assert.equal(result.current.scopeComplete,false);assert.equal(result.current.positions[0].observation.quantity,"1.123456");assert.equal(result.current.positions[0].observation.price,"100.1234");assert.equal(result.current.positions[0].observation.currency,"USD");
   assert.equal(result.current.positions[0].observation.at,result.current.at);assert.ok(result.current.positions[0].observation.priceObservedAt<result.current.at);
+  assert.equal(result.current.positions[0].observation.timestampBasis,"collection");
   assert.deepEqual(result.history,[]);assert.equal(result.trades,null);assert.equal(result.current.positions[0].cost,null);
 });
 it("matches shared quotes by market, currency and ticker instead of ticker alone",async()=>{

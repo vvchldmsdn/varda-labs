@@ -1,3 +1,4 @@
+import { isCollectionPriceSource } from "@/lib/quote-time-basis";
 
 import { instrumentLabel } from "@/lib/instrument-display";
 import type {HoldingsRead} from '@/lib/cairn-v2/holding-contract';
@@ -20,7 +21,7 @@ export function HoldingsTable({rows}:{rows:HoldingsRead['rows']}) {
           {(!row.priceSource||!row.priceStatus)&&<small>가격 출처/상태 일부 미제공</small>}
           <details className={styles.rowEvidence}><summary>기록 근거</summary><dl>
             <dt>시장·원통화</dt><dd>{row.market} · {row.currency}</dd><dt>계좌 코드</dt><dd>{row.accountCode}</dd><dt>가격 출처</dt><dd>{row.priceSource??'미제공'}</dd><dt>가격 상태</dt><dd>{row.priceStatus??'미제공'}</dd>
-            <dt>가격 관측 시각</dt><dd>{row.priceAsOf??'미제공'}</dd><dt>기록 갱신 시각</dt><dd>{row.updatedAt}</dd><dt>보관 시각</dt><dd>{row.archivedAt??'보관되지 않음'}</dd>
+            <dt>{isCollectionPriceSource(row.priceSource) ? "시세 수집 시각" : "가격 관측 시각"}</dt><dd>{row.priceAsOf??'미제공'}</dd><dt>기록 갱신 시각</dt><dd>{row.updatedAt}</dd><dt>보관 시각</dt><dd>{row.archivedAt??'보관되지 않음'}</dd>
             <dt>원본 수량</dt><dd>{row.quantity}</dd><dt>원본 평균원가</dt><dd>{row.averageCost??'미기록'}</dd><dt>원본 저장 가격</dt><dd>{row.currentPrice}</dd>
           </dl></details>
         </td>

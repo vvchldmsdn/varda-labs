@@ -6,6 +6,7 @@ import type { InvestmentReturn } from "./investment-return";
 import { availableHoldingValueKrw } from "../home-metrics.ts";
 import { compositionCounts, isManualValuationSource, trackedInvestmentComposition, type CurrentInvestmentComposition, type CurrentCompositionPosition } from "../current-investment-composition.ts";
 import { Decimal } from "../money.ts";
+import { isCollectionPriceSource } from '../quote-time-basis.ts';
 
 type LegacyHolding = Pick<DashboardHolding,"name"|"ticker"|"account"|"market"|"currency"|"quantity"|"currentPrice"|"currentWeight"|"assetType"|"groupName"|"valueKrw"|"priceAsOf"|"priceFetchedAt"|"priceSource">;
 export type OriginalCurrentValuePresentation =
@@ -49,7 +50,7 @@ export function originalCurrentComposition(read: OriginalCurrentValuePresentatio
       market:row.market,account:row.account,currency:row.currency,value:value===null ? null : String(value),
       displayWeightPct:null,portfolioWeightPct:value===null ? null : row.currentWeight,
       reason:value!==null ? null : !(row.currentPrice>0) ? "missing_price" : row.currency==="USD" ? "missing_fx" : "unsupported_currency",
-      priceAsOf:row.priceAsOf,priceFetchedAt:row.priceFetchedAt,priceReferenceDate:null,priceTimestampBasis:null,
+      priceAsOf:row.priceAsOf,priceFetchedAt:row.priceFetchedAt,priceReferenceDate:null,priceTimestampBasis:isCollectionPriceSource(row.priceSource) ? 'collection' : null,
       source:row.priceSource,manuallyEntered:isManualValuationSource(row.priceSource)} satisfies CurrentCompositionPosition;
   });
   const counts=compositionCounts(positions),complete=counts.excluded===0;

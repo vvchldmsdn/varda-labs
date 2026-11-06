@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { calculatePlan, createPlanDraft, parseDraft, PLAN_STORAGE_KEY, SAMPLE_PLAN, type PlanDraft, type PlanInput } from "@/lib/investment-plan";
+import { PLAN_EDITOR_KEY, parsePlanEditor, type PlanEditorDraft } from "@/lib/investment-plan-editor";
+import { PLAN_TTL_MS } from "@/lib/investment-plan";
 import { clearPublicUserAllocationWorkspaces } from "@/lib/user-allocation-comparison";
 import { trackFirstVisit } from "@/lib/first-visit-events";
 import { analyzeQuickPortfolio, parseQuickDraft, QUICK_STORAGE_KEY, type QuickInput } from "@/lib/quick-portfolio";
@@ -44,6 +46,7 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
   const [error, setError] = useState("");
   const [storageNote, setStorageNote] = useState("");
   const [loaded, setLoaded] = useState(!personal);
+  const quickOrigin = useRef<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
@@ -51,14 +54,21 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
     trackFirstVisit("personal_started");
     const frame=requestAnimationFrame(()=>{try {
       const quick = fromQuick ? parseQuickDraft(localStorage.getItem(QUICK_STORAGE_KEY)) : null;
+      const restored = parseDraft(localStorage.getItem(PLAN_STORAGE_KEY));
+      const editor = parsePlanEditor(localStorage.getItem(PLAN_EDITOR_KEY));
+      if (editor && (fromQuick ? quick && editor.quickId === quick.id : (!restored || editor.calculationId === restored.id))) {
+        quickOrigin.current=editor.quickId; setCurrency(editor.currency); setAsOf(editor.asOf); setVersioned(editor.versioned);
+        setRows(editor.rows); setAmount(editor.amount); setDraft(restored?.id === editor.calculationId ? restored : null);
+        setResult(editor.calculated && restored?.id === editor.calculationId && editor.currency === restored.input.currency && editor.amount === String(restored.input.amount) && JSON.stringify(editor.rows) === JSON.stringify(formRows(restored.input)) ? restored.input : null);
+        setStorageNote("이 브라우저에서 계산한 입력을 복원했습니다.");setLoaded(true);return;
+      }
       if (fromQuick) {
         const bridge = quick ? quickInputForPlan(quick.input) : null;
         if (!bridge?.ok) { setQuickBlocked(true); setLoaded(true); return; }
-        setCurrency(bridge.currency); setAsOf(bridge.asOf ?? new Date().toISOString()); setVersioned(true);
+        quickOrigin.current=quick!.id; setCurrency(bridge.currency); setAsOf(bridge.asOf ?? new Date().toISOString()); setVersioned(true);
         setRows(bridge.rows); setAmount(""); setResult(null); setDraft(null);
         setStorageNote("목표 비중과 이번 투자금만 더하면 돼요."); setLoaded(true); return;
       }
-      const restored = parseDraft(localStorage.getItem(PLAN_STORAGE_KEY));
       if (restored) { setCurrency(restored.input.currency); setAsOf(restored.input.asOf); setVersioned(restored.input.version === 2); setRows(formRows(restored.input)); setAmount(String(restored.input.amount)); setResult(restored.input); setDraft(restored); setStorageNote("이 브라우저에서 계산한 입력을 복원했습니다."); }
       else { localStorage.removeItem(PLAN_STORAGE_KEY); setAsOf(new Date().toISOString()); }
     } catch { if (fromQuick) setQuickBlocked(true); setAsOf(new Date().toISOString()); setStorageNote("브라우저 임시 저장을 사용할 수 없습니다. 화면에서는 계산할 수 있지만 인증 후 복원하려면 브라우저 저장을 허용해 주세요."); }
@@ -71,6 +81,16 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
     const timer = setTimeout(expire, Math.max(0, draft.expiresAt - Date.now()));
     return () => clearTimeout(timer);
   }, [draft]);
+  useEffect(() => {
+    if (!personal || !loaded || quickBlocked) return;
+    try {
+      if (!amount && rows.every(row => !row.name && !row.value && !row.target)) { localStorage.removeItem(PLAN_EDITOR_KEY); return; }
+      const value: PlanEditorDraft = { version: 1, expiresAt: Date.now() + PLAN_TTL_MS,
+        calculationId: draft?.id ?? null, quickId: quickOrigin.current, currency, amount, rows, asOf, versioned, calculated: Boolean(result) };
+      if (!parsePlanEditor(JSON.stringify(value))) throw new Error('invalid_editor');
+      localStorage.setItem(PLAN_EDITOR_KEY, JSON.stringify(value));
+    } catch { setStorageNote("임시 저장에 실패했습니다. 결과는 볼 수 있지만 인증 후 입력 복원이 불가능합니다. 브라우저 저장을 허용한 뒤 다시 계산해 주세요."); }
+  }, [personal, loaded, quickBlocked, draft, currency, amount, rows, asOf, versioned, result]);
   const input: PlanInput = { currency, amount: parseMoneyInput(amount, currency) ?? NaN, rows: rows.map(row => ({ name: row.name, value: parseMoneyInput(row.value, currency) ?? NaN, targetBps: Math.round(readNumber(row.target, 2) * 100) })), ...(versioned ? { version: 2, asOf } : {}) };
   const sampleCalculation = personal ? null : calculatePlan(input);
   function changeRow(index: number, key: keyof FormRow, value: string) { setRows(rows.map((row, i) => i === index ? { ...row, [key]: value } : row)); setResult(null); setError(""); }
@@ -95,7 +115,7 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
   }
   function clear() {
     let cleared = true;
-    try { localStorage.removeItem(PLAN_STORAGE_KEY); if (localStorage.getItem(PLAN_STORAGE_KEY) !== null) cleared = false; } catch { cleared = false; }
+    try { localStorage.removeItem(PLAN_STORAGE_KEY); localStorage.removeItem(PLAN_EDITOR_KEY); quickOrigin.current=null; if (localStorage.getItem(PLAN_STORAGE_KEY) !== null) cleared = false; } catch { cleared = false; }
     try { if (!clearPublicUserAllocationWorkspaces(sessionStorage)) cleared = false; } catch { cleared = false; }
     if (!cleared) { setStorageNote("임시 입력 삭제에 실패했습니다. 브라우저 저장 권한을 확인하고 다시 시도해 주세요."); return; }
     for (const cookie of clearPlanReturnCookies(location.protocol === "https:")) document.cookie = cookie;
@@ -119,7 +139,7 @@ export function PlanExperience({ personal, fromQuick = false }: { personal: bool
       <p className={styles.lead}>{personal ? t("보유 금액과 목표 비중으로\n이번 투자금을 나눠보세요.", "Split new money toward your own targets.") : t("금액이나 비중을 바꿔보세요.\n배분 결과가 바로 달라집니다.", "Change an amount or target.\nSee the allocation respond.")}</p>
       {!personal?<a className={styles.mobileResultLink} href="#plan-result">{t("배분 결과 보기", "View allocation")} ↓</a>:null}
       {!loaded ? <CairnStatus as="p" tone="neutral" role="status">{t("임시 입력을 확인하고 있어요.", "Restoring your inputs…")}</CairnStatus> : quickBlocked ? <section className={styles.saveUnavailable}><CairnSectionTitle>{t("환산 기준을 먼저 확인해 주세요.", "Check the exchange-rate basis first.")}</CairnSectionTitle><p>{t("서로 다른 통화는 같은 기준으로 환산해야 배분할 수 있어요. 원래 입력은 그대로 유지됩니다.", "Mixed currencies need a matching exchange rate before allocation. Your original inputs are kept.")}</p><Link className={styles.primary} href="/try/analyze">{t("입력과 환율 확인하기", "Review inputs and exchange rate")}</Link></section> : <CairnForm className={styles.form} onSubmit={event => { event.preventDefault(); if (personal) calculate(); }} noValidate>
-        {personal ? <div className={styles.inputHeading}><span>{t("계산 통화", "Calculation currency")}</span><div className={styles.actions}>{(["KRW", "USD"] as const).map(value => <CairnButton variant="primary" key={value} type="button" className={value === currency ? styles.primary : styles.secondary} disabled={currencyLocked && value !== currency} aria-pressed={value === currency} onClick={() => { if (!currencyLocked) { setCurrency(value); setVersioned(true); setAsOf(new Date().toISOString()); setError(""); } }}>{value}</CairnButton>)}</div></div> : null}
+        {personal ? <div className={styles.inputHeading}><span>{t("계산 통화", "Calculation currency")}</span><div className={styles.currencyChoices}>{(["KRW", "USD"] as const).map(value => <CairnButton variant="selection" key={value} type="button" disabled={currencyLocked && value !== currency} aria-pressed={value === currency} onClick={() => { if (!currencyLocked) { setCurrency(value); setVersioned(true); setAsOf(new Date().toISOString()); setError(""); } }}>{value}</CairnButton>)}</div></div> : null}
         <CairnField className={styles.amount}>{t("이번 추가 투자금", "New investment")} · {currency}<MoneyInput allowDecimals={currency === "USD"} value={amount} onValueChange={value => { setAmount(value); setResult(null); }} placeholder={currency === "USD" ? "500.00" : "500,000"} aria-describedby="plan-currency" /></CairnField>
         <div className={styles.inputHeading}><CairnSectionTitle>{t("나눠 담을 자산", "Your assets")}</CairnSectionTitle><span>{t("목표 비중 합계 100%", "Targets total 100%")}</span></div>
         {rows.map((row, i) => <CairnFieldset className={styles.assetRow} key={i}><legend className={styles.srOnly}>{t(`자산 ${i + 1}`, `Asset ${i + 1}`)}</legend><div className={styles.fields}>

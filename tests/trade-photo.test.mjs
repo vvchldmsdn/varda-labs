@@ -148,3 +148,13 @@ test('session switch prevents all writes; definitive rejection clears only its p
  const f=portFixture(1,true);await assert.rejects(savePhotoTrades([row()],'different',f.port,f.save),/account_changed/);assert.equal(f.posts.length,0);
  await assert.rejects(savePhotoTrades([row()],f.context.sessionKey,f.port,f.save),/unavailable/);assert.equal(f.getPending(),null);assert.equal(f.complete.length,0);
 });
+
+test('each reviewed account loads its own complete history, and scope mismatch cannot authorize a write',async()=>{
+ const a=row(),b=row({key:'r2',operationId:'44444444-4444-4444-8444-444444444444',accountId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}),base=context(),reads=[],writes=[];
+ const accounts=[base.accounts[0],{...base.accounts[0],id:b.accountId,state:{...base.accounts[0].state,accountId:b.accountId}}];
+ const port={context:async id=>{reads.push(id);return {...base,scopeAccountId:id,accounts,entries:[]};},pending:()=>null,remember:()=>{},forget:()=>{},lookup:async()=> 'unconfirmed',post:async m=>writes.push(m.accountId)};
+ await savePhotoTrades([a,b],base.sessionKey,port,()=>{});assert.deepEqual(writes,[a.accountId,b.accountId]);assert.ok(reads.includes(b.accountId));
+ assert.equal(importIssue(b,{...base,scopeAccountId:a.accountId},[b]),'history_not_loaded');
+ writes.length=0;port.context=async id=>({...base,scopeAccountId:id,accounts,complete:id!==b.accountId});
+ await assert.rejects(savePhotoTrades([a,b],base.sessionKey,port,()=>{}),/incomplete_history/);assert.equal(writes.length,0);
+});

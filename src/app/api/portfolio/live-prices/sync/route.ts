@@ -1,3 +1,4 @@
+import { isCollectionPriceSource } from "@/lib/quote-time-basis";
 import "server-only";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -83,7 +84,8 @@ export async function POST(request: Request) {
         const checkedAt = evidence?.fetchedAt ? new Date(evidence.fetchedAt).toISOString() : null;
         return refreshItem({ id: job.key, label: job.kind === "fx" ? "USD/KRW" : job.ticker, provider: "KIS", startedAt, readAt,
           valid, fresh: valid && Date.parse(checkedAt ?? "") >= cutoff && Date.parse(checkedAt ?? "") <= Date.now() + 60_000,
-          checkedAt, priceAsOf: job.kind === "fx" ? null : quote?.priceAsOf?.toISOString() ?? null,
+          checkedAt, priceAsOf: job.kind === "fx" || isCollectionPriceSource(quote?.source) ? null : quote?.priceAsOf?.toISOString() ?? null,
+          priceCollectedAt: job.kind !== "fx" && isCollectionPriceSource(quote?.source) ? quote?.fetchedAt?.toISOString() ?? null : null,
           job: queued.find(row => row.key === job.key) });
       });
       items.push(...(native.items ?? []));

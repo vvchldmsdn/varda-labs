@@ -5,6 +5,7 @@ export type QuoteRefreshItem = {
   id: string; label: string; provider: string;
   state: "ready" | "pending" | "running" | "delayed" | "failed" | "unavailable";
   priceAsOf: string | null; checkedAt: string | null; retryAt: string | null;
+  priceCollectedAt?: string | null;
 };
 export type QuoteRefreshProgress = {
   items: QuoteRefreshItem[]; total: number; completed: number; pending: number; failed: number;
@@ -21,6 +22,7 @@ export function refreshItem(input: {
   id: string; label: string; provider: string; fresh: boolean; valid: boolean;
   priceAsOf?: string | null; checkedAt?: string | null; job?: CollectionProgressRow;
   startedAt: string; now?: number; supported?: boolean; readAt?: string;
+  priceCollectedAt?: string | null;
 }): QuoteRefreshItem {
   const now = input.now ?? Date.now(), job = input.job;
   // Completion of this explicit operation does not expire halfway through a
@@ -36,7 +38,8 @@ export function refreshItem(input: {
         input.valid && (input.fresh || collected) ? "ready" : "unavailable";
   return { id: input.id, label: input.label, provider: input.provider, state,
     priceAsOf: input.priceAsOf ?? null, checkedAt: collected ? job!.completedAt : input.checkedAt ?? null,
-    retryAt: state === "delayed" ? job?.availableAt ?? null : null };
+    retryAt: state === "delayed" ? job?.availableAt ?? null : null,
+    ...(input.priceCollectedAt !== undefined ? { priceCollectedAt: input.priceCollectedAt } : {}) };
 }
 export function refreshProgress(items: QuoteRefreshItem[]): QuoteRefreshProgress {
   return { items, total: items.length, completed: items.filter(row => row.state === "ready").length,
