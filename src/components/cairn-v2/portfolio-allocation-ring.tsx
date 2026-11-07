@@ -11,11 +11,12 @@ type Entry = Readonly<{ key: string; name: string; weightPct: number; color?: st
 const COLORS = ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c", "#c98e76", "#9a96a8", "#bbbcaa"];
 const TAU = Math.PI * 2;
 
-export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compositionOnly = false }: {
+export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compositionOnly = false, showHint = true }: {
   entries: readonly Entry[];
   selectedKey: string;
   onSelect: (key: string) => void;
   compositionOnly?: boolean;
+  showHint?: boolean;
 }) {
 
   const { t } = useI18n();
@@ -84,7 +85,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compos
           <p>{active?.name ?? t("보유 종목 없음", "No holdings")}</p>
         </div>
       </div>
-      <p className={styles.hint}>{compositionOnly ? t("조각을 선택해 자산별 비중을 확인하세요", "Select a segment to explore each asset's weight") : t("조각을 선택해 비중과 목표를 비교하세요", "Select a segment to compare its weight and target")}</p>
+      {showHint && <p className={styles.hint}>{compositionOnly ? t("조각을 선택해 자산별 비중을 확인하세요", "Select a segment to explore each asset's weight") : t("조각을 선택해 비중과 목표를 비교하세요", "Select a segment to compare its weight and target")}</p>}
     </div>
   );
 }

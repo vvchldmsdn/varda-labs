@@ -21,7 +21,7 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
             {displayReadMoney(view, legacy.value, currency, true, "dashboard")}
           </ValueText>
         </p>
-        <p className={styles.note}>가상 데이터 · 전일 기록 대비</p>
+        <p className={styles.note}>예시 · 전일 대비</p>
       </div>
     );
   return (

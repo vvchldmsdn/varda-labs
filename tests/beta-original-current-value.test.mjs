@@ -154,7 +154,7 @@ test('the actual beta value card shows original partial coverage and never subst
   });
   const markup=renderToStaticMarkup(createElement(home.BetaHome,{initialContext:context}));
   const card=markup.match(/<section data-beta-card="value">([\s\S]*?)<\/section>/)?.[1];
-  assert.ok(card);assert.match(card,/1,950,000/);assert.match(card,/보유 15\/17건/);assert.match(card,/제외 2건/);
+  assert.ok(card);assert.match(card,/1,950,000/);assert.match(card,/평가 소계 · 15\/17건/);assert.match(card,/제외 2건/);
   const composition=originalCurrentComposition(read,'KRW');
   assert.deepEqual(ringEntries.map(row=>row.key),composition.positions.filter(row=>row.value!==null).map(row=>row.key));
   assert.equal(ringEntries.length,15);assert.equal(ringEntries.some(row=>row.key==='gold'),false);
@@ -168,7 +168,7 @@ test('the actual beta value card shows original partial coverage and never subst
   const legacy={kind:'legacy',data:dashboard()};legacy.data.holdings.push({...legacy.data.holdings[0],name:'Missing manual quote',currentPrice:0,valueKrw:0});
   view.domain.currentValuePresentation=legacy;
   const legacyCard=renderToStaticMarkup(createElement(home.BetaHome,{initialContext:context})).match(/<section data-beta-card="value">([\s\S]*?)<\/section>/)?.[1];
-  assert.match(legacyCard,/141,400/);assert.match(legacyCard,/확인 가능한 소계/);assert.match(legacyCard,/보유 1\/2건/);assert.match(legacyCard,/제외 1건/);
+  assert.match(legacyCard,/141,400/);assert.match(legacyCard,/평가 소계/);assert.match(legacyCard,/1\/2건/);assert.match(legacyCard,/제외 1건/);
 });
 
 test('beta structure keeps ring and treemap on current valuation and exposes every excluded holding',async()=>{
