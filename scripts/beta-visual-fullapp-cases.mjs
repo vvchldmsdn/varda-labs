@@ -30,9 +30,12 @@ export async function runBetaVisualCases({page,check,url,output}) {
         await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
       }
       const ring=page.locator('[data-beta-card="structure"] [data-allocation-ring] svg');
-      if(width>700){
-        const nav=page.getByLabel('목적별 내비게이션',{exact:true});assert.ok((await nav.boundingBox()).width<=114);
+      if(width>=800){
+        const nav=page.getByLabel('목적별 내비게이션',{exact:true});
+        const navBox=await nav.boundingBox(),todayBox=await today.boundingBox();
+        assert.ok(navBox&&todayBox&&navBox.width>=width*.9&&navBox.height<=90&&navBox.y+navBox.height<=todayBox.y,'desktop home navigation spans the top without covering the content');
         await expect(nav.locator('svg').first()).toBeVisible();
+        for(const label of ['홈','자산','분석','계획','기록'])await expect(nav.getByRole('link',{name:label,exact:true})).toBeVisible();
       }
       await expect(ring.getByRole('button',{name:'KODEX 200',exact:false})).toHaveCount(1);
       await expect(ring.getByRole('button',{name:'069500',exact:false})).toHaveCount(0);
