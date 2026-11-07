@@ -101,8 +101,10 @@ export function BetaHome({
             </div>
             <p className={styles.cardFootnote}>
               {originalValue ? originalValue.coverage
-                ? `${originalValue.complete ? "투자자산 평가" : "확인 가능한 소계"} · 보유 ${originalValue.coverage.valued}/${originalValue.coverage.positions}건 · 제외 ${originalValue.coverage.excludedPositions}건`
-                : originalValue.amount === null ? "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : "투자자산 · 갱신 " + originalValue.asOf
+                ? originalValue.complete
+                  ? `보유 ${originalValue.coverage.positions}건`
+                  : `평가 소계 · ${originalValue.coverage.valued}/${originalValue.coverage.positions}건 · 제외 ${originalValue.coverage.excludedPositions}건`
+                : originalValue.amount === null ? "평가 조회 실패 · 다시 조회해 주세요" : originalValue.asOf
                 : view.domain
                 ? (readStateText(view.domain.valueState, "보유 자산 없음") ??
                   (view.domain.valueState === "partial"
@@ -110,14 +112,14 @@ export function BetaHome({
                     : view.domain.valueState === "empty"
                       ? "보유 자산 없음"
                       : view.domain.refreshedAt
-                        ? "투자자산 · 갱신 " +
+                        ? "조회 " +
                           new Date(new Date(view.domain.refreshedAt).getTime() + 9 * 3600000)
                             .toISOString()
                             .slice(5, 16)
                             .replace("T", " ") +
                           " KST"
                         : "확인 전"))
-                : "10.02 07:00 기준"}
+                : "예시 · 10.02 07:00"}
             </p>
           </Card>
           <Card onOpen={open} kind="today">

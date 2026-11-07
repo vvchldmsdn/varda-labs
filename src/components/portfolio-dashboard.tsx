@@ -111,7 +111,7 @@ export function PortfolioDashboard({
           <div className={`${compositionStyles.hero} ${home.overview}`}>
           <section className={`${styles.stageSummary} ${home.summary} ${compositionStyles.summary}`} aria-labelledby="portfolio-overview-title">
             <div className={styles.balance}>
-              <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko={currentComposition.complete ? "투자자산 평가액" : "확인 가능한 소계"} en={currentComposition.complete ? "Invested asset value" : "Verified subtotal"}/></span>
+              <span><T ko={currentComposition.complete ? "투자자산 평가액" : "투자자산 소계"} en={currentComposition.complete ? "Investment value" : "Investment subtotal"}/></span>
               <strong>{currentComposition.amount === null ? "—" : <T ko={formatKrw(Number(currentComposition.amount))} en={translateHomeHistory(formatKrw(Number(currentComposition.amount)))}/>}</strong>
               <p><T ko={`보유 ${currentComposition.counts.positions}건 · ${data.accountSummaries.length}개 계좌${currentComposition.counts.excluded ? ` · 평가 제외 ${currentComposition.counts.excluded}건` : ""}`} en={`${currentComposition.counts.positions} holdings · ${data.accountSummaries.length} accounts${currentComposition.counts.excluded ? ` · ${currentComposition.counts.excluded} excluded` : ""}`}/></p>
             </div>
@@ -126,13 +126,12 @@ export function PortfolioDashboard({
             <dl className={styles.summaryMetric}>
               <dt><T ko="투자자산 수익률" en="Investment return"/></dt>
               <dd className={toneClass(data.totalReturnPct)}>{formatPercent(data.totalReturnPct, true)}</dd>
-              <dd className={styles.status}><T ko="현금 제외 · " en="Excludes cash · " />{data.totalReturnPct === null ? <T ko="원가·거래 근거 부족" en="Cost or trade evidence is incomplete" /> : <T ko={`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)} />}</dd>
+              <dd className={styles.status}>{data.totalReturnPct === null ? <T ko="매입원가·거래 확인 필요" en="Cost and trades needed" /> : <T ko={`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`} en={translateHomeHistory(`누적 손익 ${formatSignedKrw(data.totalPnlKrw)}`)} />}</dd>
             </dl>
             <div className={`${styles.stageNote} ${baselineIsDelayed ? styles.stageWarning : ""}`}>
               <span><T ko={baselineIsDelayed ? "오늘 변동" : "오늘의 최대 기여"} en={baselineIsDelayed ? "Today's change" : "Largest contributor today"}/></span>
               <strong><T ko={movementReady ? topContributor?.name ?? "변동 없음" : "계산 대기"} en={movementReady ? topContributor?.name ?? "No change" : "Awaiting data"}/></strong>
-              <p><T ko={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount) : movementPendingReason(data)} en={movementReady ? dataStatusText(data, data.dataHealth.movementExcludedAssetCount, "en") : translateHomeHistory(movementPendingReason(data))}/></p>
-              {baselineIsDelayed ? <p><T ko="새 기준 기록이 준비되면 오늘 변동이 계산됩니다. 현재 평가액은 최신 시세로 표시합니다." en="Today's change will appear when the new baseline is ready. Current value still uses the latest prices."/></p> : null}
+              {!movementReady ? <p><T ko={movementPendingReason(data)} en={translateHomeHistory(movementPendingReason(data))}/></p> : data.dataHealth.movementExcludedAssetCount > 0 ? <p><T ko={`${data.dataHealth.movementExcludedAssetCount}종목 제외`} en={`${data.dataHealth.movementExcludedAssetCount} holdings excluded`}/></p> : null}
             </div>
           </section>
 
@@ -291,10 +290,6 @@ function percentageOfPrevious(value: number | null, previousValue: number) {
 
 function scopedHref(path: string, selectedScopeKey: PortfolioAnalysisScopeKey, designPreview = false) {
   return buildPortfolioAnalysisScopeHref(path, selectedScopeKey, designPreview ? { preview: "design" } : {});
-}
-
-function homeScopeLabel(scope: PortfolioAnalysisScope) {
-  return scope.kind === "all" ? "전체 자산" : scope.label;
 }
 
 function compareHomeScope(left: PortfolioAnalysisScope, right: PortfolioAnalysisScope) {

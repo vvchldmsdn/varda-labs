@@ -89,7 +89,7 @@ export function PortfolioHistoryChart({
       <div className={styles.chartHeading}>
         <div>
           <CairnSectionTitle id="portfolio-history-title" className={styles.panelTitle}><T ko="포트폴리오 흐름" en="Portfolio history"/></CairnSectionTitle>
-          <p className="mt-1.5 text-[11px] text-[var(--muted)]">{metric === "return" ? "저장 수익률과 복구 기간 수익률" : <T ko="저장된 실제 평가액 추이" en="Recorded portfolio values"/>}</p>
+          {metric === "return" && <p className="mt-1.5 text-[11px] text-[var(--muted)]"><T ko="저장·복구 수익률" en="Recorded and reconstructed returns"/></p>}
         </div>
         <ChoiceGroup appearance="segmented" label={t("조회 기간", "Time range")}>
           {(["1M", "3M", "6M", "ALL"] as const).map((item) => (
@@ -119,7 +119,7 @@ export function PortfolioHistoryChart({
               <span>{<T ko={formatDate(activePoint?.date ?? null)} en={translateHomeHistory(formatDate(activePoint?.date ?? null))}/>}{<T ko={selectedIndex !== null ? " · 선택한 날짜" : ""} en={translateHomeHistory(selectedIndex !== null ? " · 선택한 날짜" : "")}/>}</span>
               <strong>{<T ko={formatKrw(activePoint?.totalMarketValue ?? null)} en={translateHomeHistory(formatKrw(activePoint?.totalMarketValue ?? null))}/>}</strong>
             </div>
-            <p><T ko="점을 선택하면 날짜가 고정됩니다." en="Select a point to pin its date."/><br /><T ko="키보드 방향키로 이력을 탐색하세요." en="Use the arrow keys to explore history."/></p>
+            <p id="portfolio-history-help" className="sr-only"><T ko="점을 선택하면 날짜가 고정됩니다. 키보드 방향키로 이력을 탐색하세요." en="Select a point to pin its date. Use the arrow keys to explore history."/></p>
           </div>
           <div
             ref={setPlotElement}
@@ -132,6 +132,7 @@ export function PortfolioHistoryChart({
             <svg
               role="img"
               aria-label={t("기간별 포트폴리오 평가액 추이", "Portfolio value over the selected period")}
+              aria-describedby="portfolio-history-help"
               className="h-full w-full overflow-visible"
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               preserveAspectRatio="xMidYMid meet"
