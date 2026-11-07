@@ -324,6 +324,53 @@ function rerenderHooks() {
   };
 }
 
+for (const completedBeforeFailure of [0, 3]) it(`shows connection loss at ${completedBeforeFailure}/15 and resumes the same manual operation`, async test => {
+  const hooks = rerenderHooks(), timers = new Map(), responses = [], requests = []; let timerId = 0;
+  const start = '2026-11-07T02:32:00.000Z';
+  const descriptors = new Map(['window', 'document', 'fetch', 'sessionStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout(callback) { const id = ++timerId; timers.set(id, () => { timers.delete(id); return callback(); }); return id; }, clearTimeout(id) { timers.delete(id); } } });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { visibilityState: 'visible' } });
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: () => null, setItem() {}, removeItem() {} } });
+  Object.defineProperty(globalThis, 'fetch', { configurable: true, value: async (_url, options) => {
+    requests.push(JSON.parse(options.body)); assert.ok(responses.length);
+    const value = responses.shift(); if (value instanceof Error) throw value;
+    return { ok: true, json: async () => value };
+  } });
+  test.mock.method(Date, 'now', () => Date.parse(start));
+  test.after(() => { hooks.unmount(); for (const [key, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; } });
+  const router = { refresh() {} };
+  const [component] = await importUiWithPorts(['src/components/home/portfolio-refresh-button.tsx'], {
+    react: hooks.react, 'next/navigation': { useRouter: () => router },
+    '@/components/i18n/locale-provider': { useI18n: () => ({ t: (_ko, en) => en }) },
+    '@/components/i18n/localized-text': { T: () => null },
+    '@/components/home/home-history-messages': { translateHomeHistory: value => value }, 'lucide-react': { RefreshCw: () => null },
+  });
+  const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
+  const text = tree => tree == null ? '' : typeof tree !== 'object' ? String(tree) : Array.isArray(tree) ? tree.map(text).join('') : text(tree.props?.children);
+  const render = () => { hooks.begin(); const tree = component.PortfolioRefreshButton({ compact: true }); hooks.commit(); return tree; };
+  const operation = continuation(start);
+  const receipt = (completed, delayed = false) => ({ state: completed === 15 ? 'fresh' : 'queued', startedAt: start, operation,
+    progress: { completed, total: 15, pending: 15 - completed, failed: 0, items: Array.from({ length: 15 }, (_, i) => ({ id: String(i), label: `Fixture ${i}`, provider: 'KIS', state: i < completed ? 'ready' : delayed ? 'delayed' : 'pending', retryAt: delayed ? new Date(Date.parse(start) + 60_000).toISOString() : null })) } });
+  const summary = tree => text(nodes(tree).find(node => node.type === 'summary'));
+  const spin = tree => nodes(tree).some(node => node.props?.className?.includes('animate-spin'));
+  const tick = async response => { responses.push(response); await Promise.all([...timers.values()].map(callback => callback())); return render(); };
+  let tree = render(); responses.push(receipt(0)); tree.props.children[0].props.onClick(); await settle(); tree = render();
+  if (completedBeforeFailure) tree = await tick(receipt(completedBeforeFailure));
+  tree = await tick(new Error('synthetic lost connection'));
+  assert.match(summary(tree), new RegExp(`${completedBeforeFailure}/15 checked · reconnecting`));
+  assert.doesNotMatch(summary(tree), /complete|in progress/);
+  assert.equal(spin(tree), false); assert.equal(tree.props.children[0].props.disabled, false);
+  assert.equal(timers.size, 1, 'the accepted operation keeps its bounded retry without another click');
+  tree = await tick(receipt(3, true));
+  assert.match(summary(tree), /3\/15 checked · retry scheduled/); assert.equal(spin(tree), false);
+  assert.equal(tree.props.children[0].props.disabled, true, 'provider waiting does not invite duplicate manual requests');
+  tree = await tick(receipt(15));
+  assert.match(summary(tree), /15\/15 checked · complete/); assert.equal(timers.size, 0);
+  assert.equal(tree.props.children[0].props.disabled, false);
+  assert.equal(requests.filter(row => row.reason === 'manual').length, 1);
+  assert.ok(requests.slice(1).every(row => row.reason === 'poll' && JSON.stringify(row.operation) === JSON.stringify(operation)));
+});
+
 it('a new queued operation never paints the previous completion before its effects or first poll', async test => {
   const hooks = rerenderHooks(), intervals = new Map(), responses = []; let timerId = 0;
   const start = '2026-11-03T01:00:00.000Z';

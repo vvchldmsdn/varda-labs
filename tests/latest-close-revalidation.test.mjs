@@ -137,6 +137,27 @@ describe("latest shared close revalidation", () => {
     assert.equal((await f.pg.query("select status from market_data_sync_runs")).rows[0].status, "failed");
     f.setRows([f.row()]); assert.equal((await f.run()).state, "revalidated"); assert.equal(f.calls(), 2);
   });
+  it("retains safe token-stage diagnostics without storing the provider error body", async () => {
+    const f = await fixture(); await f.seed(); const before = await f.stored();
+    const provider = { name: 'kis', fetchClosePrices: async () => ({ provider: 'kis', warnings: ['kis token request failed'],
+      rows: [f.row({ status: 'error', closePrice: null, error: 'private-provider-body credential=DO_NOT_STORE' })] }) };
+    await assert.rejects(f.run(f.now, provider), /latest_close_token_request_failed/);
+    const [run] = (await f.pg.query('select status,error,metadata_json from market_data_sync_runs')).rows;
+    assert.equal(run.status, 'failed'); assert.equal(run.metadata_json.failureCode, 'latest_close_token_request_failed');
+    assert.doesNotMatch(JSON.stringify(run), /private-provider-body|DO_NOT_STORE/);
+    assert.deepEqual(await f.stored(), before);
+  });
+  it("distinguishes deferred budget diagnostics from token issuance failure without recording arbitrary error text", async () => {
+    for (const code of ['provider_budget_limited', 'provider_token_cooldown', 'private-unknown-code']) {
+      const f = await fixture(); await f.seed(); const before = await f.stored();
+      const failure = Object.assign(new Error('private-provider-body'), { code, retryAfterSeconds: 10 });
+      await assert.rejects(f.run(f.now, { name: 'kis', fetchClosePrices: async () => { throw failure; } }), error => error === failure);
+      const [run] = (await f.pg.query('select status,error,metadata_json from market_data_sync_runs')).rows;
+      assert.equal(run.metadata_json.failureCode, code.startsWith('provider_') ? code : 'latest_close_revalidation_failed');
+      assert.doesNotMatch(JSON.stringify(run), /private-provider-body|private-unknown-code/);
+      assert.deepEqual(await f.stored(), before);
+    }
+  });
   it("negative-caches an earlier day returned by the actual KIS close adapter", async () => {
     const f = await fixture();
     const prior = new Date(`${f.date}T00:00:00Z`); prior.setUTCDate(prior.getUTCDate() - 1);
