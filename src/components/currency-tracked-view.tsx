@@ -2,7 +2,7 @@
 
 import { instrumentLabel } from "@/lib/instrument-display";
 import { QuickTradeActions } from "@/components/quick-trade-actions";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { PortfolioAllocationRing } from "@/components/portfolio/portfolio-allocation-ring";
 import { MoneyInput } from "@/components/first-visit/money-input";
@@ -15,6 +15,10 @@ import { RecoveryNotice } from "@/components/recovery/recovery-notice";
 import { currencyRecoveryKind, type NativeViewDraft } from "@/lib/recovery-currency";
 import { isManualValuationSource, trackedInvestmentComposition } from "@/lib/current-investment-composition";
 import styles from "./currency-tracked-view.module.css";
+import home from "./home/home-composition.module.css";
+import { HomeValuationHistory } from "./home/home-valuation-history";
+import { HomeAllocation } from "./home/home-allocation";
+import { valueTone } from "./home/portfolio-format";
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, Input as CairnInput, PageTitle as CairnPageTitle, SectionTitle as CairnSectionTitle, Select as CairnSelect, Status as CairnStatus } from "@/components/cairn-ui";
 
 
@@ -22,11 +26,12 @@ type ContributionPolicy = { trimDriftThresholdPct: number; minimumExecutionRatio
 type Contribution = ReturnType<typeof calculateCurrencyContribution>;
 const ZONES = ["Asia/Seoul", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Tokyo", "UTC"];
 
-export function CurrencyTrackedView({ evidence, investmentEvidence, reports, investmentReports, timeZone = "Asia/Seoul", contributionPolicy, surface, hideCurrencyControl = false, embedded = false, nativeContributionScopeKey, recoveryScope, initialView }: {
+export function CurrencyTrackedView({ evidence, investmentEvidence, reports, investmentReports, timeZone = "Asia/Seoul", contributionPolicy, surface, homeHistory, hideCurrencyControl = false, embedded = false, nativeContributionScopeKey, recoveryScope, initialView }: {
   evidence: CurrencyTrackedInput; timeZone?: string; contributionPolicy?: ContributionPolicy;
   investmentEvidence?: CurrencyTrackedInput;
   investmentReports?: Readonly<Record<Currency, CurrencyTrackedResult>>;
   reports: Readonly<Record<Currency, CurrencyTrackedResult>>;
+  homeHistory?: ReactNode;
   surface?: "home" | "today" | "history" | "structure" | "contribution";
   hideCurrencyControl?: boolean;
   embedded?: boolean;
@@ -132,8 +137,10 @@ export function CurrencyTrackedView({ evidence, investmentEvidence, reports, inv
   const currentCalculation = calculation?.evidence === evidence ? calculation.result : null;
   const ready = currentCalculation?.status === "ready" ? currentCalculation : null;
   const resultMoney = (value: number) => money(value, ready?.context.reportingCurrency ?? currency);
+  const homeTone = (value: string | number | null | undefined) => surface === "home"
+    ? valueTone(value == null || !Number.isFinite(Number(value)) ? null : Number(value)) : undefined;
   const Root = embedded ? "section" : "main";
-  return <Root className={`${styles.page}${embedded ? " " + styles.embedded : ""}`} id={embedded ? undefined : "varda-main-content"} data-surface={surface}>
+  return <Root className={`${styles.page} ${surface === "home" ? home.frame : ""}${embedded ? " " + styles.embedded : ""}`} id={embedded ? undefined : "varda-main-content"} data-surface={surface}>
     {!embedded && <header className={styles.heading}><div><p className={styles.eyebrow}>{t("보유자산 평가", "HOLDINGS VALUATION")} · {currency}</p><CairnPageTitle>{t(title[0], title[1])}</CairnPageTitle></div>
       {!hideCurrencyControl ? <CairnField className={styles.selectLabel}>{t("분석 통화", "Analysis currency")}<CairnSelect value={currency} onChange={event => { setCurrency(event.target.value as Currency); invalidate(); }}><option value="KRW">KRW · ₩</option><option value="USD">USD · $</option></CairnSelect></CairnField> : null}
     </header>}
@@ -142,18 +149,20 @@ export function CurrencyTrackedView({ evidence, investmentEvidence, reports, inv
     {evidence.groupEvidence ? <details className={styles.method}><summary>{t("그룹 계산 범위", "Group calculation scope")}</summary><p>{t("선택한 계좌는 현금을 포함하고, 개별 종목은 그 종목만 포함해요.", "Selected accounts include their cash; individually selected holdings include only the holding.")}</p><p>{t("현재 구성으로 비교 가능한 시작", "Current membership window starts")} · {date(evidence.groupEvidence.stableSince)}</p></details> : null}
     <div className={styles.context}><span>{t("평가 시각", "Valued at")} · {date(current.at)}</span><details><summary>{t("시간대", "Time zone")} · {zone}</summary><CairnSelect aria-label={t("표시 시간대", "Display time zone")} value={zone} onChange={event => setZone(event.target.value)}>{[...new Set([...ZONES, timeZone])].map(value => <option key={value}>{value}</option>)}</CairnSelect><p>{t("표시 시각만 바뀝니다. 서비스 일자는 한국시간 오전 7시를 기준으로 구분해요.", "This changes display times. Service days still roll over at 7 am in Korea.")}</p></details></div>
 
-    <section className={styles.valuation} aria-label={t("현재 평가", "Current valuation")}>
+    <section className={surface === "home" ? `${home.hero} ${styles.homeHero}` : styles.valuation} aria-label={t("현재 평가", "Current valuation")}>
       {surface === "structure" && <p className={styles.notice} data-valuation-scope={includedCash.length ? "including-cash" : "investments"}>{t(`투자자산 보유 ${includedSecurities}건`, `${includedSecurities} investment positions`)}{!includedCash.length && composition.counts.unidentifiedPositions === 0 ? t(` · ${composition.counts.instruments}종목`, ` · ${composition.counts.instruments} instruments`) : ""} · {includedCash.length ? t(`현금 ${includedCash.length}항목 포함`, `Includes ${includedCash.length} cash entries`) : t("현금 제외", "Cash excluded")}{includedCash.some(row => !row.observation) ? t(" · 현금 잔액 확인 필요", " · Cash balance needs verification") : ""}</p>}
-      <div className={styles.total}><p>{current.complete ? investmentReports ? t("투자자산 평가액 · 현금 제외", "Investment value · excluding cash") : t("조회 범위의 평가액", "Value of included holdings") : t("확인 가능한 자산의 소계", "Subtotal with evidence")}</p><strong>{money(current.coverage.valued > 0 ? current.total ?? current.verifiedSubtotal : null)}</strong>
+      <div className={`${styles.total} ${surface === "home" ? `${home.summary} ${styles.homeSummary}` : ""}`}><p>{current.complete ? investmentReports ? t("투자자산 평가액 · 현금 제외", "Investment value · excluding cash") : t("조회 범위의 평가액", "Value of included holdings") : t("확인 가능한 자산의 소계", "Subtotal with evidence")}</p><strong>{money(current.coverage.valued > 0 ? current.total ?? current.verifiedSubtotal : null)}</strong>
         {!current.complete ? <CairnStatus as="p" tone="neutral" className={styles.notice} role="status">{t(`전체 평가액과 비중은 계산할 수 없어요. ${current.coverage.positions}개 중 ${current.coverage.valued}개의 가격·환율 근거가 확인됩니다.`, `The full total and weights are unavailable. ${current.coverage.valued} of ${current.coverage.positions} holdings have price and currency evidence.`)}{!current.coverage.scopeComplete ? t(" 현금 또는 다른 보유 정보도 확인이 필요해요.", " Cash or other holdings also need verification.") : ""}</CairnStatus> : null}
         {!current.complete ? <small>{t(`제외 ${current.coverage.excludedPositions}개 · 제외 비중은 금액 확인 후 제공`, `${current.coverage.excludedPositions} excluded · excluded weight needs missing values`)}</small> : null}
         {evidence.groupEvidence?.reason ? <p className={styles.notice}>{unavailable(evidence.groupEvidence.reason)}</p> : null}
-        {report.movement ? <div className={styles.change}><span>{evidence.groupEvidence ? t("선택 범위의 평가액 변화", "Value change in the selected scope") : investmentReports ? t("현금 포함 계좌 평가액 변화", "Account value change · including cash") : t("이전 기록 대비 평가액 변화", "Value change since previous record")}</span><strong>{money(report.movement.valuationChange)}</strong><small>{date(report.movement.from)}</small></div> : null}
-        {evidence.ledgerComplete && (!surface || surface === "home" || surface === "history") ? <div className={styles.change}><span>{evidence.groupEvidence ? t("선택 범위의 기간 수익률", "Period return in the selected scope") : investmentReports ? t("현금 포함 계좌 기간 수익률", "Account period return · including cash") : t("입출금 반영 기간 수익률", "Period return adjusted for cash flows")}</span><strong>{report.performanceReturn?.status === "ready" ? `${(report.performanceReturn.totalReturn * 100).toFixed(2)}%` : "—"}</strong><small>{report.performanceReturn?.status === "ready" ? `Modified Dietz · ${currency}` : t("기간별 평가와 입출금 근거가 필요해요.", "Dated values and cash flows are needed.")}</small></div> : null}
-        {report.realizedPnl.coverage.sales > 0 && (!surface || surface === "home") ? <div className={styles.change}><span>{t("기록된 매도 누적 실현손익", "Realized P&L from recorded sales")}</span><strong>{money(report.realizedPnl.total)}</strong><small>{t("수수료 별도 · 매도 시점 환율과 원래 취득원가 기준", "Fees separate · sale-time FX and original acquisition costs")}{report.realizedPnl.status !== "ready" ? t(" · 원가 또는 해당 시점 환율 확인 필요", " · Dated cost or FX evidence is needed") : ""}</small></div> : null}
+        {report.movement ? <div className={styles.change}><span>{evidence.groupEvidence ? t("선택 범위의 평가액 변화", "Value change in the selected scope") : investmentReports ? t("현금 포함 계좌 평가액 변화", "Account value change · including cash") : t("이전 기록 대비 평가액 변화", "Value change since previous record")}</span><strong data-tone={homeTone(report.movement.valuationChange)}>{money(report.movement.valuationChange)}</strong><small>{date(report.movement.from)}</small></div> : null}
+        {evidence.ledgerComplete && (!surface || surface === "home" || surface === "history") ? <div className={styles.change}><span>{evidence.groupEvidence ? t("선택 범위의 기간 수익률", "Period return in the selected scope") : investmentReports ? t("현금 포함 계좌 기간 수익률", "Account period return · including cash") : t("입출금 반영 기간 수익률", "Period return adjusted for cash flows")}</span><strong data-tone={homeTone(report.performanceReturn?.status === "ready" ? report.performanceReturn.totalReturn : null)}>{report.performanceReturn?.status === "ready" ? `${(report.performanceReturn.totalReturn * 100).toFixed(2)}%` : "—"}</strong><small>{report.performanceReturn?.status === "ready" ? `Modified Dietz · ${currency}` : t("기간별 평가와 입출금 근거가 필요해요.", "Dated values and cash flows are needed.")}</small></div> : null}
+        {report.realizedPnl.coverage.sales > 0 && (!surface || surface === "home") ? <div className={styles.change}><span>{t("기록된 매도 누적 실현손익", "Realized P&L from recorded sales")}</span><strong data-tone={homeTone(report.realizedPnl.total)}>{money(report.realizedPnl.total)}</strong><small>{t("수수료 별도 · 매도 시점 환율과 원래 취득원가 기준", "Fees separate · sale-time FX and original acquisition costs")}{report.realizedPnl.status !== "ready" ? t(" · 원가 또는 해당 시점 환율 확인 필요", " · Dated cost or FX evidence is needed") : ""}</small></div> : null}
       </div>
-      {entries.length > 0 && (!surface || surface === "home" || surface === "structure") ? <div className={styles.ring}>{!current.complete && <p className={styles.note}>{t("확인된 소계 내 비중", "Shares of the verified subtotal")}</p>}<PortfolioAllocationRing entries={entries} selectedKey={active?.id ?? ""} onSelect={setSelected} compositionOnly /></div> : null}
+      {entries.length > 0 && (!surface || surface === "structure") ? <div className={styles.ring}>{!current.complete && <p className={styles.note}>{t("확인된 소계 내 비중", "Shares of the verified subtotal")}</p>}<PortfolioAllocationRing entries={entries} selectedKey={active?.id ?? ""} onSelect={setSelected} compositionOnly /></div> : null}
+      {surface === "home" && <section className={home.plot} aria-label={t("히스토리", "History")}><div className={home.sectionHeader}><CairnSectionTitle>{t("히스토리", "History")}</CairnSectionTitle></div>{homeHistory ?? <HomeValuationHistory frames={currentReport.history} currency={currency} />}</section>}
     </section>
+    {surface === "home" && <section className={home.panel} aria-label={t("자산 비중", "Allocation")}><div className={home.sectionHeader}><CairnSectionTitle>{t("자산 비중", "Allocation")}</CairnSectionTitle></div>{!current.complete && <p className={home.note}>{t("확인된 소계 내 비중", "Shares of the verified subtotal")}</p>}<HomeAllocation entries={entries} selectedKey={active?.id ?? ""} onSelect={setSelected} /></section>}
     {recoveryScope && evidence.current.source !== "synthetic_fixture" && recoveryKind ? <RecoveryNotice presentation={current.coverage.valued > 0 ? "inline" : "blocking"} kind={recoveryKind} scope={recoveryScope} reasons={recoveryReasons} draft={recoveryDraft} details={showHistory && report.history.length === 0 ? t("확인된 과거 평가가 아직 없습니다. 거래 및 시작 보유 기록을 확인할 수 있지만, 현재 원가나 거래 입력만으로 과거 평가와 수익률이 만들어지지는 않습니다.", "No past valuation has been verified yet. Review transactions and opening holdings; entering trades or current cost alone does not create historical valuations or returns.") : undefined} /> : null}
     {showMovement ? <section className={styles.section}><CairnSectionTitle>{evidence.groupEvidence ? t("선택 범위의 변동", "Changes in the selected scope") : investmentReports ? t("현금 포함 계좌 변동", "Account changes · including cash") : t("무엇이 변했나요?", "What changed?")}</CairnSectionTitle>
       {report.movement?.attribution ? <><div className={styles.metrics}>{[[t("가격 영향", "Price effect"), report.movement.attribution.price], [t("환율 영향", "Currency effect"), report.movement.attribution.exchange], [evidence.ledgerComplete ? t("순입출금", "Net external cash flow") : t("종목 매매 반영", "Asset trade flow"), report.movement.attribution.assetTradeFlow], ...(evidence.ledgerComplete ? [[t("배당·비용 등", "Income and costs"), report.movement.attribution.otherCashReturn], [t("입출금 제외 변동", "Change excluding external flows"), report.movement.attribution.investmentChange]] : [])].map(([label, value]) => <div key={label}><p>{label}</p><strong>{money(value)}</strong></div>)}</div>{!evidence.ledgerComplete ? <p className={styles.note}>{t("계좌 전체의 입출금을 반영한 성과는 아닙니다.", "This does not adjust for portfolio-wide deposits and withdrawals.")}</p> : null}

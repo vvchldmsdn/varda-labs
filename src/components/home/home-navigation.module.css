@@ -1,0 +1,37 @@
+.shell.shell { background:#f4f4f0; }
+.shell.shell > main { max-width:1440px;margin:0 auto;padding:0 40px 48px;min-height:0;display:block; }
+.shell.shell > main > header { align-items:center;height:auto;min-height:108px;padding:24px 0;gap:16px; }
+.shell.shell > main > header h1[data-cairn-page-title] { margin-right:0;font-size:28px;font-weight:500;min-width:0; }
+.shell > main > header > button { margin-left:auto; width:auto;min-width:140px;min-height:44px;border-radius:8px;border:1px solid var(--cairn-v2-line);background:transparent; }
+.shell.shell > main > header > div:last-child { margin-left:0; }
+.shell > main > header select { min-height:44px; }
+@media(min-width:800px) {
+ .shell.shell > aside { position:static;inset:auto;width:100%;height:76px;padding:0 40px;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:32px;border-bottom:1px solid #e1e1dc;background:transparent;overflow:visible; }
+ .shell > aside > a { padding:0; }
+ .shell.shell > aside nav { display:flex;gap:20px;margin:0; }
+ .shell > aside nav a { padding:10px 8px;min-height:44px;gap:8px;border-radius:0;font-size:14px;background:transparent; }
+ .shell > aside nav a[aria-current] { box-shadow:inset 0 -1px currentColor; }
+ .shell > aside nav img { width:17px;height:17px; }
+ .shell > aside > button { flex-direction:row;margin:0;font-size:12px;gap:8px;min-height:44px; }
+ .original.original :global(.varda-sidebar) { position:static;width:100%;height:76px;padding:0 28px;flex-direction:row;align-items:center;gap:24px;border-right:0;border-bottom:1px solid var(--line);background:transparent; }
+ .original :global(.varda-sidebar-brand) { margin:0;padding:0;flex:none; }
+ .original :global(.varda-sidebar-groups) { display:flex;gap:16px;padding:0;flex:1;justify-content:center; }
+ .original :global(.varda-sidebar-group) { display:flex;gap:6px;margin:0; }
+ .original :global(.varda-sidebar-group)>p { display:none; }
+ .original :global(.varda-sidebar-link) { width:auto;padding:10px 8px;min-height:44px;border-radius:0;gap:6px;font-size:13px; }
+ .original :global(.varda-sidebar-link) svg { display:none; }
+ .original :global(.varda-sidebar-link)[aria-current] { background:transparent;box-shadow:inset 0 -1px currentColor; }
+ .original :global(.varda-sidebar-bottom) { margin:0;padding:0;display:flex;gap:8px;border:0; }
+ .original :global(.varda-sidebar-account) { min-width:44px;min-height:44px;padding:8px;font-size:12px; }
+ .original :global(.varda-sidebar-bottom) > :not(:last-child) { display:none; }
+ .original.original :global(.varda-topbar) { position:static;margin:0;padding:8px 40px;min-height:56px;border:0;background:transparent; }
+ .original :global(.varda-topbar-location) { display:none; }
+ .original.original :global(.varda-content) { margin:0 auto;padding:8px 40px 64px;max-width:1440px; }
+}
+@media(max-width:799px) {
+ .shell.shell > main { margin-left:0;padding:0 20px calc(100px + env(safe-area-inset-bottom)); }
+ .shell.shell > main > header { padding:24px 0 20px;gap:12px; }
+ .shell.shell > main > header h1[data-cairn-page-title] { font-size:24px;flex-basis:100%;line-height:1.3; }
+ .shell.shell > main > header > button { min-width:130px;margin-left:0; }
+ .shell.shell > main > header > div:last-child { margin-left:auto; }
+}

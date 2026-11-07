@@ -11,3 +11,12 @@ export function MetricControls({ compact = false }: { compact?: boolean }) {
     <CairnButton variant="bare" type="button" aria-pressed={metric === "return"} onClick={() => setMetric("return")}>수익률</CairnButton>
   </ChoiceGroup>;
 }
+
+export function PeriodControls() {
+  const { period, setPeriod } = useBetaPreferences();
+  return <ChoiceGroup appearance="segmented" label="조회 기간">
+    {(["1M", "3M", "6M", "ALL"] as const).map(option => <CairnButton variant="bare" key={option} type="button" aria-pressed={option === period} onClick={() => setPeriod(option)}>
+      {{ "1M":"1개월", "3M":"3개월", "6M":"6개월", "ALL":"전체" }[option]}
+    </CairnButton>)}
+  </ChoiceGroup>;
+}

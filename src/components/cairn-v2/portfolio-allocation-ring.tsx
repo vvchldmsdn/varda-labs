@@ -4,6 +4,7 @@
 
 
 import { useState, type CSSProperties } from "react";
+import { useI18n } from "@/components/i18n/locale-provider";
 import styles from "./allocation-ring.module.css";
 
 type Entry = Readonly<{ key: string; name: string; weightPct: number; color?: string }>;
@@ -17,6 +18,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compos
   compositionOnly?: boolean;
 }) {
 
+  const { t } = useI18n();
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const active = entries.find((entry) => entry.key === (hoveredKey ?? selectedKey)) ?? entries[0];
   const positive = entries.filter((entry) => Number.isFinite(entry.weightPct) && entry.weightPct > 0);
@@ -32,7 +34,7 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compos
 
   return (
     <div className={styles.ring} data-allocation-ring onPointerLeave={() => setHoveredKey(null)}>
-      <svg className={styles.svg} viewBox="0 0 520 520" role="group" aria-label="보유 종목별 평가액 비중">
+      <svg className={styles.svg} viewBox="0 0 520 520" role="group" aria-label={t("보유 종목별 평가액 비중", "Allocation by holding value")}>
         {segments.length === 0 ? <circle cx="260" cy="260" r="185" fill="none" stroke="var(--cairn-v2-line)" strokeWidth="52" /> : null}
         {segments.map((segment, index) => {
           const middle = segment.start + segment.span / 2;
@@ -76,13 +78,13 @@ export function PortfolioAllocationRing({ entries, selectedKey, onSelect, compos
         })}
       </svg>
       <div className={styles.center}>
-        <span className={styles.centerLabel}>{hoveredKey ? "살펴보는 종목" : "선택한 종목"}</span>
+        <span className={styles.centerLabel}>{hoveredKey ? t("살펴보는 종목", "Exploring holding") : t("선택한 종목", "Selected holding")}</span>
         <div key={active?.key} className={styles.centerValue}>
           <strong>{active && Number.isFinite(active.weightPct) ? <>{active.weightPct.toFixed(2)}<small>%</small></> : "—"}</strong>
-          <p>{active?.name ?? "보유 종목 없음"}</p>
+          <p>{active?.name ?? t("보유 종목 없음", "No holdings")}</p>
         </div>
       </div>
-      <p className={styles.hint}>{compositionOnly ? "조각을 선택해 자산별 비중을 확인하세요" : "조각을 선택해 비중과 목표를 비교하세요"}</p>
+      <p className={styles.hint}>{compositionOnly ? t("조각을 선택해 자산별 비중을 확인하세요", "Select a segment to explore each asset's weight") : t("조각을 선택해 비중과 목표를 비교하세요", "Select a segment to compare its weight and target")}</p>
     </div>
   );
 }

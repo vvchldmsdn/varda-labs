@@ -17,7 +17,7 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
     return (
       <div className={styles.body}>
         <p className={styles.headline}>
-          <ValueText unit={currency === "KRW" ? "원" : "USD"}>
+          <ValueText tone={legacy.value === null || legacy.value === 0 ? "neutral" : legacy.value > 0 ? "positive" : "negative"} unit={currency === "KRW" ? "원" : "USD"}>
             {displayReadMoney(view, legacy.value, currency, true, "dashboard")}
           </ValueText>
         </p>

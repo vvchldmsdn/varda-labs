@@ -148,7 +148,7 @@ test('the actual beta value card shows original partial coverage and never subst
     '@/components/cairn-v2/target-drift-home':{TargetDriftHome:empty},
     '@/components/cairn-v2/holding-heatmap':{HoldingHeatmap:empty},
     '@/components/cairn-v2/home-simulation':{HomeSimulation:empty,HomeSimulationPending:empty},
-    '@/components/cairn-v2/history-detail-controls':{MetricControls:empty},
+    '@/components/cairn-v2/history-detail-controls':{MetricControls:empty,PeriodControls:empty},
     '@/components/cairn-v2/beta-charts':{HistoryChart:empty},
     '@/components/cairn-v2/portfolio-allocation-ring':{PortfolioAllocationRing:({entries})=>{ringEntries=entries;return null;}},
   });

@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { HomeCard as Card } from "./home-card";
 import { cardTitles, type CardKind } from "./card-definition";
-import { MetricControls } from "./history-detail-controls";
+import { MetricControls, PeriodControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
@@ -30,7 +30,8 @@ const BetaDetail = dynamic(() => import("./beta-details").then((module) => modul
   ),
 });
 import { HistoryChart } from "./beta-charts";
-import { PortfolioAllocationRing } from "./portfolio-allocation-ring";
+import { HomeAllocation } from "@/components/home/home-allocation";
+import compositionStyles from "@/components/home/home-composition.module.css";
 import { useBetaPreferences } from "./beta-provider";
 import { useBetaContext } from "./use-beta-context";
 import styles from "./beta.module.css";
@@ -84,7 +85,9 @@ export function BetaHome({
     : contributionTotal !== null;
   return (
     <BetaShell context={context} setContext={setContext} readView={view}>
-      <div className={home.dashboard}>
+      <div className={`${compositionStyles.frame} ${home.dashboard}`}>
+        <div className={compositionStyles.hero}>
+          <div className={`${compositionStyles.summary} ${home.summary}`}>
 
           <Card onOpen={open} kind="value">
             <div
@@ -120,6 +123,46 @@ export function BetaHome({
           <Card onOpen={open} kind="today">
             <HomeToday view={view} currency={context.currency} />
           </Card>
+          </div>
+          <div className={`${compositionStyles.plot} ${home.history}`}>
+            <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
+              <HistoryChart view={view} compact />
+              <PeriodControls />
+            </Card>
+
+          </div>
+
+        </div>
+        <div className={compositionStyles.lower}>
+          <Card onOpen={open} kind="structure" className={!allocationEntries.length ? home.noHoldings : undefined}>
+            {compositionRequested && composition && !composition.complete ? <p className={styles.cardFootnote}>확인된 소계 내 비중 · 제외 {composition.counts.excluded}건</p> : null}
+            {!compositionRequested && view.domain?.excluded.length ? (
+              <p className={styles.cardFootnote}>
+                확인 가능한 소계 {displayMoney(view.domain.knownSubtotalKrw, context.currency)}{" "}
+                {context.currency} · 제외 {view.domain.excluded.length}종목 · 소계 내 비중
+              </p>
+            ) : null}
+            {!compositionRequested && view.domain && view.domain.nonInvestmentCount > 0 && (
+              <p className={styles.cardFootnote}>
+                투자자산 소계 내 비중 · 비투자자산 {view.domain.nonInvestmentCount}개 별도
+              </p>
+            )}
+            {(compositionRequested ? !allocationEntries.length : readStateText(view.domain?.valueState, "보유 종목 없음") || !view.rows.length) ? (
+              <CairnStatus as="p" className={styles.empty} role="status">
+                {compositionRequested ? composition ? composition.counts.positions ? "평가할 수 있는 보유자산이 없어요. 확대하여 필요한 자료를 확인해 주세요." : "보유 자산 없음" : "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : readStateText(view.domain?.valueState, "보유 종목 없음") ?? "보유 종목 없음"}
+              </CairnStatus>
+            ) : (
+              <div className={home.allocation}>
+                <HomeAllocation
+                  entries={allocationEntries}
+                  selectedKey={active?.key ?? ""}
+                  onSelect={setSelected}
+                />
+              </div>
+            )}
+          </Card>
+
+          <div className={home.planning}>
           <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
             {view.domain ? (
               <ContributionHome view={view} dirty={contributionDirty} />
@@ -168,43 +211,10 @@ export function BetaHome({
               </div>
             )}
           </Card>
-          <div className={home.history}>
-            <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
-              <HistoryChart view={view} compact />
-            </Card>
             <TargetDriftHome view={view} onOpen={(trigger) => open("drift", trigger)} />
           </div>
-
-          <Card onOpen={open} kind="structure" className={!allocationEntries.length ? home.noHoldings : undefined}>
-            {compositionRequested && composition && !composition.complete ? <p className={styles.cardFootnote}>확인된 소계 내 비중 · 제외 {composition.counts.excluded}건</p> : null}
-            {!compositionRequested && view.domain?.excluded.length ? (
-              <p className={styles.cardFootnote}>
-                확인 가능한 소계 {displayMoney(view.domain.knownSubtotalKrw, context.currency)}{" "}
-                {context.currency} · 제외 {view.domain.excluded.length}종목 · 소계 내 비중
-              </p>
-            ) : null}
-            {!compositionRequested && view.domain && view.domain.nonInvestmentCount > 0 && (
-              <p className={styles.cardFootnote}>
-                투자자산 소계 내 비중 · 비투자자산 {view.domain.nonInvestmentCount}개 별도
-              </p>
-            )}
-            {(compositionRequested ? !allocationEntries.length : readStateText(view.domain?.valueState, "보유 종목 없음") || !view.rows.length) ? (
-              <CairnStatus as="p" className={styles.empty} role="status">
-                {compositionRequested ? composition ? composition.counts.positions ? "평가할 수 있는 보유자산이 없어요. 확대하여 필요한 자료를 확인해 주세요." : "보유 자산 없음" : "현재 평가를 불러오지 못했어요. 다시 조회해 주세요." : readStateText(view.domain?.valueState, "보유 종목 없음") ?? "보유 종목 없음"}
-              </CairnStatus>
-            ) : (
-              <div className={styles.homeRing}>
-                <PortfolioAllocationRing
-                  compositionOnly={!!view.domain}
-                  entries={allocationEntries}
-                  selectedKey={active?.key ?? ""}
-                  onSelect={setSelected}
-                />
-              </div>
-            )}
-          </Card>
-
-          <Card onOpen={open} kind="heatmap" minimal className={home.heatmap}>
+        </div>
+          <Card onOpen={open} kind="heatmap" className={home.heatmap}>
             <HoldingHeatmap view={view} compact />
           </Card>
       </div>

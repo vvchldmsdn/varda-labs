@@ -190,8 +190,8 @@ export function HistoryChart({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="#c64623" stopOpacity=".10" />
-            <stop offset="1" stopColor="#c64623" stopOpacity="0" />
+            <stop stopColor="var(--home-chart-line, #c64623)" stopOpacity=".10" />
+            <stop offset="1" stopColor="var(--home-chart-line, #c64623)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[plot.top, (plot.top + plot.bottom) / 2, plot.bottom].map(
@@ -202,7 +202,7 @@ export function HistoryChart({
               x2={plot.right}
               y1={y}
               y2={y}
-              stroke="#dedfda"
+              stroke="var(--home-chart-grid, #dedfda)"
               strokeWidth=".7"
               strokeDasharray={compact ? undefined : "1 4"}
             />
@@ -215,7 +215,7 @@ export function HistoryChart({
             )}
             <path
               d={d}
-              stroke="#c64623"
+              stroke="var(--home-chart-line, #c64623)"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -232,7 +232,7 @@ export function HistoryChart({
             <path
               d={`M${points.at(-2)!.x},${points.at(-2)!.y} L${points.at(-1)!.x},${points.at(-1)!.y}`}
               fill="none"
-              stroke="#c64623"
+              stroke="var(--home-chart-line, #c64623)"
               strokeWidth="1.4"
               strokeDasharray="3 4"
               vectorEffect="non-scaling-stroke"
@@ -260,7 +260,7 @@ export function HistoryChart({
               cx={p.x}
               cy={p.y}
               r="2.5"
-              fill="#c64623"
+              fill="var(--home-chart-line, #c64623)"
             />
           ) : null,
         )}
@@ -270,7 +270,7 @@ export function HistoryChart({
             cx={selectedPoint.x}
             cy={selectedPoint.y}
             r="3"
-            fill="#c64623"
+            fill="var(--home-chart-line, #c64623)"
           />
         )}
       </svg>
@@ -355,7 +355,7 @@ export function ScenarioChart({ view }: { view: FixtureView }) {
         />
         <polyline
           points={coordinates(0, 1)}
-          stroke="#c64623"
+          stroke="var(--home-chart-line, #c64623)"
           strokeWidth="1.4"
           fill="none"
           vectorEffect="non-scaling-stroke"

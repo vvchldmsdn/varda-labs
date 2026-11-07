@@ -9,7 +9,10 @@ import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
-import { ArrowUpRight, Plus, ChartPie, ChartNoAxesCombined, Grid2X2, Target } from "lucide-react";
+import { ArrowUpRight, Plus, ChartPie, ChartNoAxesCombined, Target } from "lucide-react";
+import { HomeAllocation } from "@/components/home/home-allocation";
+import compositionStyles from "@/components/home/home-composition.module.css";
+import homeNavigation from "@/components/home/home-navigation.module.css";
 import home from "@/components/home/dashboard-discovery.module.css";
 import styles from "@/components/home/portfolio-overview.module.css";
 
@@ -77,7 +80,7 @@ export function PortfolioDashboard({
   const targetNavigation = buildPortfolioTargetNavigation({ scopeKey: data.selectedScope.key, from: "home", isDesignPreview: designPreview });
 
   return (
-    <main className="varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]" data-page="home">
+    <main className={`${homeNavigation.original} varda-page varda-presentation-page varda-stage-page bg-[var(--paper)] text-[var(--ink)]`} data-page="home">
       <PortfolioPrimaryNavigation
         activePath="/"
         generatedAt={data.generatedAt}
@@ -85,7 +88,7 @@ export function PortfolioDashboard({
       />
 
       <div className="varda-content varda-presentation-content varda-stage-content">
-        <div className={`${styles.stage} ${home.stage}`}>
+        <div className={`${styles.stage} ${home.stage} ${compositionStyles.frame}`}>
           <header className={styles.stageHeader}>
             <CairnPageTitle id="portfolio-overview-title" className={styles.stageTitle}><T ko="자산의 흐름" en="Your portfolio, over time"/></CairnPageTitle>
             <div className={styles.stageScope}>
@@ -105,8 +108,8 @@ export function PortfolioDashboard({
             </div>
           </header>
 
-          <div className={home.overview}>
-          <section className={`${styles.stageSummary} ${home.summary}`} aria-labelledby="portfolio-overview-title">
+          <div className={`${compositionStyles.hero} ${home.overview}`}>
+          <section className={`${styles.stageSummary} ${home.summary} ${compositionStyles.summary}`} aria-labelledby="portfolio-overview-title">
             <div className={styles.balance}>
               <span><T ko={homeScopeLabel(data.selectedScope)} en={data.selectedScope.kind === "all" ? "All assets" : data.selectedScope.label}/> <T ko={currentComposition.complete ? "투자자산 평가액" : "확인 가능한 소계"} en={currentComposition.complete ? "Invested asset value" : "Verified subtotal"}/></span>
               <strong>{currentComposition.amount === null ? "—" : <T ko={formatKrw(Number(currentComposition.amount))} en={translateHomeHistory(formatKrw(Number(currentComposition.amount)))}/>}</strong>
@@ -133,12 +136,7 @@ export function PortfolioDashboard({
             </div>
           </section>
 
-          <ActionGroup label="내 자산 더 살펴보기">
-            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산" en="Plan a contribution" />} /></Link>
-            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="자산 비중 살펴보기" en="Explore your allocation" />} /></Link>
-          </ActionGroup>
-
-          <div className={styles.stageVisual}>
+          <div className={`${styles.stageVisual} ${compositionStyles.plot} ${home.plot}`}>
               <LocalizedElement as="section" en={{"aria-label": "Asset history"}} className={styles.chartPanel} aria-label="자산 이력">
               <RecoveredPortfolioHistoryChart accountId={!designPreview && data.selectedScope.kind === 'account' ? data.selectedScope.accountId : undefined}
                 key={data.selectedScope.key}
@@ -161,12 +159,27 @@ export function PortfolioDashboard({
 
 
 
+          <div className={compositionStyles.lower}>
+            <section className={compositionStyles.panel} aria-label="자산 비중">
+              <div className={compositionStyles.sectionHeader}><CairnSectionTitle><T ko="자산 비중" en="Allocation" /></CairnSectionTitle><LocalizedLink href={structureHref} aria-label="자산 비중 자세히 보기" en={{"aria-label":"Allocation details"}}><ArrowUpRight size={18} aria-hidden="true" /></LocalizedLink></div>
+              {!currentComposition.complete && <p className={compositionStyles.note}><T ko={`확인된 소계 내 비중 · 평가 제외 ${currentComposition.counts.excluded}건`} en={`Shares of the verified subtotal · ${currentComposition.counts.excluded} excluded`} /></p>}
+              <HomeAllocation entries={currentComposition.positions.flatMap(row => row.displayWeightPct === null || row.displayWeightPct <= 0 ? [] : [{key:row.key,name:instrumentLabel(row),weightPct:row.displayWeightPct}])} />
+            </section>
+            <section className={`${compositionStyles.panel} ${home.actions}`} aria-label="투자 계획">
+              <div className={compositionStyles.sectionHeader}><CairnSectionTitle><T ko="다음 투자" en="Your next investment" /></CairnSectionTitle></div>
+          <ActionGroup label="내 자산 더 살펴보기">
+            <Link href={scopedHref("/additional-contribution", data.selectedScope.key, designPreview)} data-primary="true"><ActionContent icon={<Plus size={22} />} title={<T ko="추가 투자 계산" en="Plan a contribution" />} /></Link>
+            <Link href={structureHref}><ActionContent icon={<ChartPie size={22} />} title={<T ko="자산 비중 살펴보기" en="Explore your allocation" />} /></Link>
+          </ActionGroup>
+
+            </section>
+          </div>
+          <section className={compositionStyles.heatmap} aria-label="종목별 흐름">
+            <HoldingMovementHeatmap key={data.selectedScope.key} history={data.holdingHistory} riskHref={riskHref} structureHref={structureHref} />
+          </section>
+
           <footer className={styles.stageFooter}>
             <ActionGroup label="분석 자세히 보기" className={styles.stageLaunchers}>
-              <PresentationDialog label="종목별 흐름 보기" labelEn="Explore holding trends" title="종목별 흐름" titleEn="Holding trends" triggerContent={<ActionContent icon={<Grid2X2 />} title={<T ko="종목별 흐름 보기" en="Explore holding trends" />} />} wide>
-              <HoldingMovementHeatmap key={data.selectedScope.key} history={data.holdingHistory} riskHref={riskHref} structureHref={structureHref} />
-              </PresentationDialog>
-
               <PresentationDialog label="변동 근거" labelEn={"Change details"} title="오늘의 근거와 자산 흐름" titleEn={"Today's changes and their sources"} triggerContent={<ActionContent icon={<ChartNoAxesCombined />} title={<T ko="변동 근거" en="Change details" />} />} wide>
               <LocalizedElement as="aside" en={{"aria-label": "Today's changes and their sources"}} className={styles.evidence} aria-label="오늘의 근거와 자산 흐름">
               <div>
