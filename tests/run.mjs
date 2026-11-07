@@ -39,6 +39,7 @@ import "./snapshot-cost-evidence.test.mjs";
 import "./body-scroll-lock.test.mjs";
 import "./today-mobile-interaction.test.mjs";
 import "./home-mobile-interaction.test.mjs";
+import "./home-composition.test.mjs";
 import "./portfolio-target-policy-ui.test.mjs";
 import "./investment-lab-panel.test.mjs";
 import "./research-detail-boundary.test.mjs";

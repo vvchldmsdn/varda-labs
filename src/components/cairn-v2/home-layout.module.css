@@ -1,37 +1,52 @@
-.dashboard { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(300px,1.3fr); align-items:start; gap:20px; }
-.dashboard [data-beta-card] { grid-column:auto; grid-row:auto; height:auto; min-width:0; padding:var(--cairn-ui-space-5,24px); border-radius:var(--cairn-ui-radius-panel,24px); background:var(--cairn-ui-paper,#f7f7f5); }
+
+.dashboard { min-width:0; }
+.dashboard [data-beta-card] { position:relative;grid-column:auto;grid-row:auto;min-width:0;min-height:0;height:auto;padding:24px 0;border-radius:0;background:transparent;box-shadow:none; }
 .dashboard [data-beta-card]::before { display:none; }
-.dashboard [data-cairn-card-header] h2 { font-size:16px; }
-.dashboard > :is([data-beta-card=value],[data-beta-card=today]) { min-height:220px; }
-.dashboard > [data-beta-card=structure] { grid-column:3; grid-row:2; min-height:350px; }
-.dashboard > [data-beta-card=structure] > div:last-child { flex:none; height:auto; width:100%; max-width:300px; margin:16px auto 0; }
-.dashboard > [data-beta-card=structure] [data-allocation-ring] { width:100%; max-width:300px; margin-inline:auto; }
-.dashboard [data-allocation-ring] > p { position:static!important; margin-top:10px!important; font-size:12px!important; }
-.history { display:flex; flex-direction:column; grid-column:1/3; min-width:0; gap:16px; }
-.history > [data-beta-card=history] { min-height:335px; }
-.history > [data-beta-card=drift] { display:block; padding:0; }
-.dashboard > [data-beta-card=heatmap] {grid-column:1/-1;position:relative;padding:12px 0 0;background:transparent;border-radius:0;}
-.heatmap > header {justify-content:flex-end;min-height:44px;}
-.dashboard > [data-beta-card].contributionStatus {display:grid;grid-template-columns:1fr;min-height:0;gap:0;}
-.dashboard .noAllocation { grid-template-columns:1fr; }
-.dashboard .noAllocation > :last-child { display:none; }
-.dashboard [data-beta-card].noHistory,.dashboard [data-beta-card].noHoldings { min-height:0; }
-.explore { margin-top:28px; }
-.explore h2 { margin-bottom:14px; font-size:19px; font-weight:550; }
-@media(min-width:700px) and (max-width:1100px) {
- .dashboard { grid-template-columns:repeat(2,minmax(0,1fr)); }
- .dashboard > [data-beta-card=contribution],.history { grid-column:1/-1; }
- .dashboard > [data-beta-card=structure] { grid-column:1/-1; grid-row:auto; }
+.dashboard [data-beta-card]:hover { background:transparent; }
+.dashboard [data-cairn-card-header] { margin:0 0 16px; }
+.dashboard [data-cairn-card-header] h2 { font-size:16px;font-weight:500; }
+.dashboard [data-cairn-card-header] button { font-weight:500; }
+.dashboard [data-beta-card=structure] { border-top:1px solid var(--home-line); }
+.dashboard .summary { display:flex;flex-direction:column;justify-content:center;gap:36px; }
+.summary [data-beta-card] { padding:0;color:inherit; }
+.summary [data-beta-card] > p { color:#c2c5bf;line-height:1.7;font-size:12px; }
+.summary [data-cairn-card-header] button { color:inherit; }
+.summary [data-beta-card=value] > div { font-size:clamp(32px,3.6vw,50px);font-weight:400;letter-spacing:-.045em;line-height:1.2; }
+.summary [data-beta-card=value] small { color:#c2c5bf;font-size:14px;letter-spacing:0; }
+.summary [data-beta-card=today] { border-top:1px solid #ffffff24;padding-top:20px; }
+.summary [data-beta-card=today] [data-cairn-card-header] { margin-bottom:8px; }
+.summary [data-beta-card=today] p { margin-block:6px; }
+.summary [data-beta-card=today] p:first-child { font-size:28px; }
+.summary [data-tone=positive] { color:#ff9b7c; }
+.summary [data-tone=negative] { color:#9bbdf0; }
+.history { display:flex;flex-direction:column; }
+.dashboard .history [data-beta-card=history]:focus-within { box-shadow:none; }
+.history [data-beta-card=history] { display:flex;flex:1;padding:0;min-height:320px; }
+.history [data-beta-card=history] > figure { flex:1;display:flex;flex-direction:column;justify-content:center; }
+.history [data-beta-card=history] > figure > div:has(>svg) { flex:1;min-height:220px; }
+.allocation { margin-top:12px; }
+.planning { border-top:1px solid var(--home-line);min-width:0; }
+.planning [data-beta-card=drift] { display:block;border-top:1px solid var(--home-line);padding:0; }
+.planning [data-beta-card=drift] > button { padding:20px 0;min-height:86px;border-radius:0; }
+.planning [data-beta-card=drift] strong { font-size:28px;font-weight:400; }
+.dashboard [data-beta-card=heatmap] { margin-top:24px;border-top:1px solid var(--home-line); }
+.heatmap > header { min-height:44px; }
+.contributionStatus { display:grid;grid-template-columns:1fr;gap:0; }
+.noAllocation { grid-template-columns:1fr; }
+.noAllocation > :last-child { display:none; }
+.dashboard .noHistory,.dashboard .noHoldings { min-height:0; }
+.explore { margin-top:20px;padding-top:20px;border-top:1px solid var(--cairn-v2-line); }
+.explore h2 { margin-bottom:12px;font-size:16px;font-weight:500; }
+@media(max-width:760px) {
+ .dashboard .summary { gap:24px; }
+ .summary [data-beta-card=value] > div { font-size:36px; }
+ .summary [data-beta-card=today] { display:block; }
+ .history [data-beta-card=history] { min-height:280px; }
+ .dashboard [data-beta-card=heatmap] { margin-top:8px; }
+ .explore { margin-top:8px; }
 }
-@media(max-width:699px) {
- .dashboard { display:flex; flex-direction:column; align-items:stretch; gap:16px; }
- .dashboard > [data-beta-card] { align-self:stretch; }
- .dashboard [data-beta-card] { padding:16px 20px; border-radius:22px; }
- .dashboard > [data-beta-card=value] > div {margin-top:10px;}
- .dashboard > [data-beta-card=value] > p {margin-top:12px;}
- .dashboard > [data-beta-card=heatmap] {padding:0;background:transparent;}
- .dashboard > :is([data-beta-card=value],[data-beta-card=today]) { min-height:0; }
- .history { gap:12px; } .history > [data-beta-card=history] { min-height:300px; }
- .history > [data-beta-card=drift] { padding:0; }
- .explore { margin-top:28px; }
-}
+
+.dashboard .summary [data-beta-card]:hover{background:transparent}.summary [data-beta-card=value] > div > span{white-space:normal;overflow-wrap:anywhere}
+
+.history [data-beta-card=history] > figure{flex:none}.history [data-beta-card=history] [data-history-plot]{height:260px;min-height:0;flex:none}.history [data-beta-card=history]{flex:initial;min-height:0}.summary [data-cairn-card-header]{color:#f7f7f5}.summary [data-cairn-card-header] h2,.summary [data-cairn-card-header] svg{color:#f7f7f5}
+@media(max-width:760px){.history [data-beta-card=history] [data-history-plot]{height:220px}}

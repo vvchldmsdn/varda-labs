@@ -159,12 +159,12 @@ export function PortfolioHistoryChart({
                 className={styles.historyLine}
                 d={geometry.path}
                 fill="none"
-                stroke="var(--ink)"
+                stroke="var(--home-chart-line, var(--ink))"
                 strokeWidth="2.2"
                 vectorEffect="non-scaling-stroke"
               />
               {geometry.points.map((point, index) => index % Math.max(1, Math.ceil(geometry.points.length / 36)) === 0 ? (
-                <circle key={`sample:${index}`} cx={point.x} cy={point.y} r="1.65" fill="var(--ink)" opacity=".3" className={styles.observationDot} style={{ "--dot-delay": `${index * 3}ms` } as CSSProperties} />
+                <circle key={`sample:${index}`} cx={point.x} cy={point.y} r="1.65" fill="var(--home-chart-line, var(--ink))" opacity=".3" className={styles.observationDot} style={{ "--dot-delay": `${index * 3}ms` } as CSSProperties} />
               ) : null)}
               {activePoint && activeGeometry ? (
                 <g className={styles.historyMarker}>

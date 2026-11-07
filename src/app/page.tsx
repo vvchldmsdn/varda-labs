@@ -44,6 +44,13 @@ type HomeProps = {
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
 
+  if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "native-home") {
+    const { trackedCurrencyFixture } = await import("@/lib/currency-tracked-fixture");
+    const evidence = { ...trackedCurrencyFixture(), reporting: params.currency === "USD" ? "USD" as const : "KRW" as const };
+    const scope = { kind: "all", key: "all", label: "전체 자산" } as const;
+    return <CurrencyPortfolioSurface surface="home" evidence={evidence} scopes={[scope]} selectedScope={scope} />;
+  }
+
   if (process.env.NODE_ENV === "development" && firstSearchParam(params.preview) === "quick-usd") {
     const asOf = "2026-09-13T00:00:00Z";
     return <><CairnStatus as="p" tone="neutral" role="status" className="px-6 py-2 text-xs">Synthetic portfolio · USD preview</CairnStatus><QuickHome input={{ version: 2, source: "manual", currency: "USD", locale: "en", timeZone: "America/New_York", asOf,

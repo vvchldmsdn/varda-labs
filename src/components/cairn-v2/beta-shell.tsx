@@ -1,4 +1,5 @@
 "use client";
+import homeNavigation from "@/components/home/home-navigation.module.css";
 import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Input as CairnInput, PageTitle as CairnPageTitle, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
@@ -77,7 +78,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
   const readUnavailable = retryReadNeeded(readView);
   const canSwitchFrontend = existingCrudAvailable && frontendFeature && supportsExactFrontendChoice(pathname);
   const currentLink = (href: string) => isCurrentWorkspaceLink(pathname, context.analysis, href) ? 'page' as const : undefined;
-  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : styles.homeShell}`} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
+  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : `${styles.homeShell} ${homeNavigation.shell}`}`} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
     <aside className={styles.navigation} aria-label="목적별 내비게이션">
       <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.brand} href={readHref(betaHref("/beta", context))}><BrandLogo stacked /></Link>
       <nav>{purposeDestinations.map((item) => <div key={item.label}>
