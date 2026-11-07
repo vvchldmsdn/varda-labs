@@ -179,4 +179,25 @@ describe("KIS token lifecycle", () => {
       await assert.rejects(getReusableKisAccessToken(options), error => error instanceof KisTokenCooldownError && error.retryAfterSeconds === expected);
     }
   });
+
+  for (const policy of ["per_request", "memory_cache"]) it(`resumes at the shared budget deadline without extending it (${policy})`, async () => {
+    for (const seconds of [3, 10, 48, 180]) {
+      let time = 1_000, calls = 0;
+      const session = { tokenCache: null };
+      const common = { cacheKey: `budget-deadline-${policy}-${seconds}`, policy, now: () => time,
+        issueToken: async () => {
+          calls++;
+          if (calls === 1) throw Object.assign(new Error('request not admitted yet'), { code: 'provider_budget_limited', retryAfterSeconds: seconds });
+          return { accessToken: 'fixture-token', expiresInSeconds: 3600 };
+        } };
+      const request = () => getReusableKisAccessToken({ ...common, session: policy === 'memory_cache' ? { tokenCache: null } : session });
+      await assert.rejects(request(), /not admitted/);
+      time += seconds * 1_000 - 1;
+      await assert.rejects(request(), error => error instanceof KisTokenCooldownError && error.retryAfterSeconds === 1);
+      assert.equal(calls, 1, 'no early issuance while shared budget is waiting');
+      time++;
+      assert.equal(await request(), 'fixture-token');
+      assert.equal(calls, 2, 'resume at the exact authorized deadline, not a new 60s cooldown');
+    }
+  });
 });

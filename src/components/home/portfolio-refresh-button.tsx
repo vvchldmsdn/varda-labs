@@ -14,7 +14,7 @@ import type { QuoteRefreshResponse } from "@/lib/market-data/quote-refresh-progr
 import { readRefreshOperation, retainRefreshOperation, type QuoteRefreshOperation } from "@/lib/market-data/quote-refresh-operation";
 
 
-type SyncState = "idle" | "syncing" | "fresh" | "partial" | "cooldown" | "queued" | "waiting" | "error";
+type SyncState = "idle" | "syncing" | "fresh" | "partial" | "cooldown" | "queued" | "waiting" | "reconnecting" | "error";
 type SyncResponse = QuoteRefreshResponse;
 
 let activeSyncRequest: { promise: Promise<SyncResponse>; controller: AbortController } | null = null;
@@ -78,8 +78,11 @@ export function PortfolioRefreshButton({
   // Shared work can become pending again while comparison prices are checked.
   // The latest item receipt outranks an earlier completion, but cannot reopen
   // a stopped polling window or replace an active manual request/error.
-  const displayState: SyncState = ["syncing", "error", "cooldown", "waiting"].includes(polledState) || !receipt?.progress ? polledState
+  const connectionLost = collectionState === "unavailable" || Boolean(receipt?.connectionUnavailable);
+  const displayState: SyncState = ["syncing", "error", "cooldown", "waiting"].includes(polledState) ? polledState
+    : connectionLost && receipt?.progress?.pending ? "reconnecting" : !receipt?.progress ? polledState
     : receipt.progress.pending > 0 ? "queued" : receipt.progress.failed > 0 ? "partial" : "fresh";
+  const providerWaiting = displayState === "queued" && receipt?.progress?.items.some(item => item.state === "delayed") && !receipt.progress.items.some(item => item.state === "running");
   const pending = syncState === "syncing" || displayState === "queued" || refreshPending;
 
   const sync = useCallback(
@@ -146,23 +149,24 @@ export function PortfolioRefreshButton({
       onClick={() => designPreview ? startTransition(() => router.refresh()) : void sync()}
       title={t(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState), translateHomeHistory(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState)))}
     >
-      <span aria-hidden="true" className={pending ? "animate-spin motion-reduce:animate-none" : undefined}>
+      <span aria-hidden="true" className={pending && !providerWaiting ? "animate-spin motion-reduce:animate-none" : undefined}>
         <RefreshCw size={15} strokeWidth={1.5} />
       </span>
-      {compact ? null : <span aria-live="polite">{<T ko={syncLabel(displayState)} en={displayState === "queued" ? "Refresh queued" : displayState === "waiting" ? "Pending · check again" : translateHomeHistory(syncLabel(displayState))}/>}</span>}
+      {compact ? null : <span aria-live="polite">{<T ko={syncLabel(displayState)} en={displayState === "queued" ? "Refresh queued" : displayState === "waiting" ? "Pending · check again" : displayState === "reconnecting" ? "Connection lost · retrying" : translateHomeHistory(syncLabel(displayState))}/>}</span>}
     </CairnButton>
     {compact && !receipt?.progress && ["error", "cooldown", "waiting"].includes(displayState) && <span role="status" className="text-xs">{syncLabel(displayState)}</span>}
     {receipt?.progress && <details className="text-xs">
       <summary className="cursor-pointer whitespace-nowrap py-2" aria-live="polite">
         {receipt.progress.completed}/{receipt.progress.total} {t("조회", "checked")}
-        {displayState === "queued" ? t(" · 진행 중", " · in progress") : displayState === "waiting" ? t(" · 확인 중단", " · paused") : receipt.progress.failed ? t(" · 일부 실패", " · incomplete") : t(" · 완료", " · complete")}
+        {displayState === "reconnecting" ? t(" · 연결 재시도 중", " · reconnecting") : providerWaiting ? t(" · 재시도 대기", " · retry scheduled") : displayState === "queued" ? t(" · 진행 중", " · in progress") : displayState === "waiting" ? t(" · 확인 중단", " · paused") : receipt.progress.failed ? t(" · 일부 실패", " · incomplete") : t(" · 완료", " · complete")}
       </summary>
       <div className="absolute right-0 top-full z-50 mt-2 max-h-80 w-[min(340px,calc(100vw-32px))] overflow-y-auto border border-[var(--line)] bg-[var(--paper)] p-4 text-[var(--ink)] shadow-sm">
         <p className="mb-3">{t("종목·환율 조회 결과", "Quote and exchange-rate checks")}</p>
         {receipt.comparison && receipt.comparison.pending > 0 && <p role="status" className="mb-3">{t("시세는 먼저 반영해요. 오늘 변동의 비교 기준은 확인 대기 중이에요.", "Quotes update first. Comparison prices for today's change are awaiting verification.")}</p>}
         {receipt.comparison && receipt.comparison.failed > 0 && <p role="status" className="mb-3">{t("일부 종목의 비교 기준을 확인하지 못했어요.", "Some comparison prices could not be checked.")}</p>}
         {displayState === "waiting" && <p role="status" className="mb-3">{t("확인 시간이 길어져 멈췄어요. 완료되지 않은 항목은 다시 갱신할 수 있어요.", "Checking timed out. You can retry the remaining items.")}</p>}
-        {(collectionState === "unavailable" || receipt.connectionUnavailable) && <p role="status">{t("연결을 확인하지 못했어요.", "The connection could not be checked.")}</p>}
+        {connectionLost && <p role="status">{t("연결을 확인하지 못했어요. 확인된 결과는 유지돼요.", "Connection lost. Confirmed results are preserved.")}</p>}
+        {providerWaiting && <p role="status" className="mb-3">{t("시세 제공처의 대기 시간 후 이어서 조회해요.", "Checks will continue after the provider's waiting period.")}</p>}
         <ul>{receipt.progress.items.map(item => <li key={item.id} className="border-t border-[var(--line)] py-2">
           <div className="flex justify-between gap-3"><span>{item.label} <small>{item.provider}</small></span><span>{t(...progressLabel(item.state))}</span></div>
           {item.priceAsOf && <p className="mt-1 text-[var(--muted)]">{t("가격 기준", "Price as of")} {formatTime(item.priceAsOf)}</p>}
@@ -208,6 +212,7 @@ function requestLivePriceSync(operation?: QuoteRefreshOperation, signal?: AbortS
 function syncLabel(state: SyncState) {
   if (state === "queued") return "시세 갱신 대기 중";
   if (state === "waiting") return "대기 중 · 다시 확인";
+  if (state === "reconnecting") return "연결 재시도 중";
   if (state === "syncing") return "시세 확인 중";
   if (state === "fresh") return "시세 조회 완료";
   if (state === "partial") return "일부 시세 반영됨";
@@ -229,6 +234,7 @@ function formatTime(value: string) {
 }
 
 function syncTitle(state: SyncState) {
+  if (state === "reconnecting") return "연결을 다시 확인하고 있습니다. 누르면 새로 시도합니다";
   if (state === "cooldown") return "공급자 보호 시간 후 다시 시도할 수 있습니다";
   if (state === "error") return "시세 갱신에 실패했습니다. 다시 누르면 재시도합니다";
   return "소유한 보유 종목의 최신 시세를 확인합니다";

@@ -111,7 +111,13 @@ export async function getReusableKisAccessToken({
   }).catch((error: unknown) => {
     const requestedSeconds = typeof error === "object" && error !== null && "retryAfterSeconds" in error
       ? Number(error.retryAfterSeconds) : 0;
-    const retryDelay = Math.min(MAXIMUM_FAILURE_COOLDOWN_MS, Math.max(MINIMUM_FAILURE_COOLDOWN_MS,
+    // The shared request budget already owns this deadline (including token
+    // issuance spacing). Do not turn a 3s admission wait into a new 60s token
+    // failure: repeated warm workers could otherwise miss each available slot.
+    // Actual issuance/transport failures retain the conservative 60s cooldown.
+    const budgetWait = typeof error === "object" && error !== null && "code" in error &&
+      error.code === "provider_budget_limited" && Number.isFinite(requestedSeconds) && requestedSeconds > 0;
+    const retryDelay = Math.min(MAXIMUM_FAILURE_COOLDOWN_MS, Math.max(budgetWait ? 1_000 : MINIMUM_FAILURE_COOLDOWN_MS,
       Number.isFinite(requestedSeconds) && requestedSeconds > 0 ? requestedSeconds * 1000 : 0));
     const retryAt = now() + retryDelay;
     session.tokenFailure = Object.freeze({ cacheKey, retryAt });

@@ -44,7 +44,13 @@ export async function revalidateLatestClose({ target, provider, now = new Date()
       const result = await provider.fetchClosePrices([lookup], { mode: "close", priceDate, requestedAt: now, dryRun: false, fixture: false });
       const valid = result.rows.filter(row => row.status === "ok" && row.ticker === target.ticker && row.market === target.market
         && row.currency === target.currency && row.closePrice !== null && Number.isFinite(Number(row.closePrice)) && Number(row.closePrice) > 0);
-      if (result.provider !== "kis" || valid.length !== 1 || valid[0].priceDate > priceDate) throw new Error("latest_close_provider_unavailable");
+      if (result.provider !== "kis" || valid.length !== 1 || valid[0].priceDate > priceDate) {
+        // Retain the adapter's safe stage marker, never its provider response or
+        // error rows. Otherwise an initial token failure disappears behind the
+        // later cooldowns and cannot be distinguished from missing close data.
+        throw new Error(result.provider === "kis" && result.warnings?.includes("kis token request failed")
+          ? "latest_close_token_request_failed" : "latest_close_provider_unavailable");
+      }
       const exact = valid.filter(row => row.priceDate === priceDate);
       // A provider can legitimately return an earlier actual close. Keep its original date;
       // do not promote it into the requested date or stamp an existing price as revalidated.
@@ -56,8 +62,13 @@ export async function revalidateLatestClose({ target, provider, now = new Date()
       [runId, exact.length, exact.length ? 0 : 1, JSON.stringify({ ...metadata, state, returnedPriceDate: valid[0].priceDate })]);
       return { state, priceDate };
     } catch (error) {
+      const allowed = ["provider_budget_limited", "provider_token_cooldown", "provider_history_pending",
+        "latest_close_token_request_failed", "latest_close_provider_unavailable", "latest_close_write_unavailable"];
+      const code = typeof error === "object" && error !== null && "code" in error ? String(error.code)
+        : error instanceof Error ? error.message : "";
+      const failureCode = allowed.includes(code) ? code : "latest_close_revalidation_failed";
       await sqlClient.query(`update market_data_sync_runs set status='failed',finished_at=clock_timestamp(),failed_count=1,
-        error='latest_close_revalidation_failed' where id=$1::uuid`, [runId]);
+        error='latest_close_revalidation_failed',metadata_json=metadata_json||jsonb_build_object('failureCode',$2::text) where id=$1::uuid`, [runId, failureCode]);
       throw error;
     }
   });
