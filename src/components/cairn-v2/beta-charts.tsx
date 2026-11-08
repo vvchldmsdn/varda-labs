@@ -2,7 +2,9 @@
 import { Field as CairnField, Input as CairnInput, Status as CairnStatus } from "@/components/cairn-ui";
 
 import dynamic from "next/dynamic";
-import { useId, type PointerEvent, type KeyboardEvent } from "react";
+import { useId, useState, type PointerEvent, type KeyboardEvent } from "react";
+import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
+import type { BetaCurrency } from "@/lib/cairn-v2/navigation";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import styles from "./beta.module.css";
 import { historySourceView } from "@/lib/cairn-v2/read-display";
@@ -25,12 +27,18 @@ const ReturnTimelineChart = dynamic(
 export function HistoryChart({
   view: inputView,
   compact = false,
+  interactive = false,
+  currency = "KRW",
 }: {
   view: FixtureView;
   compact?: boolean;
+  interactive?: boolean;
+  currency?: BetaCurrency;
 }) {
   const { metric, period, historyDate, setHistoryDate } = useBetaPreferences();
   const [measured, setPlotElement] = useMeasuredPlot();
+  const [inspecting, setInspecting] = useState(false);
+  const canExplore = !compact || interactive;
   const historySource = historySourceView(inputView, undefined, historyDate);
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
@@ -115,7 +123,8 @@ export function HistoryChart({
   const selectedPoint = points[selectedIndex];
   const selectedX = plot.left + axis.fraction(rows[selectedIndex].date) * (plot.right - plot.left);
   const selectPointerDate = (event: PointerEvent<SVGSVGElement>) => {
-    if (compact) return;
+    if (!canExplore) return;
+    setInspecting(true);
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * plot.width;
     const fraction = Math.max(0, Math.min(1, (x - plot.left) / (plot.right - plot.left)));
@@ -125,6 +134,7 @@ export function HistoryChart({
     const delta = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
     if (!delta && event.key !== "Home" && event.key !== "End") return;
     event.preventDefault();
+    setInspecting(true);
     const index =
       event.key === "Home"
         ? 0
@@ -156,14 +166,18 @@ export function HistoryChart({
       {view.domain?.historyState === "partial" && (
         <p className={styles.muted}>부분 이력 포함 · 확인 소계 · 전체 비교 주의</p>
       )}
-      <div ref={setPlotElement} className={styles.historyPlot} data-history-plot>
+      <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
+      {compact && interactive && inspecting && <output className={styles.compactReadout}>
+        <span>{rows[selectedIndex].date}</span>
+        <strong>{metric === "value" ? displayReadMoney(view, rows[selectedIndex].valueKrw, currency) + " " + currency : rows[selectedIndex].exampleReturnPct === null ? "—" : rows[selectedIndex].exampleReturnPct.toFixed(2) + "%"}</strong>
+      </output>}
       <svg
         viewBox={`0 0 ${plot.width} ${plot.height}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        tabIndex={compact ? undefined : 0}
+        tabIndex={canExplore ? 0 : undefined}
         aria-label={
-          compact
+          !canExplore
             ? view.domain
               ? view.domain.historyObservationPolicy && metric === "value"
                 ? "확인된 관측점을 잇는 평가 추이, 누락 날짜의 평가를 생성하지 않습니다"
@@ -172,7 +186,7 @@ export function HistoryChart({
             : `히스토리 날짜 탐색 · ${rows[selectedIndex].date} · 좌우 방향키로 날짜 선택`
         }
         onPointerDown={
-          compact
+          !canExplore
             ? undefined
             : (event) => {
                 selectPointerDate(event);
@@ -180,13 +194,16 @@ export function HistoryChart({
               }
         }
         onPointerMove={
-          compact
+          !canExplore
             ? undefined
             : (event) => {
                 if (event.pointerType === "mouse" || event.buttons) selectPointerDate(event);
               }
         }
-        onKeyDown={compact ? undefined : selectKeyboardDate}
+        onKeyDown={canExplore ? selectKeyboardDate : undefined}
+        onPointerLeave={() => setInspecting(false)}
+        onBlur={() => setInspecting(false)}
+        onClick={interactive ? event => event.stopPropagation() : undefined}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -238,7 +255,7 @@ export function HistoryChart({
               vectorEffect="non-scaling-stroke"
             />
           )}
-        {!compact && (
+        {(!compact || (interactive && inspecting)) && (
           <line
             x1={selectedX}
             x2={selectedX}

@@ -2,7 +2,7 @@
 
 import { instrumentLabel } from "@/lib/instrument-display";
 import { Button as CairnButton, Status as CairnStatus, ActionGroup, ActionContent } from "@/components/cairn-ui";
-import { ChartNoAxesCombined } from 'lucide-react';
+import { ArrowRight, ChartNoAxesCombined } from 'lucide-react';
 import { HoldingHeatmap } from './holding-heatmap';
 
 import { HomeSimulation, HomeSimulationPending } from "./home-simulation";
@@ -31,11 +31,12 @@ const BetaDetail = dynamic(() => import("./beta-details").then((module) => modul
 });
 import { HistoryChart } from "./beta-charts";
 import { HomeAllocation } from "@/components/home/home-allocation";
-import compositionStyles from "@/components/home/home-composition.module.css";
 import { useBetaPreferences } from "./beta-provider";
 import { useBetaContext } from "./use-beta-context";
 import styles from "./beta.module.css";
 import home from './home-layout.module.css';
+
+const HOME_ALLOCATION_COLORS = ["#F39579", "#868A84", "#DDBE9D", "#AFBEAC", "#718895", "#EE8A72", "#D2C4AF", "#B9C1BE"];
 
 export function BetaHome({
   initialContext,
@@ -53,8 +54,8 @@ export function BetaHome({
   const compositionRequested = !!view.domain?.currentValuePresentation;
   const allocationEntries = compositionRequested ? composition?.positions.flatMap((row, index) => row.displayWeightPct === null || row.displayWeightPct <= 0 ? [] : [{
     key: row.key, name: instrumentLabel(row), weightPct: row.displayWeightPct,
-    color: ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
-  }]) ?? [] : view.rows.map(row => ({key:row.key,name:instrumentLabel(row),weightPct:row.weightPct,color:row.color}));
+    color: HOME_ALLOCATION_COLORS[index % HOME_ALLOCATION_COLORS.length],
+  }]) ?? [] : view.rows.map((row,index) => ({key:row.key,name:instrumentLabel(row),weightPct:row.weightPct,color:HOME_ALLOCATION_COLORS[index % HOME_ALLOCATION_COLORS.length]}));
   const displayMoney = (value: number | null, currency: BetaContext["currency"], signed = false) =>
     displayReadMoney(view, value, currency, signed);
   const { selected, setSelected } = useBetaPreferences();
@@ -63,7 +64,7 @@ export function BetaHome({
   );
   const unit = context.currency === "KRW" ? "원" : "USD";
   function open(kind: CardKind, trigger: HTMLElement) {
-    const card = trigger.closest<HTMLElement>("[data-beta-card]")!;
+    const card = trigger.closest<HTMLElement>("[data-beta-card]") ?? trigger;
     setExpanded({ kind, origin: { rect: card.getBoundingClientRect(), trigger } });
   }
   const [contributionDirty, setContributionDirty] = useState(false);
@@ -85,9 +86,9 @@ export function BetaHome({
     : contributionTotal !== null;
   return (
     <BetaShell context={context} setContext={setContext} readView={view}>
-      <div className={`${compositionStyles.frame} ${home.dashboard}`}>
-        <div className={compositionStyles.hero}>
-          <div className={`${compositionStyles.summary} ${home.summary}`}>
+      <div className={home.dashboard}>
+        <div className={home.hero}>
+          <div className={home.summary}>
 
           <Card onOpen={open} kind="value">
             <div
@@ -126,16 +127,16 @@ export function BetaHome({
             <HomeToday view={view} currency={context.currency} />
           </Card>
           </div>
-          <div className={`${compositionStyles.plot} ${home.history}`}>
+          <div className={home.history}>
             <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
-              <HistoryChart view={view} compact />
+              <HistoryChart view={view} compact interactive currency={context.currency} />
               <PeriodControls />
             </Card>
 
           </div>
 
         </div>
-        <div className={compositionStyles.lower}>
+        <div className={home.lower}>
           <Card onOpen={open} kind="structure" className={!allocationEntries.length ? home.noHoldings : undefined}>
             {compositionRequested && composition && !composition.complete ? <p className={styles.cardFootnote}>확인된 소계 내 비중 · 제외 {composition.counts.excluded}건</p> : null}
             {!compositionRequested && view.domain?.excluded.length ? (
@@ -167,7 +168,7 @@ export function BetaHome({
           <div className={home.planning}>
           <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
             {view.domain ? (
-              <ContributionHome view={view} dirty={contributionDirty} />
+              <ContributionHome view={view} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS} />
             ) : (
               <div className={`${styles.contributionBody} ${!view.contribution.length ? home.noAllocation : ''}`}>
                 <div>
@@ -213,11 +214,17 @@ export function BetaHome({
               </div>
             )}
           </Card>
+            {context.mode === "domain" && contributionReady && <div className={home.amountChoices} role="group" aria-label="추가 투자금">
+              {[500000,1000000,2000000].map(amount => <CairnButton variant="bare" type="button" key={amount} aria-pressed={context.cashAmountKrw === String(amount)} onClick={() => setContext({...context,cashAmountKrw:String(amount)})}>{amount / 10000}만원</CairnButton>)}
+            </div>}
             <TargetDriftHome view={view} onOpen={(trigger) => open("drift", trigger)} />
+            <CairnButton variant="bare" className={home.planLink} type="button" onClick={event => open("contribution", event.currentTarget)}>
+              투자안 자세히 보기 <ArrowRight size={14} aria-hidden="true" />
+            </CairnButton>
           </div>
         </div>
           <Card onOpen={open} kind="heatmap" className={home.heatmap}>
-            <HoldingHeatmap view={view} compact />
+            <HoldingHeatmap view={view} compact maxDates={14} />
           </Card>
       </div>
       {view.rows.length > 0 && <section className={home.explore} aria-label="포트폴리오 더 살펴보기">

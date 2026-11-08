@@ -83,6 +83,10 @@
 .driftButton small {font-size:11px;color:var(--cairn-v2-muted);font-weight:400;margin-left:5px;}
 .compactChart {margin-top:27px;display:flex;flex-direction:column;}
 .historyPlot {width:100%;min-width:0;flex:none;}
+.historyPlot[data-interactive] {position:relative;}
+.compactReadout {position:absolute;right:12px;top:4px;z-index:2;display:grid;gap:3px;padding:8px 10px;border:1px solid var(--cairn-v2-line);border-radius:8px;background:var(--cairn-v2-paper);color:var(--cairn-v2-ink);pointer-events:none;font-size:11px;}
+.compactReadout span {color:var(--cairn-v2-muted);font-size:10px;}
+.compactReadout strong {font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;}
 .compactChart .historyPlot {height:220px;}
 .historyPlot svg {display:block;width:100%;height:100%;}
 .chartDates {display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--cairn-v2-muted);padding-inline:4px;margin-top:8px;}

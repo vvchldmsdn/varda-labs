@@ -11,12 +11,12 @@ const signed=(value:number|null)=>value===null?'—':(value>0?'+':'')+eventNumbe
 const basisLabel=(cell:PortfolioDashboardHeatmapCell)=>cell.basis==='live_price'?'가격 등락률':cell.basis==='unit_value'?'단위 평가 변동률':cell.basis==='market_value'?'평가액 변동률':cell.basis==='live_movement'?'현재 평가액 변동률':'변동률 비교 불가';
 // Selection/arrow-key behavior and color scale are a limited port of the original
 // components/home/holding-movement-heatmap.tsx; no data fetching or graph engines.
-export function HoldingHeatmap({view,compact=false}:{view:BetaView;compact?:boolean}){
+export function HoldingHeatmap({view,compact=false,maxDates}:{view:BetaView;compact?:boolean;maxDates?:number}){
  const read=view.domain?.heatmap;
  const [draft,setDraft]=useState<{key:string;row:number;cell:number}|null>(null);
  const [days,setDays]=useState(31);
  if(!read?.history)return <p role="status" className={styles.message}>{read?.message??(view.domain?.state==='loading'?'종목 흐름 확인 중':view.domain?.state==='unauthorized'?'로그인과 조회 범위를 확인해 주세요':'종목 흐름의 저장 이력을 확인하지 못했습니다.')}</p>;
- const start=compact?0:Math.max(0,read.history.dates.length-days);
+ const start=compact?(maxDates ? Math.max(0,read.history.dates.length-maxDates) : 0):Math.max(0,read.history.dates.length-days);
  const history={...read.history,dates:read.history.dates.slice(start),rows:read.history.rows.map(row=>({...row,cells:row.cells.slice(start)}))};
  const repeatedNames=new Set(history.rows.filter((row,index,rows)=>rows.findIndex(other=>instrumentLabel(other)===instrumentLabel(row))!==index).map(row=>instrumentLabel(row)));
  if(!history.rows.length)return <p role="status" className={styles.message}>{read.message}</p>;

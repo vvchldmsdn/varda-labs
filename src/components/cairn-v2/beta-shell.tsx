@@ -1,5 +1,6 @@
 "use client";
 import homeNavigation from "@/components/home/home-navigation.module.css";
+import homeDesign from "./home-shell.module.css";
 import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Input as CairnInput, PageTitle as CairnPageTitle, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
@@ -78,9 +79,9 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
   const readUnavailable = retryReadNeeded(readView);
   const canSwitchFrontend = existingCrudAvailable && frontendFeature && supportsExactFrontendChoice(pathname);
   const currentLink = (href: string) => isCurrentWorkspaceLink(pathname, context.analysis, href) ? 'page' as const : undefined;
-  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : `${styles.homeShell} ${homeNavigation.shell}`}`} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
+  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : `${styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell}`}`} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
     <aside className={styles.navigation} aria-label="목적별 내비게이션">
-      <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.brand} href={readHref(betaHref("/beta", context))}><BrandLogo stacked /></Link>
+      <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.brand} href={readHref(betaHref("/beta", context))}><BrandLogo stacked={!!workspace} /></Link>
       <nav>{purposeDestinations.map((item) => <div key={item.label}>
         {"beta" in item && (item.label !== "분석" || context.mode === "domain") && (item.label !== "계획" || context.mode === "domain") ? <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.purposeLink} aria-current={((workspace === "plans" && item.label === "계획") || (!workspace && item.label === "홈") || ((workspace === "history" || workspace === "ledger") && item.label === "기록") || ((workspace === "structure" || workspace === "holdings" || workspace === "accounts" || workspace === "groups" || workspace === "targets") && item.label === "자산") || ((workspace === "analysis" || workspace === "simulation" || workspace === "etfs" || workspace === "lab") && item.label === "분석")) ? "page" : undefined} href={readHref(item.label === "계획" && existingCrudAvailable ? remainingWorkspaceHref("plans",context) : betaHref(item.beta, context) + ("hash" in item ? item.hash : ""))} title={item.label === "계획" ? "홈의 추가 투자 카드 · 확대해서 계산" : undefined}>
           <span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>
@@ -91,12 +92,13 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
     </aside>
     <main className={styles.main}>
       <header className={`${styles.topbar} ${workspace ? controls.workspaceTopbar : ""}`}>
+        {!workspace && <span className={homeDesign.eyebrow}>Portfolio overview</span>}
         <CairnPageTitle>{workspace === "history" ? "히스토리" : workspace === "structure" ? "포트 구조" : presentation?.title ?? (workspace ? workspace === "ledger" ? "기록 / 거래·현금" : workspace === "plans" ? "계획 / 저장된 투자계획" : workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "lab" ? "분석 / 과거 비교" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
         <CairnButton variant="bare" className={styles.scopeTrigger} type="button" aria-haspopup="dialog" aria-expanded={!!scopeOrigin} onClick={(e) => { setSearch(""); setScopeOrigin({ rect: e.currentTarget.getBoundingClientRect(), trigger: e.currentTarget }); }}>{selectedScope.label}<span aria-hidden>⌄</span></CairnButton>
         <div className={styles.topbarActions}>
           {!workspace && context.mode === 'domain' && existingCrudAvailable && <PortfolioRefreshButton compact />}
           {!workspace && readUnavailable && <CairnButton variant="bare" className={styles.retryRead} type="button" onClick={() => router.refresh()}>조회 다시 시도</CairnButton>}
-        {fixedAnalysisCurrency ? <span className={styles.currency}>분석 기준 · {fixedAnalysisCurrency}</span> : <CairnField className={styles.currency}><span className={styles.visuallyHidden}>표시 통화</span><CairnSelect aria-label="표시 통화" value={context.currency} onChange={(e) => setContext({ ...context, currency: e.target.value === "USD" ? "USD" : "KRW" })}><option>KRW</option><option>USD</option></CairnSelect></CairnField>}
+        {fixedAnalysisCurrency ? <span className={styles.currency}>분석 기준 · {fixedAnalysisCurrency}</span> : !workspace ? <div className={homeDesign.currency} role="group" aria-label="표시 통화">{(["KRW","USD"] as const).map(currency => <CairnButton variant="bare" type="button" key={currency} aria-pressed={context.currency === currency} onClick={() => setContext({...context,currency})}>{currency}</CairnButton>)}</div> : <CairnField className={styles.currency}><span className={styles.visuallyHidden}>표시 통화</span><CairnSelect aria-label="표시 통화" value={context.currency} onChange={(e) => setContext({ ...context, currency: e.target.value === "USD" ? "USD" : "KRW" })}><option>KRW</option><option>USD</option></CairnSelect></CairnField>}
         <CairnButton variant="bare" className={controls.mobileSettingsTrigger} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></CairnButton>
         </div>
       </header>
