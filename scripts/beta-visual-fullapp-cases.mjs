@@ -42,12 +42,15 @@ export async function runBetaVisualCases({page,check,url,output}) {
       const ringBox=await ring.boundingBox();assert.ok(ringBox&&Math.abs(ringBox.width-ringBox.height)<1);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       const homeHeatmap=page.locator('[data-beta-card="heatmap"]');
-      await expect(homeHeatmap.locator('[data-heatmap-cell]')).toHaveCount(248);
+      await expect(homeHeatmap.locator('[data-heatmap-cell]')).toHaveCount(112);
+      await expect(homeHeatmap.locator('[data-row-index="0"][data-cell-index="0"]')).toHaveAttribute('aria-label',/2026-09-20/);
+      await expect(homeHeatmap.locator('[data-row-index="0"][data-cell-index="13"]')).toHaveAttribute('aria-label',/2026-10-03/);
       const viewport=homeHeatmap.getByRole('region',{name:'종목 흐름 · 가로 탐색',exact:true});
       assert.equal(await viewport.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true,'inline heatmap must show all holding rows without a nested vertical scroller');
       await homeHeatmap.locator('[data-row-index="0"][data-cell-index="0"]').focus();
       await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
       await expect(homeHeatmap.locator('[data-cell-index="2"][data-row-index="0"]')).toBeFocused();
+      await expect(homeHeatmap.locator('[data-cell-index="2"][data-row-index="0"]')).toHaveAttribute('aria-label',/2026-09-22/);
       await expect(homeHeatmap).toContainText('비교 자료 없음');
       await homeHeatmap.getByRole('button',{name:'히트맵 선택 해제'}).click();
       await page.getByRole('button',{name:'종목 흐름 확대',exact:true}).click();
@@ -56,6 +59,9 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(heatDialog.locator('[data-heatmap-cell]')).toHaveCount(56);
       await heatDialog.getByRole('group',{name:'종목 흐름 기간'}).getByRole('button',{name:'전체',exact:true}).click();
       await expect(heatDialog.locator('[data-heatmap-cell]')).toHaveCount(248);
+      await heatDialog.locator('[data-row-index="0"][data-cell-index="2"]').click();
+      await expect(heatDialog.locator('[data-row-index="0"][data-cell-index="2"]')).toHaveAttribute('aria-label',/2026-09-05 .*비교 불가/);
+      await expect(heatDialog).toContainText('비교 자료 없음');
       assert.equal(await heatDialog.getByRole('region',{name:'종목 흐름 · 가로 탐색'}).evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);
       await page.screenshot({path:path.join(output,`beta-heatmap-${width}.png`)});
       await page.keyboard.press('Escape');await expect(heatDialog).toHaveCount(0);
