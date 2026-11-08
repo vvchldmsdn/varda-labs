@@ -4,10 +4,11 @@ import { RecoveryTitle } from "@/components/recovery/recovery-notice";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
 import home from "./home-contribution.module.css";
-export function ContributionHome({ view, dirty = false }: { view: BetaView; dirty?: boolean }) {
+const DEFAULT_COLORS = ["#ef5a32", "#30362f", "#cda680", "#8b9d89", "#80909b", "#bdbbae"];
+export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS }: { view: BetaView; dirty?: boolean; colors?: readonly string[] }) {
   const read = view.domain?.planning?.contribution;
   const result = !dirty && read?.state === "ready" ? read.result : null;
-  const colors = ["#ef5a32", "#30362f", "#cda680", "#8b9d89", "#80909b", "#bdbbae"];
+  const palette = colors.length ? colors : DEFAULT_COLORS;
   const segments = result
     ? result.rows
         .filter((row) => row.allocationKrw > 0)
@@ -15,7 +16,7 @@ export function ContributionHome({ view, dirty = false }: { view: BetaView; dirt
           key: row.accountCode + ":" + index,
           name: instrumentLabel(row) + " · " + row.accountName,
           amount: row.allocationKrw,
-          color: colors[index % colors.length],
+          color: palette[index % palette.length],
         }))
     : [];
   if (result && result.residualCashKrw > 0)

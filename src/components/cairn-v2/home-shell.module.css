@@ -1,0 +1,42 @@
+@font-face {
+  font-family:"Cairn Pretendard";src:url("/cairn-v2/fonts/PretendardVariable.woff2") format("woff2");
+  font-style:normal;font-weight:45 920;font-display:swap;
+}
+.shell.shell.shell {
+  --cairn-v2-ink:#18212a; --cairn-v2-muted:#77736c; --cairn-v2-line:#d9d3c7;
+  --cairn-ui-ink:#18212a; --cairn-ui-muted:#77736c; --cairn-ui-line:#d9d3c7;
+  --cairn-ui-paper:#f8f6f0; --cairn-ui-surface:#ecebe5;
+  background:#f4f0e7;font-family:"Cairn Pretendard","Apple SD Gothic Neo",sans-serif;
+}
+.shell.shell.shell > main { max-width:1500px;width:100%;padding:0 40px 48px; }
+.shell.shell.shell > main > header { position:relative;min-height:108px;padding:36px 0 20px;gap:12px; }
+.eyebrow { position:absolute;top:22px;left:0;font-size:10px;font-weight:650;letter-spacing:.18em;text-transform:uppercase;color:#817d75; }
+.shell.shell.shell > main > header h1[data-cairn-page-title] { font-size:34px;font-weight:400;line-height:1.15;letter-spacing:-.045em;font-family:Georgia,"Cairn Pretendard",serif; }
+.shell.shell > main > header > button { min-width:140px;padding-inline:16px;border-radius:12px;border-color:#d8d3c8;background:#faf8f3;font-size:12px; }
+.shell.shell > main > header > div:last-child { gap:8px; }
+.currency { display:flex;gap:2px;padding:4px;border:1px solid #d8d3c8;border-radius:12px;background:#faf8f3; }
+.currency [data-cairn-button] { min-width:44px;min-height:36px;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:650;color:#77756f; }
+.currency [data-cairn-button][aria-pressed=true] { background:#18212a;color:#fff; }
+.currency [data-cairn-button]:hover:not([aria-pressed=true]) { background:#ecebe5;color:#18212a; }
+@media(min-width:800px) {
+  .shell.shell.shell > aside { position:sticky;top:0;height:68px;padding:0 max(40px,calc((100vw - 1420px) / 2));gap:36px;border-color:#ddd8cc;background:#f4f0e7f2;backdrop-filter:blur(16px);z-index:10; }
+  .shell.shell > aside > a { margin-right:auto; }
+  .shell.shell > aside > nav { gap:24px; }
+  .shell.shell > aside > nav a { font-size:13px;font-weight:550;min-height:68px;padding:12px 4px;gap:0; }
+  .shell.shell > aside > nav a > span:first-child { display:none; }
+  .shell.shell > aside > nav a[aria-current] { box-shadow:inset 0 -2px #c6543f; }
+  .shell.shell > aside > button { margin-left:auto;border:1px solid #d8d3c8;border-radius:50%;width:44px;min-width:44px;height:44px;background:#faf8f3; }
+  .shell.shell > aside > button > span:last-child { display:none; }
+}
+@media(max-width:799px) {
+  .shell.shell.shell > main { padding:0 20px calc(100px + env(safe-area-inset-bottom)); }
+  .shell.shell.shell > main > header { padding:42px 0 20px;gap:12px; }
+  .shell.shell.shell > main > header h1[data-cairn-page-title] { font-size:30px;flex-basis:100%; }
+  .shell.shell > main > header > button { min-width:0;flex:1;max-width:180px; }
+  .currency [data-cairn-button] { min-height:40px;padding-inline:9px; }
+}
+@media(max-width:359px) {
+  .shell.shell.shell > main { padding-inline:12px; }
+  .shell.shell.shell > main > header { gap:6px; }
+  .currency [data-cairn-button] { padding-inline:6px; }
+}
