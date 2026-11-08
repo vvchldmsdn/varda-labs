@@ -5,6 +5,11 @@ import { usePathname } from "next/navigation";
 import { useI18n } from "./locale-provider";
 
 const pageNames: Record<string, [string, string]> = {
+  "/try/analyze": ["내 포트폴리오 분석", "Analyze my portfolio"],
+  "/demo/home": ["샘플 홈", "Sample home"], "/demo/today": ["샘플 오늘 변동", "Sample daily changes"],
+  "/demo/structure": ["샘플 포트 구조", "Sample allocation"], "/demo/contribution": ["샘플 추가투입", "Sample contribution"],
+  "/demo/lab": ["샘플 투자 랩", "Sample Investment Lab"], "/demo/simulation": ["샘플 시뮬레이션", "Sample simulation"],
+  "/demo/history": ["샘플 히스토리", "Sample history"],
   "/plans": ["내 투자계획", "My investment plans"], "/start": ["시작하기", "Get started"],
   "/try": ["서비스 둘러보기", "Explore Cairn"], "/portfolio/ledger": ["거래 기록", "Transactions"],
   "/": ["홈", "Home"], "/today": ["오늘 변동", "Today"], "/history": ["히스토리", "History"],

@@ -5,6 +5,27 @@ import { importWithPorts } from "./helpers/import-with-ports.mjs";
 
 const [demo, contribution] = await importWithPorts(["src/lib/demo-portfolio.ts", "src/lib/demo-contribution.ts"], {});
 describe("public demo is an isolated deterministic product projection", () => {
+  it("preserves every sample account and holding identity in navigation", () => {
+    for (const account of demo.DEMO_ACCOUNTS) for (const view of demo.DEMO_VIEWS) {
+      const url = new URL(demo.demoHref(view, account, "same ticker / other account"), "https://sample.invalid");
+      assert.equal(url.pathname, `/demo/${view}`);
+      assert.equal(url.searchParams.get("account"), account);
+      assert.equal(url.searchParams.get("holding"), "same ticker / other account");
+    }
+  });
+  it("keeps illustrative targets separate from approved targets and deviations", () => {
+    for (const account of demo.DEMO_ACCOUNTS) {
+      const { holdingRows } = demo.buildDemoPortfolio(account);
+      assert.ok(holdingRows.every(row => row.targetPolicyStatus === "asset_target_raw" && row.effectiveTargetPct === null && row.driftPct === null));
+      assert.ok(Math.abs(holdingRows.reduce((sum, row) => sum + row.sampleTargetPct, 0) - 100) < 1e-8);
+      const plan = contribution.buildDemoContribution(holdingRows, 1_000_000);
+      assert.ok(plan);
+      // The sample calculator must not read a policy number from the display DTO.
+      const changedDisplay = holdingRows.map(row => ({ ...row, effectiveTargetPct: 0 }));
+      assert.deepEqual(contribution.buildDemoContribution(changedDisplay, 1_000_000).rows.map(row => row.allocationKrw), plan.rows.map(row => row.allocationKrw));
+      assert.equal(plan.totalAllocatedKrw + plan.residualCashKrw, 1_000_000);
+    }
+  });
   it("allows only fixed views and account scopes", () => {
     for (const view of ["home", "today", "structure", "contribution", "lab", "simulation", "history"]) assert.equal(demo.isDemoView(view), true);
     for (const value of ["../auth", "owner", "account:private", ["brokerage"], null, undefined]) {

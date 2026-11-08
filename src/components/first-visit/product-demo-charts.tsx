@@ -11,7 +11,7 @@ import { Field as CairnField, Select as CairnSelect } from "@/components/cairn-u
 export default function ProductDemoCharts({ data }: { data: PublicProductDemo }) {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState("fixed_mix");
-  if (data.kind === "simulation") return <div className={styles.simulation} data-public-simulation><ResearchFanChart execution={data.execution} /></div>;
+  if (data.kind === "simulation") return <div className={styles.simulation} data-public-simulation><ResearchFanChart execution={{ ...data.execution, name: t("샘플 포트폴리오", "Sample portfolio") }} /></div>;
   const actual = data.chart.lines.find(line => line.id === "actual")!;
   const selected = data.chart.lines.find(line => line.id === selectedId) ?? data.chart.lines[1];
   return <div className={styles.lab}>
