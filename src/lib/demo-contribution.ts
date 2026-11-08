@@ -1,10 +1,10 @@
 import { calculateExplainableAdditionalContribution } from "./additional-contribution-policy-engine.ts";
 import type { AdditionalContributionResultPreview } from "./additional-contribution-view.ts";
-import type { PortfolioStructureHoldingRow } from "./portfolio-structure.ts";
+import type { DemoHoldingRow } from "./demo-portfolio.ts";
 
-export function buildDemoContribution(holdings: readonly PortfolioStructureHoldingRow[], amount: number, equalTargets = false): AdditionalContributionResultPreview | null {
+export function buildDemoContribution(holdings: readonly DemoHoldingRow[], amount: number, equalTargets = false): AdditionalContributionResultPreview | null {
   if (!Number.isSafeInteger(amount) || amount < 0 || amount > 1_000_000_000 || holdings.length === 0) return null;
-  const weights = holdings.map(row => equalTargets ? 1 : row.effectiveTargetPct ?? 0);
+  const weights = holdings.map(row => equalTargets ? 1 : row.sampleTargetPct ?? 0);
   const total = weights.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return null;
   const targets = weights.map(weight => Math.floor(weight / total * 10_000));

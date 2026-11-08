@@ -96,7 +96,7 @@ export function AdditionalContributionFlowMap({
             return (
               <g
                 key={item.row.id}
-                aria-label={`${item.row.name}, ${formatKrw(item.amountKrw)}`}
+                aria-label={`${item.row.kind === "holding" ? item.row.name : pt(item.row.name)}, ${formatKrw(item.amountKrw)}`}
                 className="cursor-default outline-none"
                 onBlur={() => setActiveId(null)}
                 onFocus={() => setActiveId(item.row.id)}
@@ -130,7 +130,7 @@ export function AdditionalContributionFlowMap({
                   x="840"
                   y={item.targetY - 3}
                 >
-                  {truncateName(item.row.kind === "cash" ? pt(item.row.name) : item.row.name)}
+                  {truncateName(item.row.kind === "holding" ? item.row.name : pt(item.row.name))}
                 </text>
                 <text
                   fill="var(--muted)"
@@ -156,10 +156,10 @@ export function AdditionalContributionFlowMap({
           >
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium">
-                {row.kind === "cash" ? <PortfolioText ko={row.name} /> : row.name}
+                {row.kind === "holding" ? row.name : <PortfolioText ko={row.name} />}
               </span>
               <span className="mt-1 block truncate text-xs text-[var(--muted)]">
-                {row.accountName}
+                {row.kind === "holding" ? row.accountName : <PortfolioText ko={row.accountName} />}
                 {row.ticker ? ` · ${row.ticker}` : ""}
               </span>
               <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-[var(--wash)]">
@@ -227,9 +227,9 @@ function FlowTooltip({
     mode === "final" ? row.allocationKrw : row.strategicAllocationKrw;
   return (
     <div className="pointer-events-none absolute right-0 top-4 z-10 w-64 border border-[var(--line)] bg-[var(--surface)]/95 p-4 shadow-[0_12px_30px_rgba(37,40,36,0.08)] backdrop-blur-sm">
-      <p className="truncate text-sm font-medium">{row.name}</p>
+      <p className="truncate text-sm font-medium">{row.kind === "holding" ? row.name : <PortfolioText ko={row.name} />}</p>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        {row.accountName}
+        {row.kind === "holding" ? row.accountName : <PortfolioText ko={row.accountName} />}
         {row.ticker ? ` · ${row.ticker}` : ""}
       </p>
       <p className="mt-4 text-2xl font-medium tabular-nums">
