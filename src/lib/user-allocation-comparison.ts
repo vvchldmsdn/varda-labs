@@ -7,7 +7,7 @@ import { validatePlan, type PlanInput } from './investment-plan.ts';
 export type UserAllocationBasis = {
   baseCurrency: Currency; maximumBudget: number; usdKrw: number | null;
   rows: { allocationKey: string; currentValue: number; targetWeightBps: number; buyable: boolean;
-    metadata: { name: string; currency: Currency; market?: string; ticker?: string } }[];
+    metadata: { manualValuation?: boolean; name: string; currency: Currency; market?: string; ticker?: string } }[];
 };
 
 export function nativeUserAllocationBasis(basis: ContributionComparisonBasis): UserAllocationBasis {

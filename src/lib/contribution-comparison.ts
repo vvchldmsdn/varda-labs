@@ -4,7 +4,7 @@ import { convertMoney } from './currency-valuation.ts';
 import { Decimal, parseMoneyInput, type Currency } from './money.ts';
 import type { NativeContributionContextResult } from './native-contribution-plan.ts';
 
-export type ComparisonRow = AdditionalContributionPolicyRow<{ name: string; currency: Currency; market?: string; ticker?: string }>;
+export type ComparisonRow = AdditionalContributionPolicyRow<{ manualValuation?: boolean; name: string; currency: Currency; market?: string; ticker?: string }>;
 export type ContributionComparisonBasis = {
   status: 'ready'; scopeLabel: string; asOf: string; policyRevision: number;
   rows: ComparisonRow[]; modifiers: ContributionModifiers;
@@ -37,7 +37,7 @@ export function prepareContributionComparison(context: NativeContributionContext
         currentValueKrw: converted.value.toNumber(), costBasisKrw: null, targetWeightBps: row.targetWeightBps,
         maAssetClass: row.maAssetClass, maRuleEnabled: row.maRuleEnabled,
         ma120Evidence: maValid ? row.ma120Evidence : { status: 'unavailable', distanceFromMaPct: null },
-        fxExposureType: row.fxExposureType, metadata: { name: context.names[row.allocationKey] ?? row.allocationKey, currency: row.value.currency, market: metadata?.market, ticker: metadata?.ticker } });
+        fxExposureType: row.fxExposureType, metadata: { ...(["stored_manual_snapshot", "manual_entry"].includes(row.value.source) ? {manualValuation:true} : {}), name: context.names[row.allocationKey] ?? row.allocationKey, currency: row.value.currency, market: metadata?.market, ticker: metadata?.ticker } });
     }
     const fx = convertMoney('1', 'USD', 'KRW', input.asOf, input.fx, input.maxFxAgeMs);
     return { status: 'ready', scopeLabel: context.scopeLabel, asOf: input.asOf, policyRevision: context.policy.revision,

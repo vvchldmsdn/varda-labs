@@ -2,6 +2,7 @@ import 'server-only';
 import {savedPlanSession} from '../shared-backend/saved-plan-session';
 import {readNativeContributionContext} from '../../db/queries/native-contribution-context';
 import {prepareContributionComparison} from '../contribution-comparison';
+import {dataIssueLabel} from '../data-issue-presentation';
 import {nativeUserAllocationBasis} from '../user-allocation-comparison';
 import {randomUUID} from 'node:crypto';
 import {resolveCurrentTenantContext} from '../auth/current-tenant-context';
@@ -23,8 +24,10 @@ export async function getPlanWorkspace(params: Record<string,string|string[]|und
   const planOwner = await savedPlanSession();
   if (!planOwner.ok || planOwner.tenant.ownerUserId !== owner.tenantContext.ownerUserId) return {read:envelope,reason:'temporarily_unavailable'};
   try {
-    const comparison = prepareContributionComparison(await readNativeContributionContext(owner.tenantContext, read.context.scope, 'KRW', true));
+    const context = await readNativeContributionContext(owner.tenantContext, read.context.scope, 'KRW', true);
+    const comparison = prepareContributionComparison(context);
     return {read:envelope, projectionOwner:planOwner.key, projection:comparison.status === 'ready' ? nativeUserAllocationBasis(comparison) : undefined,
+      unavailableHoldings:context.status === 'blocked' ? context.unavailablePositions?.map(row => row.name+' · '+dataIssueLabel(row.reason)) : undefined,
       reason:comparison.status === 'blocked' ? comparison.reason : undefined};
   } catch {
     return {read:envelope, reason:'temporarily_unavailable'};

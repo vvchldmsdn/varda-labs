@@ -64,3 +64,18 @@ it("keeps a captured baseline FX when later historical observations are more rec
   assert.equal(result.movement.attribution.price,"10000");
   assert.equal(result.movement.attribution.exchange,"-11000");
 });
+
+it("retains a documented manual current valuation without admitting it as a historical quote", () => {
+  const input=fixture();
+  const observation={quantity:"3",price:"1000",currency:"KRW",at:end,source:"manual_entry",basis:"raw",
+    timestampBasis:"stored_valuation",manualRecordedAt:"2025-01-12T01:00:00Z",priceReferenceDate:"2025-01-12"};
+  const row={id:"gold",name:"Gold",ownerId:"owner",observation};
+  input.current.positions=[row];
+  input.history[0].positions=[{...row,observation:{...observation,at:start}}];
+  const report=buildTrackedCurrencyPortfolio(input);
+  assert.equal(report.current.total,"3000");
+  assert.equal(report.current.positions[0].priceObservedAt,null);
+  assert.equal(report.history[0].positions[0].value,null);
+  observation.manualRecordedAt="2099-01-01T00:00:00Z";
+  assert.equal(buildTrackedCurrencyPortfolio(input).current.positions[0].value,null);
+});

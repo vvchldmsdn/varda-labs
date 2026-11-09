@@ -126,9 +126,9 @@ export function CurrencyTrackedView({ evidence, investmentEvidence, reports, inv
   const titles = { home: ["내 자산의 흐름", "My portfolio"], today: ["오늘 변동", "Today’s change"], history: ["자산이 지나온 시간", "Your portfolio over time"], structure: ["포트 구조", "Portfolio composition"], contribution: ["다음 투자금, 목표에 가깝게.", "Bring your next contribution closer to your targets."] };
   const title = surface ? titles[surface] : ["통화가 바뀌면, 평가도 달라집니다.", "One portfolio. Two perspectives."];
   const active = current.positions.find(row => row.id === selected) ?? current.positions[0];
-  const priceTimeLabel = active?.priceTimestampBasis === "daily_close" ? t("종가 기준일", "Close session")
+  const priceTimeLabel = active?.priceTimestampBasis === "stored_valuation" ? t("수동 평가 기록일", "Manual valuation recorded") : active?.priceTimestampBasis === "daily_close" ? t("종가 기준일", "Close session")
     : active?.priceTimestampBasis === "collection" ? t("시세 수집 시각", "Quote collected") : t("시세 관측 시각", "Price observed");
-  const priceTimeValue = active?.priceTimestampBasis === "daily_close" ? active.priceReferenceDate ?? "—"
+  const priceTimeValue = active?.priceTimestampBasis === "daily_close" || active?.priceTimestampBasis === "stored_valuation" ? active.priceReferenceDate ?? "—"
     : active?.priceTimestampBasis === "collection" ? active.priceFetchedAt ? date(active.priceFetchedAt) : "—"
       : active?.priceObservedAt ? date(active.priceObservedAt) : "—";
   const native = currentEvidence.current.positions.find(row => row.id === active?.id)?.observation;

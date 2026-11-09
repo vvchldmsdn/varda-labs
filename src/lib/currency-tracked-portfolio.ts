@@ -89,8 +89,11 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
         priceObservedAt, priceFetchedAt: row.observation?.priceFetchedAt ?? null, priceReferenceDate: row.observation?.priceReferenceDate ?? null, priceTimestampBasis, reason: null as string | null };
       // Keep the valuation-time admission contract separate from the display:
       // a recorded frame time is not an invented exchange observation time.
-      const priceAt = Date.parse(row.observation?.priceObservedAt ?? row.observation?.at ?? "");
-      let reason = issues.some(issue => issue.code === "invalid_frame") ? "invalid_frame" : duplicates.has(row.id) ? "duplicate_position" : row.unsupportedReason ?? row.evidenceReason ?? (!row.observation ? "native_price_evidence_missing" : !Number.isFinite(priceAt) || priceAt > at ? "invalid_price_time" : at - priceAt > evidence.maxPriceAgeMs ? "price_stale" : null);
+      const manualCurrent = !historic && frame === evidence.current && priceTimestampBasis === "stored_valuation" &&
+        (row.observation?.source === "manual_entry" || row.observation?.source === "stored_manual_snapshot");
+      const priceAt = Date.parse(manualCurrent ? row.observation?.manualRecordedAt ?? "" : row.observation?.priceObservedAt ?? row.observation?.at ?? "");
+      let reason = issues.some(issue => issue.code === "invalid_frame") ? "invalid_frame" : duplicates.has(row.id) ? "duplicate_position" : row.unsupportedReason ?? row.evidenceReason ?? (!row.observation ? "native_price_evidence_missing" : !Number.isFinite(priceAt) || priceAt > at ? "invalid_price_time" : !manualCurrent && at - priceAt > evidence.maxPriceAgeMs ? "price_stale" : null);
+      if (!reason && priceTimestampBasis === "stored_valuation" && !manualCurrent) reason = "native_price_evidence_missing";
       if (!reason && row.observation && !row.observation.source.trim()) reason = "native_price_evidence_missing";
       if (!reason && row.observation) {
         // FX is at the valuation time; an earlier unchanged quote does not freeze currency exposure.

@@ -1,3 +1,4 @@
+import { currentManualGold } from "../src/lib/market-data/current-manual-gold.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
@@ -174,5 +175,28 @@ describe("manual asset price", () => {
     assert.match(routeSource, /requireAdminJob\(request\)/);
     assert.match(routeSource, /buildManualAssetPriceUpdate/);
     assert.doesNotMatch(routeSource, /FSC_PUBLIC_DATA_SERVICE_KEY/);
+  });
+});
+
+describe("current-only gold evidence", () => {
+  const now = new Date("2026-10-04T00:00:00Z"), capturedAt = new Date("2026-10-03T01:00:00Z");
+  const holding = { ...KRX_GOLD_MANUAL_ASSET_BINDING, account:"brokerage", id:"gold-1", accountId:"a", canonicalOwnerUserId:"u",
+    quantity:"3",currentPrice:"1000.0000",fractionalKrwValue:null, priceAsOf:null,priceFetchedAt:null,priceQuoteType:null,priceSource:null,priceStatus:null };
+  const record = {assetId:"gold-1",accountId:"a",canonicalOwnerUserId:"u",currency:"KRW",quantity:"3",currentPrice:"1000",marketValueKrw:"3000",
+    source:"varda_manual_daily_snapshot",priceBasis:"manual_current",priceSource:"asset_current_price",isSample:false,capturedAt};
+  it("uses the recorded manual valuation without manufacturing a market or receipt time", () => {
+    const observation=currentManualGold(holding,[record],now);
+    assert.equal(observation.source,"stored_manual_snapshot");
+    assert.equal(observation.manualRecordedAt,capturedAt.toISOString());
+    assert.equal(observation.priceObservedAt,undefined);
+    assert.equal(observation.priceFetchedAt,undefined);
+    assert.equal(currentManualGold({...holding,...buildManualAssetPriceUpdate({currentPrice:"1100",recordedAt:capturedAt})},[],now).source,"manual_entry");
+  });
+  it("requires one corroborating owned row with matching units, value and source", () => {
+    for(const patch of [{assetId:"other"},{accountId:"b"},{canonicalOwnerUserId:"z"},{isSample:true},{currentPrice:"900"},{quantity:"4"},{marketValueKrw:null},{marketValueKrw:"2999"},{capturedAt:new Date("2027-01-01")},{priceBasis:"close"},{currency:"USD"}])
+      assert.equal(currentManualGold(holding,[{...record,...patch}],now),null);
+    assert.equal(currentManualGold(holding,[record,record],now),null);
+    assert.equal(currentManualGold({...holding,ticker:"123456"},[record],now),null);
+    assert.equal(currentManualGold({...holding,priceSource:"unknown"},[record],now),null);
   });
 });

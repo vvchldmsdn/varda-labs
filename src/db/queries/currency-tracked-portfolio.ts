@@ -1,4 +1,6 @@
 import "server-only";
+import { isKrxGoldManualAssetCandidate } from "@/lib/market-data/manual-asset-price";
+import { currentManualGold } from "@/lib/market-data/current-manual-gold";
 import { isCollectionPriceSource } from '@/lib/quote-time-basis';
 import { getReadOnlyTenantPortfolioDashboardSources } from "./portfolio-dashboard";
 import type { TenantContext } from "@/lib/session-resolver-contract";
@@ -23,11 +25,18 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
   const providerEvidence = options.collect === true ? requestTwelveDataEvidence : readTwelveDataEvidence;
   const historicalFxEvidence = options.collect === false ? readTwelveDataHistoricalFx : requestTwelveDataHistoricalFx;
   const splitRiskEvidence = options.collect === false ? readTwelveDataSplitRisk : requestTwelveDataSplitRisk;
-  const sources = await getReadOnlyTenantPortfolioDashboardSources({ tenantContext: tenant, scope, serviceDate: resolveSnapshotCycle(now).snapshotDate });
+  const serviceDate = resolveSnapshotCycle(now).snapshotDate;
+  const sources = await getReadOnlyTenantPortfolioDashboardSources({ tenantContext: tenant, scope, serviceDate });
   if (sources.assetRows.some(asset => asset.canonicalOwnerUserId !== tenant.ownerUserId)) throw new Error("currency_owner_scope_mismatch");
   const at = now.toISOString();
-  const positions: TrackedNativePosition[] = sources.assetRows.map(asset => {
+  const positions = await Promise.all(sources.assetRows.map(async (asset): Promise<TrackedNativePosition> => {
     const base = { id: asset.id, ownerId: asset.canonicalOwnerUserId ?? "", name: asset.name, ticker: asset.ticker, market: asset.market, observation: null, cost: null };
+    if (options.investmentsOnly && isKrxGoldManualAssetCandidate({...asset, accountCode:asset.account})) {
+      const checkpoint = asset.priceSource === null
+        ? await (await import("./manual-gold-checkpoint")).latestGoldCheckpoint(tenant, asset.accountId, asset.id, serviceDate) : [];
+      const observation = currentManualGold(asset, checkpoint, now);
+      if (observation) return { ...base, observation };
+    }
     if (!["stock", "etf"].includes(asset.assetType ?? "etf") || !["korea", "us"].includes(asset.market.toLowerCase()) || !isCurrency(asset.currency)) return { ...base, unsupportedReason: asset.assetType === "commodity" ? "manual_gold" : "unsupported_instrument" };
     // A separate fractional KRW balance is not a native quantity and has no valuation date here.
     if (asset.fractionalKrwValue && Decimal.from(asset.fractionalKrwValue).compare(0) !== 0) return { ...base, unsupportedReason: "fractional_value_not_dated" };
@@ -42,7 +51,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
     const enteredCurrentPrice = options.investmentsOnly && source === "user_entered_onboarding" && quoteType === "manual";
     if ((!enteredCurrentPrice && (!source?.startsWith("kis") || !["live", "close"].includes(quoteType ?? ""))) || !source || !observedAt || !fetchedAt || observedAt > now || fetchedAt > now || observedAt > fetchedAt || status !== "ok") return base;
     return { ...base, observation: { quantity: asset.quantity, price: quote?.price ?? asset.currentPrice, currency: asset.currency, at, priceObservedAt: observedAt.toISOString(), priceFetchedAt: fetchedAt.toISOString(), timestampBasis: isCollectionPriceSource(source) ? 'collection' : 'provider', basis: "raw", source } };
-  });
+  }));
   const evidence: TrackedPortfolioEvidence = { ownerId: tenant.ownerUserId, reporting, asOf: at,
     current: { at, source: "owned_native_asset_and_kis_quote", positions, scopeComplete: false },
     // Legacy snapshots lack separate native-price observation timestamps. They are not relabeled as USD history.
