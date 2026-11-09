@@ -64,7 +64,7 @@ export function compareContribution(basis: ContributionComparisonBasis, amount: 
     const aligned = calculateExplainableAdditionalContribution({ ...input, rows: buyOnlyRows.map(row => ({ ...row, maRuleEnabled: false })) });
     const adjusted = calculateExplainableAdditionalContribution({ ...input, rows: buyOnlyRows });
     if (aligned.status !== 'ready' || adjusted.status !== 'ready') return { status: 'blocked', reason: 'invalid_policy' };
-    const ratioAmounts = allocateRatio(units, basis.rows);
+    const ratioAmounts = allocateTargetRatio(units, basis.rows);
     const alignedAmounts = Object.fromEntries(aligned.rows.map(row => [row.allocationKey, row.allocationKrw]));
     const amounts: Record<string, number> = Object.create(null);
     const evidence = adjusted.rows.map(row => {
@@ -78,7 +78,7 @@ export function compareContribution(basis: ContributionComparisonBasis, amount: 
   } catch { return { status: 'blocked', reason: 'invalid_evidence' }; }
 }
 
-function allocateRatio(budget: number, rows: readonly ComparisonRow[]) {
+export function allocateTargetRatio(budget: number, rows: readonly Pick<ComparisonRow, "allocationKey" | "targetWeightBps">[]) {
   const ranked = rows.map(row => {
     const numerator = BigInt(budget) * BigInt(row.targetWeightBps);
     return { key: row.allocationKey, amount: Number(numerator / BigInt(10000)), remainder: Number(numerator % BigInt(10000)) };

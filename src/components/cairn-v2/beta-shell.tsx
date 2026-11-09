@@ -4,6 +4,7 @@ import homeDesign from "./home-shell.module.css";
 import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Input as CairnInput, PageTitle as CairnPageTitle, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
 
 import { RecoveryJourneyLink as Link } from '@/components/recovery/recovery-return';
+import { labHref } from "@/lib/cairn-v2/lab-contract";
 import {remainingWorkspaceHref} from "@/lib/cairn-v2/remaining-workspace-contract";
 import {targetEditorHref} from '@/lib/cairn-v2/target-editor-contract';
 import {ownedManagementHref} from '@/lib/cairn-v2/owned-management-contract';
@@ -76,24 +77,31 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
     ...(context.mode === "domain" && existingCrudAvailable ? [{ label: "보유 관리", href: ownedManagementHref("holdings", context), beta: true }, { label: "범위 관리", href: ownedManagementHref("groups", context), beta: true }] : [context.mode === "domain" ? { label: "범위 관리 · 미연결", note: "기존 조회 범위의 선택만 지원하며 범위 생성·편집은 연결하지 않았습니다" } : { label: "분석 범위", href: originalHref("/portfolio/groups", context) }]),
   ];
   if(context.mode==='domain'&&existingCrudAvailable&&workspace&&['structure','holdings','accounts','groups','targets'].includes(workspace))subnav.push({label:'목표비중 관리',href:targetEditorHref(context),beta:true},{label:'거래·현금 기록',href:remainingWorkspaceHref('ledger',context),beta:true},{label:'저장된 투자계획',href:remainingWorkspaceHref('plans',context),beta:true});
+  const ledgerAccount = context.scope.startsWith("account:") ? context.scope.slice(8) : undefined;
+  const purposeHref = (item: Extract<(typeof purposeDestinations)[number], { beta: string }>) => {
+    if (item.label === "분석" && context.mode === "domain") return labHref(context, { run: "1" });
+    if (item.label === "계획" && existingCrudAvailable) return remainingWorkspaceHref("plans", context);
+    if (item.label === "기록" && existingCrudAvailable)
+      return remainingWorkspaceHref("ledger", context, undefined, { accountId: ledgerAccount }).replace("#trade-ledger", ledgerAccount ? "#trade-ledger" : "#choose-record-account");
+    return betaHref(item.beta, context) + ("hash" in item ? item.hash : "");
+  };
   const readUnavailable = retryReadNeeded(readView);
   const canSwitchFrontend = existingCrudAvailable && frontendFeature && supportsExactFrontendChoice(pathname);
   const currentLink = (href: string) => isCurrentWorkspaceLink(pathname, context.analysis, href) ? 'page' as const : undefined;
-  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : `${styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell}`}`} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
+  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell}`} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
     <aside className={styles.navigation} aria-label="목적별 내비게이션">
-      <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.brand} href={readHref(betaHref("/beta", context))}><BrandLogo stacked={!!workspace} /></Link>
+      <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.brand} href={readHref(betaHref("/beta", context))}><BrandLogo /></Link>
       <nav>{purposeDestinations.map((item) => <div key={item.label}>
-        {"beta" in item && (item.label !== "분석" || context.mode === "domain") && (item.label !== "계획" || context.mode === "domain") ? <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.purposeLink} aria-current={((workspace === "plans" && item.label === "계획") || (!workspace && item.label === "홈") || ((workspace === "history" || workspace === "ledger") && item.label === "기록") || ((workspace === "structure" || workspace === "holdings" || workspace === "accounts" || workspace === "groups" || workspace === "targets") && item.label === "자산") || ((workspace === "analysis" || workspace === "simulation" || workspace === "etfs" || workspace === "lab") && item.label === "분석")) ? "page" : undefined} href={readHref(item.label === "계획" && existingCrudAvailable ? remainingWorkspaceHref("plans",context) : betaHref(item.beta, context) + ("hash" in item ? item.hash : ""))} title={item.label === "계획" ? "홈의 추가 투자 카드 · 확대해서 계산" : undefined}>
+        {"beta" in item && (item.label !== "분석" || context.mode === "domain") && (item.label !== "계획" || context.mode === "domain") ? <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.purposeLink} aria-current={((workspace === "plans" && item.label === "계획") || (!workspace && item.label === "홈") || ((workspace === "history" || workspace === "ledger") && item.label === "기록") || ((workspace === "structure" || workspace === "holdings" || workspace === "accounts" || workspace === "groups" || workspace === "targets") && item.label === "자산") || ((workspace === "analysis" || workspace === "simulation" || workspace === "etfs" || workspace === "lab") && item.label === "분석")) ? "page" : undefined} href={readHref(purposeHref(item))} title={item.label === "계획" ? "홈의 추가 투자 카드 · 확대해서 계산" : undefined}>
           <span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>
         </Link> : <a className={styles.purposeLink} href={originalHref(item.original, context)} title="기존 화면에서 계속"><span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>{workspace && <small>기존 ↗</small>}</a>}
-        {workspace && ((workspace === "plans" && item.label === "계획") || ((workspace === "history" || workspace === "ledger") && item.label === "기록") || ((workspace === "structure" || workspace === "holdings" || workspace === "accounts" || workspace === "groups" || workspace === "targets") && item.label === "자산") || ((workspace === "analysis" || workspace === "simulation" || workspace === "etfs" || workspace === "lab") && item.label === "분석")) && <details className={`${styles.subnav} ${controls.subnav}`}><summary>더 둘러보기</summary>{subnav.map((sub) => sub.beta ? <Link prefetch={context.mode === "domain" ? false : undefined} href={readHref(sub.href)} aria-current={currentLink(sub.href)} key={sub.label}>{sub.label}</Link> : "note" in sub ? <span key={sub.label} title={sub.note}>{sub.label}</span> : <a key={sub.label} href={sub.href}>{sub.label}<small>기존 ↗</small></a>)}</details>}
       </div>)}</nav>
       <CairnButton variant="bare" className={`${styles.settingsLink} ${controls.settingsTrigger}`} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><span className={styles.navIcon}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></span><span>설정</span></CairnButton>
     </aside>
     <main className={styles.main}>
       <header className={`${styles.topbar} ${workspace ? controls.workspaceTopbar : ""}`}>
         {!workspace && <span className={homeDesign.eyebrow}>Portfolio overview</span>}
-        <CairnPageTitle>{workspace === "history" ? "히스토리" : workspace === "structure" ? "포트 구조" : presentation?.title ?? (workspace ? workspace === "ledger" ? "기록 / 거래·현금" : workspace === "plans" ? "계획 / 저장된 투자계획" : workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "lab" ? "분석 / 과거 비교" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
+        <CairnPageTitle>{workspace === "history" ? "히스토리" : workspace === "structure" ? "자산" : workspace === "plans" ? "계획" : workspace === "ledger" ? "기록" : workspace === "lab" ? "분석" : presentation?.title ?? (workspace ? workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
         <CairnButton variant="bare" className={styles.scopeTrigger} type="button" aria-haspopup="dialog" aria-expanded={!!scopeOrigin} onClick={(e) => { setSearch(""); setScopeOrigin({ rect: e.currentTarget.getBoundingClientRect(), trigger: e.currentTarget }); }}>{selectedScope.label}<span aria-hidden>⌄</span></CairnButton>
         <div className={styles.topbarActions}>
           {!workspace && context.mode === 'domain' && existingCrudAvailable && <PortfolioRefreshButton compact />}
@@ -105,9 +113,9 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
       {!workspace && readView?.domain && (readView.domain.valueState !== "ready" || readUnavailable) && <CairnStatus as="p" role="status" data-read-state={readView.domain.state} className={styles.readStatus}>{readUnavailable ? "일부 자료를 불러오지 못했어요. 다시 조회해 주세요." : readView.domain.message}</CairnStatus>}
       {workspace && readUnavailable && <CairnButton variant="bare" className={styles.continueLink} type="button" onClick={() => router.refresh()}>조회 다시 시도</CairnButton>}
       {readView?.domain?.state === "unauthorized" && <a className={styles.continueLink} href={readHref(betaHref(workspace === "history" ? "/beta/history" : workspace === "structure" ? "/beta/portfolio/structure" : "/beta", { ...context, scope: "all" }))}>기본 범위 접근 다시 확인</a>}
-      {context.mode === "domain" && workspace && <details className={controls.mobileMenu}>
+      {workspace && <details className={controls.mobileMenu}>
         <summary>{presentation?.menuLabel ?? '작업 메뉴'}<span aria-hidden>⌄</span></summary>
-        <nav aria-label={presentation?.menuLabel ?? '작업 메뉴'}>{subnav.map(sub => sub.beta && sub.href ? <Link key={sub.label} prefetch={false} href={readHref(sub.href)} aria-current={currentLink(sub.href)} onClick={e=>{const menu=e.currentTarget.closest('details');menu?.removeAttribute('open');menu?.querySelector('summary')?.focus({preventScroll:true});}}>{sub.label}</Link> : 'note' in sub ? <span key={sub.label}>{sub.label}</span> : null)}</nav>
+        <nav aria-label={presentation?.menuLabel ?? '작업 메뉴'}>{subnav.map(sub => sub.beta && sub.href ? <Link key={sub.label} prefetch={false} href={readHref(sub.href)} aria-current={currentLink(sub.href)} onClick={e=>{const menu=e.currentTarget.closest('details');menu?.removeAttribute('open');menu?.querySelector('summary')?.focus({preventScroll:true});}}>{sub.label}</Link> : 'note' in sub ? <span key={sub.label}>{sub.label}</span> : <a key={sub.label} href={sub.href}>{sub.label} ↗</a>)}</nav>
       </details>}
       {children}
       <div className={`${styles.homeUtilities} ${existingCrudAvailable && workspace ? styles.crudUtilities : ""}`}>

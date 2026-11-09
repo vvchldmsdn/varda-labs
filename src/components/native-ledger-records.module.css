@@ -9,3 +9,15 @@
 .values{display:grid;gap:6px;align-content:start;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.values>strong{font-size:20px;font-weight:500}.values span strong{font-weight:500}
 .memo{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted,#6c6d68);white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:520px){.record{grid-template-columns:1fr;gap:14px}.values{text-align:left}.header{gap:12px}.section{margin-top:32px;padding-top:24px}}
+
+.journal {display:grid;grid-template-columns:minmax(165px,.4fr) minmax(0,1fr);align-items:start;gap:18px}
+.journal aside {background:#192630;color:#fbf6ed;border-radius:16px;padding:22px;display:grid;gap:12px}
+.journal label {font-size:13px;color:#cec7bc}
+.journal select {min-height:44px;width:100%;color:inherit;background:#192630;border:0;border-bottom:1px solid #52606a;font:400 26px Georgia,serif}
+.journal aside div {display:flex;gap:8px;flex-wrap:wrap}
+.journal button {border:0;background:transparent;color:#c8c7bf;min-height:44px;padding-inline:5px}
+.journal button[aria-pressed=true] {color:#fff;box-shadow:inset 0 -2px #e7957c}
+.days {min-width:0;background:#faf8f3;border:1px solid #d9d3c7;border-radius:16px;padding:18px}
+.days h3 {font-size:14px;font-weight:550;color:#625e57}
+.days section + section {margin-top:24px}
+@media(max-width:700px){.journal{grid-template-columns:minmax(0,1fr)}.journal aside{grid-template-columns:1fr auto;align-items:center;gap:4px 12px;padding:16px}.journal label{grid-column:1/-1}.journal select{font-size:21px}.days{padding:14px}}

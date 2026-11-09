@@ -31,10 +31,12 @@ import { compositionPriceTime } from "@/lib/current-investment-composition";
 function StructureDetail({
   view,
   context,
+  workspace,
   onTargetDrift,
 }: {
   view: FixtureView;
   context: BetaContext;
+  workspace: boolean;
   onTargetDrift?: () => void;
 }) {
   const freshness = useBetaReadFreshness();
@@ -49,7 +51,7 @@ function StructureDetail({
     : displayMoney(amount === null ? null : Number(amount), context.currency);
   const rows = compositionRequested ? composition?.positions.flatMap((row, index) => row.value === null || row.displayWeightPct === null ? [] : [{
     ...row, amount: row.value, weightPct: row.displayWeightPct, targetPct: null,
-    color: ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
+    color: workspace ? ["#f29579","#b0bcaa","#d9bd97","#78929e","#a499aa"][index % 5] : ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
   }]) ?? [] : view.rows.map(row => ({...row,amount:row.valueKrw,manuallyEntered:false}));
   const excluded = compositionRequested ? composition?.positions.filter(row=>row.value === null) ?? [] : view.domain?.excluded ?? [];
   const amount = compositionRequested ? composition?.amount ?? null : view.rows.length ? view.totalKrw : null;
@@ -104,7 +106,7 @@ function StructureDetail({
           제외: {instrumentLabel(r)}{r.currency ? ` · ${r.currency}` : ""} · {dataIssueLabel(r.reason ?? "valuation_incomplete")}
         </p>
       ))}</details>}
-      <div className={structureLayout.layout}>
+      <div className={`${structureLayout.layout} ${workspace ? structureLayout.workspace : ""}`}>
         <aside className={structureLayout.summary}>
           <p className={styles.muted}>
             {excluded.length || composition && !composition.complete
@@ -125,6 +127,7 @@ function StructureDetail({
         <div className={structureLayout.visual}>
           {structureView === "ring" ? (
             <PortfolioAllocationRing
+              showHint={!workspace}
               compositionOnly={!!view.domain}
               entries={rows.map((r) => ({
                 key: r.key,
@@ -160,6 +163,13 @@ function StructureDetail({
             </div>
           )}
         </div>
+        {workspace && rows.length > 0 && <section className={structureLayout.holdings} aria-label="보유 목록">
+          <h3>보유 자산</h3>
+          {rows.map(row => <button key={row.key} type="button" aria-pressed={row.key === active?.key} onClick={() => setSelected(row.key)}>
+            <i aria-hidden style={{background:row.color}} /><span>{instrumentLabel(row)}<small>{row.account}</small></span>
+            <strong>{formatAmount(row.amount)} <small>{context.currency}</small></strong><span>{row.weightPct.toFixed(2)}%</span>
+          </button>)}
+        </section>}
         <aside
           className={`${structureLayout.selected} ${evidence.surface} ${evidence.holdingEvidence}`}
         >
@@ -306,7 +316,7 @@ export function BetaDetail({
       {kind === "history" ? (
         <HistoryDetail view={view} context={context} />
       ) : kind === "structure" ? (
-        <StructureDetail view={view} context={context} onTargetDrift={onTargetDrift} />
+        <StructureDetail workspace={workspace} view={view} context={context} onTargetDrift={onTargetDrift} />
       ) : view.domain && kind === "heatmap" ? (
         <HoldingHeatmap view={view} />
       ) : view.domain && kind === "simulation" ? (
