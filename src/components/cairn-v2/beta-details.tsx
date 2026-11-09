@@ -51,7 +51,7 @@ function StructureDetail({
     : displayMoney(amount === null ? null : Number(amount), context.currency);
   const rows = compositionRequested ? composition?.positions.flatMap((row, index) => row.value === null || row.displayWeightPct === null ? [] : [{
     ...row, amount: row.value, weightPct: row.displayWeightPct, targetPct: null,
-    color: ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
+    color: workspace ? ["#f29579","#b0bcaa","#d9bd97","#78929e","#a499aa"][index % 5] : ["#ef5a32", "#343932", "#cca17b", "#8c9f89", "#697f8c"][index % 5],
   }]) ?? [] : view.rows.map(row => ({...row,amount:row.valueKrw,manuallyEntered:false}));
   const excluded = compositionRequested ? composition?.positions.filter(row=>row.value === null) ?? [] : view.domain?.excluded ?? [];
   const amount = compositionRequested ? composition?.amount ?? null : view.rows.length ? view.totalKrw : null;
@@ -127,6 +127,7 @@ function StructureDetail({
         <div className={structureLayout.visual}>
           {structureView === "ring" ? (
             <PortfolioAllocationRing
+              showHint={!workspace}
               compositionOnly={!!view.domain}
               entries={rows.map((r) => ({
                 key: r.key,

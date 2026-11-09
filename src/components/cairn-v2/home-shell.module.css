@@ -43,3 +43,4 @@
 @media(min-width:700px) and (max-width:799px) {
   .shell.shell.shell > main {margin-left:112px;width:calc(100% - 112px)}
 }
+@media(min-width:800px){.shell.shell.shell > aside nav a[aria-current=page]{border-radius:0;background:transparent}}

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button, Field, Input, Select } from '@/components/cairn-ui';
 import { useState } from 'react';
 import { compareUserAllocation, type UserAllocationBasis } from '@/lib/user-allocation-comparison';
 import { allocateTargetRatio } from '@/lib/contribution-comparison';
@@ -14,6 +15,7 @@ const pct = (value: number | null) => value === null ? '—' : value.toLocaleStr
 
 export function PlanProjection({basis, reason, context, amount, onAmountChange}: {amount:string;onAmountChange:(value:string)=>void;basis?:UserAllocationBasis; reason?:string; context:BetaContext}) {
   const [allocation,setAllocation] = useState('ratio');
+  const [editing,setEditing] = useState(false);
   const units = parseMoneyInput(amount,'KRW');
   const validBudget = units !== null && Number.isSafeInteger(units) && units > 0 && units <= 100_000_000_000;
   const validWeights = basis?.rows.every(row=>Number.isInteger(row.targetWeightBps) && row.targetWeightBps>=0) && basis.rows.reduce((sum,row)=>sum+row.targetWeightBps,0)===10000;
@@ -24,15 +26,16 @@ export function PlanProjection({basis, reason, context, amount, onAmountChange}:
   const rows = projection?.status==='ready' ? projection.rows : [];
   return <section className={styles.spread} aria-label="추가 투자 미리보기">
     <div className={styles.budget}>
-      <label htmlFor="plan-budget">추가 투자금</label>
-      <div><input id="plan-budget" inputMode="numeric" value={amount} onChange={event=>onAmountChange(event.target.value)} aria-invalid={!validBudget}/><span>원</span></div>
+      <Field htmlFor="plan-budget">추가 투자금</Field>
+      <div><Input presentation="amount" id="plan-budget" inputMode="numeric" value={!editing && validBudget ? units.toLocaleString('ko-KR') : amount} onFocus={()=>setEditing(true)} onBlur={()=>setEditing(false)} onChange={event=>onAmountChange(event.target.value)} aria-invalid={!validBudget}/><span>원</span></div>
       {!validBudget && <p role="alert">1원부터 1,000억 원까지 정수로 입력해 주세요.</p>}
+      <nav aria-label="투자금 빠른 입력" className={styles.presets}>{[50,100,200].map(value=><Button variant="bare" type="button" key={value} onClick={()=>onAmountChange(String(value*10000))}>{value}만 원</Button>)}</nav>
       <small>가상 배분 · 원화 기준</small>
     </div>
     <div className={styles.allocation}>
-      <header><h2>투자 후 비중</h2>{basis && <label>배분 방식<select value={allocation} onChange={event=>setAllocation(event.target.value)}>
+      <header><h2>투자 후 비중</h2>{basis && <Field>배분 방식<Select value={allocation} onChange={event=>setAllocation(event.target.value)}>
         <option value="ratio">목표 비율대로</option>{basis.rows.filter(row=>row.buyable).map(row=><option key={row.allocationKey} value={row.allocationKey}>{instrumentLabel(row.metadata)}에 전액</option>)}
-      </select></label>}</header>
+      </Select></Field>}</header>
       {rows.length>0 && basis ? <>
         <div className={styles.ribbon} aria-hidden>{rows.map((row,index)=><span key={row.key} style={{width:(row.afterPct??0)+'%',background:colors[index%colors.length]}}/>)}</div>
         <table><thead><tr><th>종목</th><th>현재</th><th>투자 후</th><th>목표 차이</th></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>

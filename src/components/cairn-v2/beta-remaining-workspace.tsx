@@ -7,7 +7,7 @@ import {T} from '@/components/i18n/localized-text';
 import { carryRecoveryFragment } from '@/lib/recovery-navigation';
 import { ContributionNextSteps } from '@/components/additional-contribution/contribution-journey';
 import Link from 'next/link';
-import {useLayoutEffect,useMemo,useRef,useState,useTransition} from 'react';
+import {useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore,useTransition} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {domainQueryContext} from '@/lib/cairn-v2/read-service';
 import {blankDomainView} from '@/lib/cairn-v2/read-contract';
@@ -20,6 +20,11 @@ import {SavedPlanLibrary} from './reused/saved-plan-library';
 import {useBetaExistingCrudAvailable,useBetaReadFreshness} from './beta-provider';
 import {BetaShell} from './beta-shell';
 import styles from './remaining-workspace.module.css';
+function subscribeToFragment(notify:()=>void) {
+ window.addEventListener('hashchange',notify);
+ window.addEventListener('popstate',notify);
+ return ()=>{window.removeEventListener('hashchange',notify);window.removeEventListener('popstate',notify)};
+}
 export function BetaRemainingWorkspace({read,projection,reason,projectionOwner}:{read:RemainingWorkspaceRead;projection?:UserAllocationBasis;reason?:string;projectionOwner?:string}){
  const [budgetDraft,setBudgetDraft]=useState<{generation:string;amount:string}|null>(null);
  const [saved,setSaved]=useState<{epoch:string;queryKey:string}|null>(null);
@@ -31,16 +36,17 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner}:
  const shell=blankDomainView(blocked?'loading':read.state==='unauthorized'?'unauthorized':'ready',read.message);shell.domain!.scopes=blocked?[]:read.scopes;
  const home=betaReadHref(betaHref('/beta',context),store?.pendingEpoch());
  const budget=budgetDraft?.generation===generation ? budgetDraft.amount : typeof context.cashAmountKrw==='string'?context.cashAmountKrw:'1000000';
- const selectLedgerAccount = read.kind==='ledger' && !read.selection.accountId && !context.scope.startsWith('account:');
+ const journalLanding = useSyncExternalStore(subscribeToFragment,()=>location.hash==='#choose-record-account',()=>true);
+ const selectLedgerAccount = journalLanding && read.kind==='ledger' && !read.selection.accountId && !context.scope.startsWith('account:');
  const ledgerSelection = read.selection.accountId || !context.scope.startsWith('account:') ? read.selection : {...read.selection,accountId:context.scope.slice(8)};
  const ledgerNavigation=betaLedgerNavigation(context,store?.pendingEpoch(),read.selection);
  return <BetaShell workspace={read.kind} context={context} setContext={move} readView={shell} originalPath={read.kind==='ledger'?'/portfolio/ledger':'/plans'}>
   <section className={styles.workspace} id={read.kind==='ledger'?'trade-ledger':'saved-plans'} data-remaining-kind={read.kind} data-remaining-state={blocked?'loading':read.state} aria-busy={blocked}>
-   <DetailHeader title={read.kind==='ledger'?'거래·현금 기록':'저장된 투자계획'} actions={<Link prefetch={false} href={home}>홈으로 ↗</Link>} />
+   {!ready && <DetailHeader title={read.kind==='ledger'?'거래·현금 기록':'저장된 투자계획'} actions={<Link prefetch={false} href={home}>홈으로 ↗</Link>} />}
    {(blocked||read.state!=='ready')&&<p role="status">{blocked?'불러오는 중…':read.message}</p>}
 
    {ready&&saved&&saved.epoch===read.readEpoch&&saved.queryKey===read.queryKey&&<CairnStatus as="p" tone="success" role="status"><T ko="기록했어요. 아래 거래 목록에서 확인할 수 있어요." en="Recorded. You can review it in the transaction list below." /></CairnStatus>}
-   {ready && selectLedgerAccount && <p role="status">계좌별 거래 기록은 상단에서 계좌를 선택해 확인하세요. <Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),store?.pendingEpoch())}>이 범위의 평가 기록 보기 →</Link></p>}
+   {ready && selectLedgerAccount && <p id="choose-record-account" role="status">계좌별 거래 기록은 상단에서 계좌를 선택해 확인하세요. <Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),store?.pendingEpoch())}>이 범위의 평가 기록 보기 →</Link></p>}
    {read.kind==='plans'?<div hidden={!ready} inert={!ready} aria-hidden={!ready}><SavedPlanLibrary generation={generation} suspended={!ready} projectionOwner={projectionOwner} projection={ready && <PlanProjection key={generation} amount={budget} onAmountChange={amount=>setBudgetDraft({generation,amount})} basis={projection} reason={reason} context={context}/>}/></div>:<div key={generation} hidden={!ready} inert={!ready} aria-hidden={!ready}>
     {ready&&!selectLedgerAccount&&<div onInputCapture={()=>setSaved(null)}><LocaleProvider initialLocale="ko"><NativeLedgerView embedded homeHref={home} reportingCurrency={context.currency} {...ledgerNavigation} initialSelection={ledgerSelection} onSaved={()=>{if(current.current!==generation||store?.blocked(read.readReceipt,read.readEpoch))return;const epoch=crypto.randomUUID();setSaved({epoch,queryKey:read.queryKey});store?.begin(epoch);start(()=>router.replace(carryRecoveryFragment(remainingWorkspaceHref('ledger',context,epoch,read.selection),location.hash),{scroll:false}));}}/></LocaleProvider></div>}
    </div>}

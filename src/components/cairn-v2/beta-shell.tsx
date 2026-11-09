@@ -82,7 +82,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
     if (item.label === "분석" && context.mode === "domain") return labHref(context, { run: "1" });
     if (item.label === "계획" && existingCrudAvailable) return remainingWorkspaceHref("plans", context);
     if (item.label === "기록" && existingCrudAvailable)
-      return remainingWorkspaceHref("ledger", context, undefined, { accountId: ledgerAccount }).replace("#trade-ledger", "#native-records");
+      return remainingWorkspaceHref("ledger", context, undefined, { accountId: ledgerAccount }).replace("#trade-ledger", ledgerAccount ? "#trade-ledger" : "#choose-record-account");
     return betaHref(item.beta, context) + ("hash" in item ? item.hash : "");
   };
   const readUnavailable = retryReadNeeded(readView);
@@ -101,7 +101,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
     <main className={styles.main}>
       <header className={`${styles.topbar} ${workspace ? controls.workspaceTopbar : ""}`}>
         {!workspace && <span className={homeDesign.eyebrow}>Portfolio overview</span>}
-        <CairnPageTitle>{workspace === "history" ? "히스토리" : workspace === "structure" ? "포트 구조" : presentation?.title ?? (workspace ? workspace === "ledger" ? "기록 / 거래·현금" : workspace === "plans" ? "계획 / 저장된 투자계획" : workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "lab" ? "분석 / 과거 비교" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
+        <CairnPageTitle>{workspace === "history" ? "히스토리" : workspace === "structure" ? "자산" : workspace === "plans" ? "계획" : workspace === "ledger" ? "기록" : workspace === "lab" ? "분석" : presentation?.title ?? (workspace ? workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
         <CairnButton variant="bare" className={styles.scopeTrigger} type="button" aria-haspopup="dialog" aria-expanded={!!scopeOrigin} onClick={(e) => { setSearch(""); setScopeOrigin({ rect: e.currentTarget.getBoundingClientRect(), trigger: e.currentTarget }); }}>{selectedScope.label}<span aria-hidden>⌄</span></CairnButton>
         <div className={styles.topbarActions}>
           {!workspace && context.mode === 'domain' && existingCrudAvailable && <PortfolioRefreshButton compact />}

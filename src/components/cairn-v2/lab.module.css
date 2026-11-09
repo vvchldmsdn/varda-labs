@@ -28,3 +28,4 @@
 @media(min-width:700px){.summary > div + div {border-left:1px solid #d9d3c7}}
 @media(max-width:699px){.summary>div {display:flex;align-items:center;justify-content:space-between;gap:12px}.summary>div+div{border-top:1px solid #d9d3c7}.summary dd{font-size:23px}.summary dt{margin:0}}
 .chart.observedChart {--muted:#625e57;background:#faf8f3;color:#18212a;border:1px solid #d9d3c7}
+.period {border-block:1px solid var(--cairn-v2-line)}.period summary {cursor:pointer;font-size:13px;min-height:44px;padding:12px 0}.period[open]{padding-bottom:12px}

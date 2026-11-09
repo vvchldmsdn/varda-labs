@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, SectionTitle, Status } from "@/components/cairn-ui";
+import { Button, Field, Select, SectionTitle, Status } from "@/components/cairn-ui";
 import { nativeRecordAmountLabel, nativeRecordNumber, nativeRecordTypeLabel, type NativeLedgerRecord, type NativeLedgerRecordsRead } from "@/lib/native-ledger-records";
 import styles from "./native-ledger-records.module.css";
 
@@ -82,9 +82,9 @@ function RecordJournal({records,locale}:{records:NativeLedgerRecord[];locale:"ko
     entries.push(record);groups.set(day,entries);
   }
   return <div className={styles.journal}>
-    <aside><label htmlFor="record-month">{locale==="ko"?"기록한 달":"Record month"}</label>
-      <select id="record-month" value={month} onChange={e=>setMonth(e.target.value)}>{months.map(value=><option key={value}>{value}</option>)}</select>
-      <div role="group" aria-label={locale==="ko"?"거래 종류":"Transaction type"}>{(["all","buy","sell"] as const).map(type=><button key={type} type="button" aria-pressed={filter===type} onClick={()=>setFilter(type)}>{locale==="en"?type:{all:"전체",buy:"매수",sell:"매도"}[type]}</button>)}</div>
+    <aside><Field htmlFor="record-month">{locale==="ko"?"기록한 달":"Record month"}</Field>
+      <Select id="record-month" value={month} onChange={e=>setMonth(e.target.value)}>{months.map(value=><option key={value}>{value}</option>)}</Select>
+      <div role="group" aria-label={locale==="ko"?"거래 종류":"Transaction type"}>{(["all","buy","sell"] as const).map(type=><Button variant="bare" key={type} type="button" aria-pressed={filter===type} onClick={()=>setFilter(type)}>{locale==="en"?type:{all:"전체",buy:"매수",sell:"매도"}[type]}</Button>)}</div>
     </aside>
     <div className={styles.days}>{[...groups.keys()].sort().reverse().map(day=><section key={day}><h3><time dateTime={day}>{day}</time></h3>
       <ol className={styles.list}>{groups.get(day)!.map(record=><NativeRecordItem key={record.id} record={record} locale={locale}/>)}</ol>
