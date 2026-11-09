@@ -31,10 +31,12 @@ import { compositionPriceTime } from "@/lib/current-investment-composition";
 function StructureDetail({
   view,
   context,
+  workspace,
   onTargetDrift,
 }: {
   view: FixtureView;
   context: BetaContext;
+  workspace: boolean;
   onTargetDrift?: () => void;
 }) {
   const freshness = useBetaReadFreshness();
@@ -104,7 +106,7 @@ function StructureDetail({
           제외: {instrumentLabel(r)}{r.currency ? ` · ${r.currency}` : ""} · {dataIssueLabel(r.reason ?? "valuation_incomplete")}
         </p>
       ))}</details>}
-      <div className={structureLayout.layout}>
+      <div className={`${structureLayout.layout} ${workspace ? structureLayout.workspace : ""}`}>
         <aside className={structureLayout.summary}>
           <p className={styles.muted}>
             {excluded.length || composition && !composition.complete
@@ -160,6 +162,13 @@ function StructureDetail({
             </div>
           )}
         </div>
+        {workspace && rows.length > 0 && <section className={structureLayout.holdings} aria-label="보유 목록">
+          <h3>보유 자산</h3>
+          {rows.map(row => <button key={row.key} type="button" aria-pressed={row.key === active?.key} onClick={() => setSelected(row.key)}>
+            <i aria-hidden style={{background:row.color}} /><span>{instrumentLabel(row)}<small>{row.account}</small></span>
+            <strong>{formatAmount(row.amount)} <small>{context.currency}</small></strong><span>{row.weightPct.toFixed(2)}%</span>
+          </button>)}
+        </section>}
         <aside
           className={`${structureLayout.selected} ${evidence.surface} ${evidence.holdingEvidence}`}
         >
@@ -306,7 +315,7 @@ export function BetaDetail({
       {kind === "history" ? (
         <HistoryDetail view={view} context={context} />
       ) : kind === "structure" ? (
-        <StructureDetail view={view} context={context} onTargetDrift={onTargetDrift} />
+        <StructureDetail workspace={workspace} view={view} context={context} onTargetDrift={onTargetDrift} />
       ) : view.domain && kind === "heatmap" ? (
         <HoldingHeatmap view={view} />
       ) : view.domain && kind === "simulation" ? (
