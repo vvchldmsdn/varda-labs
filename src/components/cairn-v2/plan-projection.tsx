@@ -13,7 +13,7 @@ import styles from './plan-projection.module.css';
 const colors = ['#d48670','#80988d','#c6a478','#889eaf','#a998aa'];
 const pct = (value: number | null) => value === null ? '—' : value.toLocaleString('ko-KR',{maximumFractionDigits:2})+'%';
 
-export function PlanProjection({basis, reason, context, amount, onAmountChange}: {amount:string;onAmountChange:(value:string)=>void;basis?:UserAllocationBasis; reason?:string; context:BetaContext}) {
+export function PlanProjection({basis, reason, unavailableHoldings, context, amount, onAmountChange}: {amount:string;onAmountChange:(value:string)=>void;basis?:UserAllocationBasis; reason?:string; unavailableHoldings?:string[]; context:BetaContext}) {
   const [allocation,setAllocation] = useState('ratio');
   const units = parseMoneyInput(amount,'KRW');
   const validBudget = units !== null && Number.isSafeInteger(units) && units > 0 && units <= 100_000_000_000;
@@ -38,10 +38,10 @@ export function PlanProjection({basis, reason, context, amount, onAmountChange}:
       {rows.length>0 && basis ? <>
         <div className={styles.ribbon} aria-hidden>{rows.map((row,index)=><span key={row.key} style={{width:(row.afterPct??0)+'%',background:colors[index%colors.length]}}/>)}</div>
         <table><thead><tr><th>종목</th><th>현재</th><th>투자 후</th><th>목표 차이</th></tr></thead><tbody>{rows.map((row,index)=><tr key={row.key}>
-          <th scope="row"><i style={{background:colors[index%colors.length]}}/>{instrumentLabel(basis.rows[index].metadata)}</th>
+          <th scope="row"><i style={{background:colors[index%colors.length]}}/>{instrumentLabel(basis.rows[index].metadata)}{basis.rows[index].metadata.manualValuation && <small> · 수동 평가</small>}</th>
           <td>{pct(row.currentPct)}</td><td>{pct(row.afterPct)}</td><td>{row.gapPp===null?'—':(row.gapPp>0?'+':'')+row.gapPp.toFixed(2)+'%p'}</td>
         </tr>)}</tbody></table>
-      </>:<p role="status">{!context.scope.startsWith('account:')?'상단에서 투자할 계좌를 선택해 주세요.':!validBudget?'투자금을 확인해 주세요.':dataIssueLabel(reason ?? (projection?.status==='blocked'?projection.reason:'valuation_incomplete'))}</p>}
+      </>:<p role="status">{!context.scope.startsWith('account:')?'상단에서 투자할 계좌를 선택해 주세요.':!validBudget?'투자금을 확인해 주세요.':dataIssueLabel(reason ?? (projection?.status==='blocked'?projection.reason:'valuation_incomplete'))}{validBudget && unavailableHoldings?.length ? ' '+unavailableHoldings.join(' ') : ''}</p>}
     </div>
   </section>;
 }

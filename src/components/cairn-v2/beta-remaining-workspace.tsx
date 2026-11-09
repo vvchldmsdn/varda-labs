@@ -26,7 +26,7 @@ function subscribeToFragment(notify:()=>void) {
  window.addEventListener('popstate',notify);
  return ()=>{window.removeEventListener('hashchange',notify);window.removeEventListener('popstate',notify)};
 }
-export function BetaRemainingWorkspace({read,projection,reason,projectionOwner}:{read:RemainingWorkspaceRead;projection?:UserAllocationBasis;reason?:string;projectionOwner?:string}){
+export function BetaRemainingWorkspace({read,projection,reason,projectionOwner,unavailableHoldings}:{read:RemainingWorkspaceRead;projection?:UserAllocationBasis;reason?:string;unavailableHoldings?:string[];projectionOwner?:string}){
  const [budgetDraft,setBudgetDraft]=useState<{generation:string;amount:string}|null>(null);
  const [saved,setSaved]=useState<{epoch:string;queryKey:string}|null>(null);
  const router=useRouter(),search=useSearchParams(),query=search.toString(),context=useMemo(()=>domainQueryContext(query),[query]),freshness=useBetaReadFreshness(),store=freshness?.store,observed=freshness?.observed,available=useBetaExistingCrudAvailable(),[pending,start]=useTransition();
@@ -49,7 +49,7 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner}:
 
    {ready&&saved&&saved.epoch===read.readEpoch&&saved.queryKey===read.queryKey&&<CairnStatus as="p" tone="success" role="status"><T ko="기록했어요. 아래 거래 목록에서 확인할 수 있어요." en="Recorded. You can review it in the transaction list below." /></CairnStatus>}
    {ready && selectLedgerAccount && <p id="choose-record-account" role="status">계좌별 거래 기록은 상단에서 계좌를 선택해 확인하세요. <Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),store?.pendingEpoch())}>이 범위의 평가 기록 보기 →</Link></p>}
-   {read.kind==='plans'?<div hidden={!ready} inert={!ready} aria-hidden={!ready}><SavedPlanLibrary generation={generation} suspended={!ready} projectionOwner={projectionOwner} projection={ready && <PlanProjection key={generation} amount={budget} onAmountChange={amount=>setBudgetDraft({generation,amount})} basis={projection} reason={reason} context={context}/>}/></div>:<div key={generation} hidden={!ready} inert={!ready} aria-hidden={!ready}>
+   {read.kind==='plans'?<div hidden={!ready} inert={!ready} aria-hidden={!ready}><SavedPlanLibrary generation={generation} suspended={!ready} projectionOwner={projectionOwner} projection={ready && <PlanProjection key={generation} amount={budget} onAmountChange={amount=>setBudgetDraft({generation,amount})} basis={projection} reason={reason} unavailableHoldings={unavailableHoldings} context={context}/>}/></div>:<div key={generation} hidden={!ready} inert={!ready} aria-hidden={!ready}>
     {ready&&!selectLedgerAccount&&<div onInputCapture={()=>setSaved(null)}><LocaleProvider initialLocale="ko"><NativeLedgerView embedded homeHref={home} reportingCurrency={context.currency} {...ledgerNavigation} initialSelection={ledgerSelection} onSaved={()=>{if(current.current!==generation||store?.blocked(read.readReceipt,read.readEpoch))return;const epoch=crypto.randomUUID();setSaved({epoch,queryKey:read.queryKey});store?.begin(epoch);start(()=>router.replace(carryRecoveryFragment(remainingWorkspaceHref('ledger',context,epoch,read.selection),location.hash),{scroll:false}));}}/></LocaleProvider></div>}
    </div>}
    {ready&&read.kind==='plans'&&budgetKrw!==null&&budgetKrw>0&&budgetKrw<=100_000_000_000&&<ContributionNextSteps compact journey={{scope:context.scope,currency:'KRW',reportingCurrency:context.currency,beta:true,amount:String(budgetKrw)}} />}

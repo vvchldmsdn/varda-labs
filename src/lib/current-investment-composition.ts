@@ -52,6 +52,7 @@ export function isManualValuationSource(source: string | null | undefined) {
 /** Receipt time is not exchange observation time; an official close is dated
  * by its session, even when it deliberately has no intraday timestamp. */
 export function compositionPriceTime(position: Pick<CurrentCompositionPosition,"priceAsOf"|"priceFetchedAt"|"priceReferenceDate"|"priceTimestampBasis">) {
+  if(position.priceTimestampBasis === "stored_valuation")return {label:"수동 평가 기록일",value:position.priceReferenceDate};
   if(position.priceTimestampBasis === "daily_close")return {label:"종가 기준일",value:position.priceReferenceDate};
   if(position.priceTimestampBasis === "collection")return {label:"시세 수집 시각",value:position.priceFetchedAt};
   return {label:"가격 관측",value:position.priceAsOf};

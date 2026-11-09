@@ -49,7 +49,8 @@ export type ValuationObservation = { quantity: string; price: string; currency: 
   priceKind?: "live" | "realtime" | "delayed" | "close";
   /** A dated official close is a session observation, not an invented tick time. */
   priceReferenceDate?: string;
-  timestampBasis?: "collection" | "provider" | "daily_close";
+  timestampBasis?: "collection" | "provider" | "daily_close" | "stored_valuation";
+  manualRecordedAt?: string;
 };
 export function valuePosition(row: ValuationObservation, reporting: Currency, fx: readonly FxEvidence[], maxAgeMs: number): CurrencyResult<Decimal> {
   if (row.basis !== "raw") return { ok: false, reason: "price_basis_mismatch" };

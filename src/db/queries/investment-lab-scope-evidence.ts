@@ -1,7 +1,8 @@
 import "server-only";
 import { brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { loadLabNativeEvents } from "./investment-lab-native-events";
 
 import { db } from "@/db/client";
 import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
@@ -27,10 +28,15 @@ import type { TenantContext } from "@/lib/session-resolver-contract";
 export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
   scope,
   tenantContext,
+  includeEffectiveNativeTrades = false,
 }: {
   scope: PortfolioAnalysisScope;
   tenantContext: TenantContext;
+  includeEffectiveNativeTrades?: boolean;
 }): Promise<InvestmentLabAnalysisScopeEvidence> {
+  // A group can contain assets or formerly active accounts at different
+  // dates. The native adapter is admitted for a single resolved account only.
+  const readNative = includeEffectiveNativeTrades && scope.kind === "account";
   const [
     ownedAccounts,
     memberships,
@@ -43,6 +49,7 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
         id: accounts.id,
         code: accounts.code,
         isActive: accounts.isActive,
+        ...(readNative ? {hasNative: sql<boolean>`${accounts.nativeState} is not null`} : {}),
       })
       .from(accounts)
       .where(eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId)),
@@ -135,6 +142,7 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
         and(
           eq(accounts.canonicalOwnerUserId, tenantContext.ownerUserId),
           eq(eventLedgerEntries.isSample, false),
+          readNative ? isNull(eventLedgerEntries.nativeData) : undefined,
         ),
       )
       .orderBy(
@@ -179,6 +187,10 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
         : [],
     ),
   );
+  const nativeAccount = readNative && ownedAccounts.find(account =>
+    account.isActive && account.hasNative && scope.accountId === account.id,
+  );
+  const nativeEvents = nativeAccount ? await loadLabNativeEvents(tenantContext, nativeAccount.id) : [];
 
   return buildInvestmentLabAnalysisScopeEvidence({
     scope,
@@ -205,7 +217,7 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
           ]
         : [],
     ),
-    events: eventRows.map((row, index) => ({
+    events: [...eventRows.map((row, index) => ({
       accountId: row.accountId,
       assetId: row.assetId,
       legacyAssetId: row.legacyAssetId,
@@ -227,6 +239,6 @@ export async function getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({
       market: row.market,
       currency: row.currency,
       assetType: row.assetType,
-    })),
+    })), ...nativeEvents],
   });
 }

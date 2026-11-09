@@ -11,7 +11,7 @@ export type NativeContributionContext = {
   evidenceVersion?:string;
   names: Record<string, string>;
 };
-export type NativeContributionContextResult = NativeContributionContext | { status: "blocked"; reason: string; evidenceReasons?: readonly string[] };
+export type NativeContributionContextResult = NativeContributionContext | { status: "blocked"; reason: string; evidenceReasons?: readonly string[]; unavailablePositions?: readonly {name:string;reason:string}[] };
 export type NativeContributionRequest = { id: string; scopeKey: string; reportingCurrency: Currency; newMoney: { amount: string; currency: Currency }; useAvailableCash: boolean; previewEvidenceVersion?:string; excludedSellKeys?: string[] };
 export type NativeContributionDocument = { version: "native_contribution_plan_v1"; request: NativeContributionRequest; basis: NativeContributionContext; result: Extract<ReturnType<typeof calculateCurrencyContribution>, { status: "ready" }> };
 export type SavedNativeContributionPlan = { id: string; createdAt: string; document: NativeContributionDocument };

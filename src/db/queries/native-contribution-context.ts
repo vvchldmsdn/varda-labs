@@ -22,7 +22,7 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
   if (scope.kind !== "account") return { status: "blocked", reason: "choose_account_for_funding" };
   const now = new Date(), serviceDate = resolveSnapshotCycle(now).snapshotDate;
   const [rawEvidence, model, comparisonLedger] = await Promise.all([
-    getTrackedCurrencyEvidence(tenant, scope, reporting, { asOf: now }),
+    getTrackedCurrencyEvidence(tenant, scope, reporting, { asOf: now, investmentsOnly, ...(investmentsOnly ? {collect:false} : {}) }),
     getReadOnlyTenantPortfolioTargetPolicyModel({ tenantContext: tenant, scope, serviceDate }),
     investmentsOnly && scope.kind === 'account' ? readNativeLedger(tenant, scope.accountId) : null,
   ]);
@@ -30,10 +30,11 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
   if (investmentsOnly && !investment) return { status: 'blocked', reason: 'holding_evidence_incomplete' };
   const evidence = investment ? { ...rawEvidence, ...investment.evidence } : rawEvidence;
   const current = buildTrackedCurrencyPortfolio(evidence).current;
+  const unavailable = current?.positions.filter(row => row.value === null) ?? [];
   if (!current?.complete || !investmentsOnly && !evidence.ledgerComplete) return {
     status: "blocked", reason: "valuation_incomplete",
     evidenceReasons: [...new Set([...(current?.issues.map(issue => issue.code) ?? []), ...(!investmentsOnly && !evidence.ledgerComplete ? ['ledger_incomplete'] : [])])],
-    ...(investmentsOnly ? { unavailableHoldings: current?.positions.filter(row => row.value === null).map(row => row.name) ?? [] } : {}),
+    ...(investmentsOnly ? { unavailableHoldings: unavailable.map(row => row.name), unavailablePositions: unavailable.map(row => ({name:row.name, reason:row.reason ?? "valuation_incomplete"})) } : {}),
   };
   if (model.status !== "ready" || model.policyValidation.status !== "available" || !model.approvedPolicy.policy) return { status: "blocked", reason: "approved_targets_required" };
   const holdings = evidence.current.positions.filter(row => row.kind !== "cash" && row.observation && Decimal.from(row.observation.quantity).compare(0) > 0);
@@ -67,7 +68,7 @@ export async function readNativeContributionContext(tenant: TenantContext, scope
           ma120Evidence: rawCompatible && trend ? { status: trend.status, distanceFromMaPct: trend.evidence?.distanceFromMaPct ?? null } : { status: "unavailable", distanceFromMaPct: null },
           ...(rawCompatible ? { maBasis: { priceCurrency: target.currency, averageCurrency: target.currency, priceBasis: "raw", averageBasis: "raw" } } : {}),
           metadata: { accountId: target.accountId, accountName:target.accountName, name: target.assetName, ticker: target.ticker, market: target.market, maEvidence: trend?.evidence ?? null,
-            entryQuote: observed ? { assetId: row!.id, price: observed.price, currency: observed.currency, at: observed.priceObservedAt ?? observed.at, source: observed.source, basis: observed.basis } : null },
+            entryQuote: observed && observed.timestampBasis !== "stored_valuation" ? { assetId: row!.id, price: observed.price, currency: observed.currency, at: observed.priceObservedAt ?? observed.at, source: observed.source, basis: observed.basis } : null },
           value: { amount: observed ? Decimal.from(observed.quantity).mul(observed.price).toExactString() : "0", currency: isCurrency(target.currency)?target.currency:reporting, at: evidence.current.at, source: observed?.source ?? "unheld_target_zero" },
           cost: null, costLots: row?.costLots ?? null,
         };

@@ -4,6 +4,7 @@ import type {
 } from "./investment-lab-counterfactual-read-model.ts";
 import type { InvestmentLabAnchorPositionRow } from "./investment-lab-anchor-basket-anchor.ts";
 import { matchesDecisionSupportSpecialHolding } from "./portfolio-analysis-special-holding-authority.ts";
+import type { LabNativeAmountBasis, LabNativeTrace, LabNativeTradeIssue } from "./investment-lab-native-events.ts";
 import {
   NAMED_PORTFOLIO_ACCOUNTS,
   isNamedPortfolioAccount,
@@ -43,6 +44,7 @@ export type InvestmentLabScopePositionCandidate =
 
 export type InvestmentLabScopeEventCandidate = InvestmentLabSourceEventRow &
   Readonly<{
+    nativeTrace?: LabNativeTrace;
     accountId: string | null;
     assetId: string | null;
     assetName: string | null;
@@ -62,6 +64,10 @@ export type InvestmentLabScopeSnapshotProvenance = Readonly<{
 }>;
 
 export type InvestmentLabAnalysisScopeEvidence = Readonly<{
+  nativeTradeEvidence?: {
+    blocked: readonly {date: string; reason: LabNativeTradeIssue; label: string | null}[];
+    valued: readonly {date: string; basis: LabNativeAmountBasis}[];
+  };
   policy: typeof INVESTMENT_LAB_ANALYSIS_SCOPE_POLICY;
   engineAccount: PortfolioAccountScope;
   supportsLegacyTargetPolicy: boolean;
@@ -122,9 +128,19 @@ export function buildInvestmentLabAnalysisScopeEvidence({
   const scopedPositions = selectedPositions.filter(
     (row) => !matchesFountPosition(row),
   );
-  const scopedEvents = selectedEvents.filter(
+  const includedEvents = selectedEvents.filter(
     (row) => !matchesFountEvent(row, fountIdentity),
   );
+  // Legacy rows use recorded ledger order. Native rows use the effective
+  // replay sequence. Between these sources a shared date has no joint order.
+  const legacyTradeDates = new Set(includedEvents.filter(row => !row.nativeTrace && (row.eventType === "buy" || row.eventType === "sell"))
+    .map(row => JSON.stringify([row.accountId, row.eventDate])));
+  const hasNative = includedEvents.some(row => row.nativeTrace);
+  const scopedEvents = hasNative ? includedEvents.map(row =>
+    row.nativeTrace && "basis" in row.nativeTrace && legacyTradeDates.has(JSON.stringify([row.accountId, row.eventDate]))
+      ? { ...row, amountKrw: null, nativeTrace: { reason: "unsupported" as const } }
+      : row,
+  ).sort((left, right) => left.eventDate.localeCompare(right.eventDate) || left.sequence - right.sequence) : includedEvents;
   const selectedCashProvenance = provenanceRows.filter((row) =>
     includesAccountCashAtDate({
       accountId: row.accountId,
@@ -199,6 +215,12 @@ export function buildInvestmentLabAnalysisScopeEvidence({
     includedAccountCodes,
     snapshotRows,
     eventRows,
+    ...(hasNative ? {nativeTradeEvidence: {
+      blocked: scopedEvents.flatMap(row => row.nativeTrace && "reason" in row.nativeTrace
+        ? [{ date: row.eventDate, reason: row.nativeTrace.reason, label: row.assetName }] : []),
+      valued: scopedEvents.flatMap(row => row.nativeTrace && "basis" in row.nativeTrace
+        ? [{ date: row.eventDate, basis: row.nativeTrace.basis }] : []),
+    }} : {}),
     anchorPositionRows,
     fountAdjustment: Object.freeze({
       status:

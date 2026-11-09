@@ -29,5 +29,5 @@ const blockers:Record<Blocker,string>={
 };
 export const labPeriodReason=(reason:PeriodReason|null)=>reason?periodReasons[reason]:null;
 export const labBlockerLabel=(reason:Blocker)=>blockers[reason];
-export const labFundingLabel=(status:LabModel['funding']['actual']['status'])=>({ready:'근거 있음',unavailable:'근거 부족',not_requested:'이번 비교 대상 아님'}[status]);
+export const labFundingLabel=(status:NonNullable<LabModel['funding']>['actual']['status'])=>({ready:'근거 있음',unavailable:'근거 부족',not_requested:'이번 비교 대상 아님'}[status]);
 export const labChartPalette={actual:'var(--cairn-v2-ink, #20211f)',scenario:'var(--cairn-v2-brand, #c64623)',axis:'var(--cairn-v2-line, #e1e1dc)',text:'var(--cairn-v2-muted, #6c6d68)',surface:'var(--cairn-v2-paper, #f7f7f5)'};

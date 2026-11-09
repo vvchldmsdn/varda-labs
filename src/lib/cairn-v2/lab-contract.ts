@@ -1,16 +1,22 @@
 import type {InvestmentLabAnalysisScopeEvidence} from '../investment-lab-analysis-scope';
 import type {getReadOnlyTenantInvestmentLabCounterfactualForScope} from '../../db/queries/investment-lab';
-import {resolveInvestmentLabPeriodSelection} from '../investment-lab-period-selection';
+import {markInvestmentLabPeriodUnavailable,resolveInvestmentLabPeriodSelection} from '../investment-lab-period-selection';
+import {labTradePeriod} from '../investment-lab-native-period';
 import {domainContext,domainQueryValid} from './read-service';
 import {betaReadHref,type BetaContext} from './navigation';
 export type LabParams=Record<string,string|string[]|undefined>;
 type Source=Awaited<ReturnType<typeof getReadOnlyTenantInvestmentLabCounterfactualForScope>>;
-export function adaptLab(source:Source,evidence:InvestmentLabAnalysisScopeEvidence){const m=source.model,r=m.returnEstimate,f=source.fundingPreflight;return {
+export function adaptLab(source:Source,evidence:InvestmentLabAnalysisScopeEvidence){
+ const m=source.model,r=m.returnEstimate,f=source.fundingPreflight;
+ const tradeEvidence=labTradePeriod(source.period,source.observedHistory.segments,evidence.nativeTradeEvidence);
+ const tradeBlocked=!!tradeEvidence?.blocked.length;
+ return {
  scopeEvidence:{includedAccountCodes:evidence.includedAccountCodes,engineAccount:evidence.engineAccount,policy:evidence.policy,excluded:evidence.fountAdjustment},
- period:source.period,observedHistory:source.observedHistory,
- comparison:{status:m.status,scenario:m.scenario,summary:m.summary,rows:m.rows,coverage:m.coverage,blockers:m.blockers,sourceAuthority:m.sourceAuthority,
- returns:r?{status:r.status,actualReturn:r.actualReturn,scenarioReturn:r.scenarioReturn,differencePercentagePoints:r.differencePercentagePoints,method:r.method,basis:r.basis,blockers:r.blockers}:null},
- funding:{policy:f.policy,accountScope:f.accountScope,actual:f.aggregateScenarios.actual,kodex200:f.aggregateScenarios.kodex200,accounts:f.accountRows.map(a=>({account:a.account,actual:a.scenarios.actual,kodex200:a.scenarios.kodex200}))},
+ defaultContext:source.defaultContext??null,
+ period:tradeBlocked?markInvestmentLabPeriodUnavailable(source.period):source.period,observedHistory:source.observedHistory,tradeEvidence,
+ comparison:{status:tradeBlocked?'blocked' as const:m.status,scenario:m.scenario,summary:tradeBlocked?null:m.summary,rows:tradeBlocked?[]:m.rows,coverage:m.coverage,blockers:m.blockers,sourceAuthority:m.sourceAuthority,
+ returns:r&&!tradeBlocked?{status:r.status,actualReturn:r.actualReturn,scenarioReturn:r.scenarioReturn,differencePercentagePoints:r.differencePercentagePoints,method:r.method,basis:r.basis,blockers:r.blockers}:null},
+ funding:tradeBlocked?null:{policy:f.policy,accountScope:f.accountScope,actual:f.aggregateScenarios.actual,kodex200:f.aggregateScenarios.kodex200,accounts:f.accountRows.map(a=>({account:a.account,actual:a.scenarios.actual,kodex200:a.scenarios.kodex200}))},
  fount:source.fountScopeAdjustment,
  };}
 export type LabModel=ReturnType<typeof adaptLab>;

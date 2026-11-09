@@ -7,4 +7,12 @@ import {getReadOnlyTenantInvestmentLabCounterfactualForScope} from '@/db/queries
 import {canonicalBetaReadEpoch} from './read-freshness';
 import {readBetaLab} from './lab-service';
 import type {LabParams} from './lab-contract';
-export async function getBetaLabRead(p:LabParams){const readReceipt=randomUUID(),readEpoch=canonicalBetaReadEpoch(p._betaRead);const read=await readBetaLab(p,{session:resolveCurrentTenantContext,scopes:getReadOnlyTenantPortfolioAnalysisScopeContext,evidence:getReadOnlyTenantInvestmentLabAnalysisScopeEvidence,research:getReadOnlyTenantInvestmentLabCounterfactualForScope});return {...read,readReceipt,readEpoch,readAt:new Date().toISOString()};}
+export async function getBetaLabRead(p:LabParams){
+ const readReceipt=randomUUID(),readEpoch=canonicalBetaReadEpoch(p._betaRead);
+ const read=await readBetaLab(p,{
+  session:resolveCurrentTenantContext,scopes:getReadOnlyTenantPortfolioAnalysisScopeContext,
+  evidence:args=>getReadOnlyTenantInvestmentLabAnalysisScopeEvidence({...args,includeEffectiveNativeTrades:true}),
+  research:getReadOnlyTenantInvestmentLabCounterfactualForScope,
+ });
+ return {...read,readReceipt,readEpoch,readAt:new Date().toISOString()};
+}
