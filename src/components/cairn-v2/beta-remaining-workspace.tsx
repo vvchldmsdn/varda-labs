@@ -1,4 +1,5 @@
 'use client';
+import { parseMoneyInput } from '@/lib/money';
 import { PlanProjection } from './plan-projection';
 import type {UserAllocationBasis} from '@/lib/user-allocation-comparison';
 import { DetailHeader } from './ui/molecules';
@@ -35,7 +36,8 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner}:
  const move=(next:typeof context)=>{setSaved(null);current.current='navigation';start(()=>router.push(carryRecoveryFragment(remainingWorkspaceHref(read.kind,next,store?.pendingEpoch()),location.hash),{scroll:false}));};
  const shell=blankDomainView(blocked?'loading':read.state==='unauthorized'?'unauthorized':'ready',read.message);shell.domain!.scopes=blocked?[]:read.scopes;
  const home=betaReadHref(betaHref('/beta',context),store?.pendingEpoch());
- const budget=budgetDraft?.generation===generation ? budgetDraft.amount : typeof context.cashAmountKrw==='string'?context.cashAmountKrw:'1000000';
+ const budget=budgetDraft?.generation===generation ? budgetDraft.amount : typeof context.cashAmountKrw==='string'?context.cashAmountKrw:'1,000,000';
+ const budgetKrw=parseMoneyInput(budget,'KRW');
  const journalLanding = useSyncExternalStore(subscribeToFragment,()=>location.hash==='#choose-record-account',()=>true);
  const selectLedgerAccount = journalLanding && read.kind==='ledger' && !read.selection.accountId && !context.scope.startsWith('account:');
  const ledgerSelection = read.selection.accountId || !context.scope.startsWith('account:') ? read.selection : {...read.selection,accountId:context.scope.slice(8)};
@@ -50,7 +52,7 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner}:
    {read.kind==='plans'?<div hidden={!ready} inert={!ready} aria-hidden={!ready}><SavedPlanLibrary generation={generation} suspended={!ready} projectionOwner={projectionOwner} projection={ready && <PlanProjection key={generation} amount={budget} onAmountChange={amount=>setBudgetDraft({generation,amount})} basis={projection} reason={reason} context={context}/>}/></div>:<div key={generation} hidden={!ready} inert={!ready} aria-hidden={!ready}>
     {ready&&!selectLedgerAccount&&<div onInputCapture={()=>setSaved(null)}><LocaleProvider initialLocale="ko"><NativeLedgerView embedded homeHref={home} reportingCurrency={context.currency} {...ledgerNavigation} initialSelection={ledgerSelection} onSaved={()=>{if(current.current!==generation||store?.blocked(read.readReceipt,read.readEpoch))return;const epoch=crypto.randomUUID();setSaved({epoch,queryKey:read.queryKey});store?.begin(epoch);start(()=>router.replace(carryRecoveryFragment(remainingWorkspaceHref('ledger',context,epoch,read.selection),location.hash),{scroll:false}));}}/></LocaleProvider></div>}
    </div>}
-   {ready&&read.kind==='plans'&&<ContributionNextSteps compact journey={{scope:context.scope,currency:'KRW',reportingCurrency:context.currency,beta:true,amount:budget}} />}
+   {ready&&read.kind==='plans'&&budgetKrw!==null&&budgetKrw>0&&budgetKrw<=100_000_000_000&&<ContributionNextSteps compact journey={{scope:context.scope,currency:'KRW',reportingCurrency:context.currency,beta:true,amount:String(budgetKrw)}} />}
   </section>
  </BetaShell>;
 }

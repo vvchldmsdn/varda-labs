@@ -19,7 +19,9 @@
 .allocation th i {width:6px;height:6px;display:inline-block;border-radius:50%;margin-right:5px}
 @media(max-width:760px){.spread{grid-template-columns:minmax(0,1fr);gap:12px}.allocation table{font-size:12px}}
 
-.spread .budget input {font:400 clamp(32px,3.8vw,58px)/1.15 Georgia,"Cairn Pretendard",serif;padding:0;border:0}
+.spread .budget input[data-cairn-control] {color:#fbf6ed;caret-color:#fbf6ed;background:transparent;font:400 clamp(32px,3.8vw,58px)/1.15 Georgia,"Cairn Pretendard",serif;padding:0;border:0}
 .spread .presets {display:flex;gap:16px;margin:-15px 0 16px}
 .spread .presets button {color:#f4af98;border:0;padding:0;background:transparent;min-height:44px}
 @media(min-width:761px){.budget{align-self:stretch;display:flex;flex-direction:column}.budget small{margin-top:auto}}
+
+.spread .budget label {color:#d1c9bf}

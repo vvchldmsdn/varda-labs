@@ -15,7 +15,6 @@ const pct = (value: number | null) => value === null ? '—' : value.toLocaleStr
 
 export function PlanProjection({basis, reason, context, amount, onAmountChange}: {amount:string;onAmountChange:(value:string)=>void;basis?:UserAllocationBasis; reason?:string; context:BetaContext}) {
   const [allocation,setAllocation] = useState('ratio');
-  const [editing,setEditing] = useState(false);
   const units = parseMoneyInput(amount,'KRW');
   const validBudget = units !== null && Number.isSafeInteger(units) && units > 0 && units <= 100_000_000_000;
   const validWeights = basis?.rows.every(row=>Number.isInteger(row.targetWeightBps) && row.targetWeightBps>=0) && basis.rows.reduce((sum,row)=>sum+row.targetWeightBps,0)===10000;
@@ -27,9 +26,9 @@ export function PlanProjection({basis, reason, context, amount, onAmountChange}:
   return <section className={styles.spread} aria-label="추가 투자 미리보기">
     <div className={styles.budget}>
       <Field htmlFor="plan-budget">추가 투자금</Field>
-      <div><Input presentation="amount" id="plan-budget" inputMode="numeric" value={!editing && validBudget ? units.toLocaleString('ko-KR') : amount} onFocus={()=>setEditing(true)} onBlur={()=>setEditing(false)} onChange={event=>onAmountChange(event.target.value)} aria-invalid={!validBudget}/><span>원</span></div>
+      <div><Input presentation="amount" id="plan-budget" inputMode="numeric" value={amount} onBlur={()=>{if(validBudget) onAmountChange(units.toLocaleString('ko-KR'))}} onChange={event=>onAmountChange(event.target.value)} aria-invalid={!validBudget}/><span>원</span></div>
       {!validBudget && <p role="alert">1원부터 1,000억 원까지 정수로 입력해 주세요.</p>}
-      <nav aria-label="투자금 빠른 입력" className={styles.presets}>{[50,100,200].map(value=><Button variant="bare" type="button" key={value} onClick={()=>onAmountChange(String(value*10000))}>{value}만 원</Button>)}</nav>
+      <nav aria-label="투자금 빠른 입력" className={styles.presets}>{[50,100,200].map(value=><Button variant="bare" type="button" key={value} onClick={()=>onAmountChange((value*10000).toLocaleString('ko-KR'))}>{value}만 원</Button>)}</nav>
       <small>가상 배분 · 원화 기준</small>
     </div>
     <div className={styles.allocation}>
