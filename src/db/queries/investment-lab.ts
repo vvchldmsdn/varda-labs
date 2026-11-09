@@ -22,6 +22,7 @@ import type { InvestmentLabFixedMixSelection } from "@/lib/investment-lab-fixed-
 import type { InvestmentLabFountRuntimeEvidence } from "@/lib/investment-lab-fount-runtime-scope";
 import { INVESTMENT_LAB_FOUNT_RUNTIME_SCOPE_POLICY } from "@/lib/investment-lab-fount-runtime-scope";
 import type { InvestmentLabAnalysisScopeEvidence } from "@/lib/investment-lab-analysis-scope";
+import { nativeLabDefaultWindow } from "@/lib/investment-lab-native-period";
 import {
   DECISION_SUPPORT_SPECIAL_HOLDING_DECISIONS,
   attachBase44ImportedTickerEvidence,
@@ -729,9 +730,10 @@ export async function getReadOnlyTenantInvestmentLabCounterfactualForScope({
   tenantContext: TenantContext;
 }) {
   const evidence = await evidencePromise;
+  const defaultWindow = nativeLabDefaultWindow(evidence, request);
   const result = await loadInvestmentLabCounterfactualReadModel(
     createTenantInvestmentLabScopeRepository(tenantContext, evidence),
-    request,
+    defaultWindow?.request ?? request,
     fixedMixSelection,
     requestedAnchorDate,
     evidence.engineAccount,
@@ -748,6 +750,13 @@ export async function getReadOnlyTenantInvestmentLabCounterfactualForScope({
 
   return Object.freeze({
     ...result,
+    period: defaultWindow ? {
+      ...result.period,
+      status: result.period.status === "selected" ? "current_writer" as const : result.period.status,
+      requestedStartServiceDate: null,
+      requestedEndServiceDate: null,
+    } : result.period,
+    defaultContext: defaultWindow?.context ?? null,
     analysisScope: scope,
     fountScopeAdjustment,
   });

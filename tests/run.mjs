@@ -138,6 +138,8 @@ import "./investment-lab-account-composition-return.test.mjs";
 import "./investment-lab-account-funding-preflight.test.mjs";
 import "./investment-lab-data-availability.test.mjs";
 import "./investment-lab-period-selection.test.mjs";
+import "./investment-lab-native-events.test.mjs";
+import "./beta-lab-trade-period.test.mjs";
 import "./investment-lab-etf-xray.test.mjs";
 import "./investment-lab-etf-shock.test.mjs";
 import "./investment-lab-rolling-comparison.test.mjs";
