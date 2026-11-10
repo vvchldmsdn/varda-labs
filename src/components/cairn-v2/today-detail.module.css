@@ -12,6 +12,8 @@
 @media(max-width:600px) {.primaryMetrics {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}.detail .primaryMetrics [data-cairn-metric] > dd:first-of-type {font-size:clamp(23px,7vw,32px);overflow-wrap:anywhere;}.movementBridge {padding:18px 16px;}.movementBridge>dl {grid-template-columns:1fr;gap:18px;}.coverage>span:last-child {font-size:11px;}.selected dl>div {display:block;}.selected dl dd {text-align:left;}}
 
 .movementBridge summary { min-height:44px; cursor:pointer; font-size:14px; color:var(--cairn-v2-ink); }
+.breakdown { padding-bottom:12px; }
+.rowBreakdown { grid-column:1/-1; grid-row:3; }
 .movementBridge[open] > dl { margin-top:20px; }
 .movementBridge summary:focus-visible { outline:2px solid var(--cairn-v2-brand); outline-offset:4px; }
 .row { transition:background 180ms ease; }
@@ -21,3 +23,18 @@
 
 @container today-detail (max-width:600px) { .rows {grid-template-columns:minmax(0,1fr);} }
 .row {gap:4px 10px;padding:8px 4px!important;}
+@container today-detail (min-width:601px) {
+  .heading { margin-bottom:8px; }
+  .breakdown { padding-bottom:6px; }
+  .explorer { margin-top:12px; }
+  .row {
+    grid-template-columns:minmax(0,1fr) minmax(0,34%) auto;
+    grid-template-areas:"identity bar total" "effects effects total";
+    row-gap:2px;
+    line-height:1.35;
+  }
+  .identity { grid-area:identity; }
+  .rowValue { grid-area:total; }
+  .rowBreakdown { grid-area:effects; }
+  .bar { grid-area:bar; }
+}

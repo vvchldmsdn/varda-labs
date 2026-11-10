@@ -14,6 +14,8 @@ import { normalizeTicker, toNumber } from './portfolio-math.ts';
 export type CurrentHoldingMovement = {
   basis: 'current_quantity_price_fx';
   changeKrw: number | null;
+  priceChangeKrw: number | null;
+  fxChangeKrw: number | null;
   returnPct: number | null;
   previousValueKrw: number | null;
   includedCount: number;
@@ -55,7 +57,7 @@ export function buildCurrentHoldingMovement(input: {
   const selected = snapshots.contributionRows.length ? snapshots : closes;
   // A legacy fixed KRW balance can be part of valueKrw without known exposed
   // quantity. Its unexplained amount is not a price/FX return.
-  const rows = selected.contributionRows.filter(row =>
+  const rows = selected.contributionRows.filter((row): row is PortfolioMovementContribution & { priceChangeKrw: number; fxChangeKrw: number } =>
     row.priceChangeKrw !== null && row.fxChangeKrw !== null,
   );
   const previous = rows.reduce((sum, row) => sum + row.previousValueKrw, 0);
@@ -83,6 +85,8 @@ export function buildCurrentHoldingMovement(input: {
   });
   const rawChange = rows.length && rawChanges.every(value => value !== null) ? rawChanges.reduce<number>((sum, value) => sum + value!, 0) : null;
   return { basis: 'current_quantity_price_fx', changeKrw: rows.length ? change : null,
+    priceChangeKrw: rows.length ? rows.reduce((sum, row) => sum + row.priceChangeKrw, 0) : null,
+    fxChangeKrw: rows.length ? rows.reduce((sum, row) => sum + row.fxChangeKrw, 0) : null,
     returnPct: rows.length && previous > 0 ? change / previous * 100 : null,
     previousValueKrw: rows.length ? previous : null, includedCount: rows.length, excludedCount,
     partial: excludedCount > 0, valuationChangeKrw: rawChange, quantityChangeKrw: rawChange === null ? null : rawChange - change,
