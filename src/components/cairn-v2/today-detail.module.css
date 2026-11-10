@@ -12,6 +12,8 @@
 @media(max-width:600px) {.primaryMetrics {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}.detail .primaryMetrics [data-cairn-metric] > dd:first-of-type {font-size:clamp(23px,7vw,32px);overflow-wrap:anywhere;}.movementBridge {padding:18px 16px;}.movementBridge>dl {grid-template-columns:1fr;gap:18px;}.coverage>span:last-child {font-size:11px;}.selected dl>div {display:block;}.selected dl dd {text-align:left;}}
 
 .movementBridge summary { min-height:44px; cursor:pointer; font-size:14px; color:var(--cairn-v2-ink); }
+.breakdown { padding-bottom:12px; }
+.rowBreakdown { grid-column:1/-1; grid-row:3; }
 .movementBridge[open] > dl { margin-top:20px; }
 .movementBridge summary:focus-visible { outline:2px solid var(--cairn-v2-brand); outline-offset:4px; }
 .row { transition:background 180ms ease; }

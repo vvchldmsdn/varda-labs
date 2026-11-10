@@ -4,6 +4,7 @@ import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { movementDisplay } from "@/lib/cairn-v2/read-display";
 import type { BetaCurrency } from "@/lib/cairn-v2/navigation";
 import { ValueText } from "./ui/atoms";
+import { MovementBreakdown } from "./movement-breakdown";
 import { formatPercent } from "./ui/format";
 import styles from "./home-today.module.css";
 
@@ -21,6 +22,8 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
             {displayReadMoney(view, legacy.value, currency, true, "dashboard")}
           </ValueText>
         </p>
+        {view.rows.length > 0 && legacy.value !== null &&
+          <MovementBreakdown view={view} currency={currency} priceChangeKrw={view.priceMoveKrw} fxChangeKrw={view.fxMoveKrw} />}
         <p className={styles.note}>예시 · 전일 대비</p>
       </div>
     );
@@ -39,6 +42,8 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
           "비교 근거 확인 전"
         )}
       </p>
+      {ready && current.includedCount > 0 &&
+        <MovementBreakdown view={view} currency={currency} priceChangeKrw={current.priceChangeKrw} fxChangeKrw={current.fxChangeKrw} />}
       {ready && current.excludedCount > 0 && <p className={styles.note}>일부 종목 기준 · {current.excludedCount}종목 제외</p>}
       {currency === "USD" && <p className={styles.note}>변동률은 KRW 기준</p>}
     </div>

@@ -1,0 +1,12 @@
+.breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.effect { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
+.label, .effect small { color: var(--cairn-v2-muted); font-size: .92em; }
+.effect > [data-tone] { white-space: nowrap; }

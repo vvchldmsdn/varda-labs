@@ -17,7 +17,9 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.goto(url+'/qa-beta-visual?mode=domain&scope=all&currency=KRW');
       const home=page.locator('[data-beta-root]');await expect(home).toHaveAttribute('data-beta-ready','true');
       const today=page.locator('[data-beta-card="today"]');
-      await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.04%');
+      await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.10%');
+      await expect(today).toContainText('가격 변동 +39,000원');
+      await expect(today).toContainText('환율 변동 -7,000원');
       const amount=today.getByLabel('오늘 변동액 · KRW',{exact:true});await expect(amount).toContainText('+32,000');
       assert.ok(await amount.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))>=22);
       await expect(today).toContainText('일부 종목 기준 · 1종목 제외');
@@ -177,7 +179,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
     const today=page.locator('[data-beta-card="today"]');
     await expect(today.getByLabel('오늘 변동액 · USD',{exact:true})).toContainText('+22.86');
     await expect(today).toContainText('변동률은 KRW 기준');
-    await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.04%');
+    await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.10%');
     await expect(page.locator('[data-beta-card="heatmap"]')).toContainText('KRW 기준');
   });
   await page.emulateMedia({reducedMotion:'no-preference'});

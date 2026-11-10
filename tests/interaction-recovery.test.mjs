@@ -92,6 +92,30 @@ test('all excluded current holdings have a reason while matched return values re
   assert.equal(result.changeKrw,-50);assert.equal(result.returnPct,-5);assert.deepEqual(input,before);
 });
 
+test('current basket separates offsetting local price and FX moves using the same comparable quantities', async () => {
+  const base = {
+    assetType: 'etf', account: 'brokerage', quantity: 2, priceStatus: 'ok',
+    priceQuoteType: 'live', priceFetchedAt: '2026-07-08T01:00:00Z',
+  };
+  const usd = { ...base, id: 'us', ticker: 'VOO', name: 'VOO', market: 'us', currency: 'USD', currentPrice: 90, valueKrw: 252000 };
+  const krw = { ...base, id: 'kr', ticker: '069500', name: 'KODEX 200', market: 'korea', currency: 'KRW', currentPrice: 105, valueKrw: 210 };
+  const input = {
+    holdings: [usd, krw], priceRows: [], usdKrwRate: 1400, baselineDate: '2026-07-07',
+    movementCycle: {snapshotDate:'2026-07-08',liveWindowStartAt:new Date('2026-07-07T22:00:00Z'),liveWindowEndAt:new Date('2026-07-08T22:00:00Z')},
+    positionRows: [usd, krw].map(h => ({ id: h.id + '-prev', assetId: h.id, account: h.account, unitPrice: 100, quantity: 1, fxRate: h.currency === 'USD' ? 1300 : null })),
+  };
+  const result = buildCurrentHoldingMovement(input);
+  assert.deepEqual(result.rows.map(r => [r.priceChangeKrw, r.fxChangeKrw]), [[-26000, 18000], [10, 0]]);
+  assert.deepEqual([result.priceChangeKrw, result.fxChangeKrw, result.changeKrw], [-25990, 18000, -7990]);
+  const [contract] = await importUiWithPorts(['src/lib/cairn-v2/read-contract.ts'], {});
+  const evidence = contract.movementEvidenceRows({holdings: input.holdings, todayMovement: {contributionRows: result.rows, exclusions: result.exclusions}});
+  assert.deepEqual(evidence.rows.map(r => [r.ticker,r.priceChangeKrw,r.fxChangeKrw]), [['VOO',-26000,18000], ['069500',10,0]]);
+  const partial = buildCurrentHoldingMovement({...input, positionRows: input.positionRows.map(row => ({...row, fxRate:null}))});
+  assert.deepEqual([partial.priceChangeKrw, partial.fxChangeKrw, partial.excludedCount], [10, 0, 1]);
+  const missing = buildCurrentHoldingMovement({...input, positionRows: []});
+  assert.deepEqual([missing.changeKrw, missing.priceChangeKrw, missing.fxChangeKrw], [null, null, null]);
+});
+
 test('plan display limits percent precision and uses currency minor units without changing calculation values',async()=>{
   const [values,plan]=await importUiWithPorts(['src/components/cairn-v2/reused/saved-plan-values.ts','src/lib/investment-plan.ts'],{});
   const input={currency:'KRW',amount:100,rows:[{name:'A',value:100,targetBps:5000},{name:'B',value:200,targetBps:5000}]};

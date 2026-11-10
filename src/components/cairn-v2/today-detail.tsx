@@ -13,6 +13,7 @@ import { useBetaReadFreshness } from "./beta-provider";
 import styles from "./today-detail.module.css";
 import { Metric, SectionHeading } from "./ui/molecules";
 import { StatusPill } from "./ui/atoms";
+import { MovementBreakdown } from "./movement-breakdown";
 import { formatNumber, formatPercent } from "./ui/format";
 
 // Limited presentation port of original today-contribution-explorer.tsx:
@@ -33,6 +34,7 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  if(!d || ["loading","unauthorized"].includes(d.state)) return <p role="status" className={styles.status}>{movement.message ?? "조회 근거 확인 중"}</p>;
  const market=d.currentHoldingMovement;
  const rows=[...(market?.rows ?? [])].sort((a,b)=>Math.abs(b.changeKrw)-Math.abs(a.changeKrw));
+ const comparisonSource=rows[0]?.source ?? d.movementSource;
  const active=rows.find(row=>selection?.read===readKey&&row.key===selection.key) ?? rows[0] ?? null;
  const maximum=Math.max(1,...rows.map(row=>Number.isFinite(row.changeKrw)?Math.abs(row.changeKrw):0));
  const excluded=market?.exclusions?.filter(row=>row.subject!=="aggregate") ?? [];
@@ -41,11 +43,14 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  return <section className={styles.detail} aria-label="오늘 변동 상세">
   <header className={styles.heading}>
    <dl className={styles.primaryMetrics}>
-    <Metric label="가격·환율 수익률" value={formatPercent(market?.returnPct ?? null,2,true)} size="hero" tone={tone(market?.returnPct ?? null)} note="현재 수량 기준 · KRW" />
-    <Metric label="가격·환율 변동액" value={money(market?.changeKrw ?? null,true)} unit={context.currency} tone={tone(market?.changeKrw ?? null)} note={market?.partial ? "비교 가능한 종목의 소계" : "수량 증가·감소 효과 제외"} />
+    <Metric label="총변동률" value={formatPercent(market?.returnPct ?? null,2,true)} size="hero" tone={tone(market?.returnPct ?? null)} note="현재 수량 기준 · KRW" />
+    <Metric label="총변동액" value={money(market?.changeKrw ?? null,true)} unit={context.currency} tone={tone(market?.changeKrw ?? null)} note={market?.partial ? "비교 가능한 종목의 소계" : "수량 증가·감소 효과 제외"} />
    </dl>
-   <div className={styles.basis}><span>비교 기준</span><strong>{d.comparisonDate ?? "기준일 미제공"}</strong><p>{sourceLabel(d.movementSource)}</p></div>
+   <div className={styles.basis}><span>비교 기준</span><strong>{d.comparisonDate ?? "기준일 미제공"}</strong><p>{sourceLabel(comparisonSource)}</p></div>
   </header>
+  {market && rows.length > 0 && <div className={styles.breakdown}>
+    <MovementBreakdown view={view} currency={context.currency} priceChangeKrw={market.priceChangeKrw} fxChangeKrw={market.fxChangeKrw} previousValueKrw={market.previousValueKrw}/>
+  </div>}
   <div className={styles.coverage}><StatusPill tone={market?.partial ? "muted" : "positive"}>비교 {market?.includedCount ?? 0}종목 · 제외 {market?.excludedCount ?? 0}종목</StatusPill><span>매매 수량 변화 제외</span></div>
   {!rows.length&&movement.message&&<p className={styles.notice} role="status">{movement.message}</p>}
   {context.currency==="USD"&&<p className={styles.notice}>금액은 현재 환율로 환산한 표시입니다. 수익률은 KRW 기준입니다.</p>}
@@ -55,9 +60,10 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
     <div className={styles.chart}>
      <SectionHeading title="종목별 변동" />
      <div className={styles.rows} aria-label="종목별 변동 기여 목록">
-      {rows.map(row=><button key={row.key} type="button" className={styles.row} onClick={()=>select(row)} onFocus={()=>select(row)} aria-pressed={active?.key===row.key} aria-controls={readoutId} aria-label={(instrumentLabel(row))+" · "+(row.accountLabel??"계좌 확인 전")+" · 변동 "+money(row.changeKrw,true)+" "+context.currency+" · 가격·환율 수익률 "+formatPercent(row.returnPct,2,true)}>
+      {rows.map(row=><button key={row.key} type="button" className={styles.row} onClick={()=>select(row)} onFocus={()=>select(row)} aria-pressed={active?.key===row.key} aria-controls={readoutId} aria-label={(instrumentLabel(row))+" · "+(row.accountLabel??"계좌 확인 전")+" · 변동 "+money(row.changeKrw,true)+" "+context.currency+" · 변동률 "+formatPercent(row.returnPct,2,true)+" · 가격 변동 "+money(row.priceChangeKrw,true)+" "+context.currency+" · 환율 변동 "+money(row.fxChangeKrw,true)+" "+context.currency}>
        <span className={styles.identity}><strong title={instrumentLabel(row)}>{instrumentLabel(row)}</strong><small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></span>
        <DotBar value={row.changeKrw} maximum={maximum} active={active?.key===row.key}/>
+       <span className={styles.rowBreakdown}><MovementBreakdown view={view} currency={context.currency} priceChangeKrw={row.priceChangeKrw} fxChangeKrw={row.fxChangeKrw}/></span>
        <span className={styles.rowValue} data-tone={tone(row.changeKrw)}>{money(row.changeKrw,true)}<small>{row.returnPct===null?"변동률 —":formatPercent(row.returnPct,2,true)}</small></span>
       </button>)}
      </div>
@@ -65,7 +71,7 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
     {active&&<aside className={styles.selected} id={readoutId} aria-live="polite">
      <p className={styles.eyebrow}>선택한 종목</p><h3>{instrumentLabel(active)}</h3><p>{active.accountLabel??"계좌 확인 전"} · {active.market??"시장 미제공"}</p>
      <strong className={styles.selectedAmount} data-tone={tone(active.changeKrw)}>{money(active.changeKrw,true)} <small>{context.currency}</small></strong>
-     <dl><Metric label="가격·환율 수익률" value={formatPercent(active.returnPct,2,true)} /><Metric label="같은 수량의 기준 평가" value={formatNumber(active.previousValueKrw,{maximumFractionDigits:0})} unit="원" /></dl>
+     <dl><Metric label="변동률" value={formatPercent(active.returnPct,2,true)} /><Metric label="같은 수량의 기준 평가" value={formatNumber(active.previousValueKrw,{maximumFractionDigits:0})} unit="원" /></dl>
      <p className={styles.selectedNote}>같은 수량의 가격·환율 변화입니다.</p>
      {active.identityStatus==="unmatched"&&<p className={styles.notice}>변동 근거는 있으나 현재 종목 이름을 연결하지 못했습니다.</p>}
     </aside>}
@@ -78,13 +84,21 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
   <details className={styles.evidence}><summary>숫자·시세·비교 근거</summary>
    {rows.length>0&&<>
    <div className={styles.tableScroll} tabIndex={0} aria-label="종목별 변동 원본 숫자 표">
-    <table><caption>종목별 변동 근거 · KRW 원본</caption><thead><tr><th>종목 · 계좌</th><th>가격·환율 변동액</th><th>수익률</th><th>같은 수량의 기준 평가</th></tr></thead><tbody>{rows.map(row=><tr key={row.key}><th>{instrumentLabel(row)}<small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></th><td data-tone={tone(row.changeKrw)}>{exact(row.changeKrw,true)}</td><td>{row.returnPct===null?"—":exact(row.returnPct,true)+"%"}</td><td>{exact(row.previousValueKrw)}</td></tr>)}</tbody></table>
+    <table><caption>종목별 변동 근거 · KRW 원본</caption>
+     <thead><tr><th>종목 · 계좌</th><th>총변동액</th><th>가격 변동</th><th>환율 변동</th><th>변동률</th><th>같은 수량의 기준 평가</th></tr></thead>
+     <tbody>{rows.map(row=><tr key={row.key}>
+      <th>{instrumentLabel(row)}<small>{row.accountLabel??"계좌 확인 전"}{row.ticker?" · "+row.ticker:""}</small></th>
+      <td data-tone={tone(row.changeKrw)}>{exact(row.changeKrw,true)}</td>
+      <td data-tone={tone(row.priceChangeKrw)}>{exact(row.priceChangeKrw,true)}</td>
+      <td data-tone={tone(row.fxChangeKrw)}>{exact(row.fxChangeKrw,true)}</td>
+      <td>{row.returnPct===null?"—":exact(row.returnPct,true)+"%"}</td><td>{exact(row.previousValueKrw)}</td>
+     </tr>)}</tbody></table>
    </div>
 
    </>}
-   <p>화면 갱신 {d.refreshedAt??"미제공"} · 비교 기준일 {d.comparisonDate??"미제공"} · {sourceLabel(d.movementSource)}</p>
+   <p>화면 갱신 {d.refreshedAt??"미제공"} · 비교 기준일 {d.comparisonDate??"미제공"} · {sourceLabel(comparisonSource)}</p>
    <p>변동 모델 환율 {exact(d.moneyBasis.dashboard.usdKrwRate)} · 환율 기준일 {d.moneyBasis.dashboard.rateDate??"미제공"}. 수익률은 현재 보유 수량을 고정한 KRW 가격·환율 비교입니다.</p>
-   <p>종목별 값은 동일 수량의 기준 평가와 현재 평가 차이입니다. 미확인 가격·환율은 제외하며, 전체 수익률로 확대 해석하지 않습니다.</p>
+   <p>가격 변동은 기준일 환율을 고정해 계산하고, 환율 변동은 현재 종목 가격을 고정해 계산합니다. %p는 각각이 총변동률에 더한 값입니다.</p>
    <p>원본 상태: {d.movementSource??"none"}{d.movementReason?" · "+d.movementReason:""}{d.movementRead?.reasons.length?" · "+d.movementRead.reasons.join(", "):""}</p>
   </details>
   <ActionGroup label="오늘 변동 더 살펴보기"><Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),freshness?.store.pendingEpoch())}><ActionContent icon={<History size={22}/>} title="지난 변동과 이어서 보기" description="날짜별 평가액과 수익률"/></Link></ActionGroup>

@@ -42,6 +42,7 @@ export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" |
 export type BetaMovementRow = Readonly<{
   key: string; name: string | null; ticker: string | null; account: string | null; accountLabel: string | null; market: string | null; currency: string | null;
   changeKrw: number; returnPct: number | null; previousValueKrw: number; tradeFlowKrw: number;
+  priceChangeKrw: number | null; fxChangeKrw: number | null;
   source: DashboardData["todayMovement"]["contributionRows"][number]["source"]; identityStatus: "matched" | "unmatched";
 }>;
 export type BetaMovementExclusion = Pick<DashboardData["todayMovement"]["exclusions"][number], "subject" | "reason" | "source" | "ticker" | "assetName" | "account" | "currency" | "valueKrw">;
@@ -56,7 +57,8 @@ export function movementEvidenceRows(dashboard: DashboardData) {
     const occurrence = occurrences.get(identity) ?? 0;
     occurrences.set(identity, occurrence + 1);
     return { key: JSON.stringify([identity, occurrence]), name: holding?.name ?? null, ticker: holding?.ticker ?? null, account: holding?.account ?? null, accountLabel: holding ? labels.get(holding.account) ?? holding.account : null, market: holding?.market ?? null, currency: holding?.currency ?? null,
-      changeKrw: row.changeKrw, returnPct: row.returnPct, previousValueKrw: row.previousValueKrw, tradeFlowKrw: row.tradeFlowKrw, source: row.source, identityStatus: holding ? 'matched' : 'unmatched' };
+      changeKrw: row.changeKrw, priceChangeKrw: row.priceChangeKrw, fxChangeKrw: row.fxChangeKrw,
+      returnPct: row.returnPct, previousValueKrw: row.previousValueKrw, tradeFlowKrw: row.tradeFlowKrw, source: row.source, identityStatus: holding ? 'matched' : 'unmatched' };
   });
   const exclusions: BetaMovementExclusion[] = dashboard.todayMovement.exclusions.map(row => ({subject:row.subject,reason:row.reason,source:row.source,ticker:row.ticker,assetName:row.assetName,account:row.account,currency:row.currency,valueKrw:row.valueKrw}));
   return { rows, exclusions };
