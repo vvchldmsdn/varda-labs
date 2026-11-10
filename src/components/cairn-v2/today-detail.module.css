@@ -23,3 +23,18 @@
 
 @container today-detail (max-width:600px) { .rows {grid-template-columns:minmax(0,1fr);} }
 .row {gap:4px 10px;padding:8px 4px!important;}
+@container today-detail (min-width:601px) {
+  .heading { margin-bottom:8px; }
+  .breakdown { padding-bottom:6px; }
+  .explorer { margin-top:12px; }
+  .row {
+    grid-template-columns:minmax(0,1fr) minmax(0,34%) auto;
+    grid-template-areas:"identity bar total" "effects effects total";
+    row-gap:2px;
+    line-height:1.35;
+  }
+  .identity { grid-area:identity; }
+  .rowValue { grid-area:total; }
+  .rowBreakdown { grid-area:effects; }
+  .bar { grid-area:bar; }
+}
