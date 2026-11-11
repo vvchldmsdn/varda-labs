@@ -11,6 +11,7 @@ import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { CURRENT_VALUATION_SOURCE, historyWithCurrentValue } from "@/lib/cairn-v2/history-current";
 import { useBetaPreferences } from "./beta-provider";
 import { useMeasuredPlot } from "@/components/use-measured-plot";
+import { ImpactLegend, ImpactLines, useHomeImpact } from "./home-impact";
 
 import { historyRows, historyAxis, readStateText } from "@/lib/cairn-v2/read-presentation";
 export { historyRows } from "@/lib/cairn-v2/read-presentation";
@@ -36,6 +37,7 @@ export function HistoryChart({
   currency?: BetaCurrency;
 }) {
   const { metric, period, historyDate, setHistoryDate } = useBetaPreferences();
+  const impact = useHomeImpact();
   const [measured, setPlotElement] = useMeasuredPlot();
   const [inspecting, setInspecting] = useState(false);
   const canExplore = !compact || interactive;
@@ -48,6 +50,8 @@ export function HistoryChart({
   if (metric === "return" && inputView.domain?.recoveredReturn)
     return (
       <ReturnTimelineChart
+        renderOverlay={impact ? plot => <ImpactLines chart={impact} plot={plot} /> : undefined}
+        renderLegend={impact ? (date, value) => <ImpactLegend chart={impact} date={date} label="수익률" value={value} /> : undefined}
         stored={historyRows(view, "ALL").map((p) => ({
           date: p.date,
           returnPct: p.exampleReturnPct,
@@ -120,6 +124,11 @@ export function HistoryChart({
   if (segment) segments.push(segment);
   const matchedIndex = rows.findIndex((r) => r.date === historyDate);
   const selectedIndex = matchedIndex >= 0 ? matchedIndex : rows.length - 1;
+  const selectedRow = rows[selectedIndex];
+  const selectedMoney = displayReadMoney(view, selectedRow.valueKrw, currency);
+  const selectedValue = metric === "return"
+    ? selectedRow.exampleReturnPct == null ? "—" : selectedRow.exampleReturnPct.toFixed(2) + "%"
+    : selectedMoney === "—" ? "—" : selectedMoney + (currency === "KRW" ? "원" : " USD");
   const selectedPoint = points[selectedIndex];
   const selectedX = plot.left + axis.fraction(rows[selectedIndex].date) * (plot.right - plot.left);
   const selectPointerDate = (event: PointerEvent<SVGSVGElement>) => {
@@ -207,7 +216,7 @@ export function HistoryChart({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="var(--home-chart-line, #c64623)" stopOpacity=".10" />
+            <stop stopColor="var(--home-chart-line, #c64623)" stopOpacity={impact ? ".16" : ".10"} />
             <stop offset="1" stopColor="var(--home-chart-line, #c64623)" stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -226,12 +235,14 @@ export function HistoryChart({
           ),
         )}
         {segments.map((d, i) => (
-          <g key={i}>
+          <g key={metric + period + i}>
             {metric === "value" && d.includes(" L") && (
               <path d={`${d} L${d.split(" L").at(-1)!.split(",")[0]},${plot.bottom} L${d.slice(1).split(",")[0]},${plot.bottom} Z`} fill={`url(#${gradientId})`} />
             )}
             <path
               d={d}
+              data-history-line
+              pathLength="1"
               stroke="var(--home-chart-line, #c64623)"
               strokeWidth="2"
               strokeLinecap="round"
@@ -255,6 +266,8 @@ export function HistoryChart({
               vectorEffect="non-scaling-stroke"
             />
           )}
+        {impact && <ImpactLines chart={impact} plot={{ start: rows[0].date, end: rows[rows.length - 1].date,
+          top: plot.top, bottom: plot.bottom, x: date => plot.left + axis.fraction(date) * (plot.right - plot.left) }} />}
         {(!compact || (interactive && inspecting)) && (
           <line
             x1={selectedX}
@@ -312,6 +325,9 @@ export function HistoryChart({
           </span>
         ))}
       </figcaption>
+      {impact && <ImpactLegend chart={impact} date={rows[selectedIndex].date}
+        label={metric === "value" ? "평가액" : "수익률"}
+        value={selectedValue} />}
       {!compact && (
         <CairnField className={styles.dateSlider}>
           조회 날짜

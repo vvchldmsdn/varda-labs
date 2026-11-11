@@ -44,3 +44,57 @@
   .shell.shell.shell > main {margin-left:112px;width:calc(100% - 112px)}
 }
 @media(min-width:800px){.shell.shell.shell > aside nav a[aria-current=page]{border-radius:0;background:transparent}}
+.shell.shell[data-home-dashboard] > main > header { min-height:64px; padding:12px 0; align-items:center; gap:10px; }
+.shell.shell[data-home-dashboard] > main > header h1[data-cairn-page-title] { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.overview { display:flex; align-items:center; justify-content:space-between; gap:12px; flex:1; min-width:0; }
+.overview .eyebrow { position:static; color:#77736c; font-size:10px; white-space:nowrap; }
+.overview time { display:flex; align-items:center; gap:6px; font-size:11px; color:#68685e; }
+.overview time::before { content:""; width:6px; height:6px; border-radius:50%; background:#7f9586; }
+.shell.shell[data-home-dashboard] > main > header > button { border-radius:22px; min-width:132px; }
+.shell.shell[data-home-dashboard] > main > header > button span { transition:transform 220ms ease; }
+.shell.shell[data-home-dashboard] > main > header > button[aria-expanded=true] span { transform:rotate(180deg); }
+.currency[data-currency] { position:relative; isolation:isolate; gap:0; border-radius:99px; }
+.currency[data-currency]::before { content:""; position:absolute; inset:4px auto 4px 4px; width:calc(50% - 4px); z-index:-1; background:#18212a; border-radius:99px; transition:transform 330ms cubic-bezier(.22,1.15,.4,1); }
+.currency[data-currency=USD]::before { transform:translateX(100%); }
+.currency[data-currency] [data-cairn-button] { flex:1; border-radius:99px; min-width:46px; transition:color 160ms; }
+.currency[data-currency] [data-cairn-button][aria-pressed=true] { background:transparent; }
+@media(min-width:800px) {
+ .shell[data-home-dashboard] > aside > a { margin-right:16px; }
+ .shell[data-home-dashboard] > aside > a svg { transition:transform 260ms cubic-bezier(.22,1.15,.4,1); }
+ .shell[data-home-dashboard] > aside > a:hover svg { transform:rotate(12deg) scale(1.06); }
+}
+@media(max-width:799px) {
+ .shell.shell[data-home-dashboard] > main > header { flex-wrap:wrap; padding:16px 0 12px; gap:6px; }
+ .overview { flex-basis:100%; }
+ .shell.shell[data-home-dashboard] > main > header > button { max-width:none; min-width:0; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .shell[data-home-dashboard] > aside > a:hover svg { transform:none; }
+ .currency[data-currency]::before,.shell.shell[data-home-dashboard] > main > header > button span { transition:none; }
+}
+.shell[data-reduced=true] .currency::before,.shell[data-reduced=true] > main > header > button span { transition:none; }
+.shell[data-reduced=true] > aside > a:hover svg { transform:none; }
+@media(prefers-reduced-motion:no-preference) {
+ .shell[data-home-dashboard][data-reduced=false] > aside > a svg path:last-of-type { animation:brand-pulse 3.2s ease-in-out infinite; }
+ .shell[data-home-dashboard][data-reduced=false] > main > header button:active { scale:.96; }
+}
+@keyframes brand-pulse { 0%,100% {opacity:.55} 50% {opacity:1} }
+.shell > aside .menuToggle { display:none; }
+@media(max-width:1023px) {
+ .shell.shell[data-home-dashboard] > aside { position:sticky; inset:0 0 auto; width:100%; height:auto; z-index:10; overflow:visible; display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:0 8px; padding:0 20px; border:0; border-bottom:1px solid #ddd8cc; background:#f4f0e7f5; backdrop-filter:blur(14px); }
+ .shell.shell[data-home-dashboard] > aside > a { grid-row:1; grid-column:1; display:inline-flex; justify-self:start; align-items:center; height:60px; margin:0; padding:0; }
+ .shell.shell[data-home-dashboard] > aside > button { display:grid; grid-row:1; grid-column:2; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; margin:0; padding:0; border:1px solid #d9d3c7; border-radius:50%; background:#faf8f3; }
+ .shell.shell[data-home-dashboard] > aside > button > span:last-child { display:none; }
+ .shell.shell[data-home-dashboard] > aside > .menuToggle { grid-column:3; background:#18212a; color:#f7f2e8; }
+ .shell.shell[data-home-dashboard] > aside nav { grid-column:1/-1; grid-row:2; display:flex; justify-content:start; gap:4px; max-height:0; margin:0; padding:0; overflow:hidden; visibility:hidden; opacity:0; }
+ .shell.shell[data-home-dashboard] > aside[data-menu-open] nav { max-height:68px; padding:6px 0 10px; visibility:visible; opacity:1; }
+ .shell.shell[data-home-dashboard] > aside nav > div { flex:0 1 auto; }
+ .shell.shell[data-home-dashboard] > aside nav a { justify-content:center; min-height:44px; padding:6px 14px; border-radius:24px; font-size:13px; }
+ .shell.shell[data-home-dashboard] > aside nav a span:first-child { display:none; }
+ .shell.shell[data-home-dashboard] > aside nav a[aria-current] { box-shadow:none; background:#18212a; color:#f7f2e8; }
+ .shell.shell[data-home-dashboard] > main { width:100%; margin:0 auto; padding-bottom:40px; }
+ .shell[data-home-dashboard] > main > header button[aria-label="화면 설정"] { display:none; }
+}
+@media(max-width:1023px) and (prefers-reduced-motion:no-preference) {
+ .shell[data-home-dashboard][data-reduced=false] > aside nav { transition:max-height 240ms ease,opacity 180ms,padding 240ms ease,visibility 240ms; }
+}

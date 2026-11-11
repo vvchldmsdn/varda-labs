@@ -1,11 +1,12 @@
 "use client";
+import type { ReactNode } from "react";
 import { instrumentLabel } from "@/lib/instrument-display";
 import { RecoveryTitle } from "@/components/recovery/recovery-notice";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
 import home from "./home-contribution.module.css";
 const DEFAULT_COLORS = ["#ef5a32", "#30362f", "#cda680", "#8b9d89", "#80909b", "#bdbbae"];
-export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS }: { view: BetaView; dirty?: boolean; colors?: readonly string[] }) {
+export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS, children }: { view: BetaView; dirty?: boolean; colors?: readonly string[]; children?: ReactNode }) {
   const read = view.domain?.planning?.contribution;
   const result = !dirty && read?.state === "ready" ? read.result : null;
   const palette = colors.length ? colors : DEFAULT_COLORS;
@@ -38,6 +39,7 @@ export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS 
     >
       <div className={home.headline}>
         <div
+          key={result.cashAmountKrw}
           className={home.amount}
           data-large={result.cashAmountKrw >= 1e9}
           title={eventNumber(result.cashAmountKrw) + " KRW"}
@@ -64,6 +66,7 @@ export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS 
               </dd>
             </div>
           </dl>
+          {children}
           <div
             className={home.allocation}
             role="img"
@@ -78,9 +81,9 @@ export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS 
                 : "매수 배분과 남는 현금 0 KRW")
             }
           >
-            {segments.map((row) => (
+            {segments.map((row, index) => (
               <span
-                key={row.key}
+                key={result.cashAmountKrw + ":" + row.key}
                 data-funding-amount={row.amount}
                 style={{
                   width:
@@ -88,6 +91,7 @@ export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS 
                       ? (row.amount / result.totalAvailableFundsKrw) * 100
                       : 0) + "%",
                   backgroundColor: row.color,
+                  animationDelay: `${index * 40}ms`,
                 }}
                 title={row.name + " · " + eventNumber(row.amount) + " KRW"}
               />

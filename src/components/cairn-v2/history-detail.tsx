@@ -186,7 +186,7 @@ export function HistoryDetail({
             <CairnSectionTitle level="h3">{metric === "value" ? "평가액의 흐름" : "수익률의 흐름"}</CairnSectionTitle>
 
           </div>
-          <HistoryChart view={view} />
+          <HistoryChart view={view} currency={context.currency} />
           {periodControls}
           {view.domain && sourceKinds.length > 1 && (
             <div

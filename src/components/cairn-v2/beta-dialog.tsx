@@ -32,12 +32,14 @@ export function BetaDialog({
   origin,
   onClosed,
   popover = false,
+  homeMotion = false,
 }: {
   children: ReactNode;
   label: string;
   origin: ExpansionOrigin;
   onClosed: () => void;
   popover?: boolean;
+  homeMotion?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -87,10 +89,10 @@ export function BetaDialog({
     const rect = origin.trigger.isConnected
       ? (origin.trigger.closest("[data-beta-card]")?.getBoundingClientRect() ?? origin.rect)
       : origin.rect;
-    const timing = popover ? dialogMotion.popoverClose : dialogMotion.close;
+    const timing = homeMotion && CSS.supports("animation-timing-function", dialogMotion.homeClose.easing) ? dialogMotion.homeClose : popover ? dialogMotion.popoverClose : dialogMotion.close;
     panel.style.willChange = "transform, opacity";
     const panelAnimation = panel.animate(
-      [current, { transform: panelTransformAtRect(target, rect), opacity: 0 }],
+      [current, { transform: homeMotion ? `translateY(${popover ? -6 : 10}px) scale(.98)` : panelTransformAtRect(target, rect), opacity: 0 }],
       { ...timing, fill: "forwards" },
     );
     const scrimAnimation = scrim.animate([{ opacity: currentScrimOpacity }, { opacity: 0 }], {
@@ -99,7 +101,7 @@ export function BetaDialog({
     });
     animationsRef.current = [panelAnimation, scrimAnimation];
     panelAnimation.onfinish = finish;
-  }, [cancelAnimations, origin, popover, reduceEffects]);
+  }, [cancelAnimations, homeMotion, origin, popover, reduceEffects]);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current!;
@@ -107,6 +109,7 @@ export function BetaDialog({
     const scrim = scrimRef.current!;
     closingRef.current = false;
     closedRef.current = false;
+    if (homeMotion) panel.style.transformOrigin = popover ? "center top" : "center";
     const unlock = lockBackground();
     dialog.style.visibility = "hidden";
     dialog.showModal();
@@ -120,7 +123,7 @@ export function BetaDialog({
         : Math.min(744, window.innerHeight - (mobile ? 24 : 100));
       const left = popover
         ? Math.max(12, Math.min(origin.rect.left, window.innerWidth - width - 12))
-        : (window.innerWidth - width + (mobile ? 0 : 80)) / 2;
+        : (window.innerWidth - width + (mobile || homeMotion ? 0 : 80)) / 2;
       const top = popover
         ? Math.max(12, Math.min(origin.rect.bottom + 10, window.innerHeight - height - 12))
         : (window.innerHeight - height) / 2;
@@ -136,11 +139,11 @@ export function BetaDialog({
     measure();
     const target = panel.getBoundingClientRect();
     if (!reduceEffects && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const timing = popover ? dialogMotion.popoverOpen : dialogMotion.open;
+      const timing = homeMotion && CSS.supports("animation-timing-function", dialogMotion.homeOpen.easing) ? dialogMotion.homeOpen : popover ? dialogMotion.popoverOpen : dialogMotion.open;
       panel.style.willChange = "transform, opacity";
       const panelAnimation = panel.animate(
         [
-          { transform: panelTransformAtRect(target, origin.rect), opacity: 0.3 },
+          { transform: homeMotion ? `translateY(${popover ? -6 : 18}px) scale(${popover ? .98 : .97})` : panelTransformAtRect(target, origin.rect), opacity: homeMotion ? 0 : 0.3 },
           { transform: "none", opacity: 1 },
         ],
         timing,
@@ -188,6 +191,7 @@ export function BetaDialog({
     <dialog
       ref={dialogRef}
       className={`${styles.dialog} ${styles.scope} ${tokens.scope} ${motionStyles.motionDialog}`}
+      data-home-motion={homeMotion ? popover ? "popover" : "modal" : undefined}
       data-reduced={reduceEffects}
       aria-label={label}
       onCancel={(event) => {

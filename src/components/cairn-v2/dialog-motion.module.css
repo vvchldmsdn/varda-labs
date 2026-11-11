@@ -5,3 +5,12 @@ dialog.motionDialog::backdrop {background:transparent;}
 dialog.motionDialog:not([open]) {display:none;}
 .scrim {position:fixed;inset:0;background:#20211f33;pointer-events:none;}
 .panel {transform-origin:top left;}
+.motionDialog[data-home-motion=modal] .scrim { background:#11182099; }
+.motionDialog[data-home-motion=modal] .panel { background:#f7f3ea; border:1px solid #d9d3c7; border-radius:26px; }
+@media(prefers-reduced-motion:no-preference) { .motionDialog[data-home-motion=modal][data-reduced=false] .scrim { backdrop-filter:blur(3px); } }
+.motionDialog[data-home-motion=modal] [data-detail-kind=history] figure:has([data-history-plot]),
+.motionDialog[data-home-motion=modal] [data-detail-kind=history] [data-return-timeline] {
+ --home-chart-line:#f39579; --home-chart-grid:#ffffff17; --paper:#17232d; --ink:#f8f4eb; --muted:#b5bec4; --brand:#f39579;
+ --cairn-v2-ink:#f8f4eb; --cairn-v2-muted:#b5bec4;
+ padding:16px; border-radius:18px; background:var(--paper); color:var(--ink);
+}
