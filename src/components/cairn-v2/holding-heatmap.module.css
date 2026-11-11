@@ -54,3 +54,7 @@
 .surface[data-compact=true] { display:flex; flex-direction:column; }
 .surface[data-compact=true] .readout:not([data-empty=true]) { order:-1; align-self:flex-end; padding:0 2px 6px; text-align:right; }
 .surface[data-compact=true] .readout:not([data-empty=true]) p:first-child { justify-content:flex-end; }
+:global([data-home-theme=dark]) .popover { background:#17232d; color:#f3efe7; border-color:#35444f; }
+:global([data-home-theme=dark]) .popover :is(dt,small) { color:#a6b1b8; }
+:global([data-home-theme=dark]) .popover dl { background:#23303a; border-color:#35444f; }
+:global([data-home-theme=dark]) .popover dl > div { border-color:#35444f; }

@@ -81,11 +81,12 @@
 @keyframes brand-pulse { 0%,100% {opacity:.55} 50% {opacity:1} }
 .shell > aside .menuToggle { display:none; }
 @media(max-width:1023px) {
- .shell.shell[data-home-dashboard] > aside { position:sticky; inset:0 0 auto; width:100%; height:auto; z-index:10; overflow:visible; display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:0 8px; padding:0 20px; border:0; border-bottom:1px solid #ddd8cc; background:#f4f0e7f5; backdrop-filter:blur(14px); }
+ .shell.shell[data-home-dashboard] > aside { position:sticky; inset:0 0 auto; width:100%; height:auto; z-index:10; overflow:visible; display:grid; grid-template-columns:minmax(0,1fr) repeat(3,auto); align-items:center; gap:0 8px; padding:0 20px; border:0; border-bottom:1px solid #ddd8cc; background:#f4f0e7f5; backdrop-filter:blur(14px); }
  .shell.shell[data-home-dashboard] > aside > a { grid-row:1; grid-column:1; display:inline-flex; justify-self:start; align-items:center; height:60px; margin:0; padding:0; }
- .shell.shell[data-home-dashboard] > aside > button { display:grid; grid-row:1; grid-column:2; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; margin:0; padding:0; border:1px solid #d9d3c7; border-radius:50%; background:#faf8f3; }
+ .shell.shell[data-home-dashboard] > aside > button { display:grid; grid-row:1; grid-column:3; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; margin:0; padding:0; border:1px solid #d9d3c7; border-radius:50%; background:#faf8f3; }
  .shell.shell[data-home-dashboard] > aside > button > span:last-child { display:none; }
- .shell.shell[data-home-dashboard] > aside > .menuToggle { grid-column:3; background:#18212a; color:#f7f2e8; }
+ .shell.shell[data-home-dashboard] > aside > .themeToggle { grid-column:2; }
+ .shell.shell[data-home-dashboard] > aside > .menuToggle { grid-column:4; background:#18212a; color:#f7f2e8; }
  .shell.shell[data-home-dashboard] > aside nav { grid-column:1/-1; grid-row:2; display:flex; justify-content:start; gap:4px; max-height:0; margin:0; padding:0; overflow:hidden; visibility:hidden; opacity:0; }
  .shell.shell[data-home-dashboard] > aside[data-menu-open] nav { max-height:68px; padding:6px 0 10px; visibility:visible; opacity:1; }
  .shell.shell[data-home-dashboard] > aside nav > div { flex:0 1 auto; }
@@ -97,4 +98,42 @@
 }
 @media(max-width:1023px) and (prefers-reduced-motion:no-preference) {
  .shell[data-home-dashboard][data-reduced=false] > aside nav { transition:max-height 240ms ease,opacity 180ms,padding 240ms ease,visibility 240ms; }
+}
+.shell[data-home-dashboard] .themeToggle {
+  display:grid; place-items:center; color:var(--cairn-v2-ink);
+}
+@media(min-width:1024px) {
+  .shell[data-home-dashboard] > aside > .themeToggle + button { margin-left:-24px; }
+}
+@media(prefers-reduced-motion:no-preference) {
+  .shell[data-home-dashboard][data-reduced=false] { transition:background-color 300ms,color 300ms; }
+  .shell[data-reduced=false] .themeToggle svg { animation:theme-icon 180ms ease-out; }
+  .shell[data-reduced=false] .themeToggle:active { scale:.9; }
+}
+@keyframes theme-icon { from { opacity:0;transform:rotate(-30deg) scale(.7); } to { opacity:1;transform:none; } }
+.shell.shell[data-home-theme=dark], .shell[data-home-theme=dark] dialog {
+  color-scheme:dark;
+  --cairn-v2-ink:#f3efe7; --cairn-v2-muted:#a6b1b8; --cairn-v2-paper:#17232d; --cairn-v2-line:#35444f;
+  --cairn-v2-brand:#f39579; --cairn-ui-ink:#f3efe7; --cairn-ui-muted:#a6b1b8; --cairn-ui-paper:#17232d;
+  --cairn-ui-line:#35444f; --cairn-ui-surface:#26343e; --cairn-ui-brand:#f39579;
+  --ink:#f3efe7; --muted:#a6b1b8; --paper:#17232d; --surface:#26343e; --wash:#202b33; --line:#35444f;
+  color:var(--cairn-v2-ink);
+}
+.shell.shell[data-home-theme=dark] { background:#0d151c; }
+.shell.shell[data-home-theme=dark] > aside { background:#0d151cf2; border-color:#293640; }
+.shell[data-home-theme=dark] .overview :is(.eyebrow,time) { color:#a6b1b8; }
+.shell.shell[data-home-theme=dark] > main > header > button,
+.shell.shell[data-home-theme=dark] > aside > button,
+.shell[data-home-theme=dark] .currency,
+.shell[data-home-theme=dark] > main > header button[aria-label*="갱신"] {
+  color:#dde3e6; border-color:#33424d; background:#151f27;
+}
+.shell[data-home-theme=dark] > aside img { filter:invert(1); }
+.shell.shell[data-home-theme=dark] > aside > .themeToggle { color:#f0d7a6; }
+.shell[data-home-theme=dark] .currency::before,
+.shell.shell[data-home-theme=dark] > aside > .menuToggle { background:#f3efe7; color:#17232d; }
+.shell[data-home-theme=dark] .currency button { color:#a6b1b8; }
+.shell[data-home-theme=dark] .currency button[aria-pressed=true] { color:#17232d; }
+@media(max-width:1023px) {
+  .shell.shell[data-home-theme=dark] > aside nav a[aria-current] { background:#f3efe7; color:#17232d; }
 }

@@ -1,5 +1,6 @@
 "use client";
-import { Menu, X } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
+import { useHomeTheme } from "./use-home-theme";
 import homeNavigation from "@/components/home/home-navigation.module.css";
 import homeDesign from "./home-shell.module.css";
 import { Button as CairnButton, Checkbox as CairnCheckbox, Field as CairnField, Input as CairnInput, PageTitle as CairnPageTitle, Select as CairnSelect, SectionTitle as CairnSectionTitle, Status as CairnStatus } from "@/components/cairn-ui";
@@ -49,6 +50,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
   const settingsOrigin = popover?.kind === 'settings' ? popover.origin : null;
   const setScopeOrigin = (origin: ExpansionOrigin | null) => setPopover(origin ? {kind:'scope',origin} : null);
   const openSettings = (trigger: HTMLButtonElement) => setPopover({kind:'settings',origin:{rect:trigger.getBoundingClientRect(),trigger}});
+  const { dark, toggle } = useHomeTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   const [search, setSearch] = useState("");
@@ -93,7 +95,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
   const observedTimes = !workspace ? (readView?.domain?.priceObservedAt ?? []).map(date => date ? Date.parse(date) : NaN).filter(Number.isFinite) : [];
   const latestQuote = observedTimes.length ? new Date(Math.max(...observedTimes)) : null;
   const currentLink = (href: string) => isCurrentWorkspaceLink(pathname, context.analysis, href) ? 'page' as const : undefined;
-  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell}`} data-home-dashboard={!workspace || undefined} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
+  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell}`} data-home-theme={!workspace ? dark ? "dark" : "light" : undefined} data-home-dashboard={!workspace || undefined} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
     <aside className={styles.navigation} aria-label="목적별 내비게이션" data-menu-open={menuOpen || undefined}
       onKeyDown={event => { if (menuOpen && event.key === "Escape") { setMenuOpen(false); menuTrigger.current?.focus(); } }}
       onBlur={event => { if (menuOpen && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false); }}>
@@ -103,6 +105,9 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
           <span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>
         </Link> : <a className={styles.purposeLink} href={originalHref(item.original, context)} title="기존 화면에서 계속"><span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>{workspace && <small>기존 ↗</small>}</a>}
       </div>)}</nav>
+      {!workspace && <CairnButton variant="bare" className={homeDesign.themeToggle} type="button" aria-label={dark ? "라이트 모드로 전환" : "다크 모드로 전환"} onClick={toggle}>
+        {dark ? <Sun key="sun" size={17} aria-hidden /> : <Moon key="moon" size={17} aria-hidden />}
+      </CairnButton>}
       <CairnButton variant="bare" className={`${styles.settingsLink} ${controls.settingsTrigger}`} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><span className={styles.navIcon}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></span><span>설정</span></CairnButton>
       {!workspace && <CairnButton variant="bare" ref={menuTrigger} className={homeDesign.menuToggle} type="button" aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"} aria-expanded={menuOpen} aria-controls="beta-home-navigation" onClick={() => setMenuOpen(!menuOpen)}>
         {menuOpen ? <X size={18} aria-hidden /> : <Menu size={18} aria-hidden />}

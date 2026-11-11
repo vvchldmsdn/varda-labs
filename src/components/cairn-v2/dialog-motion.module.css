@@ -7,6 +7,10 @@ dialog.motionDialog:not([open]) {display:none;}
 .panel {transform-origin:top left;}
 .motionDialog[data-home-motion=modal] .scrim { background:#11182099; }
 .motionDialog[data-home-motion=modal] .panel { background:#f7f3ea; border:1px solid #d9d3c7; border-radius:26px; }
+:global([data-home-theme=dark]) dialog.motionDialog .panel {
+ background:var(--cairn-v2-paper); color:var(--cairn-v2-ink); border-color:var(--cairn-v2-line);
+}
+:global([data-home-theme=dark]) .motionDialog [data-dialog-close] img { filter:invert(1); }
 @media(prefers-reduced-motion:no-preference) { .motionDialog[data-home-motion=modal][data-reduced=false] .scrim { backdrop-filter:blur(3px); } }
 .motionDialog[data-home-motion=modal] [data-detail-kind=history] figure:has([data-history-plot]),
 .motionDialog[data-home-motion=modal] [data-detail-kind=history] [data-return-timeline] {

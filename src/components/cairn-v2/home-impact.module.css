@@ -1,15 +1,18 @@
 .series[data-history-impact=price], .legend [data-impact=price] { --effect:#70a889; }
 .series[data-history-impact=fx], .legend [data-impact=fx] { --effect:#a98cc6; }
 .series { color:var(--effect); fill:currentColor; }
-.legend { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin:8px 0 2px; }
-.legend > div,.legend > button { min-width:0; border:0; border-radius:8px; padding:7px 10px; background:#ffffff0c; color:inherit; text-align:left; }
+.legend { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; margin:8px 0 2px; }
+.legend > div,.legend > button { min-width:0; border:0; position:relative; border-radius:0; padding:7px 10px; background:transparent; color:inherit; text-align:left; }
 .legend > div { --effect:#f39579; }
 .legend span { display:flex; align-items:center; gap:5px; font-size:10px; line-height:1.4; color:var(--cairn-v2-muted); }
 .legend span::before { content:""; flex:none; width:6px; height:6px; border-radius:50%; background:var(--effect); }
 .legend small { margin-left:auto; font-size:9px; }
 .legend strong { display:block; margin-top:3px; font-size:12px; font-weight:600; overflow-wrap:anywhere; }
-.legend button:hover { background:#ffffff16; }
-.legend button[aria-pressed=true] { background:color-mix(in srgb,var(--effect) 17%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--effect) 50%,transparent); }
+.legend > button { border-left:1px solid var(--cairn-v2-line); }
+.legend button::after { content:"";position:absolute;inset:auto 10px 0;height:1px;background:var(--effect);transform:scaleX(0);transform-origin:left; }
+.legend button:hover small { color:inherit; }
+.legend button[aria-pressed=true]::after { transform:scaleX(1); }
+@media(prefers-reduced-motion:no-preference) { :global([data-reduced=false]) .legend button::after { transition:transform 180ms ease; } }
 @media(max-width:600px) { .legend > button { min-height:44px; } .legend small { display:none; } }
 .basis { grid-column:1/-1; margin:0; font-size:10px; line-height:1.5; color:var(--cairn-v2-muted); }
 @media(prefers-reduced-motion:no-preference) { :global([data-reduced=false]) .series { animation:appear 220ms ease-out; } }

@@ -26,6 +26,11 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(page.getByRole('button',{name:'추가 투자 계산하기',exact:true})).toHaveCount(0);
       await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
       if(width===1440){
+        await page.evaluate(()=>{ location.hash='beta-target-drift'; });
+        await expect(page.locator('dialog [data-detail-kind=drift]')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('[data-beta-card=structure] [data-expand]')).toBeFocused();
+        await page.evaluate(()=>history.replaceState(null,'',location.pathname+location.search));
         await page.setViewportSize({width:900,height});
         await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
         await page.setViewportSize({width,height});
@@ -52,6 +57,15 @@ export async function runBetaVisualCases({page,check,url,output}) {
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       const homeHeatmap=page.locator('[data-beta-card="heatmap"]');
       await expect(homeHeatmap.locator('[data-heatmap-cell]')).toHaveCount(112);
+      await expect(homeHeatmap.locator('[data-heatmap-cell]').first()).toHaveText('');
+      await page.getByRole('button',{name:'다크 모드로 전환'}).click();
+      await page.reload();
+      await expect(page.locator('[data-home-dashboard]')).toHaveAttribute('data-home-theme','dark');
+      await page.locator('[data-beta-card=value] [data-expand]').click();
+      await expect(page.getByRole('dialog').locator('[data-beta-panel]')).toHaveCSS('background-color','rgb(23, 35, 45)');
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await page.getByRole('button',{name:'라이트 모드로 전환'}).click();
       await expect(homeHeatmap.locator('[data-row-index="0"][data-cell-index="0"]')).toHaveAttribute('aria-label',/2026-09-20/);
       await expect(homeHeatmap.locator('[data-row-index="0"][data-cell-index="13"]')).toHaveAttribute('aria-label',/2026-10-03/);
       const viewport=homeHeatmap.getByRole('region',{name:'종목 흐름 · 가로 탐색',exact:true});

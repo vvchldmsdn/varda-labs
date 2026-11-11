@@ -45,6 +45,10 @@
 .holdings button i {width:7px;height:7px;border-radius:50%}
 .holdings button small {font-size:11px;color:#655f57}
 .holdings button span small {display:block}.holdings button strong {font-weight:500}
+:global([data-home-theme=dark]) :is(.holdings,.workspace .selected) { background:var(--cairn-v2-paper); border-color:var(--cairn-v2-line); }
+:global([data-home-theme=dark]) .holdings button { border-color:var(--cairn-v2-line); }
+:global([data-home-theme=dark]) .holdings button[aria-pressed=true] { background:var(--surface); }
+:global([data-home-theme=dark]) .holdings button small { color:var(--cairn-v2-muted); }
 @media(max-width:760px) {
  .workspace.layout {grid-template-columns:minmax(0,1fr)}
  .workspace::before {grid-row:1/3}

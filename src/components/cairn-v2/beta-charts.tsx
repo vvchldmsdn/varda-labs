@@ -11,9 +11,10 @@ import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { CURRENT_VALUATION_SOURCE, historyWithCurrentValue } from "@/lib/cairn-v2/history-current";
 import { useBetaPreferences } from "./beta-provider";
 import { useMeasuredPlot } from "@/components/use-measured-plot";
-import { ImpactLegend, ImpactLines, useHomeImpact } from "./home-impact";
+import { alignedRanges, ImpactLegend, ImpactBars, useHomeImpact } from "./home-impact";
 
-import { historyRows, historyAxis, readStateText } from "@/lib/cairn-v2/read-presentation";
+import { historyRows, historyAxis, historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
+import { percentOrNull } from "@/lib/portfolio-math";
 export { historyRows } from "@/lib/cairn-v2/read-presentation";
 const ReturnTimelineChart = dynamic(
   () => import("@/components/return-timeline-chart").then((module) => module.ReturnTimelineChart),
@@ -50,8 +51,8 @@ export function HistoryChart({
   if (metric === "return" && inputView.domain?.recoveredReturn)
     return (
       <ReturnTimelineChart
-        renderOverlay={impact ? plot => <ImpactLines chart={impact} plot={plot} /> : undefined}
-        renderLegend={impact ? (date, value) => <ImpactLegend chart={impact} date={date} label="수익률" value={value} /> : undefined}
+        renderOverlay={impact ? plot => <ImpactBars chart={impact} plot={plot} /> : undefined}
+        renderLegend={impact ? (date, value, window, inspecting) => <ImpactLegend chart={impact} inspecting={inspecting ? date : undefined} window={window} returns view={view} currency={currency} label={inspecting ? "선택 수익률" : "마지막 수익률"} value={value} /> : undefined}
         stored={historyRows(view, "ALL").map((p) => ({
           date: p.date,
           returnPct: p.exampleReturnPct,
@@ -91,8 +92,10 @@ export function HistoryChart({
         )}
       </div>
     );
-  const min = Math.min(...valid);
-  const max = Math.max(...valid);
+  const ranges = impact && metric === "value" ? alignedRanges(impact.days, rows) : [];
+  const intermediate = impact && (impact.visible.price || impact.visible.fx) ? ranges.map(r => r.via) : [];
+  const min = Math.min(...valid, ...intermediate);
+  const max = Math.max(...valid, ...intermediate);
   const extent = max - min || 1;
   const width = measured.width || (compact ? 485 : 864);
   const height = measured.height || (compact ? 220 : 410);
@@ -129,6 +132,21 @@ export function HistoryChart({
   const selectedValue = metric === "return"
     ? selectedRow.exampleReturnPct == null ? "—" : selectedRow.exampleReturnPct.toFixed(2) + "%"
     : selectedMoney === "—" ? "—" : selectedMoney + (currency === "KRW" ? "원" : " USD");
+  const first = values[0], last = values.at(-1) ?? null;
+  const periodRate = metric === "value"
+    ? percentOrNull(historyComparison(rows, !!view.domain).value, first)
+    : rows.length > 1 && first !== null && last !== null && pointSegment(0) === pointSegment(rows.length - 1)
+      ? last - first : null;
+  const latestMoney = displayReadMoney(view, last, currency);
+  const latestValue = metric === "value"
+    ? latestMoney === "—" ? "자료 없음" : latestMoney + (currency === "KRW" ? "원" : " USD")
+    : last === null ? "자료 없음" : last.toFixed(2) + "%";
+  const periodLabel = metric === "value"
+    ? periodRate === null ? "최근 평가액" : "평가액 변동"
+    : periodRate === null ? "최근 수익률" : "수익률 변화";
+  const periodValue = periodRate === null ? latestValue :
+    periodRate.toLocaleString("ko-KR", {signDisplay:"exceptZero", maximumFractionDigits:2}) + (metric === "return" ? "%p" : "%");
+  const inspectedImpact = impact?.days.find(day => day.date === selectedRow.date);
   const selectedPoint = points[selectedIndex];
   const selectedX = plot.left + axis.fraction(rows[selectedIndex].date) * (plot.right - plot.left);
   const selectPointerDate = (event: PointerEvent<SVGSVGElement>) => {
@@ -178,7 +196,8 @@ export function HistoryChart({
       <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
       {compact && interactive && inspecting && <output className={styles.compactReadout}>
         <span>{rows[selectedIndex].date}</span>
-        <strong>{metric === "value" ? displayReadMoney(view, rows[selectedIndex].valueKrw, currency) + " " + currency : rows[selectedIndex].exampleReturnPct === null ? "—" : rows[selectedIndex].exampleReturnPct.toFixed(2) + "%"}</strong>
+        <strong>{selectedValue}</strong>
+        {inspectedImpact && <span>가격 {displayReadMoney(view, inspectedImpact.price, currency, true)} · 환율 {displayReadMoney(view, inspectedImpact.fx, currency, true)} {currency}</span>}
       </output>}
       <svg
         viewBox={`0 0 ${plot.width} ${plot.height}`}
@@ -266,7 +285,7 @@ export function HistoryChart({
               vectorEffect="non-scaling-stroke"
             />
           )}
-        {impact && <ImpactLines chart={impact} plot={{ start: rows[0].date, end: rows[rows.length - 1].date,
+        {impact && <ImpactBars chart={impact} ranges={ranges} y={v => plot.bottom - (v-min)/extent * (plot.bottom-plot.top)} plot={{ start: rows[0].date, end: rows[rows.length - 1].date,
           top: plot.top, bottom: plot.bottom, x: date => plot.left + axis.fraction(date) * (plot.right - plot.left) }} />}
         {(!compact || (interactive && inspecting)) && (
           <line
@@ -325,9 +344,10 @@ export function HistoryChart({
           </span>
         ))}
       </figcaption>
-      {impact && <ImpactLegend chart={impact} date={rows[selectedIndex].date}
-        label={metric === "value" ? "평가액" : "수익률"}
-        value={selectedValue} />}
+      {impact && <ImpactLegend chart={impact} window={{start:rows[0].date,end:rows[rows.length-1].date}} inspecting={inspecting ? selectedRow.date : undefined}
+        returns={metric === "return"} view={view} currency={currency} aligned={ranges.length > 0}
+        label={inspecting ? metric === "value" ? "선택 평가액" : "선택 수익률" : periodLabel}
+        value={inspecting ? selectedValue : periodValue} />}
       {!compact && (
         <CairnField className={styles.dateSlider}>
           조회 날짜
