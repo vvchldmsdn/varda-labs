@@ -97,12 +97,7 @@ export function ContributionHome({ view, dirty = false, colors = DEFAULT_COLORS,
               />
             ))}
           </div>
-          {result.totalTrimProceedsKrw > 0 && (
-            <p className={home.funding}>
-              계산상 매도 {eventNumber(result.totalTrimProceedsKrw)}원
-              <span>총 재원 {eventNumber(result.totalAvailableFundsKrw)}원</span>
-            </p>
-          )}
+
       </>
     </div>
   );

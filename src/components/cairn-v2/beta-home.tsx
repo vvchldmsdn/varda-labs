@@ -8,7 +8,7 @@ import { HoldingHeatmap } from './holding-heatmap';
 import { HomeSimulation, HomeSimulationPending } from "./home-simulation";
 import type { SimulationRead } from "@/lib/cairn-v2/simulation-contract";
 import { ContributionHome } from "./home-contribution";
-import { TargetDriftHome } from "./target-drift-home";
+
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { HomeCard as Card } from "./home-card";
@@ -71,6 +71,11 @@ export function BetaHome({
   const [contributionDirty, setContributionDirty] = useState(false);
   useEffect(() => {
     const resume = () => {
+      if (location.hash === '#beta-target-drift') {
+        const trigger = document.querySelector<HTMLElement>('[data-beta-card="structure"] [data-expand]');
+        if (trigger) open("drift", trigger);
+        return;
+      }
       if (location.hash !== '#beta-contribution') return;
       const trigger = document.getElementById('beta-contribution');
       if (trigger) trigger.click();
@@ -227,7 +232,7 @@ export function BetaHome({
               </div>
             )}
           </Card>
-            <TargetDriftHome view={view} onOpen={(trigger) => open("drift", trigger)} />
+
             <CairnButton variant="bare" className={home.planLink} type="button" onClick={event => open("contribution", event.currentTarget)}>
               투자안 자세히 보기 <ArrowRight size={14} aria-hidden="true" />
             </CairnButton>

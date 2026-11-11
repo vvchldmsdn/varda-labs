@@ -251,7 +251,7 @@ function StructureDetail({
           )}
         </aside>
       </div>
-      {view.domain && (
+      {(view.domain || onTargetDrift) && (
         <ActionGroup label="목표비중 더 살펴보기"><Link
           prefetch={false}
           href={betaReadHref(

@@ -32,8 +32,8 @@ export function MovementBreakdown({ view, currency, priceChangeKrw, fxChangeKrw,
             {points !== null && <small title="총변동률 기여도"> {formatNumber(points, { maximumFractionDigits: 2, minimumFractionDigits: 2, signDisplay: "exceptZero" })}%p</small>}
         </>;
         return controls ? <Button type="button" variant="bare" key={type} className={styles.tile} data-impact={type}
-          aria-label={label + " · 히스토리 선 표시"} aria-pressed={controls.visible[type]} onClick={() => controls.toggle(type)}>
-          {content}<span className={styles.hint}>{controls.visible[type] ? "선 켜짐" : "선 보기"}</span>
+          aria-label={label + " · 히스토리 막대 표시"} aria-pressed={controls.visible[type]} onClick={() => controls.toggle(type)}>
+          {content}<span className={styles.hint}>{controls.visible[type] ? "막대 켜짐" : "막대 보기"}</span>
         </Button> : <span className={tiles ? styles.tile : styles.effect} data-impact={tiles ? type : undefined} key={type}>{content}</span>;
       })}
     </span>
