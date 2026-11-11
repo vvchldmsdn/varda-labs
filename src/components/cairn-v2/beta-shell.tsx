@@ -104,9 +104,9 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
         </Link> : <a className={styles.purposeLink} href={originalHref(item.original, context)} title="기존 화면에서 계속"><span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>{workspace && <small>기존 ↗</small>}</a>}
       </div>)}</nav>
       <CairnButton variant="bare" className={`${styles.settingsLink} ${controls.settingsTrigger}`} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><span className={styles.navIcon}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></span><span>설정</span></CairnButton>
-      {!workspace && <button ref={menuTrigger} className={homeDesign.menuToggle} type="button" aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"} aria-expanded={menuOpen} aria-controls="beta-home-navigation" onClick={() => setMenuOpen(!menuOpen)}>
+      {!workspace && <CairnButton variant="bare" ref={menuTrigger} className={homeDesign.menuToggle} type="button" aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"} aria-expanded={menuOpen} aria-controls="beta-home-navigation" onClick={() => setMenuOpen(!menuOpen)}>
         {menuOpen ? <X size={18} aria-hidden /> : <Menu size={18} aria-hidden />}
-      </button>}
+      </CairnButton>}
     </aside>
     <main className={styles.main}>
       <header className={`${styles.topbar} ${workspace ? controls.workspaceTopbar : ""}`}>
