@@ -10,3 +10,13 @@
 .effect { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
 .label, .effect small { color: var(--cairn-v2-muted); font-size: .92em; }
 .effect > [data-tone] { white-space: nowrap; }
+.breakdown[data-tiles] { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.breakdown .tile { --marker:#70a889; --figure:#86c09d; position:relative; display:grid; align-content:start; min-width:0; padding:10px 12px; border:1px solid #ffffff1a; border-radius:12px; background:#ffffff09; text-align:left; color:inherit; }
+.breakdown .tile[data-impact=fx] { --marker:#a98cc6; --figure:#c2a5dc; }
+.tile .label { display:flex; align-items:center; gap:6px; font-size:10px; padding-right:34px; }
+.tile .label::before { content:""; width:6px; height:6px; flex:none; border-radius:50%; background:var(--marker); }
+.tile .hint { position:absolute; top:10px; right:10px; font-size:9px; color:var(--cairn-v2-muted); }
+.tile [data-tone] { grid-row:3; margin-top:2px; font-size:11px; color:#c7cccd; overflow-wrap:anywhere; }
+.tile small[title] { grid-row:2; margin-top:3px; font:400 20px/1.2 var(--home-display,Georgia,serif); color:var(--figure); }
+.breakdown .tile:hover { background:#ffffff12; }
+.breakdown .tile[aria-pressed=true] { background:color-mix(in srgb,var(--marker) 15%,transparent); border-color:color-mix(in srgb,var(--marker) 55%,transparent); }

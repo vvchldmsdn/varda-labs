@@ -15,6 +15,7 @@ import { HomeCard as Card } from "./home-card";
 import { cardTitles, type CardKind } from "./card-definition";
 import { MetricControls, PeriodControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
+import { HomeImpactProvider } from "./home-impact";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
@@ -86,12 +87,14 @@ export function BetaHome({
     : contributionTotal !== null;
   return (
     <BetaShell context={context} setContext={setContext} readView={view}>
+      <HomeImpactProvider read={view.domain?.heatmap}>
       <div className={home.dashboard}>
         <div className={home.hero}>
           <div className={home.summary}>
 
           <Card onOpen={open} kind="value">
             <div
+              key={context.scope + context.currency}
               className={styles.mainNumber}
               data-large={
                 context.fixture === "large" || (view.totalKrw !== null && view.totalKrw >= 1e11)
@@ -124,7 +127,7 @@ export function BetaHome({
             </p>
           </Card>
           <Card onOpen={open} kind="today">
-            <HomeToday view={view} currency={context.currency} />
+            <HomeToday key={context.scope + context.currency} view={view} currency={context.currency} />
           </Card>
           </div>
           <div className={home.history}>
@@ -168,7 +171,17 @@ export function BetaHome({
           <div className={home.planning}>
           <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
             {view.domain ? (
-              <ContributionHome view={view} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS} />
+              <ContributionHome view={view} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}>
+                <div className={home.amountChoices} role="group" aria-label="추가 투자금">
+                  {[500000, 1000000, 2000000].map(amount => (
+                    <CairnButton variant="bare" type="button" key={amount}
+                      aria-pressed={context.cashAmountKrw === String(amount)}
+                      onClick={() => setContext({ ...context, cashAmountKrw: String(amount) })}>
+                      {amount / 10000}만원
+                    </CairnButton>
+                  ))}
+                </div>
+              </ContributionHome>
             ) : (
               <div className={`${styles.contributionBody} ${!view.contribution.length ? home.noAllocation : ''}`}>
                 <div>
@@ -214,9 +227,6 @@ export function BetaHome({
               </div>
             )}
           </Card>
-            {context.mode === "domain" && contributionReady && <div className={home.amountChoices} role="group" aria-label="추가 투자금">
-              {[500000,1000000,2000000].map(amount => <CairnButton variant="bare" type="button" key={amount} aria-pressed={context.cashAmountKrw === String(amount)} onClick={() => setContext({...context,cashAmountKrw:String(amount)})}>{amount / 10000}만원</CairnButton>)}
-            </div>}
             <TargetDriftHome view={view} onOpen={(trigger) => open("drift", trigger)} />
             <CairnButton variant="bare" className={home.planLink} type="button" onClick={event => open("contribution", event.currentTarget)}>
               투자안 자세히 보기 <ArrowRight size={14} aria-hidden="true" />
@@ -234,7 +244,7 @@ export function BetaHome({
         </ActionGroup>
       </section>}
       {expanded && (
-        <BetaDialog
+        <BetaDialog homeMotion
           label={expanded.kind === "structure" ? "포트 구조" : cardTitles[expanded.kind]}
           origin={expanded.origin}
           onClosed={() => {
@@ -276,6 +286,7 @@ export function BetaHome({
           )}
         </BetaDialog>
       )}
+      </HomeImpactProvider>
     </BetaShell>
   );
 }

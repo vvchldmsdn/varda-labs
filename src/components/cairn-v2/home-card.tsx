@@ -23,7 +23,7 @@ export function HomeCard({
   minimal?: boolean;
 }) {
   const activate = (event: MouseEvent<HTMLElement>) => {
-    if ((event.target as Element).closest("button,a,input,select,summary,[role=button]")) return;
+    if ((event.target as Element).closest("button,a,input,select,summary,[role=button],[popover]")) return;
     const trigger = event.currentTarget.querySelector<HTMLButtonElement>("[data-expand]");
     if (trigger) onOpen(kind, trigger);
   };

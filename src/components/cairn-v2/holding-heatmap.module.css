@@ -36,3 +36,21 @@
 .surface[data-compact=true] .label,.surface[data-compact=true] .date,.surface[data-compact=true] .corner{position:static;background:transparent;z-index:auto}
 .surface[data-compact=true] .name{max-width:100%;white-space:nowrap}
 .surface[data-compact=true] .cell{scroll-margin:6px}
+.popover { position:fixed; inset:auto; margin:0; width:min(292px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; padding:16px; border:1px solid #d9d3c7; border-radius:18px; background:#f8f6f0; color:#18212a; box-shadow:0 18px 50px #18212a38; font-family:"Cairn Pretendard",sans-serif; }
+.popover header { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.popover header small,.popover dt { font-size:11px; color:#686960; }
+.popover h3 { margin:5px 0; font-size:17px; overflow-wrap:anywhere; }
+.popover header button { min-height:36px; min-width:36px; border-radius:50%; font-size:18px; }
+.popover dl { margin:10px 0 0; padding:0 12px; border-radius:12px; border:1px solid #ddd7cc; background:#ffffff88; }
+.popover dl > div:first-child { border-top:0; }
+.popover dl > div { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:9px 0; border-top:1px solid #ddd8cd; }
+.popover dd { margin:0; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; }
+@media(prefers-reduced-motion:no-preference) {
+ :global([data-reduced=false]) .popover { --enter:-8px; opacity:0; transform:translateX(var(--enter)) scale(.96); transition:opacity 160ms,transform 380ms linear(0, 0.0648, 0.2089, 0.3782, 0.541, 0.6812, 0.7931, 0.8767, 0.9356, 0.9744, 0.998, 1.0107, 1.0162, 1.0173, 1.0158, 1.0132, 1.0102, 1.0074, 1),display 160ms allow-discrete,overlay 160ms allow-discrete; }
+ :global([data-reduced=false]) .popover[data-side=left] { --enter:8px; }
+ :global([data-reduced=false]) .popover:popover-open { opacity:1; transform:none; }
+ @starting-style { :global([data-reduced=false]) .popover:popover-open { opacity:0; transform:translateX(var(--enter)) scale(.96); } }
+}
+.surface[data-compact=true] { display:flex; flex-direction:column; }
+.surface[data-compact=true] .readout:not([data-empty=true]) { order:-1; align-self:flex-end; padding:0 2px 6px; text-align:right; }
+.surface[data-compact=true] .readout:not([data-empty=true]) p:first-child { justify-content:flex-end; }

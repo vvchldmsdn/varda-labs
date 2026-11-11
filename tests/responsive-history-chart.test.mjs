@@ -18,7 +18,7 @@ const elements = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(
 it('reprojects history into measured dimensions while retaining null breaks and date navigation',async()=>{
   let size={width:320,height:220}, selected=null;
   const [ui] = await importUiWithPorts(['src/components/cairn-v2/beta-charts.tsx'],{
-    react:{useId:()=> 'chart',useState:initial=>[initial,()=>{}]},'next/dynamic':{default:()=>()=>null},
+    react:{useContext:()=>null,useId:()=> 'chart',useState:initial=>[initial,()=>{}]},'next/dynamic':{default:()=>()=>null},
     '@/components/use-measured-plot':{useMeasuredPlot:()=>[size,()=>{}]},
     '@/components/cairn-v2/beta-provider':{useBetaPreferences:()=>({metric:'value',period:'ALL',historyDate:selected,setHistoryDate:date=>{selected=date;}})},
   });

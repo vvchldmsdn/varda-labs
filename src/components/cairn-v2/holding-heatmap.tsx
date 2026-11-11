@@ -7,6 +7,7 @@ import type {PortfolioDashboardHeatmapCell} from '@/lib/cairn-v2/heatmap-model';
 import {eventNumber} from '@/lib/cairn-v2/event-display';
 import {Button, ChoiceGroup} from '@/components/cairn-ui';
 import styles from './holding-heatmap.module.css';
+import { HeatmapCellPopover } from './heatmap-cell-popover';
 const signed=(value:number|null)=>value===null?'—':(value>0?'+':'')+eventNumber(value);
 const basisLabel=(cell:PortfolioDashboardHeatmapCell)=>cell.basis==='live_price'?'가격 등락률':cell.basis==='unit_value'?'단위 평가 변동률':cell.basis==='market_value'?'평가액 변동률':cell.basis==='live_movement'?'현재 평가액 변동률':'변동률 비교 불가';
 // Selection/arrow-key behavior and color scale are a limited port of the original
@@ -15,6 +16,7 @@ export function HoldingHeatmap({view,compact=false,maxDates}:{view:BetaView;comp
  const read=view.domain?.heatmap;
  const [draft,setDraft]=useState<{key:string;row:number;cell:number}|null>(null);
  const [days,setDays]=useState(31);
+ const [anchor,setAnchor]=useState<{button:HTMLButtonElement;key:string;row:number;cell:number;press:number}|null>(null);
  if(!read?.history)return <p role="status" className={styles.message}>{read?.message??(view.domain?.state==='loading'?'종목 흐름 확인 중':view.domain?.state==='unauthorized'?'로그인과 조회 범위를 확인해 주세요':'종목 흐름의 저장 이력을 확인하지 못했습니다.')}</p>;
  const start=compact?(maxDates ? Math.max(0,read.history.dates.length-maxDates) : 0):Math.max(0,read.history.dates.length-days);
  const history={...read.history,dates:read.history.dates.slice(start),rows:read.history.rows.map(row=>({...row,cells:row.cells.slice(start)}))};
@@ -24,7 +26,10 @@ export function HoldingHeatmap({view,compact=false,maxDates}:{view:BetaView;comp
  const selection=draft?.key===readKey?draft:null;
  const selectedRow=selection?history.rows[selection.row]:null;
  const selectedCell=selectedRow&&selection?selectedRow.cells[selection.cell]:null;
- function choose(row:number,cell:number){setDraft({key:readKey,row,cell});}
+ function choose(row:number,cell:number,button?:HTMLButtonElement){
+   setDraft({key:readKey,row,cell});
+   setAnchor(previous => compact && button && typeof button.showPopover === "function" ? {button,key:readKey,row,cell,press:(previous?.press ?? 0)+1} : null);
+ }
  function move(event:KeyboardEvent<HTMLButtonElement>,row:number,cell:number){
   const movement:Record<string,number[]>={ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[-1,0]};const delta=movement[event.key];if(!delta)return;
   event.preventDefault();const nextRow=Math.min(Math.max(row+delta[0],0),history.rows.length-1),nextCell=Math.min(Math.max(cell+delta[1],0),history.dates.length-1);choose(nextRow,nextCell);
@@ -40,7 +45,7 @@ export function HoldingHeatmap({view,compact=false,maxDates}:{view:BetaView;comp
     <span className={styles.corner}>{compact?<span className={styles.visuallyHidden}>종목 / 날짜</span>:'종목 / 날짜'}</span>{history.dates.map((date,index)=><span key={date} title={(read.currentDate===date?'현재 · ':'')+date} className={styles.date}>{compact?(index===0||history.dates[index-1].slice(0,7)!==date.slice(0,7)?date.slice(5).replace('-','.'):date.slice(8)):<>{read.currentDate===date?'현재 ':''}{date.slice(5).replace('-','.')}</>}</span>)}
     {history.rows.map((row,rowIndex)=><div className={styles.row} key={row.holdingId}>
      <span className={styles.label} title={instrumentLabel(row)+' · '+row.account}><span className={styles.name}>{instrumentLabel(row)}</span><small className={compact&&!repeatedNames.has(instrumentLabel(row))?styles.visuallyHidden:undefined}>{row.account}</small></span>
-     {row.cells.map((cell,cellIndex)=>{const selected=selection?.row===rowIndex&&selection.cell===cellIndex;return <button key={row.holdingId+':'+cell.date} type="button" className={styles.cell} data-heatmap-cell data-row-index={rowIndex} data-cell-index={cellIndex} data-change-basis={cell.basis} aria-label={instrumentLabel(row)+' · '+row.account+' · '+cell.date+' · '+basisLabel(cell)+' '+signed(cell.changePct)+(cell.changePct===null?'':'%')} aria-pressed={selected} tabIndex={selected||(!selection&&rowIndex===0&&cellIndex===0)?0:-1} onClick={()=>choose(rowIndex,cellIndex)} onKeyDown={event=>move(event,rowIndex,cellIndex)} style={heatmapStyle(cell)}>{cell.changePct===null?'—':cell.changePct===0?'0':''}</button>;})}
+     {row.cells.map((cell,cellIndex)=>{const selected=selection?.row===rowIndex&&selection.cell===cellIndex;return <button key={row.holdingId+':'+cell.date} type="button" className={styles.cell} data-heatmap-cell data-row-index={rowIndex} data-cell-index={cellIndex} data-change-basis={cell.basis} aria-label={instrumentLabel(row)+' · '+row.account+' · '+cell.date+' · '+basisLabel(cell)+' '+signed(cell.changePct)+(cell.changePct===null?'':'%')} aria-pressed={selected} tabIndex={selected||(!selection&&rowIndex===0&&cellIndex===0)?0:-1} onClick={event=>choose(rowIndex,cellIndex,event.currentTarget)} onKeyDown={event=>move(event,rowIndex,cellIndex)} style={heatmapStyle(cell)}>{cell.changePct===null?'—':compact?cell.changePct.toLocaleString("ko-KR",{maximumFractionDigits:1,signDisplay:"exceptZero"}):cell.changePct===0?'0':''}</button>;})}
     </div>)}
    </div>
   </div>
@@ -48,6 +53,8 @@ export function HoldingHeatmap({view,compact=false,maxDates}:{view:BetaView;comp
   <div className={styles.readout} data-empty={compact&&!selectedCell} aria-live="polite">{selectedRow&&selectedCell?<><p><strong>{instrumentLabel(selectedRow)}</strong> · {selectedRow.account} · {selectedCell.date===read.currentDate?'현재 ':''}{selectedCell.date}<button type="button" onClick={()=>setDraft(null)} aria-label="히트맵 선택 해제">×</button></p><p>{basisLabel(selectedCell)} <strong>{signed(selectedCell.changePct)}{selectedCell.changePct===null?'':'%'}</strong>{selectedCell.changePct===null?' · 비교 자료 없음':''}</p>{!compact&&<dl className={styles.facts}>{[['평가액',selectedCell.marketValueKrw],['평가액 변화',selectedCell.changeKrw],['가격 영향',selectedCell.priceChangeKrw],['환율 영향',selectedCell.fxChangeKrw]].map(([name,value])=><div key={String(name)}><dt>{name}</dt><dd>{eventNumber(value as number|null)} KRW</dd></div>)}</dl>}</>:compact?null:<p>종목·날짜를 선택해 자세히 볼 수 있어요.</p>}</div>
   {(compact||read.state==='partial')&&<p className={styles.caption} role="status">{compact?'KRW 기준':''}{read.state==='partial'?(compact?' · 일부 비교 자료 없음':'일부 날짜의 비교 자료가 없습니다.'):''}</p>}
   {!compact&&<details className={styles.evidence}><summary>날짜·수치의 근거</summary><p>{read.message} · 저장 KRW와 현재 평가를 구분하며 표시 통화로 재환산하지 않습니다. 평가액 변화는 투자 수익률과 다릅니다.</p><p>최근 최대 31개 달력 날짜 · 기존 서비스의 07:00 저장 경계·기록 우선순위 적용. 기록이 없는 날짜는 채우지 않습니다.</p>{selectedCell&&<p>원본 비율 {selectedCell.changePct===null?'—':String(selectedCell.changePct)}% · {basisLabel(selectedCell)} · {selectedCell.date===read.currentDate?'현재 평가':'저장 기록'}</p>}</details>}
+  {compact && anchor && selection && anchor.key === readKey && anchor.row === selection.row && anchor.cell === selection.cell && selectedRow && selectedCell &&
+    <HeatmapCellPopover key={anchor.press} anchor={anchor.button} name={instrumentLabel(selectedRow)} account={selectedRow.account} cell={selectedCell} basis={basisLabel(selectedCell)} />}
  </div>;
 }
 function heatmapStyle(cell:PortfolioDashboardHeatmapCell):CSSProperties{

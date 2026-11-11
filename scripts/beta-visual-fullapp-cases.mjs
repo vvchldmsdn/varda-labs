@@ -32,12 +32,19 @@ export async function runBetaVisualCases({page,check,url,output}) {
         await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
       }
       const ring=page.locator('[data-beta-card="structure"] [data-allocation-ring] svg');
-      if(width>=800){
+      if(width>=1024){
         const nav=page.getByLabel('목적별 내비게이션',{exact:true});
         const navBox=await nav.boundingBox(),todayBox=await today.boundingBox();
         assert.ok(navBox&&todayBox&&navBox.width>=width*.9&&navBox.height<=90&&navBox.y+navBox.height<=todayBox.y,'desktop home navigation spans the top without covering the content');
         await expect(nav.locator('svg').first()).toBeVisible();
         for(const label of ['홈','자산','분석','계획','기록'])await expect(nav.getByRole('link',{name:label,exact:true})).toBeVisible();
+      }
+      if(width<1024){
+        const menu=page.getByRole('button',{name:'메뉴 열기',exact:true});
+        await menu.click();
+        await expect(page.getByLabel('목적별 내비게이션',{exact:true}).getByRole('link',{name:'자산',exact:true})).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(menu).toHaveAttribute('aria-expanded','false');
       }
       await expect(ring.getByRole('button',{name:'KODEX 200',exact:false})).toHaveCount(1);
       await expect(ring.getByRole('button',{name:'069500',exact:false})).toHaveCount(0);
@@ -49,7 +56,14 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(homeHeatmap.locator('[data-row-index="0"][data-cell-index="13"]')).toHaveAttribute('aria-label',/2026-10-03/);
       const viewport=homeHeatmap.getByRole('region',{name:'종목 흐름 · 가로 탐색',exact:true});
       assert.equal(await viewport.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true,'inline heatmap must show all holding rows without a nested vertical scroller');
-      await homeHeatmap.locator('[data-row-index="0"][data-cell-index="0"]').focus();
+      const firstDay=homeHeatmap.locator('[data-row-index="0"][data-cell-index="0"]');
+      await firstDay.click();
+      const dailyPopover=page.getByRole('region',{name:'선택한 종목의 날짜별 변동',exact:true});
+      await expect(dailyPopover).toContainText('가격 영향');
+      await expect(dailyPopover).toContainText('환율 영향');
+      await page.keyboard.press('Escape');
+      await expect(dailyPopover).toBeHidden();
+      await firstDay.focus();
       await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');
       await expect(homeHeatmap.locator('[data-cell-index="2"][data-row-index="0"]')).toBeFocused();
       await expect(homeHeatmap.locator('[data-cell-index="2"][data-row-index="0"]')).toHaveAttribute('aria-label',/2026-09-22/);
