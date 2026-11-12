@@ -90,14 +90,24 @@ export function BetaHome({
   const contributionReady = view.domain
     ? !contributionDirty && view.domain.planning?.contribution?.state === 'ready'
     : contributionTotal !== null;
+  const formattedValue = originalValue
+    ? originalValue.amount === null ? "—" : Number(originalValue.amount).toLocaleString("ko-KR", {maximumFractionDigits: context.currency === "USD" ? 2 : 0})
+    : displayMoney(view.rows.length ? view.totalKrw : null, context.currency);
+  const movement = view.domain?.currentHoldingMovement;
+  const homeSummary = {
+    count: originalValue?.coverage?.positions ?? (view.domain ? null : view.rows.length),
+    balance: formattedValue === "—" ? null : `${originalValue && !originalValue.complete ? "확인 소계 " : ""}${formattedValue} ${unit}`,
+    change: context.currency === "KRW" && movement?.returnPct != null && !movement.excludedCount
+      ? `오늘 ${movement.returnPct > 0 ? "+" : ""}${movement.returnPct.toFixed(2)}%` : null,
+  };
   return (
-    <BetaShell context={context} setContext={setContext} readView={view}>
+    <BetaShell context={context} setContext={setContext} readView={view} homeSummary={homeSummary}>
       <HomeImpactProvider read={view.domain?.heatmap}>
       <div className={home.dashboard}>
         <div className={home.hero}>
           <div className={home.summary}>
 
-          <Card onOpen={open} kind="value">
+          <Card onOpen={open} kind="value" controls={<span className={home.syncHint} aria-hidden>동기화 중</span>}>
             <div
               key={context.scope + context.currency}
               className={styles.mainNumber}
@@ -105,7 +115,7 @@ export function BetaHome({
                 context.fixture === "large" || (view.totalKrw !== null && view.totalKrw >= 1e11)
               }
             >
-              <span>{originalValue ? originalValue.amount === null ? "—" : Number(originalValue.amount).toLocaleString("ko-KR",{maximumFractionDigits:context.currency === "USD" ? 2 : 0}) : displayMoney(view.rows.length ? view.totalKrw : null, context.currency)}</span>
+              <span>{formattedValue}</span>
               <small>{unit}</small>
             </div>
             <p className={styles.cardFootnote}>
