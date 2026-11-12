@@ -38,6 +38,28 @@ test.describe("home composition on isolated development fixtures", () => {
     }
   }
 
+  test("beta mobile: bottom navigation and scope picker keep the account context", async ({page}) => {
+    await page.setViewportSize({width:360,height:800});
+    await page.goto("/beta?fixture=standard");
+    const nav = page.getByRole("navigation", {name:"주요 메뉴"});
+    await expect(nav.getByRole("link")).toHaveCount(5);
+    await page.locator("[data-beta-card=heatmap]").scrollIntoViewIfNeeded();
+    const bounds = await nav.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(Math.round(bounds!.y + bounds!.height)).toBe(800);
+
+    const trigger = page.locator('main > header button[aria-haspopup="dialog"]').first();
+    await trigger.click();
+    const picker = page.getByRole("dialog", {name:"조회 범위"});
+    await expect(picker).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await picker.getByRole("button", {name:/^계좌 A/}).click();
+    await expect(trigger).toContainText("계좌 A");
+    await expect(nav.getByRole("link", {name:"자산"})).toHaveAttribute("href", /scope=fixture-account-a/);
+  });
+
   test("original: English labels keep home controls usable", async ({page},info) => {
     await page.setViewportSize({width:390,height:844});
     await page.goto("/?preview=design");

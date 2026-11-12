@@ -167,7 +167,11 @@
 @keyframes figure-in { from {opacity:0;transform:translateY(7px)} to {opacity:1;transform:none} }
 @keyframes draw-history { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
 @keyframes distribute { from { transform:scaleX(0); } to { transform:scaleX(1); } }
-@keyframes quote-sweep { from { background-position:150% 0; } to { background-position:-50% 0; } }
+@keyframes quote-sweep { from { transform:translateX(-100%); } to { transform:translateX(220%); } }
+.syncHint { display:none; }
+:global([data-home-dashboard]:has([data-home-refresh=busy])) .syncHint { display:inline-flex; align-items:center; padding:3px 7px; border-radius:9px; background:#f395791a; color:#ffc1ae; font-size:10px; white-space:nowrap; }
+:global([data-home-dashboard]:has([data-home-refresh=busy])) .hero::before { content:""; position:absolute; inset:0 auto auto 0; width:50%; height:2px; z-index:2; pointer-events:none; background:linear-gradient(90deg,transparent,#f39579,transparent); }
+:global([data-home-dashboard]:has([data-home-refresh=busy])) .summary [data-beta-card=value] > div { opacity:.65; }
 @media(prefers-reduced-motion:no-preference) {
  :global([data-reduced=false]) .hero,:global([data-reduced=false]) .lower,:global([data-reduced=false]) .dashboard [data-beta-card=heatmap] { animation:arrive 360ms cubic-bezier(.16,1,.3,1) backwards; }
  :global([data-reduced=false]) .lower { animation-delay:70ms; }
@@ -177,7 +181,7 @@
  :global([data-reduced=false]) .planning [data-funding-amount] { transform-origin:left; animation:distribute 550ms cubic-bezier(.16,1,.3,1) backwards; transition:width 450ms ease; }
  :global([data-reduced=false]) .heatmap [data-heatmap-cell]:hover { transform:translateY(-2px) scale(1.04); }
  :global([data-reduced=false]) .heatmap [data-heatmap-cell]:active { transform:scale(.96); }
- :global([data-home-dashboard][data-reduced=false]:has(>main>header button[aria-busy=true])) .hero::before { content:""; position:absolute; inset:0; z-index:2; pointer-events:none; border-radius:inherit; backdrop-filter:blur(1px); background:#17232d22 linear-gradient(100deg,transparent 35%,#f8f4eb1c 50%,transparent 65%) 150% 0/200% 100%; animation:quote-sweep 900ms ease-in-out infinite; }
+ :global([data-home-dashboard][data-reduced=false]:has([data-home-refresh=busy])) .hero::before { animation:quote-sweep 850ms ease-in-out infinite; }
 }
 .dashboard .summary [data-beta-card=today] header { padding-right:0; }
 .dashboard .summary [data-beta-card=today] p[aria-label^="오늘 변동률"] { position:absolute; top:18px; right:78px; display:flex; align-items:center; height:40px; font-size:20px; }

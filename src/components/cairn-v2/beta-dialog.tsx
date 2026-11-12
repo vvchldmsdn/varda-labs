@@ -33,6 +33,7 @@ export function BetaDialog({
   onClosed,
   popover = false,
   homeMotion = false,
+  compactScope = false,
 }: {
   children: ReactNode;
   label: string;
@@ -40,6 +41,7 @@ export function BetaDialog({
   onClosed: () => void;
   popover?: boolean;
   homeMotion?: boolean;
+  compactScope?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -116,10 +118,12 @@ export function BetaDialog({
     const measure = () => {
       const mobile = window.innerWidth < 700;
       const width = popover
-        ? Math.min(362, window.innerWidth - 24)
+        ? Math.min(compactScope ? 256 : 362, window.innerWidth - 24)
         : Math.min(label === "히스토리" ? 1248 : 1200, window.innerWidth - (mobile ? 24 : 192));
+      const scopeContent = compactScope ? panel.querySelector<HTMLElement>("[data-scope-content]") : null;
+      if (scopeContent) panel.style.setProperty("--cairn-v2-content-width", `${width}px`);
       const height = popover
-        ? Math.min(415, window.innerHeight - 24)
+        ? Math.min(scopeContent ? scopeContent.offsetHeight + 2 : 415, 415, window.innerHeight - 24)
         : Math.min(744, window.innerHeight - (mobile ? 24 : 100));
       const left = popover
         ? Math.max(12, Math.min(origin.rect.left, window.innerWidth - width - 12))
@@ -137,6 +141,9 @@ export function BetaDialog({
       panel.style.setProperty("--cairn-v2-content-height", `${height}px`);
     };
     measure();
+    const content = compactScope ? panel.querySelector("[data-scope-content]") : null;
+    const observer = content ? new ResizeObserver(measure) : null;
+    if (content) observer?.observe(content);
     const target = panel.getBoundingClientRect();
     if (!reduceEffects && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       const timing = homeMotion && CSS.supports("animation-timing-function", dialogMotion.homeOpen.easing) ? dialogMotion.homeOpen : popover ? dialogMotion.popoverOpen : dialogMotion.open;
@@ -167,6 +174,7 @@ export function BetaDialog({
       dialog.style.visibility = "hidden";
       cancelAnimations();
       window.removeEventListener("resize", resize);
+      observer?.disconnect();
       dialog.close();
       unlock();
       origin.trigger.focus({ preventScroll: true });
@@ -191,6 +199,7 @@ export function BetaDialog({
     <dialog
       ref={dialogRef}
       className={`${styles.dialog} ${styles.scope} ${tokens.scope} ${motionStyles.motionDialog}`}
+      data-compact-scope={compactScope || undefined}
       data-home-motion={homeMotion ? popover ? "popover" : "modal" : undefined}
       data-reduced={reduceEffects}
       aria-label={label}

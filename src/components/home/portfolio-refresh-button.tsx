@@ -5,7 +5,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 
 
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { useMarketCollectionPolling } from "@/components/use-market-collection-polling";
@@ -24,9 +24,11 @@ let manualGeneration = 0;
 export function PortfolioRefreshButton({
   compact = false,
   designPreview = false,
+  homeQuoteAt,
 }: {
   compact?: boolean;
   designPreview?: boolean;
+  homeQuoteAt?: string | null;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -134,9 +136,21 @@ export function PortfolioRefreshButton({
     [router],
   );
 
+  const homeToolbar = homeQuoteAt !== undefined;
+  const confirmed = homeToolbar && displayState === "fresh" && !refreshPending && receipt && receipt.state !== "empty"
+    && (receipt.progress ? receipt.progress.total > 0 && receipt.progress.completed === receipt.progress.total && !receipt.progress.failed : true)
+    && !receipt.comparison?.pending && !receipt.comparison?.failed;
+  const [showCheck, setShowCheck] = useState(false);
+  useEffect(() => {
+    if (!confirmed) return;
+    const frame = requestAnimationFrame(() => setShowCheck(true));
+    const timeout = window.setTimeout(() => setShowCheck(false), 1600);
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timeout); };
+  }, [confirmed]);
+  const busy = displayState === "syncing" || displayState === "queued";
   return (
-    <div className="relative inline-flex items-center gap-2">
-    <CairnButton variant="secondary"
+    <div className="relative inline-flex items-center gap-2" data-home-refresh={homeToolbar ? busy ? "busy" : confirmed && showCheck ? "done" : "idle" : undefined}>
+    <CairnButton variant={homeToolbar ? "bare" : "secondary"}
       type="button"
       aria-label={t("실시간 시세 갱신", "Refresh live prices")}
       className={
@@ -150,8 +164,9 @@ export function PortfolioRefreshButton({
       title={t(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState), translateHomeHistory(designPreview ? "디자인 미리보기 새로고침" : syncTitle(displayState)))}
     >
       <span aria-hidden="true" className={pending && !providerWaiting ? "animate-spin motion-reduce:animate-none" : undefined}>
-        <RefreshCw size={15} strokeWidth={1.5} />
+        {confirmed && showCheck ? <Check size={15} strokeWidth={1.8} /> : <RefreshCw size={15} strokeWidth={1.5} />}
       </span>
+      {homeToolbar && <span aria-live="polite">{busy ? t("조회 중", "Checking") : confirmed && showCheck ? t("반영됨", "Updated") : homeQuoteAt ? <time dateTime={homeQuoteAt} title={t("최근 가격 기준 · 한국시간", "Latest price as of · KST") + " " + formatTime(homeQuoteAt)}>{new Intl.DateTimeFormat("ko-KR", {month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hourCycle:"h23", timeZone:"Asia/Seoul"}).format(new Date(homeQuoteAt))}</time> : t("시세 갱신", "Refresh")}</span>}
       {compact ? null : <span aria-live="polite">{<T ko={syncLabel(displayState)} en={displayState === "queued" ? "Refresh queued" : displayState === "waiting" ? "Pending · check again" : displayState === "reconnecting" ? "Connection lost · retrying" : translateHomeHistory(syncLabel(displayState))}/>}</span>}
     </CairnButton>
     {compact && !receipt?.progress && ["error", "cooldown", "waiting"].includes(displayState) && <span role="status" className="text-xs">{syncLabel(displayState)}</span>}
