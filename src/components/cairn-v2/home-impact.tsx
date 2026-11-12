@@ -38,6 +38,21 @@ export function HomeImpactProvider({ read, children }: { read?: BetaHeatmapRead 
   return <Context.Provider value={{ days, visible, toggle: type => setVisible(prev => ({ ...prev, [type]: !prev[type] })) }}>{children}</Context.Provider>;
 }
 
+export function HomeImpactControls() {
+  const chart = useHomeImpact();
+  if (!chart?.days.length) return null;
+  return <div className={styles.toggles} role="group" aria-label="일별 변동 막대">
+    {impactTypes.map(type => {
+      const available = chart.days.some(day => day[type] !== null);
+      return <Button key={type} variant="bare" type="button" data-impact={type}
+        aria-label={impactNames[type] + " 일별 변동 막대"} aria-pressed={chart.visible[type]}
+        disabled={!available} onClick={() => chart.toggle(type)}>
+        {impactNames[type]} <small>{!available ? "자료 없음" : chart.visible[type] ? "표시 중" : "막대 보기"}</small>
+      </Button>;
+    })}
+  </div>;
+}
+
 export type ImpactPlot = { start: string; end: string; x: (date: string) => number; top: number; bottom: number };
 
 
@@ -105,6 +120,17 @@ type LegendProps = {
   chart: ImpactContext; window: Window; view: BetaView; currency: BetaCurrency; returns: boolean;
   value: string; label: string; inspecting?: string; aligned?: boolean;
 };
+
+export function CompactImpactBasis({ chart, window, aligned }: Pick<LegendProps, "chart" | "window" | "aligned">) {
+  const active = impactTypes.filter(type => chart.visible[type]);
+  if (!active.length) return null;
+  const days = chart.days.filter(day => day.date > window.start && day.date <= window.end);
+  const missing = active.filter(type => !days.some(day => day[type] !== null));
+  return <p className={styles.basis}>
+    {missing.length < active.length && (aligned ? "막대 · 평가액과 같은 눈금" : "막대 · 일별 변동액 기준 별도 눈금")}
+    {missing.length > 0 && ` ${missing.map(type => impactNames[type]).join("·")} · 선택 기간 자료 없음`}
+  </p>;
+}
 
 export function ImpactLegend({ chart, window, view, currency, returns, value, label, inspecting, aligned }: LegendProps) {
   const day = chart.days.find(row => row.date === inspecting);

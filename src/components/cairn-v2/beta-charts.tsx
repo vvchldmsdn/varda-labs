@@ -11,7 +11,7 @@ import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { CURRENT_VALUATION_SOURCE, historyWithCurrentValue } from "@/lib/cairn-v2/history-current";
 import { useBetaPreferences } from "./beta-provider";
 import { useMeasuredPlot } from "@/components/use-measured-plot";
-import { alignedRanges, ImpactLegend, ImpactBars, useHomeImpact } from "./home-impact";
+import { alignedRanges, CompactImpactBasis, ImpactLegend, ImpactBars, useHomeImpact } from "./home-impact";
 
 import { historyRows, historyAxis, historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
 import { percentOrNull } from "@/lib/portfolio-math";
@@ -52,7 +52,7 @@ export function HistoryChart({
     return (
       <ReturnTimelineChart
         renderOverlay={impact ? plot => <ImpactBars chart={impact} plot={plot} /> : undefined}
-        renderLegend={impact ? (date, value, window, inspecting) => <ImpactLegend chart={impact} inspecting={inspecting ? date : undefined} window={window} returns view={view} currency={currency} label={inspecting ? "선택 수익률" : "마지막 수익률"} value={value} /> : undefined}
+        renderLegend={impact ? (date, value, window, inspecting) => compact ? <CompactImpactBasis chart={impact} window={window} /> : <ImpactLegend chart={impact} inspecting={inspecting ? date : undefined} window={window} returns view={view} currency={currency} label={inspecting ? "선택 수익률" : "마지막 수익률"} value={value} /> : undefined}
         stored={historyRows(view, "ALL").map((p) => ({
           date: p.date,
           returnPct: p.exampleReturnPct,
@@ -344,7 +344,8 @@ export function HistoryChart({
           </span>
         ))}
       </figcaption>
-      {impact && <ImpactLegend chart={impact} window={{start:rows[0].date,end:rows[rows.length-1].date}} inspecting={inspecting ? selectedRow.date : undefined}
+      {impact && compact && <CompactImpactBasis chart={impact} window={{ start: rows[0].date, end: rows[rows.length-1].date }} aligned={ranges.length > 0} />}
+      {impact && !compact && <ImpactLegend chart={impact} window={{start:rows[0].date,end:rows[rows.length-1].date}} inspecting={inspecting ? selectedRow.date : undefined}
         returns={metric === "return"} view={view} currency={currency} aligned={ranges.length > 0}
         label={inspecting ? metric === "value" ? "선택 평가액" : "선택 수익률" : periodLabel}
         value={inspecting ? selectedValue : periodValue} />}

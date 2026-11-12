@@ -2,12 +2,12 @@
 
 import { instrumentLabel } from "@/lib/instrument-display";
 import { Button as CairnButton, Status as CairnStatus, ActionGroup, ActionContent } from "@/components/cairn-ui";
-import { ArrowRight, ChartNoAxesCombined } from 'lucide-react';
+import { ChartNoAxesCombined } from 'lucide-react';
 import { HoldingHeatmap } from './holding-heatmap';
 
 import { HomeSimulation, HomeSimulationPending } from "./home-simulation";
 import type { SimulationRead } from "@/lib/cairn-v2/simulation-contract";
-import { ContributionHome } from "./home-contribution";
+import { ContributionEntry } from "./home-contribution-entry";
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
@@ -15,7 +15,7 @@ import { HomeCard as Card } from "./home-card";
 import { cardTitles, type CardKind } from "./card-definition";
 import { MetricControls, PeriodControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
-import { HomeImpactProvider } from "./home-impact";
+import { HomeImpactControls, HomeImpactProvider } from "./home-impact";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
@@ -73,7 +73,12 @@ export function BetaHome({
     const resume = () => {
       if (location.hash === '#beta-target-drift') {
         const trigger = document.querySelector<HTMLElement>('[data-beta-card="structure"] [data-expand]');
-        if (trigger) open("drift", trigger);
+        if (trigger) {
+          // A fragment can open the dialog without a click. Give the native
+          // dialog the same focus origin it would have on keyboard activation.
+          trigger.focus({ preventScroll: true });
+          open("drift", trigger);
+        }
         return;
       }
       if (location.hash !== '#beta-contribution') return;
@@ -141,14 +146,14 @@ export function BetaHome({
                 : "예시 · 10.02 07:00"}
             </p>
           </Card>
-          <Card onOpen={open} kind="today">
+          <Card onOpen={open} kind="today" expandText="기여율 상세">
             <HomeToday key={context.scope + context.currency} view={view} currency={context.currency} />
           </Card>
           </div>
           <div className={home.history}>
             <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
               <HistoryChart view={view} compact interactive currency={context.currency} />
-              <PeriodControls />
+              <div className={home.historyFooter}><HomeImpactControls /><PeriodControls /></div>
             </Card>
 
           </div>
@@ -186,17 +191,11 @@ export function BetaHome({
           <div className={home.planning}>
           <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
             {view.domain ? (
-              <ContributionHome view={view} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}>
-                <div className={home.amountChoices} role="group" aria-label="추가 투자금">
-                  {[500000, 1000000, 2000000].map(amount => (
-                    <CairnButton variant="bare" type="button" key={amount}
-                      aria-pressed={context.cashAmountKrw === String(amount)}
-                      onClick={() => setContext({ ...context, cashAmountKrw: String(amount) })}>
-                      {amount / 10000}만원
-                    </CairnButton>
-                  ))}
-                </div>
-              </ContributionHome>
+              <ContributionEntry key={context.scope} view={view} context={context} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}
+                onView={(trigger, amount) => {
+                  if (amount !== undefined && amount !== context.cashAmountKrw) setContext({ ...context, cashAmountKrw: amount });
+                  open("contribution", trigger);
+                }} />
             ) : (
               <div className={`${styles.contributionBody} ${!view.contribution.length ? home.noAllocation : ''}`}>
                 <div>
@@ -243,9 +242,7 @@ export function BetaHome({
             )}
           </Card>
 
-            <CairnButton variant="bare" className={home.planLink} type="button" onClick={event => open("contribution", event.currentTarget)}>
-              투자안 자세히 보기 <ArrowRight size={14} aria-hidden="true" />
-            </CairnButton>
+            {!view.domain && <CairnButton variant="bare" className={home.planLink} type="button" onClick={event => open("contribution", event.currentTarget)}>배분 보기</CairnButton>}
           </div>
         </div>
           <Card onOpen={open} kind="heatmap" className={home.heatmap}>
