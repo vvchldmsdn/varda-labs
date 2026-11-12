@@ -56,8 +56,9 @@ function trade(row: Row): AttributionTrade {
     try {
       const execution = resolveNativeTrade(event);
       const gross = execution.settlement;
+      const consideration = gross ?? execution.calculatedConsideration;
       const unit = toNumber(execution.executionUnitPrice?.amount) ??
-        (gross?.currency === event.currency ? Number(gross.amount) / q : null);
+        (consideration?.currency === event.currency ? Number(consideration.amount) / q : null);
       const grossKrw = gross?.currency === "KRW" ? toNumber(gross.amount) : null;
       // Native gross settlement and the separately recorded charges are distinct. When executed in USD
       // with documented KRW gross, their ratio gives the actual conversion for this execution.

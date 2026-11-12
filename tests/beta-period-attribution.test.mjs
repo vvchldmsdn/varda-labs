@@ -84,6 +84,19 @@ test("an unexplained quantity change, missing price or conflicting evidence is n
   }
 });
 
+test("a cutoff with no KRW valuation reports the missing price or exchange rate at either endpoint", () => {
+  const complete = position(1, 100, 1250);
+  for (const [overrides, reason] of [[{ price: null }, "price"], [{ fxRate: null }, "fx"], [{}, "valuation"]]) {
+    const missing = { ...complete, ...overrides, marketValueKrw: null };
+    for (const [before, after] of [[missing, complete], [complete, missing]]) {
+      const result = calc([before], [after]);
+      assert.equal(result.state, "unavailable");
+      assert.equal(result.totalKrw, null);
+      assert.equal(result.gaps[0].reason, reason);
+    }
+  }
+});
+
 test("an absent account day blocks both adjacent comparisons, not a later matched interval", () => {
   const observations = [snapshot("2026-10-31", [position(1, 100, 1000)]),
     snapshot("2026-11-02", [position(1, 110, 1000)]), snapshot("2026-11-03", [position(1, 111, 1000)])];

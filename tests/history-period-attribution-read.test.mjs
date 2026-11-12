@@ -20,7 +20,7 @@ async function setup(pg) {
     create table daily_position_snapshots(id uuid default gen_random_uuid(),canonical_owner_user_id uuid,account_id uuid,account text,source text,snapshot_date date,
       cycle_end_at timestamptz,captured_at timestamptz,created_at timestamptz default now(),updated_at timestamptz,description text,is_sample boolean default false,
       asset_id uuid,legacy_asset_id text,asset_name text,ticker text,market text,currency text,quantity numeric,total_quantity numeric,estimated_fractional_quantity numeric,
-      price_source text,price_basis text,unit_price numeric,current_price numeric,close_price numeric,fx_rate numeric,fractional_krw_value numeric,market_value_krw numeric);
+      price_source text,price_basis text,price_date date,reference_date date,unit_price numeric,current_price numeric,close_price numeric,fx_rate numeric,fractional_krw_value numeric,market_value_krw numeric);
     create table event_ledger_entries(id uuid default gen_random_uuid(),canonical_owner_user_id uuid,account_id uuid,asset_id uuid,asset_name text,ticker text,
       legacy_base44_id text,legacy_asset_id text,corrects_event_id uuid,legacy_corrects_event_id text,broker_recovery_data jsonb,native_data jsonb,
       recorded_at timestamptz,created_at timestamptz default now(),is_sample boolean default false,event_date date,event_type text,quantity_delta numeric,price numeric,fx_rate numeric,amount_krw numeric);
@@ -97,10 +97,66 @@ test("native cutoff evidence excludes cash and private frame identities and appl
     }
     const result = await read(owner,native);
     assert.equal(result.state,"complete"); assert.equal(result.priceKrw,10); assert.equal(result.fxKrw,0);
+    await pg.query("update daily_portfolio_snapshots set native_evidence=jsonb_set(native_evidence,'{frame,positions,0,observation,quantity}',to_jsonb('1'::text)) where snapshot_date=$1 and account_id=$2",["2025-06-03",native]);
+    await pg.query("insert into event_ledger_entries(canonical_owner_user_id,account_id,event_date,native_data) values($1,$2,$3,$4)",
+      [owner,native,day,JSON.stringify({event:{type:"buy",assetId:nativeHolding,at:"2025-06-02T09:00:00Z",quantity:"0.5",currency:"KRW",
+        executionTotal:{amount:"55",currency:"KRW"},settlementStatus:"unconfirmed"}})]);
+    const executed = await read(owner,native);
+    assert.equal(executed.state,"complete"); assert.equal(executed.totalKrw,15);
     await pg.query("update daily_portfolio_snapshots set native_evidence=jsonb_set(native_evidence,'{frame,positions,0,ownerId}',to_jsonb($1::text)) where snapshot_date=$2 and account_id=$3",[other,"2025-06-03",native]);
     const incomplete = await read(owner,native);
     assert.equal(incomplete.state,"unavailable"); assert.ok(incomplete.gaps.some(g=>g.reason==="holding_history"));
     await pg.query("insert into native_ledger_revisions values($1,$2,1,'2025-06-02T18:00Z','2025-06-08T00:00Z')",[owner,native]);
     assert.deepEqual((await read(owner,native)).gaps.map(g=>g.reason),["account_history"]);
+  } finally { await pg.close(); }
+});
+
+test("a reconstructed zero is outside the positive holding count and a manual total stays unpriced", async () => {
+  const pg = new PGlite();
+  try {
+    await setup(pg);
+    const read = await reader(pg);
+    const source = "broker_reconstructed_close_v1:fixture";
+    for (const [date,price] of [["2025-06-02",110],["2025-06-03",120]]) {
+      await pg.query("insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,num_assets) values($1,$2,'acct',$3,$4,1)",
+        [owner,account,date,source]);
+      await pg.query("insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,asset_id,asset_name,ticker,market,currency,quantity,unit_price,fx_rate,market_value_krw,price_basis) values($1,$2,'acct',$3,$4,$5,'Held','IN','us','USD',2,$7,1000,$8,'reconstructed_dated_close'),($1,$2,'acct',$3,$4,$6,'Sold','OUT','us','USD',0,null,null,0,'confirmed_zero')",
+        [owner,account,date,source,held,sold,price,price*2000]);
+    }
+    const attached = await read(owner,account);
+    assert.equal(attached.state,"complete"); assert.equal(attached.holdings.length,1); assert.equal(attached.priceKrw,20000);
+    await pg.query("update daily_position_snapshots set price_basis='confirmed_manual_total' where snapshot_date=$1 and asset_id=$2",["2025-06-03",held]);
+    const missing = await read(owner,account);
+    assert.equal(missing.priceKrw,null); assert.equal(missing.fxKrw,null);
+    assert.deepEqual(missing.gaps.map(g=>[g.holding,g.reason]),[["IN","price"]]);
+  } finally { await pg.close(); }
+});
+
+test("an explicitly recorded manual unit price belongs only to its own completed service day", async () => {
+  const pg = new PGlite();
+  try {
+    await setup(pg);
+    const read = await reader(pg);
+    for (const [date,cutoff,observed,price] of [
+      ["2025-06-02","2025-06-01T22:00:00Z","2025-05-31T23:00:00.000Z",100],
+      ["2025-06-03","2025-06-02T22:00:00Z","2025-06-01T23:00:00.000Z",125],
+    ]) {
+      await pg.query("insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,source,snapshot_date,num_assets,cycle_end_at,captured_at,description) values($1,$2,'acct','varda_manual_daily_snapshot',$3,1,$4,$4,'snapshot_status=complete')",
+        [owner,account,date,cutoff]);
+      await pg.query(`insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,source,snapshot_date,asset_id,asset_name,market,currency,quantity,unit_price,market_value_krw,price_basis,price_source,reference_date,cycle_end_at,captured_at,description)
+        values($1,$2,'acct','varda_manual_daily_snapshot',$3,$4,'금현물','korea','KRW',2,$5,$6,'manual_current','manual_entry',$7,$8,$8,$9)`,
+        [owner,account,date,held,price,2*price,observed.slice(0,10),cutoff,"price_observed_at="+observed+"; price_timestamp_basis=manual_input"]);
+    }
+    assert.equal((await read(owner,account)).priceKrw,50);
+    for (const [observed,extra] of [
+      ["2025-06-01T21:59:59.000Z",""], // Previous 07:00 KST cycle.
+      ["2025-06-02T22:00:00.000Z",""], // Exactly at the exclusive cutoff.
+      ["2025-06-01T23:00:00.000Z","; manual_carry_snapshot=previous"],
+    ]) {
+      await pg.query("update daily_position_snapshots set reference_date=$1,description=$2 where account_id=$3 and snapshot_date='2025-06-03'",
+        [observed.slice(0,10),"price_observed_at="+observed+"; price_timestamp_basis=manual_input"+extra,account]);
+      const gap = await read(owner,account);
+      assert.equal(gap.state,"unavailable"); assert.equal(gap.gaps[0].reason,"price");
+    }
   } finally { await pg.close(); }
 });

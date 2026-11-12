@@ -1,22 +1,24 @@
 import "server-only";
+import { MANUAL_ASSET_PRICE_POLICY } from "../market-data/manual-asset-price";
 import { holdingsPortfolioSql } from "../portfolio-presentation-policy";
 import { brokerRecoverySnapshotPredicateText } from "./history-read-sql";
 
 // All values are bound parameters. The caller sets this transaction-local owner using the existing tenant port.
-const ownedAccounts = `
-  select a.id,a.name,a.code,a.canonical_owner_user_id
-  from public.accounts a
-  where a.is_active and a.canonical_owner_user_id=nullif(current_setting('app.current_user_id',true),'')::uuid
+const ownedActiveAccount = `a.is_active and a.canonical_owner_user_id=nullif(current_setting('app.current_user_id',true),'')::uuid
     and ($1::uuid is null or a.id=$1::uuid)`;
+const ownedAccounts = `select a.id,a.name,a.code,a.canonical_owner_user_id
+  from public.accounts a where ${ownedActiveAccount}`;
 
 export const ATTRIBUTION_ACCOUNTS_SQL = ownedAccounts + " order by a.sort_order,a.code";
 
 export const ATTRIBUTION_ENDS_SQL = `
 with owned as (
   select a.id,a.code,a.canonical_owner_user_id, ${holdingsPortfolioSql("a")} as holdings
-  from public.accounts a join (${ownedAccounts}) authorized on authorized.id=a.id
+  from public.accounts a where ${ownedActiveAccount}
 ), candidates as (
-  select snapshot.*,case
+  select snapshot.id,snapshot.account_id,snapshot.account,snapshot.canonical_owner_user_id,
+    snapshot.snapshot_date,snapshot.source,snapshot.native_evidence,snapshot.captured_at,snapshot.created_at,
+    snapshot.description,snapshot.num_assets,case
     when snapshot.native_evidence is not null then
       (((snapshot.native_evidence->'frame'->>'at')::timestamptz at time zone 'Asia/Seoul')::date-1)
     when snapshot.source='varda_manual_daily_snapshot' or snapshot.source like 'broker_reconstructed_close_v1:%' then
@@ -31,6 +33,7 @@ with owned as (
       and ${brokerRecoverySnapshotPredicateText("snapshot")})
     or (not a.holdings and snapshot.native_evidence->>'version'='1'
       and snapshot.native_evidence->'frame'->>'boundary'='before'
+      and jsonb_typeof(snapshot.native_evidence->'frame'->'positions')='array'
       and (snapshot.source='native_ledger_cutoff_v2' or snapshot.source ~ '^native_ledger_cutoff_v3:r[0-9]+$')
       and not exists(select 1 from public.native_ledger_revisions revision
         where revision.canonical_owner_user_id=a.canonical_owner_user_id and revision.account_id=a.id
@@ -59,11 +62,24 @@ select c.account_id::text as account_id,c.valued_on::text as date,c.source,
     select jsonb_agg(jsonb_build_object('assetId',coalesce(snapshot.asset_id,legacy.id),'name',snapshot.asset_name,
         'ticker',snapshot.ticker,'market',snapshot.market,'currency',snapshot.currency,'quantity',
           coalesce(snapshot.quantity,case when coalesce(snapshot.estimated_fractional_quantity,0)=0 then snapshot.total_quantity end),
-        'price',case when snapshot.price_basis in ('manual_current','confirmed_manual_total','preserved_stored_manual_carry','preserved_manual_observation') or snapshot.price_source='user_confirmed_total_valuation' then null
+        'price',case when snapshot.price_basis='manual_current' then
+          case when snapshot.source='varda_manual_daily_snapshot' and snapshot.price_source='${MANUAL_ASSET_PRICE_POLICY.source}' and snapshot.quantity>0
+            and snapshot.description ~ '(^|; )price_timestamp_basis=manual_input(;|$)'
+            and snapshot.description not like '%manual_carry_snapshot=%'
+            and coalesce(snapshot.reference_date,snapshot.price_date)::text=left(manual.observed_at,10)
+            and manual.observed_at>=to_char((snapshot.cycle_end_at-interval '24 hours') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+            and manual.observed_at<to_char(snapshot.cycle_end_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+            and manual.observed_at<=to_char(snapshot.captured_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+            then snapshot.unit_price end
+          when snapshot.price_basis in ('confirmed_manual_total','preserved_stored_manual_carry','preserved_manual_observation') or snapshot.price_source='user_confirmed_total_valuation' then null
           else coalesce(snapshot.unit_price,snapshot.current_price,snapshot.close_price) end,
         'fxRate',snapshot.fx_rate,'fixedKrw',snapshot.fractional_krw_value,'marketValueKrw',snapshot.market_value_krw)
       order by snapshot.asset_name,snapshot.id)
     from public.daily_position_snapshots snapshot
+    -- The daily writer records ISO UTC, with milliseconds. Only an explicit unit observation
+    -- inside this completed 07:00-to-07:00 cycle qualifies; carrying yesterday's mark is not a quote.
+    cross join lateral (select substring(snapshot.description from
+      '(?:^|; )price_observed_at=([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z)(?:;|$)') as observed_at) manual
     left join public.assets legacy on snapshot.asset_id is null and legacy.legacy_base44_id=snapshot.legacy_asset_id
       and legacy.account_id=snapshot.account_id and legacy.canonical_owner_user_id=snapshot.canonical_owner_user_id
     where snapshot.canonical_owner_user_id=c.canonical_owner_user_id and snapshot.account_id=c.account_id

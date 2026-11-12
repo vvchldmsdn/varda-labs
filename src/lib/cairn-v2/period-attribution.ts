@@ -119,16 +119,16 @@ function holdingImpact(before: AttributionPosition | undefined, after: Attributi
   const { legs, flow } = execution;
   const resultingQty = legs.reduce((q, leg) => q + leg.quantityDelta, startQty);
   if (Math.abs(resultingQty - endQty) > Math.max(1e-8, endQty * 1e-10)) return "trade";
+  if (startQty > 0 && !positive(before?.price) || endQty > 0 && !positive(after?.price)) return "price";
+  const previousFx = resolveKrwFxRate(currency, before?.fxRate);
+  const currentFx = resolveKrwFxRate(currency, after?.fxRate);
+  if (startQty > 0 && !previousFx.ok || endQty > 0 && !currentFx.ok) return "fx";
   const previousValue = before ? before.marketValueKrw : 0;
   const currentValue = after ? after.marketValueKrw : 0;
   if (!nonnegative(previousValue) || !nonnegative(currentValue)) return "valuation";
   // A KRW balance without shares is a manual valuation, with no observable unit price.
   if ((!startQty && previousValue > 0) || (!endQty && currentValue > 0)) return "valuation";
   if (!startQty && !endQty && !legs.length) return { priceKrw: 0, fxKrw: 0 };
-  if (startQty > 0 && !positive(before?.price) || endQty > 0 && !positive(after?.price)) return "price";
-  const previousFx = resolveKrwFxRate(currency, before?.fxRate);
-  const currentFx = resolveKrwFxRate(currency, after?.fxRate);
-  if (startQty > 0 && !previousFx.ok || endQty > 0 && !currentFx.ok) return "fx";
 
   if (!endQty) return closedImpact(legs, flow, startQty * (before?.price ?? 0), previousValue,
     startQty && previousFx.ok ? previousFx.rate : undefined);
