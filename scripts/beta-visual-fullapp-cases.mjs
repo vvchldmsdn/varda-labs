@@ -32,7 +32,9 @@ export async function runBetaVisualCases({page,check,url,output}) {
       if(width===1440){
         await page.evaluate(()=>{ location.hash='beta-target-drift'; });
         await expect(page.locator('dialog [data-detail-kind=drift]')).toBeVisible();
+        await expect(page.locator('dialog [data-dialog-close]')).toBeFocused();
         await page.keyboard.press('Escape');
+        await expect(page.getByRole('dialog')).toHaveCount(0);
         await expect(page.locator('[data-beta-card=structure] [data-expand]')).toBeFocused();
         await page.evaluate(()=>history.replaceState(null,'',location.pathname+location.search));
         await page.setViewportSize({width:900,height});

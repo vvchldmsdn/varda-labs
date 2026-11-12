@@ -73,7 +73,12 @@ export function BetaHome({
     const resume = () => {
       if (location.hash === '#beta-target-drift') {
         const trigger = document.querySelector<HTMLElement>('[data-beta-card="structure"] [data-expand]');
-        if (trigger) open("drift", trigger);
+        if (trigger) {
+          // A fragment can open the dialog without a click. Give the native
+          // dialog the same focus origin it would have on keyboard activation.
+          trigger.focus({ preventScroll: true });
+          open("drift", trigger);
+        }
         return;
       }
       if (location.hash !== '#beta-contribution') return;
