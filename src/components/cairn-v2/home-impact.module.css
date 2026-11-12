@@ -17,3 +17,12 @@
 .basis { grid-column:1/-1; margin:0; font-size:10px; line-height:1.5; color:var(--cairn-v2-muted); }
 @media(prefers-reduced-motion:no-preference) { :global([data-reduced=false]) .series { animation:appear 220ms ease-out; } }
 @keyframes appear { from {opacity:0} to {opacity:1} }
+.toggles { display:flex; flex-wrap:wrap; gap:6px; }
+.toggles button[data-impact] { display:inline-flex; align-items:center; gap:5px; min-height:38px; padding:6px 9px; border:1px solid #ffffff28; border-radius:8px; color:var(--cairn-v2-muted); font-size:11px; }
+.toggles button::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--effect); }
+.toggles [data-impact=price] { --effect:#86c09d; }
+.toggles [data-impact=fx] { --effect:#c2a5dc; }
+.toggles button[aria-pressed=true] { background:#ffffff14; border-color:#ffffff44; color:#fff; }
+.toggles button[aria-pressed=true] small { color:var(--effect); }
+.toggles small { font-size:10px; }
+@media(max-width:600px) { .toggles button[data-impact] { min-height:44px; } }

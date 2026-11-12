@@ -12,6 +12,7 @@ export function HomeCard({
   className,
   children,
   controls,
+  expandText,
   onOpen,
   minimal = false,
 }: {
@@ -19,11 +20,12 @@ export function HomeCard({
   className?: string;
   children: ReactNode;
   controls?: ReactNode;
+  expandText?: string;
   onOpen: (kind: CardKind, trigger: HTMLElement) => void;
   minimal?: boolean;
 }) {
   const activate = (event: MouseEvent<HTMLElement>) => {
-    if ((event.target as Element).closest("button,a,input,select,summary,[role=button],[popover]")) return;
+    if ((event.target as Element).closest("button,a,input,select,label,form,details,[role=button],[popover]")) return;
     const trigger = event.currentTarget.querySelector<HTMLButtonElement>("[data-expand]");
     if (trigger) onOpen(kind, trigger);
   };
@@ -51,10 +53,11 @@ export function HomeCard({
         }
         actions={
           <IconButton
-            label={`${cardTitles[kind]} 확대`}
+            label={expandText ? `${cardTitles[kind]} ${expandText}` : `${cardTitles[kind]} 확대`}
             data-expand
             onClick={(event) => onOpen(kind, event.currentTarget)}
           >
+            {expandText && <span>{expandText}</span>}
             <svg
               width="16"
               height="16"

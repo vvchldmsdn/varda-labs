@@ -144,7 +144,7 @@ test('the actual beta value card shows original partial coverage and never subst
     '@/components/cairn-v2/beta-shell':{BetaShell:({children})=>createElement('div',null,children)},
     '@/components/cairn-v2/home-card':{HomeCard:({kind,children})=>createElement('section',{'data-beta-card':kind},children)},
     '@/components/cairn-v2/home-today':{HomeToday:empty},
-    '@/components/cairn-v2/home-contribution':{ContributionHome:empty},
+    '@/components/cairn-v2/home-contribution-entry':{ContributionEntry:empty},
     '@/components/cairn-v2/target-drift-home':{TargetDriftHome:empty},
     '@/components/cairn-v2/holding-heatmap':{HoldingHeatmap:empty},
     '@/components/cairn-v2/home-simulation':{HomeSimulation:empty,HomeSimulationPending:empty},

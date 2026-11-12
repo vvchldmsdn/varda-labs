@@ -17,6 +17,11 @@ test.describe("home composition on isolated development fixtures", () => {
         await expect(page.locator(frontend === "original" ? "#portfolio-overview-title" : "[data-beta-card=value]")).toBeVisible();
         const ring = page.locator("[data-allocation-ring]").first();
         await expect(ring).toBeVisible();
+        if (frontend === "beta") {
+          const width = (await ring.boundingBox())?.width ?? 0;
+          expect(width).toBeGreaterThanOrEqual(228);
+          expect(width).toBeLessThanOrEqual(232);
+        }
         const list = page.getByRole("list", {name:"종목별 비중"});
         const second = list.getByRole("button").nth(1);
         await second.click();
@@ -103,7 +108,7 @@ test.describe("home composition on isolated development fixtures", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(expand).toBeFocused();
-    const plan = page.getByRole("button",{name:"투자안 자세히 보기",exact:true});
+    const plan = page.getByRole("button",{name:"배분 보기",exact:true});
     await plan.click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
