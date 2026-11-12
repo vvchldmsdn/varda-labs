@@ -152,7 +152,7 @@ async function refreshHarness(test, { visibility = "visible", storageFailure = n
     "@/components/i18n/locale-provider": { useI18n: () => ({ t: (ko, en) => en ?? ko }) },
     "@/components/i18n/localized-text": { T: () => null },
     "@/components/home/home-history-messages": { translateHomeHistory: value => value },
-    "lucide-react": { RefreshCw: () => null },
+    "lucide-react": { RefreshCw: () => null, Check: () => null },
   });
   return {
     requests, storage, states, timeouts, intervals,
@@ -343,7 +343,7 @@ for (const completedBeforeFailure of [0, 3]) it(`shows connection loss at ${comp
     react: hooks.react, 'next/navigation': { useRouter: () => router },
     '@/components/i18n/locale-provider': { useI18n: () => ({ t: (_ko, en) => en }) },
     '@/components/i18n/localized-text': { T: () => null },
-    '@/components/home/home-history-messages': { translateHomeHistory: value => value }, 'lucide-react': { RefreshCw: () => null },
+    '@/components/home/home-history-messages': { translateHomeHistory: value => value }, 'lucide-react': { RefreshCw: () => null, Check: () => null },
   });
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => tree == null ? '' : typeof tree !== 'object' ? String(tree) : Array.isArray(tree) ? tree.map(text).join('') : text(tree.props?.children);
@@ -387,7 +387,7 @@ it('a new queued operation never paints the previous completion before its effec
     '@/components/i18n/locale-provider': { useI18n: () => ({ t: (_ko, en) => en }) },
     '@/components/i18n/localized-text': { T: () => null },
     '@/components/home/home-history-messages': { translateHomeHistory: value => value },
-    'lucide-react': { RefreshCw: () => null },
+    'lucide-react': { RefreshCw: () => null, Check: () => null },
   });
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => tree == null ? '' : typeof tree !== 'object' ? String(tree) : Array.isArray(tree) ? tree.map(text).join('') : text(tree.props?.children);
@@ -428,7 +428,7 @@ for (const initialState of ['fresh', 'partial']) it(`a ${initialState} receipt f
     react: hooks.react, 'next/navigation': { useRouter: () => router },
     '@/components/i18n/locale-provider': { useI18n: () => ({ t: (_ko, en) => en }) },
     '@/components/i18n/localized-text': { T: () => null },
-    '@/components/home/home-history-messages': { translateHomeHistory: value => value }, 'lucide-react': { RefreshCw: () => null },
+    '@/components/home/home-history-messages': { translateHomeHistory: value => value }, 'lucide-react': { RefreshCw: () => null, Check: () => null },
   });
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => tree == null ? '' : typeof tree !== 'object' ? String(tree) : Array.isArray(tree) ? tree.map(text).join('') : text(tree.props?.children);

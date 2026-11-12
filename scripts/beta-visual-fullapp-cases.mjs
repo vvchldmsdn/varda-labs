@@ -45,11 +45,11 @@ export async function runBetaVisualCases({page,check,url,output}) {
         for(const label of ['홈','자산','분석','계획','기록'])await expect(nav.getByRole('link',{name:label,exact:true})).toBeVisible();
       }
       if(width<1024){
-        const menu=page.getByRole('button',{name:'메뉴 열기',exact:true});
-        await menu.click();
-        await expect(page.getByLabel('목적별 내비게이션',{exact:true}).getByRole('link',{name:'자산',exact:true})).toBeVisible();
-        await page.keyboard.press('Escape');
-        await expect(menu).toHaveAttribute('aria-expanded','false');
+        const nav=page.getByRole('navigation',{name:'주요 메뉴',exact:true});
+        await expect(nav.getByRole('link')).toHaveCount(5);
+        await expect(nav.getByRole('link',{name:'자산',exact:true})).toBeVisible();
+        const box=await nav.boundingBox();
+        assert.ok(box && Math.abs(box.y + box.height - height) < 1, 'mobile navigation stays at the bottom of the viewport');
       }
       await expect(ring.getByRole('button',{name:'KODEX 200',exact:false})).toHaveCount(1);
       await expect(ring.getByRole('button',{name:'069500',exact:false})).toHaveCount(0);
