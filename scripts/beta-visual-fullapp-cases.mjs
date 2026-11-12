@@ -18,11 +18,15 @@ export async function runBetaVisualCases({page,check,url,output}) {
       const home=page.locator('[data-beta-root]');await expect(home).toHaveAttribute('data-beta-ready','true');
       const today=page.locator('[data-beta-card="today"]');
       await expect(today.getByLabel('오늘 변동률 · KRW 기준',{exact:true})).toContainText('+0.10%');
-      await expect(today).toContainText('가격 변동 +39,000원');
-      await expect(today).toContainText('환율 변동 -7,000원');
+      await expect(today.locator('[data-impact="price"]')).toHaveText('가격 +39,000원');
+      await expect(today.locator('[data-impact="fx"]')).toHaveText('환율 -7,000원');
       const amount=today.getByLabel('오늘 변동액 · KRW',{exact:true});await expect(amount).toContainText('+32,000');
       assert.ok(await amount.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))>=22);
-      await expect(today).toContainText('일부 종목 기준 · 1종목 제외');
+      const exclusions=today.locator('details');
+      await expect(exclusions.locator('summary')).toHaveText('1종목 제외');
+      await exclusions.locator('summary').click();
+      await expect(exclusions.getByText('제외 사유 확인 전',{exact:true})).toBeVisible();
+      await exclusions.locator('summary').click();
       await expect(page.getByRole('button',{name:'추가 투자 계산하기',exact:true})).toHaveCount(0);
       await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
       if(width===1440){
@@ -54,6 +58,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(ring.getByRole('button',{name:'KODEX 200',exact:false})).toHaveCount(1);
       await expect(ring.getByRole('button',{name:'069500',exact:false})).toHaveCount(0);
       const ringBox=await ring.boundingBox();assert.ok(ringBox&&Math.abs(ringBox.width-ringBox.height)<1);
+      const ringFrame=await ring.locator('..').boundingBox();assert.ok(ringFrame&&Math.abs(ringFrame.width-230)<1,'home donut keeps the larger reference frame');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       const homeHeatmap=page.locator('[data-beta-card="heatmap"]');
       await expect(homeHeatmap.locator('[data-heatmap-cell]')).toHaveCount(112);
@@ -121,7 +126,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(composition.locator('[data-segment-key="'+key+'"]')).toHaveCSS('transform','none');
       await page.screenshot({path:path.join(output,`beta-value-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
-      await page.getByRole('button',{name:'오늘의 변동 확대',exact:true}).click();
+      await today.getByRole('button',{name:'오늘의 변동 기여율 상세',exact:true}).click();
       const list=dialog.getByLabel('종목별 변동 기여 목록',{exact:true});await expect(list.getByRole('button')).toHaveCount(8);
       const boxes=await list.getByRole('button').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,bottom:r.bottom};}));
       if(width>1000){const panel=await dialog.locator('[data-beta-panel]').boundingBox();assert.ok(Math.abs(boxes[0].y-boxes[1].y)<1&&boxes[1].x>boxes[0].x,'desktop shows two columns');assert.ok(panel&&boxes.filter(r=>r.bottom<panel.y+panel.height-8).length>=6,'six holdings must fit inside the panel without scrolling');}
