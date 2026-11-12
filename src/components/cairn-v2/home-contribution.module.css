@@ -1,10 +1,10 @@
 .entry { display:grid; gap:10px; }
-.entry > label { font-size:clamp(18px,1.6vw,20px); font-weight:650; letter-spacing:-.03em; }
+.entry > label[data-cairn-field] { color:inherit; font-size:clamp(18px,1.6vw,20px); font-weight:650; line-height:inherit; letter-spacing:-.03em; }
 .inputRow { display:flex; align-items:stretch; gap:8px; }
 .inputWrap { display:flex; min-width:0; flex:1; align-items:baseline; gap:6px; padding:8px 12px; border:1px solid var(--home-line); border-radius:12px; background:var(--cairn-ui-paper); cursor:text; }
 .inputWrap:focus-within { outline:2px solid var(--home-ink); outline-offset:1px; }
-.inputWrap input { width:100%; min-width:0; padding:0; border:none; background:transparent; color:inherit; font:400 30px/1.25 var(--home-display); letter-spacing:-.04em; }
-.inputWrap input:focus-visible { outline:none; }
+.entry .inputWrap input[data-presentation=amount] { width:100%; min-width:0; min-height:0; padding:0; border:none; background:transparent; color:inherit; font:400 30px/1.25 var(--home-display); letter-spacing:-.04em; }
+.entry .inputWrap input[data-presentation=amount]:focus-visible { outline:none; }
 .inputWrap span { flex:none; font-size:12px; color:var(--cairn-v2-muted); }
 .inputRow .submit { display:inline-flex; align-items:center; gap:6px; padding-inline:14px; min-height:44px; border-radius:12px; background:var(--home-ink); color:var(--home-paper); }
 .presets { display:flex; flex-wrap:wrap; gap:5px; }

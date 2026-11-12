@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/cairn-ui";
+import { Button, Field, Form, Input } from "@/components/cairn-ui";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { parseContributionInput } from "@/lib/cairn-v2/planning-contract";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
@@ -33,7 +33,7 @@ export function ContributionEntry({ view, context, dirty, colors, onView }: {
   const canCalculate = context.currency === "KRW";
 
   return <>
-    {canCalculate ? <form className={styles.entry} noValidate onSubmit={event => {
+    {canCalculate ? <Form className={styles.entry} noValidate onSubmit={event => {
       event.preventDefault();
       if (!won) {
         setValidate(true);
@@ -44,15 +44,15 @@ export function ContributionEntry({ view, context, dirty, colors, onView }: {
       setPresetsOpen(false);
       if (submitRef.current) onView(submitRef.current, won);
     }}>
-      <label htmlFor={amountId}>얼마를 더 투자할까요?</label>
+      <Field htmlFor={amountId}>얼마를 더 투자할까요?</Field>
       <div className={styles.inputRow}>
-        <label className={styles.inputWrap}>
-          <input id={amountId} aria-label="추가 투자 금액 (만원)" inputMode="decimal" autoComplete="off" placeholder="0"
+        <div className={styles.inputWrap}>
+          <Input presentation="amount" id={amountId} aria-label="추가 투자 금액 (만원)" inputMode="decimal" autoComplete="off" placeholder="0"
             aria-invalid={invalid || undefined} aria-describedby={invalid ? amountId + "-error" : undefined}
             value={text} onFocus={() => setPresetsOpen(true)}
             onChange={event => setDraft({ base: context.cashAmountKrw, text: event.target.value })} />
           <span>만원</span>
-        </label>
+        </div>
         <Button ref={submitRef} variant="primary" type="submit" className={styles.submit}>배분 보기 <ArrowRight size={14} aria-hidden /></Button>
       </div>
       {invalid && <p id={amountId + "-error"} role="alert">1원부터 1,000억 원까지, 원 단위로 입력해 주세요.</p>}
@@ -61,7 +61,7 @@ export function ContributionEntry({ view, context, dirty, colors, onView }: {
           onClick={() => { setDraft({ base: context.cashAmountKrw, text: String(value) }); setPresetsOpen(false); setValidate(false); submitRef.current?.focus(); }}>{value}만원</Button>)}
         <Button type="button" variant="bare" onClick={() => { setPresetsOpen(false); submitRef.current?.focus(); }}>닫기</Button>
       </div>}
-    </form> : <Button variant="secondary" type="button" onClick={e => onView(e.currentTarget)}>배분 보기</Button>}
+    </Form> : <Button variant="secondary" type="button" onClick={e => onView(e.currentTarget)}>배분 보기</Button>}
     <ContributionHome view={view} dirty={dirty || (canCalculate && text !== initial && won !== String(saved))} colors={colors} />
   </>;
 }
