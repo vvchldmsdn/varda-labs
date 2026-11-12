@@ -14,6 +14,6 @@ export function BetaWorkspace({ kind, initialContext, read }: { kind: "history" 
   const [context, setContext] = useBetaContext(initialContext);
   const view = useBetaView(context, read);
   return <BetaShell context={context} setContext={setContext} readView={view} workspace={kind} originalPath={kind === "history" ? "/history" : "/portfolio/structure"}>
-    <div className={styles.workspacePaper}>{kind === "history" ? <HistoryReturnBoundary context={context} view={view}><BetaDetail kind={kind} view={view} context={context} workspace /></HistoryReturnBoundary> : <BetaDetail kind={kind} view={view} context={context} workspace />}</div>
+    <div className={styles.workspacePaper}>{kind === "history" ? <HistoryReturnBoundary context={context} view={view}><BetaDetail kind={kind} view={view} context={context} historyRead={read} onAllHistoryAccounts={() => setContext({ ...context, scope: "all" })} workspace /></HistoryReturnBoundary> : <BetaDetail kind={kind} view={view} context={context} workspace />}</div>
   </BetaShell>;
 }

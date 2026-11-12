@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {expect} from '@playwright/test';
+import {runPeriodAttributionCases} from './beta-period-attribution-cases.mjs';
 
 // Actual presentation components/CSS in the disposable Next build. No account writes.
 export async function runBetaVisualCases({page,check,url,output}) {
+  await runPeriodAttributionCases({page,check,url,output});
   const chartGeometry=async svg=>{
     await expect.poll(async()=>svg.evaluate(el=>Math.abs(el.viewBox.baseVal.width-el.getBoundingClientRect().width))).toBeLessThan(1);
     await expect.poll(async()=>svg.evaluate(el=>Math.abs(el.viewBox.baseVal.height-el.getBoundingClientRect().height))).toBeLessThan(1);
