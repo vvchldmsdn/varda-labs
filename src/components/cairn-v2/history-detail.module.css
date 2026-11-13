@@ -2,7 +2,7 @@
    No parent page, data model, reset or modal is imported. */
 .surface {container:history-detail / inline-size;min-width:0;margin-top:8px;--history-negative:#3568ae;--history-sage:#8c9f89;--history-sand:#cca17b;}
 .toolbar {display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px;}
-.toolbarActions {display:flex;align-items:center;gap:16px;}
+.toolbarActions {display:flex;align-items:center;flex-wrap:wrap;min-width:0;gap:8px 16px;}
 .latestButton {min-height:40px;padding:8px 14px!important;border:1px solid var(--cairn-v2-line)!important;border-radius:20px;font-size:12px!important;white-space:nowrap;}
 .latestButton:hover {background:#eceee8!important;}
 .track [data-source="current"],.trackLegend [data-source="current"] {background:var(--cairn-v2-brand);}
@@ -56,6 +56,7 @@
 .evidence dd {font-size:12px;margin-top:4px;overflow-wrap:anywhere;}
 .evidence>p {font-size:11px;line-height:1.65;color:var(--cairn-v2-muted);margin-top:6px;}
 .empty {padding:60px 0;text-align:center;color:var(--cairn-v2-muted);}
+.scopeNotice { display:grid; justify-items:start; gap:12px; padding:22px 0; color:var(--cairn-v2-muted); }
 @media(max-width:1100px) {.stage {grid-template-columns:minmax(180px,27%) minmax(0,1fr);gap:26px;}.value {font-size:32px;}.periodValue {font-size:23px;}}
 @container history-detail (max-width:760px) {.stage {grid-template-columns:1fr;gap:24px;}.hero {display:block;}.plot>figure>[data-history-plot] {height:270px;}}
 @media(max-width:699px) {

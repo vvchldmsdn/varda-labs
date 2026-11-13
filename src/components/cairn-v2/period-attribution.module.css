@@ -1,0 +1,52 @@
+.panel {
+  --impact-price: var(--cairn-v2-brand);
+  --impact-fx: var(--home-sage, #789488);
+  min-width: 0; display: grid; gap: 18px; padding-block: 8px 16px;
+}
+.dates { display: grid; grid-template-columns: repeat(2, minmax(0, 12rem)) auto; align-items: end; justify-content: start; gap: 10px; }
+.dates input { min-width: 0; }
+.error { grid-column: 1/-1; color: var(--cairn-v2-brand); font-size: 13px; }
+.status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-block: 18px; color: var(--cairn-v2-muted); }
+.result { display: grid; min-width: 0; gap: 8px; }
+.range, .unavailable { color: var(--cairn-v2-muted); font-size: 13px; line-height: 1.6; }
+.range, .numbers dd, .ticks, .axis, .holdings td, .gaps > li > span { font-variant-numeric: tabular-nums; }
+.numbers { display: grid; grid-template-columns: 1.2fr 1fr 1fr; align-items: baseline; gap: 12px; margin: 2px 0 6px; }
+.numbers > div { display: grid; min-width: 0; gap: 4px; padding-block: 6px; }
+.numbers dt { font-size: 13px; color: var(--cairn-v2-muted); }
+.numbers dd { margin: 0; font-size: clamp(18px, 2.6vw, 27px); line-height: 1.25; font-weight: 500; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.numbers [data-factor=total] dd { font-size: clamp(24px, 3.2vw, 37px); }
+.chart { margin: 8px 0 18px; min-width: 0; }
+.chart figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px 18px; flex-wrap: wrap; padding-bottom: 12px; }
+.chart figcaption strong { font-weight: 550; font-size: 14px; }
+.legend { display: inline-flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--cairn-v2-muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend span::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--impact-price); }
+.legend [data-series=fx]::before { background: var(--impact-fx); }
+.legend [data-series=gap]::before, .bucket[data-partial] { background: repeating-linear-gradient(135deg, transparent 0px 3px, color-mix(in srgb,var(--cairn-v2-muted) 28%,transparent) 3px 4px); }
+.plot { display: grid; grid-template-columns: minmax(38px, auto) minmax(0, 1fr); gap: 8px; min-height: 132px; }
+.axis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 11px; color: var(--cairn-v2-muted); }
+.bars { position: relative; display: flex; border-block: 1px solid var(--cairn-v2-line); }
+.bars::before { content: ""; position: absolute; top: 50%; width: 100%; height: 1px; background: var(--cairn-v2-muted); opacity: .55; }
+.bucket { flex: 1; min-width: 0; position: relative; }
+.bucket i { position: absolute; bottom: 50%; right: 50%; width: 41%; max-width: 13px; min-height: 1px; background: var(--impact-price); }
+.bucket i[data-series=fx] { left: 50%; right: auto; background: var(--impact-fx); }
+.bucket i[data-negative] { top: 50%; bottom: auto; }
+.ticks { display: flex; justify-content: space-between; color: var(--cairn-v2-muted); font-size: 11px; margin: 4px 0 0 46px; }
+.disclosure { border-top: 1px solid var(--cairn-v2-line); }
+.disclosure[data-cairn-disclosure] > summary { min-height: 44px; padding-inline-end: 6px; }
+.disclosure p, .gaps small, .holdings small { font-size: 12px; line-height: 1.55; color: var(--cairn-v2-muted); }
+.gaps { display: grid; list-style: none; padding: 0; margin: 0; }
+.gaps li { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cairn-v2-line); overflow-wrap: anywhere; font-size: 13px; }
+.gaps strong, .holdings th { font-weight: 500; }
+.gaps small, .holdings small { display: block; }
+.holdings { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+.holdings :is(th, td) { padding: 10px 2px; border-bottom: 1px solid var(--cairn-v2-line); text-align: right; overflow-wrap: anywhere; }
+.holdings th:first-child { width: 41%; text-align: left; }
+.holdings thead { color: var(--cairn-v2-muted); font-size: 12px; }
+@container history-detail (max-width: 580px) {
+  .numbers { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px 14px; }
+  .numbers [data-factor=total] { grid-column: 1/-1; }
+  .dates { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .dates button { grid-column: 1/-1; justify-self: end; }
+  .plot { min-height: 116px; }
+}

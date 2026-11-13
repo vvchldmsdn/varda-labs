@@ -11,7 +11,7 @@ import { useLayoutEffect, useRef } from "react";
 import { ContributionDetail, TargetDetail, driftNumber, targetMessage } from "./planning-details";
 import { ReadSummary } from "./read-summary";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
-import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
+import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { fixtureNotice, type FixtureView } from "@/lib/cairn-v2/fixtures";
 import { betaReadHref, betaHref, originalHref, type BetaContext } from "@/lib/cairn-v2/navigation";
 import { useBetaPreferences, useBetaReadFreshness } from "./beta-provider";
@@ -278,6 +278,8 @@ export function BetaDetail({
   view,
   context,
   workspace = false,
+  historyRead,
+  onAllHistoryAccounts,
   onContributionEdit,
   onContributionCalculate,
   onTargetDrift,
@@ -286,6 +288,8 @@ export function BetaDetail({
   view: FixtureView;
   context: BetaContext;
   workspace?: boolean;
+  historyRead?: Pick<DomainRead, "displayBinding" | "readReceipt">;
+  onAllHistoryAccounts?: () => void;
   onContributionEdit?: (dirty: boolean) => void;
   onContributionCalculate?: (amount: string, keys?: string[]) => void;
   onTargetDrift?: () => void;
@@ -314,7 +318,7 @@ export function BetaDetail({
         />
       )}
       {kind === "history" ? (
-        <HistoryDetail view={view} context={context} />
+        <HistoryDetail view={view} context={context} historyRead={historyRead} onAllAccounts={onAllHistoryAccounts} />
       ) : kind === "structure" ? (
         <StructureDetail workspace={workspace} view={view} context={context} onTargetDrift={onTargetDrift} />
       ) : view.domain && kind === "heatmap" ? (

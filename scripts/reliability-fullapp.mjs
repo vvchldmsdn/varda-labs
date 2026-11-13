@@ -68,16 +68,19 @@ export default function Page(){return <main style={{padding:20,maxWidth:1200,mar
   const context={mode:'domain',scope:'all',currency:'KRW',fixture:'standard'};
   const view=betaVisualFixture(fixtures.getFixtureView(context),contract.blankDomainView('ready',''));
   await mkdir(path.join(stage,visualRoute));
-  await writeFile(path.join(stage,visualRoute,'fixture.json'),JSON.stringify({context,view,returns:returnVisualFixture}));
+  await writeFile(path.join(stage,visualRoute,'fixture.json'),JSON.stringify({context,view,returns:returnVisualFixture,displayBinding:'b'.repeat(64)}));
   await writeFile(path.join(stage,visualRoute,'page.tsx'), `
 import {BetaProvider} from '@/components/cairn-v2/beta-provider';
 import {BetaHome} from '@/components/cairn-v2/beta-home';
+import {BetaWorkspace} from '@/components/cairn-v2/beta-workspace';
 import {ReturnTimelineChart} from '@/components/return-timeline-chart';
 import {ContributionFundingVisual} from '@/components/cairn-v2/reused/contribution-funding';
 import type {DomainRead} from '@/lib/cairn-v2/read-contract';
 import type {RecoveredReturnCurve} from '@/lib/period-return-recovery';
 import data from './fixture.json';
-export default async function Page({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){const search=await searchParams;const read={...data,context:{...data.context,currency:search.currency==='USD'?'USD':'KRW'}} as DomainRead;return <BetaProvider><BetaHome initialContext={read.context} read={read}/><section aria-label="Synthetic funding" style={{maxWidth:900,margin:"40px auto",padding:24}}><ContributionFundingVisual cash={1000000} trims={400000} total={1400000} residual={200000} rows={[{key:"VOO",name:"VOO",amount:700000},{key:"KR",name:"KODEX 200",amount:500000}]}/></section><section aria-label="Synthetic recovered history" style={{maxWidth:1000,margin:'40px auto',padding:20}}><ReturnTimelineChart stored={data.returns.stored} curve={data.returns.curve as RecoveredReturnCurve}/></section></BetaProvider>}
+export default async function Page({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){const search=await searchParams;const read={...data,context:{...data.context,currency:search.currency==='USD'?'USD':'KRW'}} as DomainRead;
+if(search.workspace==='history')return <BetaProvider><BetaWorkspace kind="history" initialContext={read.context} read={read}/></BetaProvider>;
+return <BetaProvider><BetaHome initialContext={read.context} read={read}/><section aria-label="Synthetic funding" style={{maxWidth:900,margin:"40px auto",padding:24}}><ContributionFundingVisual cash={1000000} trims={400000} total={1400000} residual={200000} rows={[{key:"VOO",name:"VOO",amount:700000},{key:"KR",name:"KODEX 200",amount:500000}]}/></section><section aria-label="Synthetic recovered history" style={{maxWidth:1000,margin:'40px auto',padding:20}}><ReturnTimelineChart stored={data.returns.stored} curve={data.returns.curve as RecoveredReturnCurve}/></section></BetaProvider>}
 `);
   const originalVisualRoute='src/app/qa-original-visual';
   await assert.rejects(access(path.join(ROOT,originalVisualRoute)),{code:'ENOENT'});

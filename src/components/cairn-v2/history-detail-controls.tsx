@@ -2,13 +2,22 @@
 import { Button as CairnButton, ChoiceGroup } from "@/components/cairn-ui";
 
 import { useBetaPreferences } from "./beta-provider";
+import { useI18n } from "@/components/i18n/locale-provider";
 
 /** Existing home/detail controls; state ownership and button semantics are unchanged. */
-export function MetricControls({ compact = false }: { compact?: boolean }) {
+export function MetricControls({ compact = false, impactActive = false, onImpactChange }: {
+  compact?: boolean; impactActive?: boolean; onImpactChange?: (active: boolean) => void;
+}) {
   const { metric, setMetric } = useBetaPreferences();
-  return <ChoiceGroup appearance={compact ? "segmented" : "underline"} label="히스토리 보기">
-    <CairnButton variant="bare" type="button" aria-pressed={metric === "value"} onClick={() => setMetric("value")}>평가액</CairnButton>
-    <CairnButton variant="bare" type="button" aria-pressed={metric === "return"} onClick={() => setMetric("return")}>수익률</CairnButton>
+  const { t } = useI18n();
+  function select(metric: "value" | "return") {
+    onImpactChange?.(false);
+    setMetric(metric);
+  }
+  return <ChoiceGroup appearance={compact ? "segmented" : "underline"} label={t("히스토리 보기", "History view")}>
+    <CairnButton variant="bare" type="button" aria-pressed={!impactActive && metric === "value"} onClick={() => select("value")}>{t("평가액", "Value")}</CairnButton>
+    <CairnButton variant="bare" type="button" aria-pressed={!impactActive && metric === "return"} onClick={() => select("return")}>{t("수익률", "Return")}</CairnButton>
+    {onImpactChange && <CairnButton variant="bare" type="button" aria-pressed={impactActive} onClick={() => onImpactChange(true)}>{t("가격·환율 영향", "Price & FX impact")}</CairnButton>}
   </ChoiceGroup>;
 }
 

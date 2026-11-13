@@ -286,6 +286,8 @@ export function BetaHome({
               kind={expanded.kind}
               view={view}
               context={context}
+              historyRead={read}
+              onAllHistoryAccounts={() => setContext({ ...context, scope: "all" })}
               onContributionEdit={setContributionDirty}
               onContributionCalculate={(amount, keys) =>
                 setContext({

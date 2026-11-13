@@ -3,11 +3,12 @@ import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as Cai
 
 import Link from "next/link";
 import { useState } from "react";
+import { useI18n } from "@/components/i18n/locale-provider";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
-import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
+import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { historySnapshotHref } from "@/lib/cairn-v2/snapshot-contract";
 import { historyDisplayReturnHref, historyEventHref, historyReturnHref } from "@/lib/cairn-v2/history-return";
 import { useBetaExistingCrudAvailable, useBetaPreferences, useBetaReadFreshness } from "./beta-provider";
@@ -15,6 +16,7 @@ import { RecoveryNotice } from "@/components/recovery/recovery-notice";
 import { HistoryChart, historyRows } from "./beta-charts";
 import { CairnSelect } from "./reused/cairn-select";
 import { MetricControls } from "./history-detail-controls";
+import { PeriodAttributionPanel } from "./period-attribution-panel";
 import styles from "./history-detail.module.css";
 import {
   CURRENT_VALUATION_SOURCE,
@@ -30,12 +32,18 @@ import { selectHistoryPoint } from "@/lib/cairn-v2/history-selection";
 export function HistoryDetail({
   view: inputView,
   context,
+  historyRead,
+  onAllAccounts,
 }: {
   view: FixtureView;
   context: BetaContext;
+  historyRead?: Pick<DomainRead, "displayBinding" | "readReceipt">;
+  onAllAccounts?: () => void;
 }) {
+  const { t } = useI18n();
   const { period, setPeriod, metric, historyDate, setHistoryDate } = useBetaPreferences();
   const [source, setSource] = useState<string>();
+  const [impactActive, setImpactActive] = useState(false);
   const historySource = historySourceView(inputView, source, historyDate);
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
@@ -89,10 +97,27 @@ export function HistoryDetail({
       </CairnButton>
     ))}
   </ChoiceGroup>;
+  const metricControls = <MetricControls impactActive={impactActive} onImpactChange={context.mode === "domain" ? setImpactActive : undefined} />;
+  if (impactActive && context.mode === "domain") {
+    const state = inputView.domain?.state;
+    const binding = historyRead?.displayBinding;
+    const ready = state !== undefined && state !== "loading" && state !== "unauthorized";
+    return <div className={styles.surface}>
+      <div className={styles.toolbar}>
+        <span className={styles.sourceLabel}>{t("당시 보유 종목 · KRW", "Holdings during the period · KRW")}</span>
+        {metricControls}
+      </div>
+      {context.scope.startsWith("portfolio:") ? <div className={styles.scopeNotice}>
+        <p>{t("계좌 또는 전체 계좌를 선택하면 기간별 영향을 볼 수 있어요.", "Select an account or all accounts to see period impact.")}</p>
+        {onAllAccounts && <CairnButton variant="secondary" onClick={onAllAccounts}>{t("전체 계좌로 조회", "View all accounts")}</CairnButton>}
+      </div> : ready && binding ? <PeriodAttributionPanel scope={context.scope} binding={binding} receipt={historyRead?.readReceipt} />
+        : <p role="status" className={styles.empty}>{state === "loading" ? t("계좌를 확인하고 있어요.", "Checking your account.") : t("계좌 연결을 확인한 뒤 다시 열어 주세요.", "Check your account connection and reopen history.")}</p>}
+    </div>;
+  }
   if (stateText && !timeline.length)
     return (
       <div className={styles.surface}>
-        <div className={styles.toolbar}>{sourceControl}<MetricControls /></div>
+        <div className={styles.toolbar}>{sourceControl}{metricControls}</div>
         <CairnStatus as="p" className={styles.empty} role="status">
           {stateText}
         </CairnStatus>
@@ -142,7 +167,7 @@ export function HistoryDetail({
           >
             최신으로
           </CairnButton>
-          <MetricControls />
+          {metricControls}
         </div>
       </div>
       <div className={styles.stage}>
