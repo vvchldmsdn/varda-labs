@@ -15,23 +15,43 @@
 .numbers dt { font-size: 13px; color: var(--cairn-v2-muted); }
 .numbers dd { margin: 0; font-size: clamp(18px, 2.6vw, 27px); line-height: 1.25; font-weight: 500; letter-spacing: -.04em; overflow-wrap: anywhere; }
 .numbers [data-factor=total] dd { font-size: clamp(24px, 3.2vw, 37px); }
-.chart { margin: 8px 0 18px; min-width: 0; }
-.chart figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px 18px; flex-wrap: wrap; padding-bottom: 12px; }
-.chart figcaption strong { font-weight: 550; font-size: 14px; }
+.chart { --axis-width: clamp(48px, 6cqw, 72px); margin: 10px 0 18px; min-width: 0; font-variant-numeric: tabular-nums; }
+.selection { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--cairn-v2-line); }
+.selection time { font-size: 16px; font-weight: 550; }
+.selection span, .bucketNote, .readout small { color: var(--cairn-v2-muted); font-size: 12px; }
+.plotHeading { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin: 16px 0 8px; }
+.plotHeading strong { font-weight: 550; font-size: 14px; }
+.plotHeading > span:not(.legend) { font-size: 15px; font-weight: 500; }
 .legend { display: inline-flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--cairn-v2-muted); }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend span::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--impact-price); }
 .legend [data-series=fx]::before { background: var(--impact-fx); }
 .legend [data-series=gap]::before, .bucket[data-partial] { background: repeating-linear-gradient(135deg, transparent 0px 3px, color-mix(in srgb,var(--cairn-v2-muted) 28%,transparent) 3px 4px); }
-.plot { display: grid; grid-template-columns: minmax(38px, auto) minmax(0, 1fr); gap: 8px; min-height: 132px; }
-.axis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 11px; color: var(--cairn-v2-muted); }
-.bars { position: relative; display: flex; border-block: 1px solid var(--cairn-v2-line); }
+.plot { display: grid; grid-template-columns: var(--axis-width) minmax(0, 1fr); gap: 8px; }
+.axis, .valueAxis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 11px; color: var(--cairn-v2-muted); }
+.axis { padding-block: 3px; }
+.valueAxis { padding-block: 6px; }
+.valueAxis:has(> :only-child) { justify-content: center; }
+.valueCanvas, .bars { position: relative; min-width: 0; height: 126px; margin-inline-end: 4px; border-block: 1px solid var(--cairn-v2-line); touch-action: pan-y; cursor: crosshair; }
+.valueCanvas svg { height: 100%; width: 100%; color: var(--cairn-v2-ink); }
+.mark, .selectedMark { position: absolute; border-radius: 50%; background: var(--cairn-v2-ink); width: 4px; height: 4px; transform: translate(-50%,-50%); pointer-events: none; }
+.selectedMark { width: 8px; height: 8px; background: var(--impact-price); border: 1px solid var(--cairn-v2-paper); }
+.cursor { position: absolute; inset-block: 0; border-left: 1px dashed var(--cairn-v2-muted); pointer-events: none; }
+.noValues { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; text-align: center; color: var(--cairn-v2-muted); font-size: 12px; }
+.bars { display: flex; height: 108px; }
 .bars::before { content: ""; position: absolute; top: 50%; width: 100%; height: 1px; background: var(--cairn-v2-muted); opacity: .55; }
-.bucket { flex: 1; min-width: 0; position: relative; }
-.bucket i { position: absolute; bottom: 50%; right: 50%; width: 41%; max-width: 13px; min-height: 1px; background: var(--impact-price); }
+.bucket { flex-basis: 0; min-width: 0; position: relative; }
+.bucket[data-active] { background-color: color-mix(in srgb,var(--cairn-v2-muted) 8%,transparent); }
+.bucket i { position: absolute; bottom: 50%; right: 50%; width: 36%; max-width: 12px; min-height: 1px; background: var(--impact-price); border-radius: 2px 2px 0 0; }
 .bucket i[data-series=fx] { left: 50%; right: auto; background: var(--impact-fx); }
-.bucket i[data-negative] { top: 50%; bottom: auto; }
-.ticks { display: flex; justify-content: space-between; color: var(--cairn-v2-muted); font-size: 11px; margin: 4px 0 0 46px; }
+.bucket i[data-negative] { top: 50%; bottom: auto; border-radius: 0 0 2px 2px; }
+.ticks { display: flex; justify-content: space-between; color: var(--cairn-v2-muted); font-size: 11px; margin: 4px 0 0 calc(var(--axis-width) + 8px); }
+.probe { margin-top: 3px; }
+.probe > div:first-child:has([data-period-cursor]) { margin: 0 4px 0 calc(var(--axis-width) + 8px); }
+.readout { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 18px; }
+.readout span { font-size: 12px; color: var(--cairn-v2-muted); }
+.readout strong { color: var(--cairn-v2-ink); font-weight: 550; font-size: 14px; }
+.bucketNote { display: block; margin-top: 6px; }
 .disclosure { border-top: 1px solid var(--cairn-v2-line); }
 .disclosure[data-cairn-disclosure] > summary { min-height: 44px; padding-inline-end: 6px; }
 .disclosure p, .gaps small, .holdings small { font-size: 12px; line-height: 1.55; color: var(--cairn-v2-muted); }
@@ -48,5 +68,6 @@
   .numbers [data-factor=total] { grid-column: 1/-1; }
   .dates { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .dates button { grid-column: 1/-1; justify-self: end; }
-  .plot { min-height: 116px; }
+  .valueCanvas { height: 108px; }
+  .bars { height: 86px; }
 }

@@ -64,6 +64,7 @@ test("historical attribution reads archived sales, dated FX and owner-scoped rev
       [owner,account,sold,day]);
     const beforeRevision = await read(owner,account);
     assert.equal(beforeRevision.state,"complete");
+    assert.equal(beforeRevision.days[0].closingValueKrw,264000);
     assert.equal(beforeRevision.priceKrw,30000); assert.equal(beforeRevision.fxKrw,50000);
     assert.equal(beforeRevision.holdings.find(p=>p.name==="OUT").totalKrw,16000);
     assert.equal((await read(other,account)).state,"unavailable");
@@ -96,6 +97,7 @@ test("native cutoff evidence excludes cash and private frame identities and appl
         [owner,native,dbDay,at,JSON.stringify(evidence)]);
     }
     const result = await read(owner,native);
+    assert.equal(result.days[0].closingValueKrw,60);
     assert.equal(result.state,"complete"); assert.equal(result.priceKrw,10); assert.equal(result.fxKrw,0);
     await pg.query("update daily_portfolio_snapshots set native_evidence=jsonb_set(native_evidence,'{frame,positions,0,observation,quantity}',to_jsonb('1'::text)) where snapshot_date=$1 and account_id=$2",["2025-06-03",native]);
     await pg.query("insert into event_ledger_entries(canonical_owner_user_id,account_id,event_date,native_data) values($1,$2,$3,$4)",
@@ -105,6 +107,7 @@ test("native cutoff evidence excludes cash and private frame identities and appl
     assert.equal(executed.state,"complete"); assert.equal(executed.totalKrw,15);
     await pg.query("update daily_portfolio_snapshots set native_evidence=jsonb_set(native_evidence,'{frame,positions,0,ownerId}',to_jsonb($1::text)) where snapshot_date=$2 and account_id=$3",[other,"2025-06-03",native]);
     const incomplete = await read(owner,native);
+    assert.equal(incomplete.days[0].closingValueKrw,null);
     assert.equal(incomplete.state,"unavailable"); assert.ok(incomplete.gaps.some(g=>g.reason==="holding_history"));
     await pg.query("insert into native_ledger_revisions values($1,$2,1,'2025-06-02T18:00Z','2025-06-08T00:00Z')",[owner,native]);
     assert.deepEqual((await read(owner,native)).gaps.map(g=>g.reason),["account_history"]);
@@ -127,6 +130,7 @@ test("a reconstructed zero is outside the positive holding count and a manual to
     assert.equal(attached.state,"complete"); assert.equal(attached.holdings.length,1); assert.equal(attached.priceKrw,20000);
     await pg.query("update daily_position_snapshots set price_basis='confirmed_manual_total' where snapshot_date=$1 and asset_id=$2",["2025-06-03",held]);
     const missing = await read(owner,account);
+    assert.equal(missing.days[0].closingValueKrw,240000);
     assert.equal(missing.priceKrw,null); assert.equal(missing.fxKrw,null);
     assert.deepEqual(missing.gaps.map(g=>[g.holding,g.reason]),[["IN","price"]]);
   } finally { await pg.close(); }

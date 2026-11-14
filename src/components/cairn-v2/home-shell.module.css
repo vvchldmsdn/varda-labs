@@ -3,8 +3,8 @@
   font-style:normal;font-weight:45 920;font-display:swap;
 }
 .shell.shell.shell {
-  --cairn-v2-ink:#18212a; --cairn-v2-muted:#77736c; --cairn-v2-line:#d9d3c7;
-  --cairn-ui-ink:#18212a; --cairn-ui-muted:#77736c; --cairn-ui-line:#d9d3c7;
+  --cairn-v2-ink:#18212a; --cairn-v2-muted:#69665f; --cairn-v2-line:#d9d3c7;
+  --cairn-ui-ink:#18212a; --cairn-ui-muted:var(--cairn-v2-muted); --cairn-ui-line:#d9d3c7;
   --cairn-ui-paper:#f8f6f0; --cairn-ui-surface:#ecebe5;
   background:#f4f0e7;font-family:"Cairn Pretendard","Apple SD Gothic Neo",sans-serif;
 }
@@ -137,12 +137,20 @@
   color-scheme:dark;
   --cairn-v2-ink:#f3efe7; --cairn-v2-muted:#a6b1b8; --cairn-v2-paper:#17232d; --cairn-v2-line:#35444f;
   --cairn-v2-brand:#f39579; --cairn-ui-ink:#f3efe7; --cairn-ui-muted:#a6b1b8; --cairn-ui-paper:#17232d;
+  --cairn-v2-surface:#26343e; --cairn-v2-wash:#202b33;
+  --cairn-v2-positive:#f39579; --cairn-v2-negative:#8eb3d1;
+  --cairn-ui-positive:var(--cairn-v2-positive); --cairn-ui-negative:var(--cairn-v2-negative);
+  --cairn-ui-success:#91c9a5; --cairn-ui-warning:#dfb991; --cairn-ui-danger:#ff9e87;
+  --cairn-ui-primary-hover:#ddd8cd; --cairn-ui-placeholder-opacity:1;
   --cairn-ui-line:#35444f; --cairn-ui-surface:#26343e; --cairn-ui-brand:#f39579;
   --ink:#f3efe7; --muted:#a6b1b8; --paper:#17232d; --surface:#26343e; --wash:#202b33; --line:#35444f;
+  --faint:var(--cairn-v2-muted); --brand:var(--cairn-v2-brand); --accent:var(--cairn-v2-positive); --negative:var(--cairn-v2-negative);
   color:var(--cairn-v2-ink);
 }
 .shell.shell[data-home-theme=dark] { background:#0d151c; }
 .shell.shell[data-home-theme=dark] > aside { --bar-bg:#0d151cf2; --bar-line:#293640; }
 
 .shell[data-home-theme=dark] > aside img { filter:invert(1); }
-.shell[data-home-theme=dark] [data-home-refresh=done] > button { color:#91c9a5; }
+.shell[data-home-theme=dark] [data-home-refresh=done] > button { color:var(--cairn-ui-success); }
+.shell[data-home-theme=dark] .scopeMenu input,
+.shell[data-home-theme=dark] [data-dialog-close]:hover { background:var(--cairn-ui-surface); }

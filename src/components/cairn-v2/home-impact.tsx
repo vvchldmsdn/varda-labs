@@ -122,13 +122,16 @@ type LegendProps = {
 };
 
 export function CompactImpactBasis({ chart, window, aligned }: Pick<LegendProps, "chart" | "window" | "aligned">) {
+  if (!chart.days.length) return null;
   const active = impactTypes.filter(type => chart.visible[type]);
-  if (!active.length) return null;
   const days = chart.days.filter(day => day.date > window.start && day.date <= window.end);
   const missing = active.filter(type => !days.some(day => day[type] !== null));
-  return <p className={styles.basis}>
+  return <p className={`${styles.basis} ${styles.compactBasis}`} data-compact-impact-basis>
+    <span className={styles.reserve} aria-hidden="true">막대 · 일별 변동액 기준 별도 눈금 가격·환율 · 선택 기간 자료 없음</span>
+    <span>
     {missing.length < active.length && (aligned ? "막대 · 평가액과 같은 눈금" : "막대 · 일별 변동액 기준 별도 눈금")}
     {missing.length > 0 && ` ${missing.map(type => impactNames[type]).join("·")} · 선택 기간 자료 없음`}
+    </span>
   </p>;
 }
 

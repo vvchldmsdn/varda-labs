@@ -84,9 +84,7 @@
 .compactChart {margin-top:27px;display:flex;flex-direction:column;}
 .historyPlot {width:100%;min-width:0;flex:none;}
 .historyPlot[data-interactive] {position:relative;}
-.compactReadout {position:absolute;right:12px;top:4px;z-index:2;display:grid;gap:3px;padding:8px 10px;border:1px solid var(--cairn-v2-line);border-radius:8px;background:var(--cairn-v2-paper);color:var(--cairn-v2-ink);pointer-events:none;font-size:11px;}
-.compactReadout span {color:var(--cairn-v2-muted);font-size:10px;}
-.compactReadout strong {font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;}
+.compactChart .historyPlot[data-interactive] svg {touch-action:pan-y;cursor:crosshair;}
 .compactChart .historyPlot {height:220px;}
 .historyPlot svg {display:block;width:100%;height:100%;}
 .chartDates {display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--cairn-v2-muted);padding-inline:4px;margin-top:8px;}
@@ -169,10 +167,10 @@
 .detailChart>.muted:last-child {margin-top:14px;}
 .dateSlider {display:flex;gap:12px;align-items:center;color:var(--cairn-v2-muted);font-size:10px;margin-top:10px;}
 .dateSlider input {flex:1;min-width:0;height:24px;appearance:none;background:transparent;cursor:pointer;}
-.dateSlider input::-webkit-slider-runnable-track {height:2px;border-radius:1px;background:#a5a6a0;}
-.dateSlider input::-webkit-slider-thumb {appearance:none;width:10px;height:10px;margin-top:-4px;border:1px solid var(--cairn-v2-paper);border-radius:50%;background:#656760;}
-.dateSlider input::-moz-range-track {height:2px;background:#a5a6a0;}
-.dateSlider input::-moz-range-thumb {width:9px;height:9px;border:1px solid var(--cairn-v2-paper);border-radius:50%;background:#656760;}
+.dateSlider input::-webkit-slider-runnable-track {height:2px;border-radius:1px;background:var(--cairn-v2-muted);}
+.dateSlider input::-webkit-slider-thumb {appearance:none;width:12px;height:12px;margin-top:-5px;border:1px solid var(--cairn-v2-paper);border-radius:50%;background:var(--cairn-v2-ink);}
+.dateSlider input::-moz-range-track {height:2px;background:var(--cairn-v2-muted);}
+.dateSlider input::-moz-range-thumb {width:10px;height:10px;border:1px solid var(--cairn-v2-paper);border-radius:50%;background:var(--cairn-v2-ink);}
 .structureHeading {display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px;}
 .structureHeading h3 {font-size:18px;font-weight:500;}
 .structureDetail {display:grid;grid-template-columns:minmax(140px,.6fr) minmax(260px,1.4fr) minmax(210px,1fr);gap:26px;align-items:start;margin-top:12px;padding-bottom:34px;flex:1;}

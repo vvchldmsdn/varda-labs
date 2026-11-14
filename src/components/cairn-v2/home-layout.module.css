@@ -1,9 +1,10 @@
 .dashboard {
   --home-paper:#f8f6f0; --home-ink:#18212a; --home-line:#d9d3c7;
+  --home-panel-hover:color-mix(in srgb,var(--home-paper) 96%,black);
   --home-sage:#718c77; --home-apricot:#b98a65; --home-slate:#667f8c;
-  --cairn-v2-ink:var(--home-ink); --cairn-v2-muted:#77736c;
+  --cairn-v2-ink:var(--home-ink);
   --cairn-v2-paper:var(--home-paper); --cairn-v2-line:var(--home-line);
-  --cairn-ui-ink:var(--home-ink); --cairn-ui-muted:#77736c;
+  --cairn-ui-ink:var(--home-ink); --cairn-ui-muted:var(--cairn-v2-muted);
   --cairn-ui-paper:var(--home-paper); --cairn-ui-line:var(--home-line);
   --accent:#eb6f4d; --negative:#36679e; --wash:#eeece6;
   --home-display:Georgia,"Times New Roman","Cairn Pretendard",serif;
@@ -101,6 +102,19 @@
 .planning .planLink:active { transform:scale(.99); }
 .dashboard [data-beta-card=heatmap] { margin-top:12px;padding:16px;border:1px solid var(--home-line);border-radius:22px;background:var(--home-paper); }
 .dashboard [data-beta-card=heatmap]::before { background:var(--home-slate); }
+/* The planning panel owns the background; keep its interactive child transparent. */
+.dashboard .lower > [data-beta-card=structure] { --home-card-hover:var(--home-panel-hover); }
+.planning { --home-card-hover:transparent; }
+@media (hover:hover) and (pointer:fine) {
+  .dashboard .lower > [data-beta-card=structure]:hover,
+  .dashboard .planning:hover,
+  .dashboard [data-beta-card=heatmap]:hover {
+    background-color:var(--home-panel-hover);
+  }
+}
+@media (prefers-reduced-motion:no-preference) {
+  :global([data-reduced=false]) .planning { transition:background-color var(--cairn-ui-motion-fast) ease; }
+}
 .heatmap > header { min-height:44px; }
 .dashboard .heatmap [data-heatmap-grid] { gap:6px;--heatmap-label-width:100px;--heatmap-cell-width:54px; }
 .heatmap [data-heatmap-cell] { min-height:40px;border-radius:6px;transition:transform 150ms,box-shadow 150ms; }
@@ -199,6 +213,7 @@
 .dashboard .heatmap header { margin-bottom:8px; }
 :global([data-home-theme=dark]) .dashboard {
   --home-paper:#151f27; --home-ink:#f3efe7; --home-line:#2b3943;
+  --home-panel-hover:color-mix(in srgb,var(--home-paper) 84%,black);
   --cairn-v2-muted:#a6b1b8; --cairn-ui-muted:#a6b1b8; --wash:#202b33;
 }
 :global([data-home-theme=dark]) .hero { background:#121c24; box-shadow:0 18px 60px #0004; }

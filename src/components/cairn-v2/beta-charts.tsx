@@ -12,6 +12,7 @@ import { CURRENT_VALUATION_SOURCE, historyWithCurrentValue } from "@/lib/cairn-v
 import { useBetaPreferences } from "./beta-provider";
 import { useMeasuredPlot } from "@/components/use-measured-plot";
 import { alignedRanges, CompactImpactBasis, ImpactLegend, ImpactBars, useHomeImpact } from "./home-impact";
+import { HomeHistoryTooltip } from "./home-history-tooltip";
 
 import { historyRows, historyAxis, historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
 import { percentOrNull } from "@/lib/portfolio-math";
@@ -149,6 +150,14 @@ export function HistoryChart({
   const inspectedImpact = impact?.days.find(day => day.date === selectedRow.date);
   const selectedPoint = points[selectedIndex];
   const selectedX = plot.left + axis.fraction(rows[selectedIndex].date) * (plot.right - plot.left);
+  const showTooltip = compact && interactive && inspecting;
+  const tooltipId = `history-tip-${gradientId}`;
+  const tooltipPoints = showTooltip ? points.flatMap((point, index) => {
+    const sourceBreak = view.domain && index > 0 && pointSegment(index) !== pointSegment(index - 1);
+    const dottedLink = index === rows.length - 1 && metric === "value" &&
+      rows[index].source === CURRENT_VALUATION_SOURCE;
+    return sourceBreak && !dottedLink ? [null, point] : [point];
+  }) : [];
   const selectPointerDate = (event: PointerEvent<SVGSVGElement>) => {
     if (!canExplore) return;
     setInspecting(true);
@@ -158,6 +167,11 @@ export function HistoryChart({
     setHistoryDate(axis.nearest(axis.start + fraction * (axis.end - axis.start)));
   };
   const selectKeyboardDate = (event: KeyboardEvent<SVGSVGElement>) => {
+    if (showTooltip && event.key === "Escape") {
+      event.stopPropagation();
+      setInspecting(false);
+      return;
+    }
     const delta = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
     if (!delta && event.key !== "Home" && event.key !== "End") return;
     event.preventDefault();
@@ -194,15 +208,15 @@ export function HistoryChart({
         <p className={styles.muted}>부분 이력 포함 · 확인 소계 · 전체 비교 주의</p>
       )}
       <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
-      {compact && interactive && inspecting && <output className={styles.compactReadout}>
-        <span>{rows[selectedIndex].date}</span>
-        <strong>{selectedValue}</strong>
-        {inspectedImpact && <span>가격 {displayReadMoney(view, inspectedImpact.price, currency, true)} · 환율 {displayReadMoney(view, inspectedImpact.fx, currency, true)} {currency}</span>}
-      </output>}
+      {showTooltip && <HomeHistoryTooltip id={tooltipId}
+        date={selectedRow.date} returns={metric === "return"} value={selectedValue}
+        impact={inspectedImpact} plot={plot} points={tooltipPoints}
+        anchor={{x: selectedX, y: selectedPoint?.y ?? height / 2}} />}
       <svg
         viewBox={`0 0 ${plot.width} ${plot.height}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
+        aria-describedby={showTooltip ? tooltipId : undefined}
         tabIndex={canExplore ? 0 : undefined}
         aria-label={
           !canExplore
@@ -229,7 +243,9 @@ export function HistoryChart({
               }
         }
         onKeyDown={canExplore ? selectKeyboardDate : undefined}
-        onPointerLeave={() => setInspecting(false)}
+        onFocus={interactive ? () => setInspecting(true) : undefined}
+        onPointerLeave={event => { if (event.pointerType !== "touch") setInspecting(false); }}
+        onPointerCancel={() => setInspecting(false)}
         onBlur={() => setInspecting(false)}
         onClick={interactive ? event => event.stopPropagation() : undefined}
       >
@@ -318,7 +334,9 @@ export function HistoryChart({
             data-observed-date={rows[selectedIndex].date}
             cx={selectedPoint.x}
             cy={selectedPoint.y}
-            r="3"
+            r={showTooltip ? 4.2 : 3}
+            stroke={showTooltip ? "var(--cairn-v2-paper)" : undefined}
+            strokeWidth={showTooltip ? 1.6 : undefined}
             fill="var(--home-chart-line, #c64623)"
           />
         )}

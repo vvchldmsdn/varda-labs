@@ -127,8 +127,8 @@ function AttributionResult({ data }: { data: PeriodAttribution }) {
           <div data-factor="price"><dt>{priceLabel}</dt><dd>{money(data.priceKrw)}</dd></div>
           <div data-factor="fx"><dt>{fxLabel}</dt><dd>{money(data.fxKrw)}</dd></div>
         </dl>
-        <PeriodImpactChart days={data.days} />
       </>}
+    <PeriodImpactChart days={data.days} />
     {!!data.gaps.length && <InfoDisclosure summary={t(`자료가 빠진 구간 · ${data.gaps.length}건`, `Missing records · ${data.gaps.length}`)} className={styles.disclosure}>
       <ul className={styles.gaps}>{data.gaps.map(gap => <li key={JSON.stringify([gap.start,gap.end,gap.account,gap.holding,gap.reason])}>
         <span>{rangeLabel(gap)}</span><div><strong>{t(...reasons[gap.reason])}</strong>

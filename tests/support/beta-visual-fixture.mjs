@@ -11,9 +11,28 @@ export function betaVisualFixture(base, blank) {
   const previousValueKrw = sum('previousValueKrw');
   const changeKrw = sum('changeKrw');
   const dates = Array.from({length:31},(_,index)=>new Date(Date.UTC(2026,8,3+index)).toISOString().slice(0,10));
-  const heatmapRows = rows.map((row,index)=>({holdingId:row.key,name:row.name,ticker:row.ticker,market:row.market,account:'QA',currentWeight:row.weightPct,cells:dates.map((date,day)=>({date,changePct:index===0&&day===2?null:((day+index)%7-3)/2,marketValueKrw:index===0&&day===2?null:row.valueKrw,changeKrw:null,priceChangeKrw:null,fxChangeKrw:null,basis:index===0&&day===2?'missing':'unit_value'}))}));
+  const heatmapRows = rows.map((row, index) => {
+    let marketValueKrw = row.valueKrw;
+    const cells = dates.map((date, day) => {
+      const prior = marketValueKrw;
+      const price = ((day + index) % 7 - 3) * 500;
+      const fx = row.market === 'korea' ? 0 : (day % 3 - 1) * 100;
+      marketValueKrw += price + fx;
+      const missing = index === 0 && day === 2;
+      const comparable = day > 0 && !missing && !(index === 0 && day === 3);
+      return { date, marketValueKrw: missing ? null : marketValueKrw,
+        changePct: comparable ? (price + fx) / prior * 100 : null,
+        changeKrw: comparable ? price + fx : null,
+        priceChangeKrw: comparable ? price : null, fxChangeKrw: comparable ? fx : null,
+        basis: comparable ? 'unit_value' : 'missing' };
+    });
+    return { holdingId: row.key, name: row.name, ticker: row.ticker, market: row.market,
+      account: 'QA', currentWeight: row.weightPct, cells };
+  });
+  const observedCellCount = heatmapRows.reduce((count, row) => count + row.cells.filter(cell => cell.changePct !== null).length, 0);
+  const expectedCellCount = rows.length * dates.length;
   return {...base,rows,domain:{...blank.domain,state:'ready',valueState:'ready',historyState:'ready',movementState:'partial',knownSubtotalKrw:base.totalKrw,
-    heatmap:{state:'partial',scopeKey:'all',currencyBasis:'KRW',currentDate:dates.at(-1),message:'합성 검증 자료 · 누락 1칸',history:{dates,rows:heatmapRows,observedCellCount:rows.length*31-1,expectedCellCount:rows.length*31,coveragePct:(rows.length*31-1)/(rows.length*31)*100}},
+    heatmap:{state:'partial',scopeKey:'all',currencyBasis:'KRW',currentDate:dates.at(-1),message:'합성 검증 자료',history:{dates,rows:heatmapRows,observedCellCount,expectedCellCount,coveragePct:observedCellCount/expectedCellCount*100}},
     historyDisplayCurrency:'KRW',comparisonDate:'2026-10-01',refreshedAt:'2026-10-03T02:00:00Z',
     scopes:[{key:'all',label:'QA portfolio',detail:'Synthetic presentation'}],
     moneyBasis:{structure:{usdKrwRate:1400,rateDate:null},dashboard:{usdKrwRate:1400,rateDate:'2026-10-02'}},
