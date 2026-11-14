@@ -25,7 +25,7 @@ type ResultAmounts = { priceKrw: number | null; fxKrw: number | null; totalKrw: 
 export type PeriodAttribution = ResultAmounts & {
   range: PeriodAttributionRange;
   state: "complete" | "partial" | "unavailable";
-  days: { date: string; priceKrw: number | null; fxKrw: number | null; complete: boolean }[];
+  days: { date: string; closingValueKrw: number | null; priceKrw: number | null; fxKrw: number | null; complete: boolean }[];
   holdings: ({ key: string; account: string; name: string } & ResultAmounts)[];
   gaps: { start: string; end: string; account: string | null; holding: string | null; reason: PeriodGapReason }[];
 };
@@ -148,6 +148,15 @@ function holdingImpact(before: AttributionPosition | undefined, after: Attributi
 }
 
 type Roster = ReturnType<typeof roster>;
+function closingHoldingValue(roster: Roster | null | undefined) {
+  if (!roster?.known) return null;
+  let value = 0;
+  for (const position of roster.positions.values()) {
+    if (!position || !nonnegative(position.marketValueKrw)) return null;
+    value += position.marketValueKrw;
+  }
+  return Number.isFinite(value) ? value : null;
+}
 function accountImpact(before: Roster | null | undefined, after: Roster | null | undefined,
   trades: AttributionTrade[], record: (id: string, name: string, value: Amounts) => void,
   gap: (reason: PeriodGapReason, id?: string, name?: string) => void) {
@@ -197,6 +206,7 @@ export function buildPeriodAttribution(range: PeriodAttributionRange, evidence: 
   for (let time = dayTime(range.start); time <= dayTime(range.end); time += DAY) {
     const date = dateAt(time), prior = dateAt(time - DAY);
     const subtotal = emptyAmounts();
+    let closingValueKrw: number | null = evidence.accounts.length ? 0 : null;
     let complete = true;
     function addGap(reason: PeriodGapReason, account: string | null, accountId: string, id = "", holding: string | null = null) {
       complete = false;
@@ -212,7 +222,11 @@ export function buildPeriodAttribution(range: PeriodAttributionRange, evidence: 
     if (!evidence.accounts.length) addGap("account_history", null, "");
     for (const account of evidence.accounts) {
       const key = date + "/" + account.id;
-      accountImpact(records.get(prior + "/" + account.id), records.get(key), trades.get(key) ?? [],
+      const closing = records.get(key);
+      const accountValue = closingHoldingValue(closing);
+      if (accountValue === null) closingValueKrw = null;
+      else if (closingValueKrw !== null) closingValueKrw += accountValue;
+      accountImpact(records.get(prior + "/" + account.id), closing, trades.get(key) ?? [],
         (id, name, effect) => {
           const key = account.id + "/" + id;
           const line = holdings.get(key) ?? { key, name, account: account.name, ...emptyAmounts() };
@@ -224,7 +238,8 @@ export function buildPeriodAttribution(range: PeriodAttributionRange, evidence: 
     if (complete && subtotal.priceKrw === null) addAmounts(subtotal, { priceKrw: 0, fxKrw: 0 });
     if (subtotal.priceKrw !== null && subtotal.fxKrw !== null)
       addAmounts(totals, { priceKrw: subtotal.priceKrw, fxKrw: subtotal.fxKrw });
-    days.push({ date, priceKrw: subtotal.priceKrw, fxKrw: subtotal.fxKrw, complete });
+    days.push({ date, closingValueKrw: Number.isFinite(closingValueKrw) ? closingValueKrw : null,
+      priceKrw: subtotal.priceKrw, fxKrw: subtotal.fxKrw, complete });
   }
   const rows = [...holdings.values()].sort((a,b) => Math.abs(b.totalKrw ?? 0) - Math.abs(a.totalKrw ?? 0) || a.key.localeCompare(b.key));
   return { range, ...totals, state: totals.totalKrw === null ? "unavailable" : gaps.length ? "partial" : "complete", days, holdings: rows, gaps };

@@ -1,0 +1,145 @@
+import assert from "node:assert/strict";
+import path from "node:path";
+import { expect } from "@playwright/test";
+
+// Resolve composited CSS colors in the browser, including translucent panel layers.
+function luminancePair(element) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext("2d");
+  const paint = color => { ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1); };
+  const luminance = () => {
+    const rgb = [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).map(channel => {
+      const c = channel / 255;
+      return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+    });
+    return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+  };
+  const chain = [];
+  for (let node = element; node; node = node.parentElement) chain.push(node);
+  paint("white");
+  for (const node of chain.reverse()) paint(getComputedStyle(node).backgroundColor);
+  const background = luminance();
+  paint(getComputedStyle(element).color);
+  const ink = luminance();
+  return { background, contrast: (Math.max(ink, background) + .05) / (Math.min(ink, background) + .05) };
+}
+
+export async function runHistoryInteractionCases({ page, check, url, output }) {
+  for (const [width, height] of [[1440, 900], [390, 844], [360, 800]]) {
+    await check(`beta-history-interaction-${width}`, async () => {
+      await page.setViewportSize({ width, height });
+      await page.goto(url + "/qa-beta-visual?mode=domain&scope=all&currency=KRW");
+      await expect(page.locator("[data-beta-root]")).toHaveAttribute("data-beta-ready", "true");
+      await page.evaluate(() => document.fonts.ready.then(() => true));
+      const history = page.locator("[data-beta-card=history]");
+      const structure = page.locator("[data-beta-card=structure]");
+      const plot = history.locator("[data-history-plot] svg");
+      const tip = history.getByRole("tooltip");
+      const docY = () => structure.evaluate(el => el.getBoundingClientRect().top + scrollY);
+      const before = await docY();
+      for (const factor of ["price", "fx"]) {
+        const button = history.locator(`button[data-impact=${factor}]`);
+        await button.click();
+        await expect(button).toHaveAttribute("aria-pressed", "true");
+        await expect(plot.locator(`[data-history-impact=${factor}]`)).toBeVisible();
+        assert.ok(Math.abs(before - await docY()) < 1, "toggling overlays keeps the next card in place");
+      }
+      await plot.scrollIntoViewIfNeeded();
+      const box = await plot.boundingBox();
+      let lastDate;
+      for (const fraction of [.04, .55, .94]) {
+        await plot.hover({ position: { x: box.width * fraction, y: box.height / 2 } });
+        const date = tip.locator("time");
+        await expect(date).toBeVisible();
+        if (lastDate) await expect(date).not.toHaveAttribute("datetime", lastDate);
+        lastDate = await date.getAttribute("datetime");
+        await expect(plot).toHaveAttribute("aria-label", new RegExp(lastDate));
+        await expect(tip.locator("[data-tooltip-series] dd")).toHaveCount(3);
+      }
+      await expect(tip.locator("[data-tooltip-series=price] dd")).toContainText("원");
+      await expect(tip.locator("[data-tooltip-series=fx] dd")).toContainText("원");
+      const withinPlot = () => tip.evaluate(el => {
+        const a = el.getBoundingClientRect();
+        const b = el.closest("[data-history-plot]").getBoundingClientRect();
+        return a.left >= b.left - 1 && a.right <= b.right + 1 && a.top >= b.top - 1 && a.bottom <= b.bottom + 1;
+      });
+      await expect.poll(withinPlot).toBe(true);
+      await history.screenshot({ path: path.join(output, `history-tooltip-${width}.png`) });
+      await plot.focus();
+      await plot.press("Home");
+      await expect(tip.locator("[data-tooltip-series=price] dd")).toHaveText("—");
+      await plot.press("Escape");
+      await expect(tip).toHaveCount(0);
+      const dashboard = page.locator("[data-home-dashboard]");
+      const darkButton = page.getByRole("button", { name: "다크 모드로 전환" });
+      if (await darkButton.count()) await darkButton.click();
+      await expect(dashboard).toHaveAttribute("data-home-theme", "dark");
+      if (width === 1440) {
+        const allocation = page.locator("[data-beta-card=contribution]").locator("..");
+        const heatmap = page.locator("[data-beta-card=heatmap]");
+        for (const panel of [structure, allocation, heatmap]) {
+          await page.mouse.move(0, 0);
+          const normal = (await panel.evaluate(luminancePair)).background;
+          await panel.hover({ position: { x: 12, y: 14 } });
+          await expect.poll(async () => (await panel.evaluate(luminancePair)).background).toBeLessThan(normal);
+        }
+      }
+      await structure.locator("[data-expand]").click();
+      const facts = page.getByRole("dialog").locator("aside dl dt");
+      await expect(facts.first()).toBeVisible();
+      for (const label of await facts.all()) {
+        const { contrast } = await label.evaluate(luminancePair);
+        assert.ok(contrast >= 4.5, `${await label.textContent()} contrast ${contrast.toFixed(2)}`);
+      }
+      if (width === 1440) {
+        const picker = page.getByRole("dialog").locator("aside [aria-haspopup=listbox]");
+        assert.ok((await picker.evaluate(luminancePair)).contrast >= 4.5);
+        await picker.click();
+        const choice = page.getByRole("option").first();
+        await expect(choice).toBeVisible();
+        assert.ok((await choice.evaluate(luminancePair)).contrast >= 4.5);
+        await choice.click();
+      }
+      await page.keyboard.press("Escape");
+      if (width === 1440) {
+        await page.locator("[data-beta-card=today] [data-expand]").click();
+        const loss = page.getByRole("dialog").locator("[data-tone=negative]").first();
+        assert.ok((await loss.evaluate(luminancePair)).contrast >= 4.5);
+        await page.keyboard.press("Escape");
+        await page.locator("[data-beta-card=contribution] [data-expand]").click();
+        const submit = page.getByRole("dialog").locator("button[type=submit]").first();
+        assert.ok((await submit.evaluate(luminancePair)).contrast >= 4.5);
+        await page.keyboard.press("Escape");
+      }
+      await page.getByRole("button", { name: "라이트 모드로 전환" }).click();
+    });
+  }
+  await check("beta-history-touch-360", async () => {
+    const phone = await page.context().browser().newPage({
+      viewport: { width: 360, height: 800 }, hasTouch: true, isMobile: true, reducedMotion: "reduce", locale: "ko-KR",
+    });
+    try {
+      await phone.route("**/*", route => new URL(route.request().url()).origin === new URL(url).origin ? route.continue() : route.abort());
+      await phone.goto(url + "/qa-beta-visual?mode=domain&scope=all&currency=KRW");
+      const card = phone.locator("[data-beta-card=history]");
+      const svg = card.locator("[data-history-plot] svg");
+      const tip = card.getByRole("tooltip");
+      const date = tip.locator("time");
+      await svg.scrollIntoViewIfNeeded();
+      const box = await svg.boundingBox();
+      await svg.tap({ position: { x: box.width * .25, y: box.height / 2 } });
+      const first = await date.getAttribute("datetime");
+      await svg.tap({ position: { x: box.width * .75, y: box.height / 2 } });
+      await expect(date).not.toHaveAttribute("datetime", first);
+      const nav = phone.getByRole("navigation", { name: "주요 메뉴" });
+      await expect.poll(async () => {
+        const [popup, bottomMenu] = await Promise.all([tip.boundingBox(), nav.boundingBox()]);
+        return popup && bottomMenu && popup.y + popup.height <= bottomMenu.y;
+      }).toBe(true);
+      await phone.screenshot({ path: path.join(output, "history-touch-360.png") });
+    } finally {
+      await phone.close();
+    }
+  });
+}

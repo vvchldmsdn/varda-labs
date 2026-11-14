@@ -1,17 +1,4 @@
-.surface {
- --paper:var(--cairn-v2-paper,#f7f7f5);
- --surface:var(--cairn-v2-surface,#fff);
- --ink:var(--cairn-v2-ink,#20211f);
- --muted:var(--cairn-v2-muted,#6c6d68);
- --faint:var(--cairn-v2-muted,#6f706b);
- --line:var(--cairn-v2-line,#e1e1dc);
- --wash:var(--cairn-v2-wash,#eeeee9);
- --brand:var(--cairn-v2-brand,#c64623);
- --accent:var(--cairn-v2-positive,#ef5a32);
- --negative:var(--cairn-v2-negative,#3568ae);
- min-width:0;
- font-feature-settings:"cv02","cv03","cv04","cv11";
-}
+.surface { composes: surface from "./theme-surface.module.css"; }
 .surface figure { margin:0; min-width:0; }
 .stageFan { display:flex; flex-direction:column; min-width:0; }
 .fanControls { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:12px 0 18px; }

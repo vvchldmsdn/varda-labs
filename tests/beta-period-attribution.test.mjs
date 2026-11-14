@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildPeriodAttribution, calendarAttributionRange, validateAttributionRange } from "../src/lib/cairn-v2/period-attribution.ts";
+import { periodChartSeries } from "../src/lib/cairn-v2/period-chart-series.ts";
 
 const accounts = [{ id: "isa", name: "ISA" }];
 const end = { start: "2026-11-01", end: "2026-11-01" };
@@ -25,7 +26,7 @@ test("calendar presets and inclusive custom bounds use real dates, including lea
 test("a one-day interval uses the preceding valuation and real fractional quantity, including its first day", () => {
   const result = calc([position(.5, 100, 1200)], [position(.5, 104, 1210)]);
   assert.deepEqual([result.state, result.priceKrw, result.fxKrw, result.totalKrw], ["complete", 2400, 520, 2920]);
-  assert.deepEqual(result.days, [{ date: end.start, priceKrw: 2400, fxKrw: 520, complete: true }]);
+  assert.deepEqual(result.days, [{ date: end.start, closingValueKrw: 62920, priceKrw: 2400, fxKrw: 520, complete: true }]);
   assert.equal(result.holdings[0].name, "ABC");
 });
 
@@ -102,6 +103,7 @@ test("an absent account day blocks both adjacent comparisons, not a later matche
     snapshot("2026-11-02", [position(1, 110, 1000)]), snapshot("2026-11-03", [position(1, 111, 1000)])];
   const result = buildPeriodAttribution({ start: end.start, end: "2026-11-03" }, { accounts, observations, trades: [] });
   assert.deepEqual(result.days.map(d => d.priceKrw), [null, null, 1000]);
+  assert.deepEqual(result.days.map(d => d.closingValueKrw), [null, 110000, 111000]);
   assert.equal(result.gaps[0].start, end.start); assert.equal(result.gaps[0].end, "2026-11-02");
   assert.equal(result.state, "partial");
 });
@@ -113,8 +115,42 @@ test("same holding IDs in separate accounts never mix and out-of-scope evidence 
       snapshot(end.start, [position(1, 100+i+1, 1000)], {accountId:id})]);
   const both = buildPeriodAttribution(end, { accounts: [...accounts, accountB], observations, trades: [] });
   assert.equal(both.holdings.length, 2); assert.equal(both.priceKrw, 3000);
+  assert.equal(both.days[0].closingValueKrw, 203000);
   const only = buildPeriodAttribution(end, { accounts, observations, trades: [] });
   assert.equal(only.priceKrw, 1000); assert.equal(only.holdings[0].account, "ISA");
+  assert.equal(only.days[0].closingValueKrw, 101000);
+});
+
+test("closing holdings are independent from price/FX attribution, and incomplete rosters cannot yield a total", () => {
+  const holding = position(1, 123, 1250);
+  const date = end.end;
+  const close = (...observations) => buildPeriodAttribution(end, { accounts, observations, trades: [] }).days[0];
+  const savedOnly = close(snapshot(date, [{...holding, price: null, fxRate: null}]));
+  assert.equal(savedOnly.closingValueKrw, 153750);
+  assert.equal(savedOnly.priceKrw, null);
+  assert.equal(close(snapshot(date, [])).closingValueKrw, 0);
+  assert.equal(close().closingValueKrw, null);
+  assert.equal(close(snapshot(date, [holding]), snapshot(date, [holding])).closingValueKrw, null);
+  assert.equal(close(snapshot(date, [holding, holding])).closingValueKrw, null);
+  assert.equal(close(snapshot(date, [holding], { expectedPositions: 2 })).closingValueKrw, null);
+  assert.equal(close(snapshot(date, [{...holding, marketValueKrw:null}])).closingValueKrw, null);
+});
+
+test("paired period charts preserve daily valuation gaps and the actual calendar width of a clipped week", () => {
+  const days = Array.from({length: 32}, (_, index) => ({
+    date: new Date(Date.UTC(2026,10,1 + index)).toISOString().slice(0,10),
+    closingValueKrw: index === 2 ? null : index, priceKrw: index === 3 ? null : 100,
+    fxKrw: index === 3 ? null : -10, complete: index !== 3,
+  }));
+  const {buckets, runs, unit, low, high} = periodChartSeries(days);
+  assert.equal(unit, "week");
+  assert.deepEqual([low,high], [0,31]);
+  assert.deepEqual(runs.map(run=>[run[0].index,run.at(-1).index]), [[0,1],[3,31]]);
+  assert.deepEqual(buckets.slice(0,2), [
+    { start:"2026-11-01", end:"2026-11-01", from:0, count:1, price:100, fx:-10, partial:false },
+    { start:"2026-11-02", end:"2026-11-08", from:1, count:7, price:600, fx:-60, partial:true },
+  ]);
+  assert.equal(buckets.at(-1).from + buckets.at(-1).count, days.length);
 });
 
 test("unknown or contradictory rosters cannot prove a new purchase; confirmed empty differs from missing", () => {

@@ -1,4 +1,4 @@
-.surface {--paper:#f7f7f5;--surface:#fff;--ink:#20211f;--muted:#6c6d68;--faint:#6f706b;--line:#e1e1dc;--wash:#eeeee9;--brand:#c64623;--accent:#ef5a32;--negative:#3568ae;font-feature-settings:"cv02","cv03","cv04","cv11";min-width:0;}
+.surface { composes: surface from "./theme-surface.module.css"; }
 .surface.interactiveMatrix { min-width: 0; }
 .surface .matrixReadout { display: flex; align-items: center; gap: 27px; margin: 25px 0 21px; }
 .surface .matrixReadout > div > span { color: var(--muted); font-size: 9px; }

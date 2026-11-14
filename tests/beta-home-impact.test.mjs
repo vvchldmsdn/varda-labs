@@ -4,8 +4,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 
-const [{ HomeImpactProvider, ImpactBars, alignedRanges, periodImpact, ImpactLegend, useHomeImpact }] =
-  await importUiWithPorts(["src/components/cairn-v2/home-impact.tsx"], {});
+const [{ HomeImpactProvider, ImpactBars, alignedRanges, periodImpact, ImpactLegend, useHomeImpact, CompactImpactBasis },
+  { HomeHistoryTooltip, tooltipPosition }] = await importUiWithPorts([
+    "src/components/cairn-v2/home-impact.tsx", "src/components/cairn-v2/home-history-tooltip.tsx",
+  ], {});
 const dates = ["2026-11-01", "2026-11-02", "2026-11-03"];
 const row = (price, fx) => ({
   cells: dates.map((date, i) => ({ date, priceChangeKrw:price[i], fxChangeKrw:fx[i] })),
@@ -70,4 +72,61 @@ test("period amounts omit the first day's movement and require each day and comp
   assert.equal(periodImpact(days,window,"price"),3);
   assert.equal(periodImpact(days,window,"fx"),null);
   assert.equal(periodImpact([days[0],days[2]],window,"price"),null);
+});
+
+test("the compact chart reserves its bar note even when both daily series are hidden", () => {
+  const props = { window:{start:dates[0],end:dates[2]}, aligned:true };
+  const days = [{date:dates[1],price:1,fx:null}];
+  const render = visible => renderToStaticMarkup(createElement(CompactImpactBasis, { ...props, chart:{days,visible} }));
+  const off = render({price:false,fx:false});
+  const on = render({price:true,fx:true});
+  for (const content of [off,on]) assert.match(content, /data-compact-impact-basis/);
+  assert.doesNotMatch(off, /막대 · 평가액과 같은 눈금/);
+  assert.match(on, /막대 · 평가액과 같은 눈금/);
+  assert.match(on, /환율 · 선택 기간 자료 없음/);
+});
+
+test("the readout follows the observation without covering the selected point or running off the edge", () => {
+  const plot = {width:600,height:220}, card = {width:176,height:104};
+  const points = [{x:8,y:35}, {x:200,y:35}, {x:280,y:209}, {x:320,y:34}, {x:590,y:30}];
+  for (const anchor of points) {
+    const {x,y} = tooltipPosition(plot,card,anchor,points);
+    assert.ok(x >= 0 && y >= 0 && x + card.width <= plot.width && y + card.height <= plot.height);
+    assert.ok(anchor.x < x || anchor.x > x + card.width || anchor.y < y || anchor.y > y + card.height);
+  }
+  const besideDrop = tooltipPosition(plot, card, points[1], points);
+  assert.ok(besideDrop.x + card.width < points[1].x);
+  assert.ok(besideDrop.y > points[1].y);
+});
+
+test("the compact readout keeps the display valuation and reports only observed KRW contributions", () => {
+  const props = {id:"test-tip",date:dates[1],returns:false,value:"35.02 USD",plot:{width:340,height:210},
+    anchor:{x:130,y:40},points:[{x:130,y:40}],impact:{price:0,fx:null}};
+  const markup = renderToStaticMarkup(createElement(HomeHistoryTooltip, props));
+  assert.match(markup, /data-tooltip-date="2026-11-02"/);
+  assert.match(markup, /35\.02 USD/);
+  assert.match(markup, /현재 보유 기준/);
+  assert.match(markup, /data-tooltip-series="price".*?0원/);
+  assert.match(markup, /data-tooltip-series="fx".*?aria-label="자료 없음".*?—/);
+});
+
+test("a rising valuation line stays visible at both ends of a 270px mobile plot", () => {
+  const plot = {width:270,height:220}, card = {width:156,height:90};
+  const points = Array.from({length:32}, (_,i) => ({x:8+i*8.2,y:207-i*6.2}));
+  for (const anchor of [points[1], points[15], points[30]]) {
+    const tip = tooltipPosition(plot, card, anchor, points);
+    for (const p of points) {
+      assert.ok(p.x < tip.x || p.x > tip.x + card.width || p.y < tip.y || p.y > tip.y + card.height);
+    }
+  }
+});
+
+test("a scrolled chart keeps every tooltip row above the bottom tabs and below the sticky header", () => {
+  const plot = {width:288,height:220}, card = {width:156,height:92};
+  const anchor = {x:214,y:60}, points = [{x:0,y:210}, anchor, {x:285,y:15}];
+  for (const visible of [{top:-512,bottom:170}, {top:65,bottom:565}, {top:-695,bottom:65}]) {
+    const pos = tooltipPosition(plot,card,anchor,points,visible);
+    assert.ok(pos.y >= visible.top + 4);
+    assert.ok(pos.y + card.height <= visible.bottom - 4);
+  }
 });
