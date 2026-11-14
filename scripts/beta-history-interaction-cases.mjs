@@ -36,14 +36,20 @@ export async function runHistoryInteractionCases({ page, check, url, output }) {
       const structure = page.locator("[data-beta-card=structure]");
       const plot = history.locator("[data-history-plot] svg");
       const tip = history.getByRole("tooltip");
-      const docY = () => structure.evaluate(el => el.getBoundingClientRect().top + scrollY);
+      // Measure layout without the card group's entrance transform or viewport scrolling.
+      const docY = () => structure.evaluate(el => {
+        let top = 0;
+        for (let node = el; node; node = node.offsetParent) top += node.offsetTop;
+        return top;
+      });
+      await history.locator("button[data-impact=price]").click({ trial: true });
       const before = await docY();
       for (const factor of ["price", "fx"]) {
         const button = history.locator(`button[data-impact=${factor}]`);
         await button.click();
         await expect(button).toHaveAttribute("aria-pressed", "true");
         await expect(plot.locator(`[data-history-impact=${factor}]`)).toBeVisible();
-        assert.ok(Math.abs(before - await docY()) < 1, "toggling overlays keeps the next card in place");
+        assert.equal(await docY(), before, `${width}px: toggling ${factor} keeps the next card in place`);
       }
       await plot.scrollIntoViewIfNeeded();
       const box = await plot.boundingBox();
