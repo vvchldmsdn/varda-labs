@@ -31,14 +31,21 @@ async function browserHarness(t){
   const win={location:{href:'http://localhost/beta?mode=domain&scope=all',reload(){reloads++;}},addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name),setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id)};
   const doc={visibilityState:'visible',querySelectorAll:selector=>selector==='[data-beta-freshness-mask]'?roots.filter(row=>row.dataset.betaFreshnessMask):roots,addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name)};
   const originals=new Map(['window','document','fetch'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  const cleanup=[];
+  t.after(()=>{
+    try { for (const dispose of cleanup) dispose?.(); }
+    finally { for(const [key,value] of originals){if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];} }
+  });
   Object.defineProperty(globalThis,'window',{configurable:true,value:win});Object.defineProperty(globalThis,'document',{configurable:true,value:doc});
   Object.defineProperty(globalThis,'fetch',{configurable:true,value:()=>new Promise((resolve,reject)=>{requests.push({resolve,reject});})});
   const [provider]=await importUiWithPorts(['src/components/cairn-v2/beta-provider.tsx'],{
-    react:{createContext:()=>({Provider:()=>null}),useContext:()=>null,useState:init=>[typeof init==='function'?init():init,()=>{}],useRef:value=>({current:value}),useCallback:fn=>fn,useEffect:fn=>effects.push(fn)},
+    react:{createContext:()=>({Provider:()=>null}),useContext:()=>null,useState:init=>[typeof init==='function'?init():init,()=>{}],useRef:value=>({current:value}),useCallback:fn=>fn,useEffect:fn=>effects.push(fn),
+      useSyncExternalStore(subscribe,read){effects.push(()=>subscribe(()=>{}));return read();}},
     'next/navigation':{useRouter:()=>({replace:href=>{replacedHrefs.push(href);}})},
   });
-  const tree=provider.BetaProvider({children:null}),{observed,store}=tree.props.children.props.value;const cleanup=effects.map(fn=>fn());observed('initial',undefined,'same-binding');
-  t.after(()=>{cleanup.forEach(fn=>fn?.());for(const [key,value] of originals){if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];}});
+  const tree=provider.BetaProvider({children:null}),{observed,store}=tree.props.children.props.value;
+  for (const effect of effects) cleanup.push(effect());
+  observed('initial',undefined,'same-binding');
   const settle=async()=>{for(let i=0;i<5;i++)await Promise.resolve();for(const [id,fn] of [...timers]){timers.delete(id);fn();}};
   return {get root(){return root;},win,doc,listeners,observed,store,get reloads(){return reloads;},get replacements(){return replacedHrefs.length;},get replacement(){return replacedHrefs.at(-1);},get pendingRequests(){return requests.length;},
     removeRoot(){root.isConnected=false;roots=[];},

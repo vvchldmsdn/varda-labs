@@ -9,8 +9,13 @@ export async function runContributionJourneyUiCases({page,check,admin,owner,acco
   await check('fullapp-journey-beta-entry-plan-live-draft-target-return', async () => {
     await page.setViewportSize({width:1440,height:900});
     await page.goto(`${url}/beta/plans?${new URLSearchParams({mode:'domain',scope,currency:'KRW'})}`);
-    await page.getByRole('navigation',{name:'투자 계획 이어가기',exact:true}).getByRole('link',{name:/^이 조건으로 계획 만들기/}).click();
+    const preview = page.getByRole('region', {name:'추가 투자 미리보기', exact:true});
+    await preview.getByLabel('추가 투자금', {exact:true}).fill('2500000');
+    await page.getByRole('navigation',{name:'투자 계획 이어가기',exact:true}).getByRole('link',{name:/^같은 금액으로 추가 투자 계산/}).click();
     await expect(page.getByRole('heading',{name:'보유 기반 투자계획',exact:true})).toBeVisible();
+    const calculation = new URL(page.url()).searchParams;
+    assert.equal(calculation.get('amount'), '2500000');
+    assert.equal(calculation.get('scope'), scope);
     const planner=page.getByRole('region',{name:'추가 투자 계획',exact:true});
     await planner.getByRole('combobox',{name:'투자금 통화',exact:true}).selectOption('USD');
     await planner.getByRole('textbox',{name:'새 투자금',exact:true}).fill('237.75');

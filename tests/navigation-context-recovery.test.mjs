@@ -69,8 +69,40 @@ it('photo-import round trips preserve exact account, holding, action and reporti
   assert.equal(photo.pathname, '/portfolio/trades/import');
   assert.equal(manual.pathname, '/portfolio/ledger');
   assert.deepEqual(Object.fromEntries(manual.searchParams), { ...hint, currency: 'USD' });
+  const betaPhoto = new URL(intent.tradePhotoImportHref(hint, 'USD', true), origin);
+  assert.equal(betaPhoto.pathname, photo.pathname);
+  assert.equal(betaPhoto.searchParams.get('frontend'), 'beta');
+  const betaManual = new URL(intent.tradeRecordHref(selection, 'USD', true), origin);
+  assert.equal(betaManual.pathname, '/beta/portfolio/ledger');
+  assert.deepEqual(Object.fromEntries(betaManual.searchParams), { ...hint, currency: 'USD', mode: 'domain', scope });
   assert.equal(intent.resolveTradeRecordSelection([{ id: otherAccount, assets: [] }], hint).accountId, '');
   assert.equal(intent.normalizeTradeRecordHint({ accountId: [accountId, otherAccount] }).accountId, undefined);
+});
+
+it('confirming a conflicting ledger account retains its holding and trade side only for that account', async t => {
+  const selection = { accountId: otherAccount, assetId, action: 'sell' };
+  const query = new URLSearchParams({ mode: 'domain', scope, currency: 'USD', ...selection });
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: new URL('/beta/portfolio/ledger?' + query, origin), configurable: true });
+  t.after(() => { if (previous) Object.defineProperty(globalThis, 'location', previous); else delete globalThis.location; });
+  const Ledger = () => null, pushed = [];
+  const [ui, routes] = await importUiWithPorts([
+    'src/components/cairn-v2/beta-remaining-workspace.tsx', 'src/lib/cairn-v2/remaining-workspace-contract.ts',
+  ], {
+    'next/link': { default: link },
+    'next/navigation': { usePathname: () => '/beta/portfolio/ledger', useRouter: () => ({ push: href => pushed.push(new URL(href, origin)) }), useSearchParams: () => query },
+    '@/components/cairn-v2/reused/native-ledger-view': { NativeLedgerView: Ledger },
+    '@/components/cairn-v2/reused/saved-plan-library': { SavedPlanLibrary: () => null },
+    '@/components/cairn-v2/beta-shell': { BetaShell: () => null },
+    '@/components/cairn-v2/beta-provider': { useBetaReadFreshness: () => null, useBetaExistingCrudAvailable: () => true },
+    react: { ...stateHooks().react, useLayoutEffect() {}, useRef: value => ({current:value}), useTransition: () => [false, fn => fn()], useSyncExternalStore: () => false },
+  });
+  const read = { kind: 'ledger', state: 'ready', scopes: [], selection, queryKey: routes.remainingWorkspaceQueryKey('ledger', query.toString()) };
+  const tree = ui.BetaRemainingWorkspace({ read });
+  nodes(tree).find(node => node.type === Ledger).props.onSwitchAccount(otherAccount);
+  assert.deepEqual(Object.fromEntries(pushed[0].searchParams), { mode:'domain', scope:'account:' + otherAccount, currency:'USD', ...selection });
+  tree.props.setContext({ ...tree.props.context, scope });
+  assert.deepEqual(Object.fromEntries(pushed[1].searchParams), { mode:'domain', scope, currency:'USD' });
 });
 
 it('photo-import page carries navigation hints into its UI and its sign-in continuation', async () => {
@@ -88,7 +120,12 @@ it('photo-import page carries navigation hints into its UI and its sign-in conti
   const props = nodes(tree).find(node => node.type === Photo).props;
   assert.deepEqual(props.initialSelection, { accountId, assetId, action: 'buy' });
   assert.equal(props.reportingCurrency, 'USD');
+  const betaParams = { ...params, frontend: 'beta' };
+  const betaTree = await page.default({ searchParams: Promise.resolve(betaParams) });
+  assert.equal(nodes(betaTree).find(node => node.type === Photo).props.returnToBeta, true);
   authenticated = false;
+  await assert.rejects(page.default({ searchParams: Promise.resolve(betaParams) }), error =>
+    new URL(error.message, origin).searchParams.get('returnTo') === intent.tradePhotoImportHref(params, 'USD', true));
   await assert.rejects(page.default({ searchParams: Promise.resolve(params) }), error => {
     const signIn = new URL(error.message, origin);
     assert.equal(signIn.searchParams.get('returnTo'), intent.tradePhotoImportHref(params, 'USD'));
@@ -101,12 +138,17 @@ it('manual entry from photo import keeps the selected holding when more than one
     'next/link': { default: link }, 'next/dynamic': { default: () => () => null },
     '@/components/i18n/locale-provider': i18n,
   });
-  const html = renderToStaticMarkup(React.createElement(ui.TradePhotoImport, {
+  const properties = {
     initial: { sessionKey: 'synthetic-session', accounts: [{ id: otherAccount, assets: [] }, { id: accountId, assets: [{ id: assetId }] }], entries: [] },
     initialSelection: { accountId, assetId, action: 'sell' }, reportingCurrency: 'USD',
-  }));
-  const href = html.match(/href="([^"]+)"[^>]*>직접 입력/)[1].replaceAll('&amp;', '&');
-  assert.deepEqual(Object.fromEntries(new URL(href, origin).searchParams), { accountId, assetId, action: 'sell', currency: 'USD' });
+  };
+  for (const beta of [false, true]) {
+    const html = renderToStaticMarkup(React.createElement(ui.TradePhotoImport, { ...properties, returnToBeta: beta }));
+    const href = html.match(/href="([^"]+)"[^>]*>직접 입력/)[1].replaceAll('&amp;', '&');
+    const destination = new URL(href, origin);
+    assert.equal(destination.pathname, beta ? '/beta/portfolio/ledger' : '/portfolio/ledger');
+    assert.deepEqual(Object.fromEntries(destination.searchParams), { accountId, assetId, action: 'sell', currency: 'USD', ...(beta ? { mode: 'domain', scope } : {}) });
+  }
 });
 
 it('currency valuation opens its account ledger in the same reporting currency', async () => {

@@ -32,6 +32,15 @@ import styles from "./beta.module.css";
 import tokens from "./ui/tokens.module.css";
 import controls from "./workspace-controls.module.css";
 
+const primaryTitles: Readonly<Record<string, string>> = {
+  "/beta": "대시보드",
+  "/beta/portfolio/structure": "자산",
+  "/beta/investment-lab": "분석",
+  "/beta/plans": "계획",
+  "/beta/portfolio/ledger": "기록",
+  "/beta/history": "히스토리",
+};
+
 /* eslint-disable @next/next/no-img-element -- Figma SVG assets retain their own root dimensions. */
 export function BetaShell({ children, context, setContext, readView, workspace, fixedAnalysisCurrency, homeSummary, originalPath = "/" }: {
   homeSummary?: { count: number | null; balance: string | null; change: string | null };
@@ -89,28 +98,29 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
       return remainingWorkspaceHref("ledger", context, undefined, { accountId: ledgerAccount }).replace("#trade-ledger", ledgerAccount ? "#trade-ledger" : "#choose-record-account");
     return betaHref(item.beta, context) + ("hash" in item ? item.hash : "");
   };
+  const pageTitle = primaryTitles[pathname] ?? presentation?.title ?? (workspace === "history" ? "히스토리" : "대시보드");
   const readUnavailable = retryReadNeeded(readView);
   const canSwitchFrontend = existingCrudAvailable && frontendFeature && supportsExactFrontendChoice(pathname);
   const observedTimes = !workspace ? (readView?.domain?.priceObservedAt ?? []).map(date => date ? Date.parse(date) : NaN).filter(Number.isFinite) : [];
   const latestQuote = observedTimes.length ? new Date(Math.max(...observedTimes)) : null;
   const currentLink = (href: string) => isCurrentWorkspaceLink(pathname, context.analysis, href) ? 'page' as const : undefined;
-  return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell}`} data-home-theme={!workspace ? dark ? "dark" : "light" : undefined} data-home-dashboard={!workspace || undefined} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
+return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.shell} ${workspace ? styles.workspaceShell : styles.homeShell} ${homeNavigation.shell} ${homeDesign.shell} ${workspace ? controls.workspaceFrame : ""}`} data-home-theme={dark ? "dark" : "light"} data-beta-workspace={workspace} data-home-dashboard={!workspace || undefined} data-reduced={reduceEffects} data-read-mode={context.mode ?? "demo"} data-beta-root>
     <aside className={styles.navigation} aria-label="목적별 내비게이션">
       <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.brand} href={readHref(betaHref("/beta", context))}><BrandLogo /></Link>
       <nav id={!workspace ? "beta-home-navigation" : undefined} aria-label="주요 메뉴">{purposeDestinations.map((item) => <div key={item.label}>
-        {"beta" in item && (item.label !== "분석" || context.mode === "domain") && (item.label !== "계획" || context.mode === "domain") ? <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.purposeLink} aria-current={((workspace === "plans" && item.label === "계획") || (!workspace && item.label === "홈") || ((workspace === "history" || workspace === "ledger") && item.label === "기록") || ((workspace === "structure" || workspace === "holdings" || workspace === "accounts" || workspace === "groups" || workspace === "targets") && item.label === "자산") || ((workspace === "analysis" || workspace === "simulation" || workspace === "etfs" || workspace === "lab") && item.label === "분석")) ? "page" : undefined} href={readHref(purposeHref(item))} title={item.label === "계획" ? "홈의 추가 투자 카드 · 확대해서 계산" : undefined}>
+        {"beta" in item && (item.label !== "분석" || context.mode === "domain") && (item.label !== "계획" || context.mode === "domain") ? <Link prefetch={context.mode === "domain" ? false : undefined} className={styles.purposeLink} aria-current={((workspace === "plans" && item.label === "계획") || (!workspace && item.label === "홈") || ((workspace === "history" || workspace === "ledger") && item.label === "기록") || ((workspace === "structure" || workspace === "holdings" || workspace === "accounts" || workspace === "groups" || workspace === "targets") && item.label === "자산") || ((workspace === "analysis" || workspace === "simulation" || workspace === "etfs" || workspace === "lab") && item.label === "분석")) ? "page" : undefined} href={readHref(purposeHref(item))}>
           <span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>
         </Link> : <a className={styles.purposeLink} href={originalHref(item.original, context)} title="기존 화면에서 계속"><span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>{workspace && <small>기존 ↗</small>}</a>}
       </div>)}</nav>
-      {!workspace && <CairnButton variant="bare" className={homeDesign.themeToggle} type="button" aria-label={dark ? "라이트 모드로 전환" : "다크 모드로 전환"} onClick={toggle}>
+      <CairnButton variant="bare" className={workspace ? controls.workspaceThemeToggle : homeDesign.themeToggle} type="button" aria-label={dark ? "라이트 모드로 전환" : "다크 모드로 전환"} onClick={toggle}>
         {dark ? <Sun key="sun" size={17} aria-hidden /> : <Moon key="moon" size={17} aria-hidden />}
-      </CairnButton>}
+      </CairnButton>
       <CairnButton variant="bare" className={`${styles.settingsLink} ${controls.settingsTrigger}`} type="button" aria-label="화면 설정" aria-haspopup="dialog" aria-expanded={!!settingsOrigin} onClick={e=>openSettings(e.currentTarget)}><span className={styles.navIcon}><img src="/cairn-v2/figma/75-319-0ad84.svg" alt="" /></span><span>설정</span></CairnButton>
     </aside>
     <main className={styles.main}>
       <header className={`${styles.topbar} ${workspace ? controls.workspaceTopbar : ""}`}>
-        <CairnPageTitle>{workspace === "history" ? "히스토리" : workspace === "structure" ? "자산" : workspace === "plans" ? "계획" : workspace === "ledger" ? "기록" : workspace === "lab" ? "분석" : presentation?.title ?? (workspace ? workspace === "targets" ? "자산 / 목표비중" : workspace === "groups" ? "자산 / 범위 관리" : workspace === "accounts" ? "자산 / 계좌 현황" : workspace === "holdings" ? "자산 / 저장 보유 근거" : workspace === "etfs" ? "분석 / ETF 구성" : workspace === "simulation" ? "분석 / 현재 보유 연구" : workspace === "analysis" ? "분석 / " + (context.analysis === "holdings" ? "집중·통화" : "위험·분산") : "자산 / 포트 구조" : "대시보드")}</CairnPageTitle>
-        <CairnButton variant="bare" className={styles.scopeTrigger} type="button" aria-haspopup="dialog" aria-expanded={!!scopeOrigin} onClick={(e) => { setSearch(""); setScopeOrigin({ rect: e.currentTarget.getBoundingClientRect(), trigger: e.currentTarget }); }}>{!workspace ? <><span className={homeDesign.scopeName}>{selectedScope.label}</span>{homeSummary?.count != null && <small aria-label={`보유 ${homeSummary.count}건`}>{homeSummary.count}</small>}<ChevronDown size={15} strokeWidth={1.75} aria-hidden /></> : <>{selectedScope.label}<span aria-hidden>⌄</span></>}</CairnButton>
+        <CairnPageTitle>{pageTitle}</CairnPageTitle>
+        <CairnButton variant="bare" className={styles.scopeTrigger} type="button" aria-haspopup="dialog" aria-expanded={!!scopeOrigin} onClick={(e) => { setSearch(""); setScopeOrigin({ rect: e.currentTarget.getBoundingClientRect(), trigger: e.currentTarget }); }}>{!workspace ? <><span className={homeDesign.scopeName}>{selectedScope.label}</span>{homeSummary?.count != null && <small aria-label={`보유 ${homeSummary.count}건`}>{homeSummary.count}</small>}<ChevronDown size={15} strokeWidth={1.75} aria-hidden /></> : <><span className={controls.scopeName}>{selectedScope.label}</span><span aria-hidden>⌄</span></>}</CairnButton>
         <div className={styles.topbarActions}>
           {!workspace && context.mode === 'domain' && (existingCrudAvailable
             ? <PortfolioRefreshButton compact homeQuoteAt={latestQuote?.toISOString() ?? null} />
@@ -122,7 +132,10 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
       </header>
       {!workspace && readView?.domain && (readView.domain.valueState !== "ready" || readUnavailable) && <CairnStatus as="p" role="status" data-read-state={readView.domain.state} className={styles.readStatus}>{readUnavailable ? "일부 자료를 불러오지 못했어요. 다시 조회해 주세요." : readView.domain.message}</CairnStatus>}
       {workspace && readUnavailable && <CairnButton variant="bare" className={styles.continueLink} type="button" onClick={() => router.refresh()}>조회 다시 시도</CairnButton>}
-      {readView?.domain?.state === "unauthorized" && <a className={styles.continueLink} href={readHref(betaHref(workspace === "history" ? "/beta/history" : workspace === "structure" ? "/beta/portfolio/structure" : "/beta", { ...context, scope: "all" }))}>기본 범위 접근 다시 확인</a>}
+      {readView?.domain?.state === "unauthorized" && <CairnButton type="button" variant="bare" className={styles.continueLink}
+        onClick={() => context.scope === "all" ? router.refresh() : setContext({ ...context, scope: "all" })}>
+        {context.scope === "all" ? "접근 다시 확인" : "전체 계좌로 다시 보기"}
+      </CairnButton>}
       {workspace && <details className={controls.mobileMenu}>
         <summary>{presentation?.menuLabel ?? '작업 메뉴'}<span aria-hidden>⌄</span></summary>
         <nav aria-label={presentation?.menuLabel ?? '작업 메뉴'}>{subnav.map(sub => sub.beta && sub.href ? <Link key={sub.label} prefetch={false} href={readHref(sub.href)} aria-current={currentLink(sub.href)} onClick={e=>{const menu=e.currentTarget.closest('details');menu?.removeAttribute('open');menu?.querySelector('summary')?.focus({preventScroll:true});}}>{sub.label}</Link> : 'note' in sub ? <span key={sub.label}>{sub.label}</span> : <a key={sub.label} href={sub.href}>{sub.label} ↗</a>)}</nav>
@@ -140,6 +153,7 @@ export function BetaShell({ children, context, setContext, readView, workspace, 
     {settingsOrigin && <BetaDialog homeMotion={!workspace} popover label="화면 설정" origin={settingsOrigin} onClosed={()=>setPopover(null)}>
       <div className={controls.settingsContent}>
         <CairnSectionTitle level="h2">화면 설정</CairnSectionTitle>
+        {workspace && <CairnField className={`${controls.effectSetting} ${controls.mobileThemeSetting}`}><CairnCheckbox checked={dark} onChange={toggle} /><span>다크 모드</span></CairnField>}
         <CairnField className={controls.effectSetting}><CairnCheckbox checked={reduceEffects} onChange={e=>setReduceEffects(e.target.checked)} /><span>모션·투명 효과 줄이기<small>기기의 효과 감소 설정도 함께 적용합니다.</small></span></CairnField>
         <section aria-label="화면 버전"><CairnSectionTitle level="h3">기존 화면과 새 화면</CairnSectionTitle>
           {canSwitchFrontend ? <FrontendChoice enabled feature={frontendFeature} current="beta" context={{...context,_betaRead:freshness?.store.pendingEpoch() ?? undefined}} admittedScopeKeys={scopes.map(scope=>scope.key)}/> : <p>{context.mode === 'domain' && !supportsExactFrontendChoice(pathname) ? '이 화면의 날짜·범위를 유지하는 기존 화면 전환은 지원하지 않습니다.' : '이 환경에서는 기존 화면으로 전환하지 않습니다.'}</p>}

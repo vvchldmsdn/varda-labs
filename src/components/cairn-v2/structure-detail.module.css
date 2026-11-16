@@ -40,6 +40,7 @@
 .workspace .map {--cairn-v2-ink:#18212a}
 .holdings,.workspace .selected {margin-top:22px;min-width:0;padding:20px;background:#faf8f3;border:1px solid #d9d3c7;border-radius:16px}
 .holdings h3 {margin:0 0 12px;font-size:18px}
+.inlineFacts {display:none}
 .holdings button {display:grid;grid-template-columns:8px minmax(0,1fr) auto auto;align-items:center;gap:10px;width:100%;min-height:54px;border:0;border-top:1px solid #ded9d0;background:transparent;text-align:left;color:inherit;font-size:14px}
 .holdings button[aria-pressed=true] {background:#ede9df}
 .holdings button i {width:7px;height:7px;border-radius:50%}
@@ -55,4 +56,8 @@
  .workspace .summary {padding:23px 22px 0}
  .workspace .visual {grid-column:1;grid-row:2;max-width:220px}
  .holdings,.workspace .selected {padding:14px;margin-top:14px}
+ .workspace:has(.inlineFacts) > .selected {display:none}
+ .inlineFacts {display:block;padding:4px 8px 14px}
+ .inlineFacts dl {margin:8px 0}
+ .inlineFacts p {margin:8px 0;font-size:12px}
 }

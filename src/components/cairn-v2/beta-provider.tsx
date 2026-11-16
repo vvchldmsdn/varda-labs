@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useReducedEffects } from "./use-home-theme";
 import { createBetaReadFreshness } from "@/lib/cairn-v2/read-freshness";
 
 type Preferences = {
@@ -122,7 +123,7 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
   const [period, setPeriod] = useState<"1M" | "3M" | "6M" | "ALL">("3M");
   const [selected, setSelected] = useState("VOO");
   const [structureView, setStructureView] = useState<"ring" | "map">("ring");
-  const [reduceEffects, setReduceEffects] = useState(false);
+  const [reduceEffects, setReduceEffects] = useReducedEffects();
   const [historyDate, setHistoryDate] = useState<string | null>(null);
   return <BetaExistingCrud.Provider value={existingCrudAvailable}><BetaReadFreshness.Provider value={{epoch,store,observed}}><BetaPreferences.Provider value={{ metric, setMetric, period, setPeriod, selected, setSelected, structureView, setStructureView, reduceEffects, setReduceEffects, historyDate, setHistoryDate }}>{children}</BetaPreferences.Provider></BetaReadFreshness.Provider></BetaExistingCrud.Provider>;
 }

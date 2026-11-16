@@ -7,7 +7,7 @@ import { Target } from "lucide-react";
 import { layoutPortfolioTreemap } from "@/lib/portfolio-structure-treemap";
 import structureLayout from "./structure-detail.module.css";
 import { HoldingHeatmap } from "./holding-heatmap";
-import { useLayoutEffect, useRef } from "react";
+import { Fragment, useLayoutEffect, useRef } from "react";
 import { ContributionDetail, TargetDetail, driftNumber, targetMessage } from "./planning-details";
 import { ReadSummary } from "./read-summary";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
@@ -74,6 +74,54 @@ function StructureDetail({
     (!compositionRequested || currentRead?.kind === "legacy" && composition?.complete) && view.domain?.planning?.targets.state === "ready"
       ? view.domain.planning.targets.rows.find((row) => row.key === active?.key)
       : null;
+  const selectedFacts = active && (
+    <>
+      <p className={styles.muted}>
+        {active.account ? `${view.domain ? "소유 계좌" : "가상 계좌"} ${active.account} · ` : ""}
+        {active.currency ?? "통화 확인 필요"}
+        {view.domain && <> · {activePriceTime.label} {activePriceTime.value ?? "미제공"}</>}
+        {active.manuallyEntered && <> · 직접 입력한 가격</>}
+      </p>
+      <dl className={evidence.holdingFacts}>
+        <div>
+          <dt>평가액</dt>
+          <dd>
+            {formatAmount(active.amount)} {context.currency}
+          </dd>
+        </div>
+        <div>
+          <dt>{composition && !composition.complete ? "확인된 소계 내 비중" : "현재 비중"}</dt>
+          <dd>{active.weightPct.toFixed(2)}%</dd>
+        </div>
+        <div>
+          <dt>목표 비중</dt>
+          <dd>
+            {(view.domain ? target?.effectiveTargetPct : active.targetPct)?.toFixed(2) ??
+              "—"}
+            %
+          </dd>
+        </div>
+        <div>
+          <dt>목표 편차</dt>
+          <dd>
+            {view.domain
+              ? driftNumber(target?.driftPct, 2)
+              : active.targetPct === null
+                ? "—"
+                : (active.weightPct - (active.targetPct ?? 0)).toFixed(2)}
+            %p
+          </dd>
+        </div>
+      </dl>
+      {view.domain && (
+        <p className={evidence.holdingNote}>
+          {target
+            ? "저장한 목표비중 기준"
+            : compositionRequested && currentRead?.kind === "tracked" ? "목표와의 차이는 목표비중 화면에서 확인하세요." : targetMessage(view)}
+        </p>
+      )}
+    </>
+  );
   return (
     <>
       <div className={styles.structureHeading}>
@@ -165,10 +213,14 @@ function StructureDetail({
         </div>
         {workspace && rows.length > 0 && <section className={structureLayout.holdings} aria-label="보유 목록">
           <h3>보유 자산</h3>
-          {rows.map(row => <button key={row.key} type="button" aria-pressed={row.key === active?.key} onClick={() => setSelected(row.key)}>
+          {rows.map(row => <Fragment key={row.key}><button type="button" aria-pressed={row.key === active?.key} onClick={() => setSelected(row.key)}>
             <i aria-hidden style={{background:row.color}} /><span>{instrumentLabel(row)}<small>{row.account}</small></span>
             <strong>{formatAmount(row.amount)} <small>{context.currency}</small></strong><span>{row.weightPct.toFixed(2)}%</span>
-          </button>)}
+          </button>
+          {row.key === active?.key && <div role="region" aria-label={`${instrumentLabel(row)} 상세`} className={`${structureLayout.inlineFacts} ${evidence.surface} ${evidence.holdingEvidence}`}>
+            {selectedFacts}
+          </div>}
+          </Fragment>)}
         </section>}
         <aside
           className={`${structureLayout.selected} ${evidence.surface} ${evidence.holdingEvidence}`}
@@ -187,50 +239,7 @@ function StructureDetail({
             <>
               <h3>{instrumentLabel(active)}</h3>
               {active.ticker && <p className={evidence.holdingIdentity}>{active.ticker}</p>}
-              <p className={styles.muted}>
-                {active.account ? `${view.domain ? "소유 계좌" : "가상 계좌"} ${active.account} · ` : ""}
-                {active.currency ?? "통화 확인 필요"}
-                {view.domain && <> · {activePriceTime.label} {activePriceTime.value ?? "미제공"}</>}
-                {active.manuallyEntered && <> · 직접 입력한 가격</>}
-              </p>
-              <dl className={evidence.holdingFacts}>
-                <div>
-                  <dt>평가액</dt>
-                  <dd>
-                    {formatAmount(active.amount)} {context.currency}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{composition && !composition.complete ? "확인된 소계 내 비중" : "현재 비중"}</dt>
-                  <dd>{active.weightPct.toFixed(2)}%</dd>
-                </div>
-                <div>
-                  <dt>목표 비중</dt>
-                  <dd>
-                    {(view.domain ? target?.effectiveTargetPct : active.targetPct)?.toFixed(2) ??
-                      "—"}
-                    %
-                  </dd>
-                </div>
-                <div>
-                  <dt>목표 편차</dt>
-                  <dd>
-                    {view.domain
-                      ? driftNumber(target?.driftPct, 2)
-                      : active.targetPct === null
-                        ? "—"
-                        : (active.weightPct - (active.targetPct ?? 0)).toFixed(2)}
-                    %p
-                  </dd>
-                </div>
-              </dl>
-              {view.domain && (
-                <p className={evidence.holdingNote}>
-                  {target
-                    ? "저장한 목표비중 기준"
-                    : compositionRequested && currentRead?.kind === "tracked" ? "목표와의 차이는 목표비중 화면에서 확인하세요." : targetMessage(view)}
-                </p>
-              )}
+              {selectedFacts}
               {!view.domain && (
                 <>
                   <p className={styles.targetMeaning}>

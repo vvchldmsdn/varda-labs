@@ -26,6 +26,21 @@ const line = (id, values) => ({
 });
 
 describe("investment lab presentation", () => {
+  it("opens the beta comparison with its last observed KRW values and a date control", async () => {
+    const [{ LabComparisonResult }] = await importUiWithPorts([
+      "src/components/cairn-v2/lab-comparison-result.tsx",
+    ], {});
+    const rows = [
+      { serviceDate: "2026-10-02", actualMarketValueKrw: 90, scenarioMarketValueKrw: 97, differenceKrw: 7, hasPendingExecution: false },
+      { serviceDate: "2026-10-12", actualMarketValueKrw: 110, scenarioMarketValueKrw: 105, differenceKrw: -5, hasPendingExecution: false },
+    ];
+    const html = renderToStaticMarkup(createElement(LabComparisonResult, { rows }));
+    assert.match(html, /2026\.10\.12/);
+    for (const value of ["110원", "105원", "-5원"]) assert.ok(html.indexOf(value) < html.indexOf("<svg") && html.includes(value));
+    assert.match(html, /type="range"/);
+    assert.match(html, /aria-valuetext="[^"]*실제 110원[^"]*KODEX 200 105원/);
+    assert.equal(renderToStaticMarkup(createElement(LabComparisonResult, { rows: [] })), "");
+  });
   it("chooses an available comparison without ranking its returns", () => {
     assert.equal(
       defaultLabScenario({

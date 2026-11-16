@@ -16,16 +16,22 @@ export function resolveTradeRecordSelection(accounts: readonly SelectableAccount
   const asset = account?.assets.find(row => row.id === hint.assetId);
   return { accountId: account?.id ?? "", assetId: asset?.id ?? "", action: ((!hint.accountId || account) ? hint.action ?? "deposit" : "deposit") as TradeRecordAction | "deposit" };
 }
-export function tradeRecordHref(input: TradeRecordHint = {}, reportingCurrency?: string) {
+export function tradeRecordHref(input: TradeRecordHint = {}, reportingCurrency?: string, beta = false) {
   const hint = normalizeTradeRecordHint(input), params = new URLSearchParams();
   if (hint.accountId) params.set("accountId", hint.accountId);
   if (hint.assetId && hint.accountId) params.set("assetId", hint.assetId);
   if (hint.action) params.set("action", hint.action);
   if (reportingCurrency === "KRW" || reportingCurrency === "USD") params.set("currency", reportingCurrency);
+  if (beta) {
+    params.set("mode", "domain");
+    params.set("scope", hint.accountId ? `account:${hint.accountId}` : "all");
+    return "/beta/portfolio/ledger?" + params.toString();
+  }
   return "/portfolio/ledger" + (params.size ? "?" + params.toString() : "");
 }
-export function tradePhotoImportHref(input: TradeRecordHint = {}, reportingCurrency?: string) {
-  return tradeRecordHref(input, reportingCurrency).replace("/portfolio/ledger", "/portfolio/trades/import");
+export function tradePhotoImportHref(input: TradeRecordHint = {}, reportingCurrency?: string, beta = false) {
+  const href = tradeRecordHref(input, reportingCurrency).replace("/portfolio/ledger", "/portfolio/trades/import");
+  return beta ? href + (href.includes("?") ? "&" : "?") + "frontend=beta" : href;
 }
 /** Opening balances do not complete the requested trade; retain instrument selection, never opening amounts. */
 export function fieldsAfterLedgerSave(previous: Record<string, string>, wasOpening: boolean, at: string): Record<string, string> {

@@ -10,6 +10,17 @@ let cleanup;return{state,effects,requests,response,listeners,doc,rerun:async(nex
 async function mounted(){const r=runtime();await r.mount();return[r,r.render()]}
 function editAmount(r,t,value){input(t,'계획 추가 투자금').props.onChange({target:{value}});return r.render()}
 async function calculate(r,t){walk(t).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});return r.render()}
+test('closing and reopening an unfinished plan preserves its editable amount without a write',async()=>{
+ const [r,t]=await mounted();
+ button(t,'새 입력 계획').props.onClick();
+ let view=editAmount(r,r.render(),'2050000');
+ button(view,'입력 닫기').props.onClick();
+ view=r.render();
+ assert.equal(input(view,'계획 추가 투자금'),undefined);
+ button(view,'입력 이어쓰기').props.onClick();
+ assert.equal(input(r.render(),'계획 추가 투자금').props.value,'2050000');
+ assert.equal(r.requests.filter(request=>request.opts.method==='POST').length,0);
+});
 test('actual saved-library has no default investment or automatic calculation/write',async()=>{const[r,t]=await mounted();assert.equal(r.requests.length,2);assert.equal(walk(t).filter(n=>n.type==='form').length,0);button(t,'새 입력 계획').props.onClick();const view=r.render();assert.equal(input(view,'계획 추가 투자금').props.value,'');assert.equal(r.requests.length,2);assert.doesNotMatch(txt(view),/승인 목표를 저장/)});
 for(const bad of ['','0','-100','1.1','1e3','NaN'])test('actual input preserves and rejects invalid KRW '+JSON.stringify(bad),async()=>{const[r,t]=await mounted();button(t,'이 입력으로 다시 계산').props.onClick();let v=editAmount(r,r.render(),bad);v=await calculate(r,v);assert.equal(input(v,'계획 추가 투자금').props.value,bad);assert.equal(button(v,'확인한 계획 저장'),undefined);assert.equal(r.requests.filter(x=>x.opts.method==='POST').length,0)});
 test('reuse input is explicit calculation; dirty hides result and save',async()=>{const[r,t]=await mounted();button(t,'이 입력으로 다시 계산').props.onClick();let v=r.render();assert.equal(r.requests.length,2);v=await calculate(r,v);assert.equal(button(v,'확인한 계획 저장').props.disabled,true);v=editAmount(r,v,'200');assert.equal(button(v,'확인한 계획 저장'),undefined);assert.equal(r.requests.length,2)});
