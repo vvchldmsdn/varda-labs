@@ -9,8 +9,8 @@ type ReadyRecords = Extract<NativeLedgerRecordsRead, { state: "ready" }>;
 type ReadState = { key: string; result: ReadyRecords | null; error: boolean };
 
 /** No write actions. A scope/session change hides the prior response immediately. */
-export function NativeLedgerRecords({ accountId, sessionKey, refreshKey = "", locale = "ko", journal = false }: {
-  accountId: string; sessionKey: string; journal?: boolean; refreshKey?: string | number; locale?: "ko" | "en";
+export function NativeLedgerRecords({ accountId, sessionKey, refreshKey = "", locale = "ko", journal = false, entryHref }: {
+  accountId: string; sessionKey: string; journal?: boolean; refreshKey?: string | number; locale?: "ko" | "en"; entryHref?: string;
 }) {
   const [retry, setRetry] = useState(0), [state, setState] = useState<ReadState | null>(null);
   const key = JSON.stringify([accountId, sessionKey, refreshKey, retry]);
@@ -35,26 +35,38 @@ export function NativeLedgerRecords({ accountId, sessionKey, refreshKey = "", lo
     return () => { active = false; controller.abort(); };
   }, [accountId, sessionKey, key]);
 
+  const refreshButton = <Button type="button" variant="ghost" size="sm" onClick={() => setRetry(value => value + 1)} disabled={!visible}>{t("새로고침", "Refresh")}</Button>;
   return <section id="native-records" className={styles.section} aria-busy={!visible} aria-label={t("직접 기록한 거래", "Recorded transactions")}>
     <header className={styles.header}><div><SectionTitle>{t("직접 기록한 거래", "Recorded transactions")}</SectionTitle>
       {visible?.result && <p>{visible.result.account.name} · {visible.result.hasMore ? t(`최근 ${visible.result.limit}건`, `Latest ${visible.result.limit} records`) : t(`${visible.result.records.length}건`, `${visible.result.records.length} records`)}</p>}</div>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setRetry(value => value + 1)} disabled={!visible}>{t("새로고침", "Refresh")}</Button></header>
+      {entryHref ? <div className={styles.headerActions}>
+        <a href={entryHref} onClick={event => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+          const form = document.getElementById(entryHref.slice(1));
+          if (form) {
+            event.preventDefault();
+            form.focus({preventScroll:true});
+            form.scrollIntoView({block:"start"});
+          }
+        }}>{t("거래 기록하기", "Record a transaction")}</a>
+        {refreshButton}
+      </div> : refreshButton}</header>
     {!visible ? <p role="status">{t("기록을 불러오고 있어요…", "Loading records…")}</p> : visible.error ? <Status as="p" tone="warning">{t("기록을 불러오지 못했어요. 새로고침해 주세요.", "Records could not be loaded. Try refreshing.")}</Status> : visible.result && <>
-      {visible.result.records.length === 0 ? <p>{t("이 계좌에 직접 기록한 거래가 없어요.", "No transactions have been recorded for this account.")}</p> : journal ? <RecordJournal records={visible.result.records} locale={locale}/> : <ol className={styles.list}>{visible.result.records.map(record => <NativeRecordItem key={record.id} record={record} locale={locale} />)}</ol>}
+      {visible.result.records.length === 0 ? <p>{t("이 계좌에 직접 기록한 거래가 없어요.", "No transactions have been recorded for this account.")}</p> : journal ? <RecordJournal records={visible.result.records} locale={locale} limited={visible.result.hasMore}/> : <ol className={styles.list}>{visible.result.records.map(record => <NativeRecordItem key={record.id} record={record} locale={locale} />)}</ol>}
       {visible.result.hasMore && <p role="status" className={styles.note}>{t("이전 기록은 보관되어 있어요. 이 목록에는 최근 100건만 표시합니다.", "Earlier records are retained. This list shows the latest 100 records.")}</p>}
     </>}
   </section>;
 }
 
-export function NativeRecordItem({ record, locale }: { record: NativeLedgerRecord; locale: "ko" | "en" }) {
+export function NativeRecordItem({ record, locale, journal = false }: { record: NativeLedgerRecord; locale: "ko" | "en"; journal?: boolean }) {
   const t = (ko: string, en: string) => locale === "en" ? en : ko;
   const stamp = record.reportedDate ?? new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ko-KR", {
     timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(new Date(record.at));
-  return <li className={styles.record}>
+  const evidence = <>
     <div className={styles.identity}><time dateTime={record.reportedDate ?? record.at}>{stamp} · {t(record.reportedDate ? "날짜만 확인" : "한국시간", record.reportedDate ? "Date only" : "Korea time")}</time>
       <div><strong>{nativeRecordTypeLabel(record.type, locale)}{record.direction ? ` · ${t(record.direction === "in" ? "받음" : "보냄", record.direction === "in" ? "Incoming" : "Outgoing")}` : ""}</strong>
-        {(record.assetName || record.ticker) && <span>{record.assetName ?? record.ticker}{record.assetName && record.ticker ? ` · ${record.ticker}` : ""}</span>}</div></div>
+        {(record.assetName || record.ticker) && <span>{record.assetName ?? record.ticker}{record.assetName && record.ticker && (!journal || record.assetName !== record.ticker) ? ` · ${record.ticker}` : ""}</span>}</div></div>
     <div className={styles.values}>
       {record.quantity && <strong>{nativeRecordNumber(record.quantity)} {t("주", "shares")}</strong>}
       {record.unitPrice && <span>{t("체결 단가", "Execution price")} {nativeRecordNumber(record.unitPrice.amount)} {record.unitPrice.currency}</span>}
@@ -64,12 +76,37 @@ export function NativeRecordItem({ record, locale }: { record: NativeLedgerRecor
       {record.settlementUnconfirmed && <span className={styles.note}>{t("현금 정산 미확인", "Cash settlement unconfirmed")}</span>}
     </div>
     {record.memo && <p className={styles.memo}>{record.memo}</p>}
-  </li>;
+  </>;
+  if (!journal) return <li className={styles.record}>{evidence}</li>;
+  const typeLabel = nativeRecordTypeLabel(record.type, locale);
+  const time = record.reportedDate ? t("날짜만 확인", "Date only") : new Intl.DateTimeFormat(locale, {
+    timeZone:"Asia/Seoul", hour:"2-digit", minute:"2-digit", hourCycle:"h23",
+  }).format(new Date(record.at));
+  const amounts = record.amounts.filter(({kind}) => ["execution", "amount", "debit", "credit"].includes(kind));
+  const amountLabel = amounts.map(({amount, currency}) => {
+    const digits = currency === "USD" ? 2 : 0;
+    const rounded = new Intl.NumberFormat(locale, { maximumFractionDigits:digits }).format(amount as `${number}`);
+    const approximate = /[1-9]/.test(amount.split(".")[1]?.slice(digits) ?? "");
+    return `${approximate ? "≈" : ""}${rounded} ${currency}`;
+  }).join(" → ");
+  return <li className={styles.journalRow}><details>
+    <summary>
+      <span><strong>{record.assetName || record.ticker || typeLabel}</strong>
+        <small>{[record.assetName || record.ticker ? typeLabel : null, time, record.direction ? t(record.direction === "in" ? "받음" : "보냄",record.direction === "in" ? "Incoming" : "Outgoing") : null].filter(Boolean).join(" · ")}</small>
+      </span>
+      <span className={styles.journalAmount}>
+        {amountLabel && <strong>{amountLabel}</strong>}
+        {record.quantity && <small>{nativeRecordNumber(record.quantity)} {t("주","shares")}</small>}
+        {record.settlementUnconfirmed && <small>{t("현금 정산 미확인","Settlement pending")}</small>}
+      </span>
+    </summary>
+    <div className={styles.record}>{evidence}</div>
+  </details></li>;
 }
 
 const koreaDate = new Intl.DateTimeFormat("sv-SE", {timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"});
 
-function RecordJournal({records,locale}:{records:NativeLedgerRecord[];locale:"ko"|"en"}) {
+function RecordJournal({records,locale,limited}:{records:NativeLedgerRecord[];locale:"ko"|"en";limited:boolean}) {
   const [requestedMonth,setMonth]=useState("");
   const [filter,setFilter]=useState<"all"|"buy"|"sell">("all");
   const dated=records.map(record=>({record,day:record.reportedDate ?? koreaDate.format(new Date(record.at))}));
@@ -87,7 +124,7 @@ function RecordJournal({records,locale}:{records:NativeLedgerRecord[];locale:"ko
       <div role="group" aria-label={locale==="ko"?"거래 종류":"Transaction type"}>{(["all","buy","sell"] as const).map(type=><Button variant="bare" key={type} type="button" aria-pressed={filter===type} onClick={()=>setFilter(type)}>{locale==="en"?type:{all:"전체",buy:"매수",sell:"매도"}[type]}</Button>)}</div>
     </aside>
     <div className={styles.days}>{[...groups.keys()].sort().reverse().map(day=><section key={day}><h3><time dateTime={day}>{day}</time></h3>
-      <ol className={styles.list}>{groups.get(day)!.map(record=><NativeRecordItem key={record.id} record={record} locale={locale}/>)}</ol>
-    </section>)}{groups.size===0&&<p role="status">{locale==="ko"?"이 달에는 선택한 거래가 없어요.":"No matching records this month."}</p>}</div>
+      <ol className={styles.list}>{groups.get(day)!.map(record=><NativeRecordItem key={record.id} record={record} journal locale={locale}/>)}</ol>
+    </section>)}{groups.size===0&&<p role="status">{limited ? (locale==="ko"?"최근 100건에서 이 달의 해당 거래를 찾지 못했어요.":"No match for this month in the latest 100 records.") : (locale==="ko"?"이 달에는 선택한 거래가 없어요.":"No matching records this month.")}</p>}</div>
   </div>;
 }

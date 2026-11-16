@@ -14,11 +14,11 @@ import {useLayoutEffect,useTransition} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {BetaShell} from './beta-shell';
 import {useBetaReadFreshness,useBetaExistingCrudAvailable} from './beta-provider';
-import {InvestmentLabComparisonChart} from '@/components/investment-lab/investment-lab-comparison-chart';
+import {LabComparisonResult} from './lab-comparison-result';
 import {ObservedHistoryChart} from './reused/lab-observed-chart';
 import {blankDomainView} from '@/lib/cairn-v2/read-contract';
 import {blankLab,labContext,labHref,labKey,labNumber,labParams,labVisible,type LabParams,type LabRead,type LabModel} from '@/lib/cairn-v2/lab-contract';
-import {labPeriodReason,labBlockerLabel,labFundingLabel,labChartPalette} from './lab-presentation';
+import {labPeriodReason,labBlockerLabel,labFundingLabel} from './lab-presentation';
 import styles from './lab.module.css';
 export function BetaLab({read}:{read:LabRead}){
  const crudAvailable=useBetaExistingCrudAvailable();
@@ -36,7 +36,7 @@ export function BetaLab({read}:{read:LabRead}){
  const scopeLabel=visible.scopes.find(s=>s.key===context.scope)?.label??'현재 조회 범위';
  return <BetaShell workspace="lab" context={context} setContext={next=>startTransition(()=>router.push(labHref(next,{...p,run:undefined},freshness?.store.pendingEpoch()),{scroll:false}))} readView={shell} originalPath="/investment-lab">
  <section className={styles.workspace} id="lab-comparison" data-lab-state={dirty?'dirty':visible.state}>
-  <header className={styles.heading}><h2>다른 종목에 투자했다면?</h2><p>같은 기간 · 같은 매매 금액 · KRW</p></header>
+  <header className={styles.heading}><h2>KODEX 200을 샀다면?</h2><p>같은 기간 · 같은 매매 금액 · KRW</p></header>
   <DraftPreservationNotice visible={draftNotPreserved} /><details className={styles.period} open={!ready || undefined}><summary>비교 기간 변경</summary><CairnForm className={styles.conditions} onSubmit={e=>{e.preventDefault();nav({...p,start:values.start||undefined,end:values.end||undefined,run:'1'})}}>
    <CairnField>시작일<CairnInput aria-label="과거 비교 시작일" type="date" value={values.start} onChange={e=>setDraft({...values,start:e.target.value})}/></CairnField>
    <CairnField>종료일<CairnInput aria-label="과거 비교 종료일" type="date" value={values.end} onChange={e=>setDraft({...values,end:e.target.value})}/></CairnField>
@@ -51,8 +51,8 @@ export function BetaLab({read}:{read:LabRead}){
   {crudAvailable&&!dirty&&visible.state!=='loading'&&visible.state!=='idle'&&!ready&&!model?.tradeEvidence?.blocked.length&&<RecoveryNotice source="current" beta scope={context.scope} reasons={c?.blockers} kind={!model?'retry':undefined} draft={{start:values.start,end:values.end}} />}
   {crudAvailable && !ready && visible === read && !['loading','unauthorized','invalid'].includes(visible.state) && <HoldingAnalysisRecovery key={`${context.scope}:${read.readReceipt}:${read.readEpoch}`} scope={context.scope} />}
   {model&&<>
-   {ready&&c?.rows.length?<div className={styles.chart} tabIndex={0} role="region" aria-label="KRW 과거 비교 차트 가로 탐색"><InvestmentLabComparisonChart chartId="beta-lab" rows={c.rows} title="실제 평가와 KODEX 200 과거 비교" description="동일 거래금액 기반 KRW 경로. 시세 관측 순서와 원본 지연 체결 표시를 보존합니다." scenarioLabel="KODEX 200 · 가상 과거 경로" palette={labChartPalette}/></div>:model.observedHistory.segments.length>0?<div className={`${styles.chart} ${styles.observedChart}`} tabIndex={0} role="region" aria-label="분절된 저장 관측 이력"><ObservedHistoryChart segments={model.observedHistory.segments}/></div>:<p className={styles.empty}>비교할 평가 기록이 아직 없어요.</p>}
-   {ready&&c?.summary&&<dl className={styles.summary}><div data-series="actual"><dt>실제 기말 평가 · KRW</dt><dd>{labNumber(c.summary.actualEndValueKrw)}</dd></div><div data-series="scenario"><dt>KODEX 200 가상 경로 · KRW</dt><dd>{labNumber(c.summary.scenarioEndValueKrw)}</dd></div><div><dt>가상 − 실제 차액 · KRW</dt><dd>{labNumber(c.summary.endDifferenceKrw)}</dd></div></dl>}
+   {ready&&c?.rows.length?<LabComparisonResult key={key} rows={c.rows} />:model.observedHistory.segments.length>0?<div className={`${styles.chart} ${styles.observedChart}`} tabIndex={0} role="region" aria-label="분절된 저장 관측 이력"><ObservedHistoryChart segments={model.observedHistory.segments}/></div>:<p className={styles.empty}>비교할 평가 기록이 아직 없어요.</p>}
+
    <details className={styles.evidence}><summary>비교 기간과 포함 범위</summary><dl className={styles.context}>
     <div><dt>요청 기간</dt><dd className={styles.dateRange}><span>{model.period.requestedStartServiceDate??'기본'}</span> ~ <span>{model.period.requestedEndServiceDate??'기본'}</span></dd></div>
     <div><dt>{model.tradeEvidence?.blocked.length?'검토 기간':'허용 기간'}</dt><dd className={styles.dateRange}><span>{model.period.selectedStartServiceDate??(ready?c?.summary?.startServiceDate:null)??'—'}</span> ~ <span>{model.period.selectedEndServiceDate??(ready?c?.summary?.endServiceDate:null)??'—'}</span></dd></div>

@@ -99,6 +99,12 @@ it('renders transaction types in both languages and retains decimal display with
   const en=renderToStaticMarkup(createElement(view.NativeRecordItem,{record,locale:'en'}));
   assert.match(ko,/매수/);assert.match(en,/Buy/);assert.match(en,/0\.010709/);assert.match(en,/701\.263896/);assert.match(en,/7\.509835062264/);
   assert.doesNotMatch(en,/native_ledger|request|realized|profit/i);
+  const journal=renderToStaticMarkup(createElement(view.NativeRecordItem,{record:{...record,assetName:'VOO',ticker:'VOO'},locale:'ko',journal:true}));
+  const summary=journal.match(/<summary>(.*?)<\/summary>/s)?.[1];
+  assert.ok(summary);
+  assert.match(summary,/≈7\.51 USD/);assert.match(summary,/0\.010709/);
+  assert.doesNotMatch(summary,/7\.509835062264|VOO · VOO/);
+  assert.match(journal,/7\.509835062264/);
 });
 
 it('hides stale account responses immediately and rejects session changes without leaking old rows',async t=>{

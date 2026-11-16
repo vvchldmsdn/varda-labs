@@ -148,4 +148,28 @@ export async function runHistoryInteractionCases({ page, check, url, output }) {
       await phone.close();
     }
   });
+  await check("beta-workspace-display-settings", async () => {
+    const tablet = await page.context().browser().newPage({ viewport: { width: 768, height: 800 } });
+    try {
+      await tablet.goto(url + "/qa-beta-visual?mode=domain&scope=all&currency=KRW&workspace=history");
+      const root = tablet.locator("[data-beta-root]");
+      await expect(root).toHaveAttribute("data-beta-ready", "true");
+      const accountButton = tablet.locator("main > header > button[aria-haspopup=dialog]");
+      const fits = () => accountButton.evaluate(el => el.clientHeight >= el.scrollHeight && el.offsetWidth >= 110);
+      await expect.poll(fits).toBe(true);
+      await tablet.getByRole("button", { name: "다크 모드로 전환" }).click();
+      await tablet.getByRole("button", { name: "화면 설정" }).click();
+      const reduced = tablet.getByRole("checkbox", { name: /모션·투명 효과 줄이기/ });
+      await reduced.check();
+      await tablet.reload();
+      await expect(root).toHaveAttribute("data-home-theme", "dark");
+      await tablet.setViewportSize({ width: 360, height: 800 });
+      await tablet.getByRole("button", { name: "화면 설정" }).click();
+      await expect(reduced).toBeChecked();
+      await tablet.getByRole("checkbox", { name: "다크 모드" }).uncheck();
+      await expect(root).toHaveAttribute("data-home-theme", "light");
+    } finally {
+      await tablet.close();
+    }
+  });
 }

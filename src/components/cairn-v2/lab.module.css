@@ -22,10 +22,24 @@
 .conditions input{min-height:52px!important;font-size:16px!important}.conditions button{min-height:52px;font-size:14px}.summary>div{padding:22px;background:var(--cairn-ui-surface);border-radius:24px}.workspace [data-cairn-actions]{margin-top:32px}
 
 .chart {--cairn-v2-ink:#f7f1e6;--cairn-v2-brand:#f0a48d;--cairn-v2-muted:#ccc6bc;--cairn-v2-line:#52606a;--cairn-v2-paper:#192630;--muted:#ccc6bc;background:#192630;color:#f7f1e6;border-radius:18px;padding:clamp(16px,2.6vw,36px);margin:20px 0 0}
-.summary {gap:0;background:#faf8f3;border:1px solid #d9d3c7;border-radius:16px;overflow:hidden}
+.summary {gap:0;background:var(--cairn-v2-paper);border:1px solid var(--cairn-v2-line);border-radius:16px;overflow:hidden}
 .summary > div {background:transparent;border-radius:0;padding:18px;min-width:0}
 .summary dd {font-family:Georgia,"Cairn Pretendard",serif}
-@media(min-width:700px){.summary > div + div {border-left:1px solid #d9d3c7}}
-@media(max-width:699px){.summary>div {display:flex;align-items:center;justify-content:space-between;gap:12px}.summary>div+div{border-top:1px solid #d9d3c7}.summary dd{font-size:23px}.summary dt{margin:0}}
+@media(min-width:700px){.summary > div + div {border-left:1px solid var(--cairn-v2-line)}}
+@media(max-width:699px){.summary>div {display:flex;align-items:center;justify-content:space-between;gap:12px}.summary>div+div{border-top:1px solid var(--cairn-v2-line)}.summary dd{font-size:23px}.summary dt{margin:0}}
 .chart.observedChart {--muted:#625e57;background:#faf8f3;color:#18212a;border:1px solid #d9d3c7}
 .period {border-block:1px solid var(--cairn-v2-line)}.period summary {cursor:pointer;font-size:13px;min-height:44px;padding:12px 0}.period[open]{padding-bottom:12px}
+.comparison {margin-top:20px}
+.comparison > header {display:flex;align-items:baseline;gap:10px;font-size:13px}
+.comparison > header span {color:var(--cairn-v2-muted)}
+.comparison .summary {margin:8px 0 0!important;border-radius:0;border-inline:0;background:transparent;color:var(--cairn-v2-ink)}
+.comparison .summary > div {padding:14px 12px}
+.comparison .summary > div:first-child {padding-left:0}
+.comparison .chart svg {display:block;min-height:0;width:100%;height:auto;touch-action:pan-y}
+.chart .chartControl[data-cairn-field] {display:flex;align-items:center;gap:12px;color:var(--cairn-v2-muted);font-size:12px}
+.chartControl input {--cairn-ui-brand:var(--cairn-v2-brand);min-width:0;flex:1;height:44px;cursor:pointer}
+@media(max-width:699px){
+  .heading{margin-bottom:12px}.heading h2{line-height:1.25;margin:4px 0 6px}
+  .comparison{margin-top:14px}.comparison .summary > div{padding:6px 0}
+  .comparison .summary dd{font-size:20px}.comparison .chart{margin-top:12px}
+}

@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, Field, Input, Select } from '@/components/cairn-ui';
-import { useState } from 'react';
 import { compareUserAllocation, type UserAllocationBasis } from '@/lib/user-allocation-comparison';
 import { allocateTargetRatio } from '@/lib/contribution-comparison';
 import { parseMoneyInput } from '@/lib/money';
@@ -13,8 +12,7 @@ import styles from './plan-projection.module.css';
 const colors = ['#d48670','#80988d','#c6a478','#889eaf','#a998aa'];
 const pct = (value: number | null) => value === null ? '—' : value.toLocaleString('ko-KR',{maximumFractionDigits:2})+'%';
 
-export function PlanProjection({basis, reason, unavailableHoldings, context, amount, onAmountChange}: {amount:string;onAmountChange:(value:string)=>void;basis?:UserAllocationBasis; reason?:string; unavailableHoldings?:string[]; context:BetaContext}) {
-  const [allocation,setAllocation] = useState('ratio');
+export function PlanProjection({basis, reason, unavailableHoldings, context, amount, allocation, onAllocationChange, onAmountChange}: {amount:string;allocation:string;onAllocationChange:(value:string)=>void;onAmountChange:(value:string)=>void;basis?:UserAllocationBasis; reason?:string; unavailableHoldings?:string[]; context:BetaContext}) {
   const units = parseMoneyInput(amount,'KRW');
   const validBudget = units !== null && Number.isSafeInteger(units) && units > 0 && units <= 100_000_000_000;
   const validWeights = basis?.rows.every(row=>Number.isInteger(row.targetWeightBps) && row.targetWeightBps>=0) && basis.rows.reduce((sum,row)=>sum+row.targetWeightBps,0)===10000;
@@ -32,7 +30,7 @@ export function PlanProjection({basis, reason, unavailableHoldings, context, amo
       <small>가상 배분 · 원화 기준</small>
     </div>
     <div className={styles.allocation}>
-      <header><h2>투자 후 비중</h2>{basis && <Field>배분 방식<Select value={allocation} onChange={event=>setAllocation(event.target.value)}>
+      <header><h2>투자 후 비중</h2>{basis && <Field>배분 방식<Select value={allocation} onChange={event=>onAllocationChange(event.target.value)}>
         <option value="ratio">목표 비율대로</option>{basis.rows.filter(row=>row.buyable).map(row=><option key={row.allocationKey} value={row.allocationKey}>{instrumentLabel(row.metadata)}에 전액</option>)}
       </Select></Field>}</header>
       {rows.length>0 && basis ? <>

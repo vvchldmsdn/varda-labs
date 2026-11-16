@@ -21,7 +21,7 @@ async function request(url: string, body?: object) {
   if (!response.ok) throw new PhotoSaveError(data.error ?? "unavailable", [400, 409].includes(response.status) && data.error !== "account_changed");
   return data;
 }
-export function TradePhotoImport({ initial, preview = false, initialSelection = {}, reportingCurrency = "KRW" }: { initial: TradeImportContext; preview?: boolean; initialSelection?: TradeRecordHint; reportingCurrency?: "KRW" | "USD" }) {
+export function TradePhotoImport({ initial, preview = false, initialSelection = {}, reportingCurrency = "KRW", returnToBeta = false }: { returnToBeta?: boolean; initial: TradeImportContext; preview?: boolean; initialSelection?: TradeRecordHint; reportingCurrency?: "KRW" | "USD" }) {
   const { t } = useI18n();
   const [context, setContext] = useState(initial), [rows, setRows] = useState<PhotoRow[]>([]), [active, setActive] = useState("");
   const [progress, setProgress] = useState<string | null>(null), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
@@ -53,7 +53,7 @@ export function TradePhotoImport({ initial, preview = false, initialSelection = 
   useEffect(()=>{for(const accountId of new Set(rows.filter(row=>row.status==='review').map(row=>row.accountId))){if(accountId&&!requested.current.has(accountId))void checkHistory(accountId);}},[rows,checkHistory]);
   const selection = resolveTradeRecordSelection(initial.accounts, initialSelection);
   const activeRow = rows.find(row=>row.key===active);
-  const manualHref = tradeRecordHref(activeRow ? resolveTradeRecordSelection(context.accounts,{accountId:activeRow.accountId,assetId:activeRow.assetId,action:activeRow.side}) : selection, reportingCurrency);
+  const manualHref = tradeRecordHref(activeRow ? resolveTradeRecordSelection(context.accounts,{accountId:activeRow.accountId,assetId:activeRow.assetId,action:activeRow.side}) : selection, reportingCurrency, returnToBeta);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; task.current?.abort(); urls.current.forEach(URL.revokeObjectURL); }; }, []);
   useEffect(() => {
     if (!busy && !uncertain && !rows.some(r => r.status === "review")) return;

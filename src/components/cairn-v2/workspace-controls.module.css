@@ -1,7 +1,45 @@
 /* Shared presentation only: no global reset or dashboard/card rules. */
 .subnav a[aria-current=page]{color:var(--cairn-v2-ink);font-weight:500;background:rgba(32,33,31,.045);border-radius:6px}
 .settingsTrigger{min-height:44px;min-width:44px;justify-content:center}
+.workspaceThemeToggle{display:grid;place-items:center;min-width:44px;min-height:44px}
+.effectSetting.mobileThemeSetting{display:none}
+.scopeName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit}
+@media(max-width:699px){
+ .workspaceThemeToggle{display:none}
+ .effectSetting.mobileThemeSetting{display:flex}
+}
+@media(min-width:700px) and (max-width:799px){
+ .workspaceThemeToggle{margin-top:auto;align-self:center}
+ .workspaceThemeToggle + .settingsTrigger{margin-top:4px}
+ .workspaceFrame > aside [role=img]{gap:5px}
+ .workspaceFrame > aside [role=img] > svg{width:24px;height:24px}
+ .workspaceFrame > aside [role=img] > span{font-size:20px;gap:3px}
+ .workspaceFrame > aside [role=img] > span > span{font-size:10px}
+ .workspaceFrame > aside nav a:has(small){display:grid;grid-template-columns:20px 1fr;gap:0 6px;align-content:center}
+ .workspaceFrame > aside nav a:has(small) > span:first-child{grid-row:span 2}
+ .workspaceFrame > aside nav a > small{grid-column:2;margin:0;white-space:nowrap}
+}
 .mobileSettingsTrigger,.mobileMenu{display:none}
+.workspaceFrame[data-beta-root][data-home-theme=dark] > aside {
+ background:var(--bar-bg,var(--cairn-v2-paper));border-color:var(--cairn-v2-line);color:var(--cairn-v2-ink);
+}
+.workspaceFrame[data-home-theme=dark] > aside :is(.workspaceThemeToggle,.settingsTrigger),
+.workspaceFrame[data-home-theme=dark] .workspaceTopbar :is(button,select) {
+ background-color:var(--cairn-v2-surface);border-color:var(--cairn-v2-line);color:var(--cairn-v2-ink);
+}
+.workspaceFrame[data-home-theme=dark] .mobileSettingsTrigger img,
+.workspaceFrame[data-home-theme=dark] [data-dialog-close] img {filter:invert(1)}
+.workspaceFrame[data-home-theme=dark] dialog [data-beta-panel] {
+ background:var(--cairn-v2-paper);border:1px solid var(--cairn-v2-line);color:var(--cairn-v2-ink);
+}
+.workspaceFrame[data-home-theme=dark] dialog :is(input[type=search],button[aria-pressed=true]) {
+ background:var(--cairn-v2-surface);color:var(--cairn-v2-ink);
+}
+@media(max-width:799px) {
+ .workspaceFrame[data-home-theme=dark] :is(aside nav,.mobileMenu) a[aria-current=page] {
+  color:var(--cairn-v2-ink);background:var(--cairn-v2-surface);
+ }
+}
 .settingsContent{padding:22px 20px 18px;font-size:13px;line-height:1.6}
 .settingsContent h2{font-size:20px;font-weight:500;margin:0 36px 24px 0}
 .settingsContent h3{font-size:12px;font-weight:500;margin:0 0 12px;color:var(--cairn-v2-muted)}
@@ -25,10 +63,11 @@
  .mobileMenu a[aria-current=page]{font-weight:500;background:rgba(32,33,31,.045);border-radius:6px}
 }
 
-@media(max-width:699px){
+@media(max-width:799px){
  header.workspaceTopbar{display:flex;flex-wrap:wrap;align-items:center;height:auto!important;min-height:88px;padding-block:16px!important;gap:8px!important}
  header.workspaceTopbar h1{flex-basis:100%;max-width:none!important;padding:0!important;line-height:28px!important;font-size:22px!important}
  header.workspaceTopbar>button{min-width:0}
+ header.workspaceTopbar select[aria-label="표시 통화"]{min-width:78px;max-width:none}
 }
 
 @media(min-width:700px) {

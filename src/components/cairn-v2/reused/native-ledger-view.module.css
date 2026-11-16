@@ -7,6 +7,8 @@
 .error{font-size:14px;line-height:1.65;margin:16px 0}
 .success{font-size:14px;margin:20px 0}
 .form{display:grid;gap:22px;margin-top:28px}
+.embedded .form {scroll-margin-top:24px}
+.page[data-journal-first=true] .form:not(:focus-within) .actions {position:static}
 .form label{min-width:0;font-size:14px}
 .body input,.body select{max-width:100%;min-width:0}
 .body :is(input,select,button,a,summary):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
