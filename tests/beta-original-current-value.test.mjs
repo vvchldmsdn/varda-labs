@@ -150,6 +150,7 @@ test('the actual beta value card shows original partial coverage and never subst
     '@/components/cairn-v2/home-simulation':{HomeSimulation:empty,HomeSimulationPending:empty},
     '@/components/cairn-v2/history-detail-controls':{MetricControls:empty,PeriodControls:empty},
     '@/components/cairn-v2/beta-charts':{HistoryChart:empty},
+    '@/components/cairn-v2/history-studio':{HistoryStudio:empty},
     '@/components/cairn-v2/portfolio-allocation-ring':{PortfolioAllocationRing:({entries})=>{ringEntries=entries;return null;}},
   });
   const markup=renderToStaticMarkup(createElement(home.BetaHome,{initialContext:context}));

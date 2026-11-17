@@ -11,10 +11,10 @@ import {
 import { PeriodImpactChart, formatWon } from "./period-impact-chart";
 import styles from "./period-attribution.module.css";
 
-type ReadContext = { scope: string; binding: string; receipt?: string };
+type ReadContext = { scope: string; binding: string; receipt?: string; selectedDate?: string | null; onDateChange?: (date: string) => void; compact?: boolean };
 type Preset = "thisMonth" | "lastMonth" | "custom";
 
-export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext) {
+export function PeriodAttributionPanel({ scope, binding, receipt, selectedDate, onDateChange, compact, range: controlledRange }: ReadContext & { range?: PeriodAttributionRange }) {
   const { t } = useI18n();
   const today = currentKstDate(new Date());
   const [preset, setPreset] = useState<Preset>("thisMonth");
@@ -22,7 +22,7 @@ export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext)
   const [custom, setCustom] = useState<PeriodAttributionRange | null>(null);
   const [attempted, setAttempted] = useState(false);
   const errorId = useId();
-  const range = preset === "custom" ? custom : calendarAttributionRange(preset, today);
+  const range = controlledRange ?? (preset === "custom" ? custom : calendarAttributionRange(preset, today));
   const error = !attempted || validateAttributionRange(draft, today) ? "" :
     !draft.start || !draft.end ? t("시작일과 종료일을 입력해 주세요.", "Enter both dates.") :
     draft.start > draft.end ? t("종료일은 시작일과 같거나 늦어야 해요.", "End date must be on or after start date.") :
@@ -30,13 +30,13 @@ export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext)
     t(`한 번에 ${MAX_ATTRIBUTION_DAYS}일까지 조회할 수 있어요.`, `Choose up to ${MAX_ATTRIBUTION_DAYS} days at a time.`);
 
   return <section className={styles.panel} data-period-attribution aria-label={t("기간별 가격·환율 영향", "Price and FX impact by period")}>
-    <ChoiceGroup appearance="segmented" label={t("영향 조회 기간", "Impact period")}>
+    {!controlledRange && <ChoiceGroup appearance="segmented" label={t("영향 조회 기간", "Impact period")}>
       {(["thisMonth", "lastMonth", "custom"] as const).map(option => <Button key={option} variant="bare" type="button"
         aria-pressed={option === preset} onClick={() => { setPreset(option); setAttempted(false); }}>
         {option === "thisMonth" ? t("이번 달", "This month") : option === "lastMonth" ? t("지난달", "Last month") : t("직접 선택", "Custom")}
       </Button>)}
-    </ChoiceGroup>
-    {preset === "custom" && <Form noValidate className={styles.dates} onSubmit={event => {
+    </ChoiceGroup>}
+    {!controlledRange && preset === "custom" && <Form noValidate className={styles.dates} onSubmit={event => {
       event.preventDefault();
       setAttempted(true);
       if (validateAttributionRange(draft, today)) setCustom(draft);
@@ -49,13 +49,13 @@ export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext)
       {error && <ValidationMessage id={errorId} className={styles.error}>{error}</ValidationMessage>}
     </Form>}
     {range && <PeriodRead key={JSON.stringify([binding, receipt, scope, range.start, range.end])}
-      range={range} scope={scope} binding={binding} />}
+      range={range} scope={scope} binding={binding} selectedDate={selectedDate} onDateChange={onDateChange} compact={compact} />}
   </section>;
 }
 
 type ReadResult = { kind: "ready"; data: PeriodAttribution } | { kind: "error" | "session" };
 
-function PeriodRead({ range, scope, binding }: ReadContext & { range: PeriodAttributionRange }) {
+function PeriodRead({ range, scope, binding, selectedDate, onDateChange, compact }: ReadContext & { range: PeriodAttributionRange }) {
   const { t } = useI18n();
   const [result, setResult] = useState<ReadResult | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -86,7 +86,7 @@ function PeriodRead({ range, scope, binding }: ReadContext & { range: PeriodAttr
     return () => controller.abort();
   }, [attempt, binding, end, scope, start]);
 
-  if (result?.kind === "ready") return <AttributionResult data={result.data} />;
+  if (result?.kind === "ready") return <AttributionResult data={result.data} selectedDate={selectedDate} onDateChange={onDateChange} compact={compact} />;
   return <div className={styles.status}>
     <p role="status">{!result ? t("기간 기록을 불러오고 있어요.", "Loading period records.") :
       result.kind === "session" ? t("계좌 연결이 바뀌었어요. 화면을 새로고침해 주세요.", "Your account connection changed. Refresh this page.") :
@@ -111,24 +111,25 @@ const reasons: Record<PeriodGapReason, [string, string]> = {
 const dateLabel = (value: string) => value.replaceAll("-", ".");
 const rangeLabel = ({ start, end }: PeriodAttributionRange) => start === end ? dateLabel(start) : dateLabel(start) + " – " + dateLabel(end);
 
-function AttributionResult({ data }: { data: PeriodAttribution }) {
+function AttributionResult({ data, selectedDate, onDateChange, compact }: { data: PeriodAttribution } & Pick<ReadContext, "selectedDate" | "onDateChange" | "compact">) {
   const { locale, t } = useI18n();
   const money = (value: number | null) => formatWon(value, locale);
   const partial = data.state === "partial";
   const totalLabel = partial ? t("확인 구간 소계", "Confirmed subtotal") : t("합계", "Combined impact");
   const priceLabel = t("가격 영향", "Price impact");
   const fxLabel = t("환율 영향", "FX impact");
-  return <div data-attribution-result data-state={data.state} className={styles.result}>
+  return <div data-attribution-result data-state={data.state} data-compact={compact || undefined} className={styles.result}>
     <p className={styles.range}>{rangeLabel(data.range)}</p>
     {data.state === "unavailable" ? <p role="status" className={styles.unavailable}>{t("이 기간에 가격과 환율을 함께 확인할 수 있는 기록이 없어요.", "No records confirm both price and FX impact in this period.")}</p> :
       <>
+        {partial && <p className={styles.partial} data-attribution-partial>{t("확인된 구간만 합산했어요.", "Totals cover confirmed intervals only.")}</p>}
         <dl className={styles.numbers}>
           <div data-factor="total"><dt>{totalLabel}</dt><dd>{money(data.totalKrw)}</dd></div>
           <div data-factor="price"><dt>{priceLabel}</dt><dd>{money(data.priceKrw)}</dd></div>
           <div data-factor="fx"><dt>{fxLabel}</dt><dd>{money(data.fxKrw)}</dd></div>
         </dl>
       </>}
-    <PeriodImpactChart days={data.days} />
+    <PeriodImpactChart days={data.days} selectedDate={selectedDate} onDateChange={onDateChange} />
     {!!data.gaps.length && <InfoDisclosure summary={t(`자료가 빠진 구간 · ${data.gaps.length}건`, `Missing records · ${data.gaps.length}`)} className={styles.disclosure}>
       <ul className={styles.gaps}>{data.gaps.map(gap => <li key={JSON.stringify([gap.start,gap.end,gap.account,gap.holding,gap.reason])}>
         <span>{rangeLabel(gap)}</span><div><strong>{t(...reasons[gap.reason])}</strong>

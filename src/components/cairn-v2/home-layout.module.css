@@ -35,7 +35,7 @@
   --cairn-ui-brand:#f39579; --cairn-ui-positive:#ff8164; --cairn-ui-negative:#8eb3d1;
   --home-chart-line:#f39579; --home-chart-grid:#ffffff0e; --home-chart-muted:#aebbc5;
   --home-card-surface:transparent; --home-card-hover:transparent;
-  display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);
+  display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);
   position:relative;min-width:0;min-height:340px;border-radius:28px;
   color:var(--cairn-v2-ink);background:#17232d;box-shadow:0 18px 50px #18212a14;
 }
@@ -196,11 +196,11 @@
  :global([data-reduced=false]) .allocation [data-allocation-ring] div:has(>strong) { animation:ring-value 230ms ease-out; }
 }
 @keyframes ring-value { from {opacity:0;transform:scale(.92)} to {opacity:1;transform:none} }
-.history [data-cairn-choice][aria-label="히스토리 보기"] { display:inline-grid; grid-template-columns:repeat(2,1fr); position:relative; isolation:isolate; gap:0; }
-.history [data-cairn-choice][aria-label="히스토리 보기"]::before { content:""; position:absolute; z-index:-1; top:2px; bottom:2px; left:2px; width:calc(50% - 2px); border-radius:6px; background:#f8f4eb; }
-.history [data-cairn-choice][aria-label="히스토리 보기"]:has(>button:nth-child(2)[aria-pressed=true])::before { transform:translateX(100%); }
-.history [data-cairn-choice][aria-label="히스토리 보기"] > button[aria-pressed=true] { background:transparent; }
-@media(prefers-reduced-motion:no-preference) { :global([data-reduced=false]) .history [data-cairn-choice][aria-label="히스토리 보기"]::before { transition:transform 320ms cubic-bezier(.22,1.15,.4,1); } }
+.history [data-cairn-choice][data-appearance=segmented][aria-label="히스토리 보기"] { display:inline-grid; grid-template-columns:repeat(2,1fr); position:relative; isolation:isolate; gap:0; }
+.history [data-cairn-choice][data-appearance=segmented][aria-label="히스토리 보기"]::before { content:""; position:absolute; z-index:-1; top:2px; bottom:2px; left:2px; width:calc(50% - 2px); border-radius:6px; background:#f8f4eb; }
+.history [data-cairn-choice][data-appearance=segmented][aria-label="히스토리 보기"]:has(>button:nth-child(2)[aria-pressed=true])::before { transform:translateX(100%); }
+.history [data-cairn-choice][data-appearance=segmented][aria-label="히스토리 보기"] > button[aria-pressed=true] { background:transparent; }
+@media(prefers-reduced-motion:no-preference) { :global([data-reduced=false]) .history [data-cairn-choice][data-appearance=segmented][aria-label="히스토리 보기"]::before { transition:transform 320ms cubic-bezier(.22,1.15,.4,1); } }
 .allocation ul { position:relative; isolation:isolate; }
 .allocation ul::before { content:""; position:absolute; z-index:-1; inset:0 0 auto; height:44px; border-radius:8px; background:#e5e7e3; transform:translateY(calc(var(--selected-row) * 100%)); }
 .dashboard .allocation ul button { height:44px; }

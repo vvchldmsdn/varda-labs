@@ -13,12 +13,17 @@ export function formatWon(value: number | null, locale: string, signed = true) {
 
 const shortDate = (date: string) => date.slice(5).replace("-", ".");
 
-export function PeriodImpactChart({ days }: { days: PeriodAttribution["days"] }) {
+export function PeriodImpactChart({ days, selectedDate, onDateChange }: { days: PeriodAttribution["days"]; selectedDate?: string | null; onDateChange?: (date: string) => void }) {
   const { t, locale } = useI18n();
   const { unit, buckets, runs, low, high } = useMemo(() => periodChartSeries(days), [days]);
   const [selected, setSelected] = useState(days.length - 1);
   if (!days.length) return null;
-  const index = Math.min(Math.max(selected, 0), days.length - 1);
+  const matched = selectedDate ? days.findIndex(day => day.date === selectedDate) : -1;
+  const index = matched >= 0 ? matched : Math.min(Math.max(selected, 0), days.length - 1);
+  function selectDay(next: number) {
+    setSelected(next);
+    onDateChange?.(days[next].date);
+  }
   const day = days[index];
   const bucket = buckets.find(item => index >= item.from && index < item.from + item.count)!;
   const peak = Math.max(0, ...buckets.flatMap(b => [Math.abs(b.price ?? 0), Math.abs(b.fx ?? 0)]));
@@ -27,7 +32,7 @@ export function PeriodImpactChart({ days }: { days: PeriodAttribution["days"] })
   function selectPoint(event: PointerEvent<HTMLDivElement>) {
     if (!event.isPrimary) return;
     const bounds = event.currentTarget.getBoundingClientRect();
-    if (bounds.width) setSelected(Math.max(0, Math.min(days.length - 1, Math.floor((event.clientX - bounds.left) / bounds.width * days.length))));
+    if (bounds.width) selectDay(Math.max(0, Math.min(days.length - 1, Math.floor((event.clientX - bounds.left) / bounds.width * days.length))));
   }
   const touch = { onPointerDown: selectPoint, onPointerMove: selectPoint };
   const impactTitle = unit === "day" ? t("일별 가격·환율 영향", "Daily price and FX impact") :
@@ -39,12 +44,12 @@ export function PeriodImpactChart({ days }: { days: PeriodAttribution["days"] })
   const axis = new Intl.NumberFormat(locale === "en" ? "en-US" : "ko-KR", { notation: "compact", maximumFractionDigits: 2 });
   const money = (value: number | null, signed = true) => value == null ? missing : formatWon(value, locale, signed);
   const tick = <i aria-hidden="true" className={styles.cursor} style={{ left: x(index) + "%" }} />;
-  const selectedDate = day.date.replaceAll("-", ".");
+  const formattedDate = day.date.replaceAll("-", ".");
   const impactStatus = day.priceKrw === null || day.fxKrw === null ? missing : day.complete ? "" : t("일부 종목", "Partial holdings");
-  const spoken = [selectedDate, valuesTitle + " " + money(day.closingValueKrw, false), price + " " + money(day.priceKrw), fx + " " + money(day.fxKrw), impactStatus].filter(Boolean).join(" · ");
+  const spoken = [formattedDate, valuesTitle + " " + money(day.closingValueKrw, false), price + " " + money(day.priceKrw), fx + " " + money(day.fxKrw), impactStatus].filter(Boolean).join(" · ");
   return <figure className={styles.chart} data-period-selection data-selected-date={day.date}
     data-selected-period-start={bucket.start} data-selected-period-end={bucket.end}>
-    <figcaption className={styles.selection}><time dateTime={day.date}>{selectedDate}</time>
+    <figcaption className={styles.selection}><time dateTime={day.date}>{formattedDate}</time>
       <span>{t("당일 기록 · 원화", "Daily record · KRW")}</span></figcaption>
     <div className={styles.plotHeading}><strong>{valuesTitle}</strong><span>{money(day.closingValueKrw, false)}</span></div>
     <div className={styles.plot}>
@@ -89,7 +94,7 @@ export function PeriodImpactChart({ days }: { days: PeriodAttribution["days"] })
       {days.length > 1 && <span>{shortDate(days[days.length - 1].date)}</span>}</div>
     <div className={styles.probe}>
       {days.length > 1 && <div className={historyStyles.dateSlider}><Input type="range" aria-label={t("그래프 날짜", "Chart date")} min={0} max={days.length - 1} step={1}
-        data-period-cursor aria-valuetext={spoken} value={index} onChange={event => setSelected(Number(event.target.value))} /></div>}
+        data-period-cursor aria-valuetext={spoken} value={index} onChange={event => selectDay(Number(event.target.value))} /></div>}
       <div className={styles.readout} data-period-readout>
         <span>{t("당일 가격 영향", "Daily price impact")} <strong>{money(day.priceKrw)}</strong></span>
         <span>{t("당일 환율 영향", "Daily FX impact")} <strong>{money(day.fxKrw)}</strong></span>
