@@ -4,12 +4,8 @@ import { useRouter } from "next/navigation";
 import { useReducedEffects } from "./use-home-theme";
 import { createBetaReadFreshness } from "@/lib/cairn-v2/read-freshness";
 
-export type HistoryStudioPreferences = {
-  identity: string;
-  mode: "value" | "return" | "impact" | "compare";
-  preset: "thisMonth" | "lastMonth" | "custom";
-  range: { start: string; end: string };
-};
+import type { HistoryStudioPreferences } from "@/lib/cairn-v2/history-studio-selection";
+export type { HistoryStudioPreferences } from "@/lib/cairn-v2/history-studio-selection";
 type Preferences = {
   metric: "value" | "return"; setMetric: (value: "value" | "return") => void;
   period: "1M" | "3M" | "6M" | "ALL"; setPeriod: (value: "1M" | "3M" | "6M" | "ALL") => void;

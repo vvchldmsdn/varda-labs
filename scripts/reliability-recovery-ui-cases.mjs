@@ -159,9 +159,15 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
 
   await check('fullapp-recovery-beta-live-and-empty-history-display-return', async () => {
     await page.goto(`${url}/beta/history?${new URLSearchParams({ mode: 'domain', scope, currency: 'KRW' })}`);
+    const studio = page.locator('[data-history-studio]');
+    const sources = studio.locator('details').filter({ has: page.locator(':scope > summary').filter({ hasText: /^기록과 출처 확인$/ }) });
+    await sources.locator(':scope > summary').click();
     await expect(page.getByText('현재 평가 · 저장 전', { exact: true })).toBeVisible();
-    const periods = page.getByRole('group', { name: '히스토리 기간', exact: true });
-    const metrics = page.getByRole('group', { name: '히스토리 보기', exact: true });
+    // The source records retain their recorded-period controls; the outer studio
+    // owns the shared calendar range and the four metric modes.
+    const periods = studio.getByRole('group', { name: '히스토리 기간', exact: true })
+      .filter({ has: page.getByRole('button', { name: '6개월', exact: true }) });
+    const metrics = studio.getByRole('group', { name: '히스토리 보기', exact: true });
     await periods.getByRole('button', { name: '6개월', exact: true }).click();
     await expect(periods.getByRole('button', { name: '6개월', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const displayDraft = { mode: 'domain', scope, currency: 'KRW', _historyViewPeriod: '6M', _historyViewMetric: 'value', _historyViewScope: scope, _historyViewCurrency: 'KRW' };
@@ -183,7 +189,7 @@ export async function runRecoveryUiCases({ page, check, account, asset, url, out
     await expect(page.getByText('현재 평가 · 저장 전', { exact: true })).toBeVisible();
     assertDraft(page.url(), '/beta/history', displayDraft, '#history-evidence');
     await expect(periods.getByRole('button', { name: '6개월', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(metrics.getByRole('button', { name: '평가액', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(metrics.getByRole('button', { name: '평가 추이', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await captureWidths(page, output, 'recovery-beta-live-history-return', periods.getByRole('button', { name: '6개월', exact: true }));
 
     // Empty/error states keep these controls available for recovery.

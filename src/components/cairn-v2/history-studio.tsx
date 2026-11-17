@@ -11,6 +11,7 @@ import { calendarAttributionRange, MAX_ATTRIBUTION_DAYS, validateAttributionRang
 import { currentKstDate } from "@/lib/current-kst-date";
 import { historySourceView } from "@/lib/cairn-v2/read-display";
 import { historyWithCurrentValue, CURRENT_VALUATION_SOURCE } from "@/lib/cairn-v2/history-current";
+import { historyStudioIdentity } from "@/lib/cairn-v2/history-studio-selection";
 import { HistoryChart, historyRows } from "./beta-charts";
 import { useBetaPreferences, type HistoryStudioPreferences } from "./beta-provider";
 import { PeriodControls } from "./history-detail-controls";
@@ -33,7 +34,7 @@ export function HistoryStudio({ view, context, historyRead, compact = false, sus
   const preferences = useBetaPreferences();
   const { historyDate, setHistoryDate, setMetric, historyStudio, setHistoryStudio } = preferences;
   const today = context.mode === "domain" ? currentKstDate(new Date()) : view.history.at(-1)?.date ?? currentKstDate(new Date());
-  const identity = JSON.stringify([context.mode, context.scope, context.currency, historyRead?.displayBinding]);
+  const identity = historyStudioIdentity(context, historyRead?.displayBinding);
   const state: HistoryStudioPreferences = historyStudio?.identity === identity ? historyStudio : {
     identity, mode: preferences.metric, preset: "thisMonth", range: calendarAttributionRange("thisMonth", today),
   };
@@ -134,6 +135,6 @@ export function HistoryStudio({ view, context, historyRead, compact = false, sus
         {mode === "compare" ? t("가격·환율 보기", "Explore price & FX") : t("이 기간, 다르게 투자했다면?", "What if I invested differently?")}<ArrowRight size={14} aria-hidden />
       </Button>
     </div>}
-    {!compact && mode === "value" && legacyDetail && <InfoDisclosure summary={t("기록과 출처 확인", "Records and sources")} className={styles.evidence}>{legacyDetail}</InfoDisclosure>}
+    {!compact && mode === "value" && legacyDetail && <InfoDisclosure summary={t("기록과 출처 확인", "Records and sources")} className={styles.evidence} data-history-evidence-panel>{legacyDetail}</InfoDisclosure>}
   </section>;
 }

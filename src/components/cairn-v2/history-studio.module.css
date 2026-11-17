@@ -14,7 +14,7 @@
 .periodBar { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; margin-bottom:12px; }
 .range { flex-shrink:0; font-size:11px; color:var(--cairn-v2-muted); white-space:nowrap; }
 .studio [data-cairn-choice][data-appearance] > [data-cairn-button] {
-  min-height:40px; padding:8px 11px; font-size:12px; font-weight:500; white-space:nowrap;
+  min-height:44px; padding:8px 11px; font-size:12px; font-weight:500; white-space:nowrap;
 }
 .studio[data-history-studio] [data-cairn-choice] {
   --cairn-ui-ink:#f8f4eb; --cairn-ui-muted:#adb9c0;

@@ -14,6 +14,16 @@ export async function runBetaVisualCases({page,check,url,output}) {
     const dot=svg.locator('circle').last(), bounds=await dot.boundingBox();
     assert.ok(bounds&&bounds.width>0&&Math.abs(bounds.width-bounds.height)<0.5,'selected marker must remain circular');
   };
+  const setRecordedRange=async studio=>{
+    // These chart fixtures have fixed recorded dates. Do not depend on the
+    // current calendar month containing synthetic historical observations.
+    await studio.getByRole('button',{name:'평가 추이',exact:true}).click();
+    await studio.getByRole('button',{name:'직접 선택',exact:true}).click();
+    await studio.getByLabel('시작일',{exact:true}).fill('2026-07-03');
+    await studio.getByLabel('종료일',{exact:true}).fill('2026-10-03');
+    await studio.getByRole('button',{name:'적용',exact:true}).click();
+    await expect(studio.getByRole('button',{name:'직접 선택',exact:true})).toHaveAttribute('aria-pressed','true');
+  };
   for(const [width,height] of [[1440,900],[1366,768],[390,844],[360,800]]) {
     await check(`beta-visual-${width}`,async()=>{
       await page.setViewportSize({width,height});
@@ -32,6 +42,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await expect(exclusions.getByText('제외 사유 확인 전',{exact:true})).toBeVisible();
       await exclusions.locator('summary').click();
       await expect(page.getByRole('button',{name:'추가 투자 계산하기',exact:true})).toHaveCount(0);
+      await setRecordedRange(page.locator('[data-beta-card="history"] [data-history-studio]'));
       await chartGeometry(page.locator('[data-beta-card="history"] [data-history-plot] svg'));
       if(width===1440){
         await page.evaluate(()=>{ location.hash='beta-target-drift'; });
@@ -149,14 +160,19 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.screenshot({path:path.join(output,`beta-today-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
       await page.getByRole('button',{name:'히스토리 확대',exact:true}).click();
-      const periods=dialog.getByRole('group',{name:'히스토리 기간'});
+      const studio=dialog.locator('[data-history-studio]');
+      const sources=studio.locator('summary').filter({hasText:/^기록과 출처 확인$/});
+      await sources.click();
+      const periods=studio.getByRole('group',{name:'히스토리 기간',exact:true}).filter({has:page.getByRole('button',{name:'3개월',exact:true})});
       const quarter=periods.getByRole('button',{name:'3개월',exact:true});
       await quarter.focus();await page.keyboard.press('Enter');await expect(quarter).toHaveAttribute('aria-pressed','true');
       const periodTargets=await periods.getByRole('button').evaluateAll(els=>els.map(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,duration:getComputedStyle(el).transitionDuration,underlineDuration:getComputedStyle(el,'::after').transitionDuration})));
       assert.ok(periodTargets.every(button=>button.height>=44&&button.width>=44&&button.duration==='0s'&&button.underlineDuration==='0s'),'period choices retain touch targets and reduced motion');
       await periods.getByRole('button',{name:'전체',exact:true}).click();
       await quarter.click();
-      const history=dialog.locator('[data-history-plot] svg');await chartGeometry(history);await history.focus();await page.keyboard.press('Home');
+      await sources.click();
+      await setRecordedRange(studio);
+      const history=studio.locator('[data-history-plot] svg').filter({visible:true});await chartGeometry(history);await history.focus();await page.keyboard.press('Home');
       await expect(history).toHaveAttribute('aria-label',/2026-07-03/);await page.keyboard.press('End');await expect(history).toHaveAttribute('aria-label',/2026-10-03/);
       await page.screenshot({path:path.join(output,`beta-history-${width}.png`)});
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
