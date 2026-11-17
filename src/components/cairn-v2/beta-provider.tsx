@@ -4,6 +4,12 @@ import { useRouter } from "next/navigation";
 import { useReducedEffects } from "./use-home-theme";
 import { createBetaReadFreshness } from "@/lib/cairn-v2/read-freshness";
 
+export type HistoryStudioPreferences = {
+  identity: string;
+  mode: "value" | "return" | "impact" | "compare";
+  preset: "thisMonth" | "lastMonth" | "custom";
+  range: { start: string; end: string };
+};
 type Preferences = {
   metric: "value" | "return"; setMetric: (value: "value" | "return") => void;
   period: "1M" | "3M" | "6M" | "ALL"; setPeriod: (value: "1M" | "3M" | "6M" | "ALL") => void;
@@ -11,6 +17,8 @@ type Preferences = {
   structureView: "ring" | "map"; setStructureView: (value: "ring" | "map") => void;
   reduceEffects: boolean; setReduceEffects: (value: boolean) => void;
   historyDate: string | null; setHistoryDate: (value: string | null) => void;
+  historyStudio: HistoryStudioPreferences | null;
+  setHistoryStudio: (value: HistoryStudioPreferences) => void;
 };
 const BetaPreferences = createContext<Preferences | null>(null);
 const BetaExistingCrud = createContext(false);
@@ -125,7 +133,8 @@ export function BetaProvider({ children, existingCrudAvailable = false }: { chil
   const [structureView, setStructureView] = useState<"ring" | "map">("ring");
   const [reduceEffects, setReduceEffects] = useReducedEffects();
   const [historyDate, setHistoryDate] = useState<string | null>(null);
-  return <BetaExistingCrud.Provider value={existingCrudAvailable}><BetaReadFreshness.Provider value={{epoch,store,observed}}><BetaPreferences.Provider value={{ metric, setMetric, period, setPeriod, selected, setSelected, structureView, setStructureView, reduceEffects, setReduceEffects, historyDate, setHistoryDate }}>{children}</BetaPreferences.Provider></BetaReadFreshness.Provider></BetaExistingCrud.Provider>;
+  const [historyStudio, setHistoryStudio] = useState<HistoryStudioPreferences | null>(null);
+  return <BetaExistingCrud.Provider value={existingCrudAvailable}><BetaReadFreshness.Provider value={{epoch,store,observed}}><BetaPreferences.Provider value={{ metric, setMetric, period, setPeriod, selected, setSelected, structureView, setStructureView, reduceEffects, setReduceEffects, historyDate, setHistoryDate, historyStudio, setHistoryStudio }}>{children}</BetaPreferences.Provider></BetaReadFreshness.Provider></BetaExistingCrud.Provider>;
 }
 export function useBetaPreferences() {
   const value = useContext(BetaPreferences);
