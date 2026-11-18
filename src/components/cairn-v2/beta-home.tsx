@@ -13,8 +13,9 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { HomeCard as Card } from "./home-card";
 import { cardTitles, type CardKind } from "./card-definition";
+import { MetricControls, PeriodControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
-import { HomeImpactProvider } from "./home-impact";
+import { HomeImpactControls, HomeImpactProvider } from "./home-impact";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
@@ -29,7 +30,7 @@ const BetaDetail = dynamic(() => import("./beta-details").then((module) => modul
     </CairnStatus>
   ),
 });
-import { HistoryStudio } from "./history-studio";
+import { HistoryChart } from "./beta-charts";
 import { HomeAllocation } from "@/components/home/home-allocation";
 import { useBetaPreferences } from "./beta-provider";
 import { useBetaContext } from "./use-beta-context";
@@ -150,8 +151,9 @@ export function BetaHome({
           </Card>
           </div>
           <div className={home.history}>
-            <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined}>
-              <HistoryStudio view={view} context={context} historyRead={read} compact suspended={expanded?.kind === "history"} />
+            <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
+              <HistoryChart view={view} compact interactive currency={context.currency} />
+              <div className={home.historyFooter}><HomeImpactControls /><PeriodControls /></div>
             </Card>
 
           </div>

@@ -26,14 +26,6 @@ function luminancePair(element) {
 }
 
 export async function runHistoryInteractionCases({ page, check, url, output }) {
-  const selectFixtureDates = async card => {
-    const studio = card.locator('[data-history-studio]');
-    await studio.getByRole('button', { name: '평가 추이', exact: true }).click();
-    await studio.getByRole('button', { name: '직접 선택', exact: true }).click();
-    await studio.getByLabel('시작일', { exact: true }).fill('2026-07-03');
-    await studio.getByLabel('종료일', { exact: true }).fill('2026-10-03');
-    await studio.getByRole('button', { name: '적용', exact: true }).click();
-  };
   for (const [width, height] of [[1440, 900], [390, 844], [360, 800]]) {
     await check(`beta-history-interaction-${width}`, async () => {
       await page.setViewportSize({ width, height });
@@ -41,7 +33,6 @@ export async function runHistoryInteractionCases({ page, check, url, output }) {
       await expect(page.locator("[data-beta-root]")).toHaveAttribute("data-beta-ready", "true");
       await page.evaluate(() => document.fonts.ready.then(() => true));
       const history = page.locator("[data-beta-card=history]");
-      await selectFixtureDates(history);
       const structure = page.locator("[data-beta-card=structure]");
       const plot = history.locator("[data-history-plot] svg");
       const tip = history.getByRole("tooltip");
@@ -51,11 +42,15 @@ export async function runHistoryInteractionCases({ page, check, url, output }) {
         for (let node = el; node; node = node.offsetParent) top += node.offsetTop;
         return top;
       });
-      // Price and FX now have a dedicated shared-period view (covered by
-      // runPeriodAttributionCases). The valuation tooltip must still overlay
-      // the chart without moving the following cards as the selected day changes.
-      await expect(history.locator('button[data-impact]')).toHaveCount(0);
+      await history.locator("button[data-impact=price]").click({ trial: true });
       const before = await docY();
+      for (const factor of ["price", "fx"]) {
+        const button = history.locator(`button[data-impact=${factor}]`);
+        await button.click();
+        await expect(button).toHaveAttribute("aria-pressed", "true");
+        await expect(plot.locator(`[data-history-impact=${factor}]`)).toBeVisible();
+        assert.equal(await docY(), before, `${width}px: toggling ${factor} keeps the next card in place`);
+      }
       await plot.scrollIntoViewIfNeeded();
       const box = await plot.boundingBox();
       let lastDate;
@@ -67,7 +62,6 @@ export async function runHistoryInteractionCases({ page, check, url, output }) {
         lastDate = await date.getAttribute("datetime");
         await expect(plot).toHaveAttribute("aria-label", new RegExp(lastDate));
         await expect(tip.locator("[data-tooltip-series] dd")).toHaveCount(3);
-        assert.equal(await docY(), before, `${width}px: inspecting ${lastDate} keeps the next card in place`);
       }
       await expect(tip.locator("[data-tooltip-series=price] dd")).toContainText("원");
       await expect(tip.locator("[data-tooltip-series=fx] dd")).toContainText("원");
@@ -135,7 +129,6 @@ export async function runHistoryInteractionCases({ page, check, url, output }) {
       await phone.route("**/*", route => new URL(route.request().url()).origin === new URL(url).origin ? route.continue() : route.abort());
       await phone.goto(url + "/qa-beta-visual?mode=domain&scope=all&currency=KRW");
       const card = phone.locator("[data-beta-card=history]");
-      await selectFixtureDates(card);
       const svg = card.locator("[data-history-plot] svg");
       const tip = card.getByRole("tooltip");
       const date = tip.locator("time");

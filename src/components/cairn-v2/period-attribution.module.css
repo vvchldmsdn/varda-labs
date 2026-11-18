@@ -1,7 +1,6 @@
 .panel {
-  --impact-price: #93b7a2;
-  --impact-fx: #b9a1cf;
-  --impact-value: var(--cairn-v2-brand);
+  --impact-price: var(--cairn-v2-brand);
+  --impact-fx: var(--home-sage, #789488);
   min-width: 0; display: grid; gap: 18px; padding-block: 8px 16px;
 }
 .dates { display: grid; grid-template-columns: repeat(2, minmax(0, 12rem)) auto; align-items: end; justify-content: start; gap: 10px; }
@@ -10,14 +9,13 @@
 .status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-block: 18px; color: var(--cairn-v2-muted); }
 .result { display: grid; min-width: 0; gap: 8px; }
 .range, .unavailable { color: var(--cairn-v2-muted); font-size: 13px; line-height: 1.6; }
-.partial { margin: 0; color: var(--cairn-v2-muted); font-size: 12px; line-height: 1.5; }
 .range, .numbers dd, .ticks, .axis, .holdings td, .gaps > li > span { font-variant-numeric: tabular-nums; }
 .numbers { display: grid; grid-template-columns: 1.2fr 1fr 1fr; align-items: baseline; gap: 12px; margin: 2px 0 6px; }
 .numbers > div { display: grid; min-width: 0; gap: 4px; padding-block: 6px; }
 .numbers dt { font-size: 13px; color: var(--cairn-v2-muted); }
-.numbers dd { margin: 0; font-size: clamp(18px, 2.6vw, 27px); line-height: 1.25; font-weight: 500; letter-spacing: -.04em; white-space: nowrap; }
+.numbers dd { margin: 0; font-size: clamp(18px, 2.6vw, 27px); line-height: 1.25; font-weight: 500; letter-spacing: -.04em; overflow-wrap: anywhere; }
 .numbers [data-factor=total] dd { font-size: clamp(24px, 3.2vw, 37px); }
-.chart { --axis-width: clamp(64px, 8cqw, 78px); margin: 10px 0 18px; min-width: 0; font-variant-numeric: tabular-nums; }
+.chart { --axis-width: clamp(48px, 6cqw, 72px); margin: 10px 0 18px; min-width: 0; font-variant-numeric: tabular-nums; }
 .selection { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--cairn-v2-line); }
 .selection time { font-size: 16px; font-weight: 550; }
 .selection span, .bucketNote, .readout small { color: var(--cairn-v2-muted); font-size: 12px; }
@@ -31,14 +29,13 @@
 .legend [data-series=gap]::before, .bucket[data-partial] { background: repeating-linear-gradient(135deg, transparent 0px 3px, color-mix(in srgb,var(--cairn-v2-muted) 28%,transparent) 3px 4px); }
 .plot { display: grid; grid-template-columns: var(--axis-width) minmax(0, 1fr); gap: 8px; }
 .axis, .valueAxis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 11px; color: var(--cairn-v2-muted); }
-.axis span, .valueAxis span { white-space: nowrap; }
 .axis { padding-block: 3px; }
 .valueAxis { padding-block: 6px; }
 .valueAxis:has(> :only-child) { justify-content: center; }
 .valueCanvas, .bars { position: relative; min-width: 0; height: 126px; margin-inline-end: 4px; border-block: 1px solid var(--cairn-v2-line); touch-action: pan-y; cursor: crosshair; }
-.valueCanvas svg { height: 100%; width: 100%; color: var(--impact-value); }
+.valueCanvas svg { height: 100%; width: 100%; color: var(--cairn-v2-ink); }
 .mark, .selectedMark { position: absolute; border-radius: 50%; background: var(--cairn-v2-ink); width: 4px; height: 4px; transform: translate(-50%,-50%); pointer-events: none; }
-.selectedMark { width: 8px; height: 8px; background: var(--impact-value); border: 1px solid var(--cairn-v2-paper); }
+.selectedMark { width: 8px; height: 8px; background: var(--impact-price); border: 1px solid var(--cairn-v2-paper); }
 .cursor { position: absolute; inset-block: 0; border-left: 1px dashed var(--cairn-v2-muted); pointer-events: none; }
 .noValues { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; text-align: center; color: var(--cairn-v2-muted); font-size: 12px; }
 .bars { display: flex; height: 108px; }
@@ -66,26 +63,9 @@
 .holdings :is(th, td) { padding: 10px 2px; border-bottom: 1px solid var(--cairn-v2-line); text-align: right; overflow-wrap: anywhere; }
 .holdings th:first-child { width: 41%; text-align: left; }
 .holdings thead { color: var(--cairn-v2-muted); font-size: 12px; }
-.result[data-compact] .range { display:none; }
-.result[data-compact] .numbers { grid-template-columns:repeat(2,minmax(0,1fr)); margin-block:0 4px; }
-.result[data-compact] .numbers [data-factor=total] { display:none; }
-.result[data-compact] .numbers dd { font-size:23px; font-family:var(--home-display,Georgia,"Cairn Pretendard",serif); font-weight:400; }
-.result[data-compact] .numbers dt { font-size:11px; }
-.result[data-compact] .chart { margin-block:6px 8px; }
-.result[data-compact] .selection { padding-bottom:7px; }
-.result[data-compact] .selection time { font-size:13px; }
-.result[data-compact] .plotHeading { margin-block:9px 5px; }
-.result[data-compact] .plotHeading strong { font-size:11px; }
-.result[data-compact] .plotHeading > span:not(.legend) { font-size:13px; }
-.result[data-compact] .valueCanvas { height:118px; }
-.result[data-compact] .bars { height:66px; }
-.result[data-compact] .disclosure[data-cairn-disclosure] > summary { font-size:11px; min-height:36px; }
-@container (max-width: 580px) {
+@container history-detail (max-width: 580px) {
   .numbers { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px 14px; }
   .numbers [data-factor=total] { grid-column: 1/-1; }
-  .numbers dd { font-size: clamp(17px,5cqw,24px); }
-  .numbers [data-factor=total] dd { font-size: clamp(26px,7cqw,34px); }
-  .result[data-compact] .numbers dd { font-size: clamp(16px,5.8cqw,23px); }
   .dates { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .dates button { grid-column: 1/-1; justify-self: end; }
   .valueCanvas { height: 108px; }
