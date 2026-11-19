@@ -8,21 +8,16 @@ import { useI18n } from "@/components/i18n/locale-provider";
 export function MetricControls({ compact = false, impactActive = false, onImpactChange }: {
   compact?: boolean; impactActive?: boolean; onImpactChange?: (active: boolean) => void;
 }) {
-  const { metric, setMetric, historyStudio, setHistoryStudio } = useBetaPreferences();
+  const { metric, setMetric } = useBetaPreferences();
   const { t } = useI18n();
   function select(metric: "value" | "return") {
     onImpactChange?.(false);
     setMetric(metric);
-    if (historyStudio) setHistoryStudio({ ...historyStudio, mode: metric });
-  }
-  function selectImpact() {
-    onImpactChange?.(true);
-    if (historyStudio) setHistoryStudio({ ...historyStudio, mode: "impact" });
   }
   return <ChoiceGroup appearance={compact ? "segmented" : "underline"} label={t("히스토리 보기", "History view")}>
     <CairnButton variant="bare" type="button" aria-pressed={!impactActive && metric === "value"} onClick={() => select("value")}>{t("평가액", "Value")}</CairnButton>
     <CairnButton variant="bare" type="button" aria-pressed={!impactActive && metric === "return"} onClick={() => select("return")}>{t("수익률", "Return")}</CairnButton>
-    {onImpactChange && <CairnButton variant="bare" type="button" aria-pressed={impactActive} onClick={selectImpact}>{t("가격·환율 영향", "Price & FX impact")}</CairnButton>}
+    {onImpactChange && <CairnButton variant="bare" type="button" aria-pressed={impactActive} onClick={() => onImpactChange(true)}>{t("가격·환율 영향", "Price & FX impact")}</CairnButton>}
   </ChoiceGroup>;
 }
 

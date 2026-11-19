@@ -17,7 +17,6 @@ import { HistoryChart, historyRows } from "./beta-charts";
 import { CairnSelect } from "./reused/cairn-select";
 import { MetricControls } from "./history-detail-controls";
 import { PeriodAttributionPanel } from "./period-attribution-panel";
-import { HistoryStudio } from "./history-studio";
 import styles from "./history-detail.module.css";
 import {
   CURRENT_VALUATION_SOURCE,
@@ -30,27 +29,16 @@ import { selectHistoryPoint } from "@/lib/cairn-v2/history-selection";
 // Presentation hierarchy from the original HistoryTimeExplorer: selected-day hero,
 // large plot, quiet period controls and source evidence. Its model is not imported:
 // the accepted beta projection, date selection and return links remain authoritative.
-export function HistoryDetail(props: {
-  view: FixtureView;
-  context: BetaContext;
-  historyRead?: Pick<DomainRead, "displayBinding" | "readReceipt">;
-  onAllAccounts?: () => void;
-}) {
-  return <HistoryStudio {...props} legacyDetail={<HistoryEvidenceDetail {...props} embedded />} />;
-}
-
-function HistoryEvidenceDetail({
+export function HistoryDetail({
   view: inputView,
   context,
   historyRead,
   onAllAccounts,
-  embedded = false,
 }: {
   view: FixtureView;
   context: BetaContext;
   historyRead?: Pick<DomainRead, "displayBinding" | "readReceipt">;
   onAllAccounts?: () => void;
-  embedded?: boolean;
 }) {
   const { t } = useI18n();
   const { period, setPeriod, metric, historyDate, setHistoryDate } = useBetaPreferences();
@@ -109,7 +97,7 @@ function HistoryEvidenceDetail({
       </CairnButton>
     ))}
   </ChoiceGroup>;
-  const metricControls = !embedded && <MetricControls impactActive={impactActive} onImpactChange={context.mode === "domain" ? setImpactActive : undefined} />;
+  const metricControls = <MetricControls impactActive={impactActive} onImpactChange={context.mode === "domain" ? setImpactActive : undefined} />;
   if (impactActive && context.mode === "domain") {
     const state = inputView.domain?.state;
     const binding = historyRead?.displayBinding;

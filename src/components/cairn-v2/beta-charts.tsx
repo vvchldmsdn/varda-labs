@@ -32,13 +32,11 @@ export function HistoryChart({
   compact = false,
   interactive = false,
   currency = "KRW",
-  dateRange,
 }: {
   view: FixtureView;
   compact?: boolean;
   interactive?: boolean;
   currency?: BetaCurrency;
-  dateRange?: { start: string; end: string };
 }) {
   const { metric, period, historyDate, setHistoryDate } = useBetaPreferences();
   const impact = useHomeImpact();
@@ -48,9 +46,7 @@ export function HistoryChart({
   const historySource = historySourceView(inputView, undefined, historyDate);
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
-  const rows = dateRange
-    ? historyRows(view, "ALL").filter(row => row.date >= dateRange.start && row.date <= dateRange.end)
-    : historyRows(view, period);
+  const rows = historyRows(view, period);
   const gradientId = useId().replaceAll(":", "");
   const stateText = readStateText(view.domain?.historyState, "저장된 평가가 없습니다.");
   if (metric === "return" && inputView.domain?.recoveredReturn)
