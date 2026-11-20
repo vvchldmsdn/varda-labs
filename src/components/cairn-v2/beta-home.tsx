@@ -5,12 +5,12 @@ import { Button as CairnButton, Status as CairnStatus, ActionGroup, ActionConten
 import { ChartNoAxesCombined } from 'lucide-react';
 import { HoldingHeatmap } from './holding-heatmap';
 
-import { HomeSimulation, HomeSimulationPending } from "./home-simulation";
-import type { SimulationRead } from "@/lib/cairn-v2/simulation-contract";
+import { HomeSimulationPending } from "./home-simulation";
 import { ContributionEntry } from "./home-contribution-entry";
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+const LazyHomeSimulation = dynamic(() => import("./home-simulation-lazy").then(module => module.LazyHomeSimulation), { loading: () => <HomeSimulationPending detail /> });
 import { HomeCard as Card } from "./home-card";
 import { cardTitles, type CardKind } from "./card-definition";
 import { MetricControls, PeriodControls } from "./history-detail-controls";
@@ -20,6 +20,7 @@ import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
 import { useBetaView } from "./use-beta-view";
+import { useHomeHistoryRead } from "./use-home-history-read";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { BetaShell } from "./beta-shell";
 import { BetaDialog, type ExpansionOrigin } from "./beta-dialog";
@@ -42,14 +43,15 @@ const HOME_ALLOCATION_COLORS = ["#F39579", "#868A84", "#DDBE9D", "#AFBEAC", "#71
 export function BetaHome({
   initialContext,
   read,
-  simulationPromise,
 }: {
   initialContext: BetaContext;
   read?: DomainRead;
-  simulationPromise?: Promise<SimulationRead>;
 }) {
   const [context, setContext] = useBetaContext(initialContext);
-  const view = useBetaView(context, read);
+  const { selected, setSelected, period } = useBetaPreferences();
+  const [expanded, setExpanded] = useState<{ kind: CardKind; origin: ExpansionOrigin } | null>(null);
+  const history = useHomeHistoryRead(useBetaView(context, read), read, context, period === "ALL" || expanded?.kind === "history");
+  const view = history.view;
   const originalValue = view.domain?.currentValuePresentation ? originalCurrentValueSummary(view.domain.currentValuePresentation,context.currency) : null;
   const composition = view.domain?.currentValuePresentation ? originalCurrentComposition(view.domain.currentValuePresentation, context.currency) : null;
   const compositionRequested = !!view.domain?.currentValuePresentation;
@@ -59,10 +61,6 @@ export function BetaHome({
   }]) ?? [] : view.rows.map((row,index) => ({key:row.key,name:instrumentLabel(row),weightPct:row.weightPct,color:HOME_ALLOCATION_COLORS[index % HOME_ALLOCATION_COLORS.length]}));
   const displayMoney = (value: number | null, currency: BetaContext["currency"], signed = false) =>
     displayReadMoney(view, value, currency, signed);
-  const { selected, setSelected } = useBetaPreferences();
-  const [expanded, setExpanded] = useState<{ kind: CardKind; origin: ExpansionOrigin } | null>(
-    null,
-  );
   const unit = context.currency === "KRW" ? "원" : "USD";
   function open(kind: CardKind, trigger: HTMLElement) {
     const card = trigger.closest<HTMLElement>("[data-beta-card]") ?? trigger;
@@ -154,6 +152,10 @@ export function BetaHome({
             <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
               <HistoryChart view={view} compact interactive currency={context.currency} />
               <div className={home.historyFooter}><HomeImpactControls /><PeriodControls /></div>
+              {history.error && <CairnStatus as="div" role="status">
+                <p>{history.error === 'session' ? '계좌 연결이 바뀌었어요. 화면을 새로고침해 주세요.' : '전체 이력을 불러오지 못했어요.'}</p>
+                <CairnButton type="button" variant="bare" onClick={() => history.error === 'session' ? window.location.reload() : history.retry()}>{history.error === 'session' ? '새로고침' : '다시 조회'}</CairnButton>
+              </CairnStatus>}
             </Card>
 
           </div>
@@ -264,20 +266,21 @@ export function BetaHome({
             setContributionDirty(false);
           }}
         >
+          {expanded.kind === "history" && history.error ? <CairnStatus as="div" role="status">
+            <p>{history.error === 'session' ? '계좌 연결이 바뀌었어요. 화면을 새로고침해 주세요.' : '전체 이력을 불러오지 못했어요.'}</p>
+            <CairnButton type="button" variant="secondary" onClick={() => history.error === 'session' ? window.location.reload() : history.retry()}>{history.error === 'session' ? '새로고침' : '다시 조회'}</CairnButton>
+          </CairnStatus> : null}
           {expanded.kind === "simulation" && view.domain ? (
             view.domain.state === "loading" ? (
               <HomeSimulationPending detail />
-            ) : (
-              <HomeSimulation
-                promise={
-                  ["ready", "partial", "empty"].includes(view.domain.state)
-                    ? simulationPromise
-                    : undefined
-                }
+            ) : read?.displayBinding ? (
+              <LazyHomeSimulation
                 context={context}
-                detail
+                binding={read.displayBinding}
+                receipt={read.readReceipt}
+                epoch={read.readEpoch}
               />
-            )
+            ) : <CairnStatus as="p" role="status">계좌 연결을 확인한 뒤 다시 열어 주세요.</CairnStatus>
           ) : (
             <BetaDetail
               onTargetDrift={() =>

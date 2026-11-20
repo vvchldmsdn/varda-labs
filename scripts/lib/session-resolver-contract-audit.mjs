@@ -79,6 +79,10 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
     join(root, "src/lib/auth/current-session-subject.ts"),
     "utf8",
   );
+  const neonSessionSource = readFileSync(
+    join(root, "src/lib/auth/current-neon-session.ts"),
+    "utf8",
+  );
   const runtimeBoundaryIntact =
     runtimeSource.startsWith('import "server-only";') &&
     [
@@ -91,8 +95,17 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
       ".limit(2)",
     ].every((marker) => runtimeSource.includes(marker)) &&
     sessionSource.startsWith('import "server-only";') &&
-    ["getAuthTransportRuntime", "auth.getSession()", "readNaverSession()", "resolveProviderSessions(neon, naver)", "emailVerified === true"].every((marker) => sessionSource.includes(marker)) &&
-    !IDENTITY_DML_PATTERN.test(runtimeSource + sessionSource) &&
+    ["cache(", "readCurrentNeonSession()", "readNaverSession()", "resolveProviderSessions(neon, naver)", "emailVerified === true"].every((marker) => sessionSource.includes(marker)) &&
+    !sessionSource.includes("auth.getSession()") &&
+    neonSessionSource.startsWith('import "server-only";') &&
+    /from\s+["']react["']/.test(neonSessionSource) &&
+    [
+      "cache(", "getAuthTransportRuntime()", 'runtime.state !== "ready"',
+      "cookies()", 'name.startsWith("__Secure-neon-auth")', "runtime.auth.getSession()",
+      'if (result.error) return { state: "unavailable" }', "!isRecord(data.user)",
+    ].every((marker) => neonSessionSource.includes(marker)) &&
+    !/unstable_cache|cacheLife|cacheTag|globalThis|\bnew\s+Map\b/.test(neonSessionSource) &&
+    !IDENTITY_DML_PATTERN.test(runtimeSource + sessionSource + neonSessionSource) &&
     !/console\.|NextResponse|Response\(|\bfetch\s*\(/.test(runtimeSource);
   if (!runtimeBoundaryIntact) {
     findings.push("runtime_adapter_boundary_drift");
@@ -143,7 +156,8 @@ export function auditSessionResolverContract({ root, writerRegistry }) {
       databaseWrites: 0,
       providerCalls: 1,
       routeCalls: 0,
-      cacheImplementations: 2,
+      cacheImplementations: [runtimeSource, sessionSource, neonSessionSource]
+        .reduce((count, source) => count + (source.match(/\bcache\s*\(/g) ?? []).length, 0),
     },
   };
 }

@@ -2,6 +2,7 @@ import "server-only";
 import {findVerifiedHistoricalWindow} from "@/lib/shared-domain/simulation-verified-window";
 import { and, asc, eq, gte, isNotNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { readSharedMarketHistory } from "./shared-market-history-cache";
 import { assetPriceSnapshots, fxRates } from "@/db/schema";
 import { planSimulationPeriodPreflightScan } from "@/lib/shared-domain/simulation-period-preflight-plan";
 import { isRiskDate } from "@/lib/portfolio-risk-calendar";
@@ -91,29 +92,29 @@ export async function getReadOnlyTenantRawHistory({selection, endServiceDate, re
   }
   const {sourceDateFrom, sourceDateTo} = plan.queryRange;
   const [priceRows, fxRows] = await Promise.all([
-    db.select({
-      market: sql<string>`lower(trim(${assetPriceSnapshots.market}))`,
-      currency: sql<string>`upper(trim(${assetPriceSnapshots.currency}))`,
-      ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`,
+    readSharedMarketHistory("instrument-price-history", db.select({
+      market: sql<string>`lower(trim(${assetPriceSnapshots.market}))`.as("market"),
+      currency: sql<string>`upper(trim(${assetPriceSnapshots.currency}))`.as("currency"),
+      ticker: sql<string>`upper(trim(${assetPriceSnapshots.ticker}))`.as("ticker"),
       priceDate: assetPriceSnapshots.priceDate, closePrice: assetPriceSnapshots.closePrice,
       adjustedClosePrice: assetPriceSnapshots.adjustedClosePrice,
       adjustedCloseBasis: assetPriceSnapshots.adjustedCloseBasis,
       adjustedCloseProvider: assetPriceSnapshots.adjustedCloseProvider,
       adjustedCloseSource: assetPriceSnapshots.adjustedCloseSource,
-      adjustedCloseFetchedAt: assetPriceSnapshots.adjustedCloseFetchedAt,
+      adjustedCloseFetchedAt: sql<string | null>`${assetPriceSnapshots.adjustedCloseFetchedAt}::text`.as("adjusted_close_fetched_at"),
       source: assetPriceSnapshots.source, providerSymbol: assetPriceSnapshots.providerSymbol,
-      providerExchange: assetPriceSnapshots.providerExchange, fetchedAt: assetPriceSnapshots.fetchedAt,
+      providerExchange: assetPriceSnapshots.providerExchange, fetchedAt: sql<string | null>`${assetPriceSnapshots.fetchedAt}::text`.as("fetched_at"),
     }).from(assetPriceSnapshots).where(and(
       identityPredicate(modeled), gte(assetPriceSnapshots.priceDate,sourceDateFrom),
       lte(assetPriceSnapshots.priceDate,sourceDateTo), eq(assetPriceSnapshots.isSample,false),
-    )).orderBy(asc(assetPriceSnapshots.priceDate),asc(assetPriceSnapshots.market),asc(assetPriceSnapshots.currency),asc(assetPriceSnapshots.ticker)),
-    plan.requiresFx ? db.select({
+    )).orderBy(asc(assetPriceSnapshots.priceDate),asc(assetPriceSnapshots.market),asc(assetPriceSnapshots.currency),asc(assetPriceSnapshots.ticker))),
+    plan.requiresFx ? readSharedMarketHistory("fx-history", db.select({
       rateDate: fxRates.rateDate, usdKrw: fxRates.usdKrw,
-      status: sql<string>`lower(trim(${fxRates.status}))`,
+      status: sql<string>`lower(trim(${fxRates.status}))`.as("status"),
     }).from(fxRates).where(and(
       gte(fxRates.rateDate,sourceDateFrom),lte(fxRates.rateDate,sourceDateTo),
       eq(fxRates.isSample,false),eq(sql<string>`lower(trim(${fxRates.status}))`,"ok"),
-    )).orderBy(asc(fxRates.rateDate)) : Promise.resolve([]),
+    )).orderBy(asc(fxRates.rateDate))) : Promise.resolve([]),
   ]);
   const input={requireAdjusted:true,sourceDateFrom,requestedEndServiceDate:endServiceDate,returnStepCount,instruments,priceRows,fxRows};
   const result=buildPrivateOwnerRawHistory(input);

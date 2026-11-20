@@ -108,7 +108,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         <div className="varda-sidebar-group" key={group.title}>
           <p>{t(group.title, group.title === "계획과 탐색" ? "Plan & explore" : group.title === "나의 데이터" ? "My data" : "Portfolio")}</p>
           {group.items.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}
+            <Link prefetch={false} key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}
               className="varda-sidebar-link" onClick={() => menuRef.current?.close()}>
               <Icon size={21} strokeWidth={1.6} aria-hidden="true" />
               <span>{t(label)}</span><PendingHint />
@@ -123,15 +123,15 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
     <header className="varda-app-navigation">
       <a className="varda-skip-link" href="#varda-main-content">{t("본문으로 건너뛰기", "Skip to content")}</a>
       <aside className="varda-sidebar" aria-label={t("서비스 탐색", "App navigation")}>
-        <Link className="varda-sidebar-brand" href={hrefFor("/")} aria-label={t("CAIRN LABS 홈", "CAIRN LABS home")}>
+        <Link prefetch={false} className="varda-sidebar-brand" href={hrefFor("/")} aria-label={t("CAIRN LABS 홈", "CAIRN LABS home")}>
           <BrandLogo stacked />
         </Link>
         {links}
         <div className="varda-sidebar-bottom">
-          {!preview ? <Link href={hrefFor("/portfolio/reporting")} className="varda-sidebar-account"><span aria-hidden="true">$</span><span>{t("통화별 평가", "Currency valuation")}</span></Link> : null}
-          <Link href={hrefFor("/plans")} className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
+          {!preview ? <Link prefetch={false} href={hrefFor("/portfolio/reporting")} className="varda-sidebar-account"><span aria-hidden="true">$</span><span>{t("통화별 평가", "Currency valuation")}</span></Link> : null}
+          <Link prefetch={false} href={hrefFor("/plans")} className="varda-sidebar-account"><Plus size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계획", "My plans")}</span></Link>
           {preview ? <span className="varda-preview-label" title={t("디자인 미리보기 · 예시 데이터", "Design preview · Demo data")}><i />{t("예시")}</span> : null}
-          <Link href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
+          <Link prefetch={false} href={hrefFor("/auth/session?view=account")} className="varda-sidebar-account">
             <UserRound size={20} strokeWidth={1.6} aria-hidden="true" /><span>{t("내 계정")}</span>
           </Link>
         </div>
@@ -144,16 +144,16 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
         </div>
         <div className="varda-topbar-actions">
           <nav className="varda-scene-pager" aria-label={t("화면 순서 이동", "Previous and next page")}>
-            {previousItem ? <Link href={hrefFor(previousItem.href)} aria-label={t(`이전 화면: ${previousItem.label}`, `Previous page: ${t(previousItem.label)}`)} title={t(previousItem.label)}><ChevronLeft size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
+            {previousItem ? <Link prefetch={false} href={hrefFor(previousItem.href)} aria-label={t(`이전 화면: ${previousItem.label}`, `Previous page: ${t(previousItem.label)}`)} title={t(previousItem.label)}><ChevronLeft size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
             <span className="varda-scene-number">{String(Math.max(0, currentIndex) + 1).padStart(2, "0")}<i>/</i>{String(allItems.length).padStart(2, "0")}</span>
-            {nextItem ? <Link href={hrefFor(nextItem.href)} aria-label={t(`다음 화면: ${nextItem.label}`, `Next page: ${t(nextItem.label)}`)} title={t(nextItem.label)}><ChevronRight size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
+            {nextItem ? <Link prefetch={false} href={hrefFor(nextItem.href)} aria-label={t(`다음 화면: ${nextItem.label}`, `Next page: ${t(nextItem.label)}`)} title={t(nextItem.label)}><ChevronRight size={16} aria-hidden="true" /></Link> : <span aria-hidden="true" />}
           </nav>
           {preview ? <span className="varda-topbar-preview"><i />{t("예시 데이터")}</span>
             : generatedAt ? <span className="varda-updated-at">{locale === "en" ? `View refreshed ${new Intl.DateTimeFormat("en-GB", {hour:"2-digit",minute:"2-digit", timeZone:"Asia/Seoul"}).format(new Date(generatedAt))} KST` : `화면 갱신 ${formatKstTime(generatedAt)}`}</span> : null}
           {!preview && generatedAt ? <PortfolioRefreshButton compact /> : null}
           {!researchHref && !preview && pathname === "/portfolio/risk" ? <span className="varda-reporting-control">{t("분석 기준", "Analysis basis")} · KRW</span> : !researchHref && !preview && REPORTING_ROUTES.some(route => route === currentPath) ? <ReportingCurrencySwitch /> : null}
           <span className="varda-topbar-language"><LanguageSwitch /></span>
-          <Link className="varda-topbar-add" aria-label={t("종목 추가")} href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)}>
+          <Link prefetch={false} className="varda-topbar-add" aria-label={t("종목 추가")} href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)}>
             <Plus size={18} aria-hidden="true" /><span>{t("종목 추가")}</span>
           </Link>
           {!preview && !researchHref ? <a className={betaSwitchStyles.link} href={buildBetaFrontendHref(params, selectedScopeKey)} aria-label={t("베타로 보기", "Try beta")}>
@@ -166,7 +166,7 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
       </div>
       <nav className="varda-mobile-bottom" aria-label={t("빠른 메뉴", "Quick navigation")}>
         {mobileNavigation.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}>
+          <Link prefetch={false} key={href} href={hrefFor(href)} aria-current={isActive(href) ? "page" : undefined}>
             <Icon size={23} strokeWidth={1.6} aria-hidden="true" /><span>{t(label)}</span><PendingHint />
           </Link>
         ))}
@@ -182,11 +182,11 @@ export function AppNavigation({ activePath, generatedAt, selectedScopeKey, resea
             {t("베타로 보기", "Try beta")}<ArrowUpRight size={15} aria-hidden="true" />
           </a> : null}
           <div className="varda-menu-language"><LanguageSwitch /></div>
-          <Link className="varda-menu-account" href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
+          <Link prefetch={false} className="varda-menu-account" href={carryRecoveryFragment(hrefFor("/portfolio/holdings/new"), recoveryHash)} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("종목 추가")}<ArrowUpRight size={15} /></Link>
           {!preview ? <TradeRecordLinks variant="menu" reportingCurrency={params.get("currency") === "USD" ? "USD" : "KRW"} accountId={scope?.startsWith("account:") ? scope.slice(8) : undefined} onNavigate={() => menuRef.current?.close()} /> : null}
-          <Link className="varda-menu-account" href={hrefFor("/plans")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
-          {!preview ? <Link className="varda-menu-account" href={hrefFor("/portfolio/reporting")} onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
-          <Link className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
+          <Link prefetch={false} className="varda-menu-account" href={hrefFor("/plans")} onClick={() => menuRef.current?.close()}><Plus size={18} />{t("내 계획", "My plans")}<ArrowUpRight size={15} /></Link>
+          {!preview ? <Link prefetch={false} className="varda-menu-account" href={hrefFor("/portfolio/reporting")} onClick={() => menuRef.current?.close()}>{t("통화별 평가", "Currency valuation")}<ArrowUpRight size={15} /></Link> : null}
+          <Link prefetch={false} className="varda-menu-account" href={hrefFor("/auth/session?view=account")} onClick={() => menuRef.current?.close()}>
             <UserRound size={18} />{t("내 계정")}<ArrowUpRight size={15} />
           </Link>
         </div>

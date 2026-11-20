@@ -303,7 +303,7 @@ describe("provider-neutral session resolver Phase 1G0", () => {
       databaseWrites: 0,
       providerCalls: 1,
       routeCalls: 0,
-      cacheImplementations: 2,
+      cacheImplementations: 3,
     });
 
     const auditCliSource = readFileSync(

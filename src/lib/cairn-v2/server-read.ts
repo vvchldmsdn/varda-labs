@@ -9,18 +9,18 @@ import { canonicalBetaReadEpoch } from "./read-freshness";
 import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { getPortfolioDashboard } from "@/lib/portfolio-dashboard";
-import { getReadOnlyTenantPortfolioStructureForScope } from "@/db/queries/portfolio-structure";
 import { getBetaHistoryRead } from "./history-read";
-import { getBetaTargetPolicyModel } from "./target-plan-read";
+import { createBetaInitialTargetReadPorts } from "./target-plan-read";
 import { getBetaAdditionalContributionPreview } from "./target-plan-contribution";
 import { getReadOnlyTenantApprovedTargetPolicy } from "@/db/queries/target-policy";
 import { readBetaDomain } from "./read-service";
 import { displayBindingForScopes } from "./display-session";
 export async function getBetaDomainRead(
   params: Record<string, string | string[] | undefined>,
-  options: { includeHeatmap?: boolean; includeCurrentValue?: boolean } = {},
+  options: { includeHeatmap?: boolean; includeCurrentValue?: boolean; historyWindow?: "recent" } = {},
 ) {
   let displayBinding: string | undefined;
+  const initialTargetReads = createBetaInitialTargetReadPorts();
   const read = await readBetaDomain(params, {
     session: resolveCurrentTenantContext,
     scopes: async args => {
@@ -52,8 +52,8 @@ export async function getBetaDomainRead(
         };
       }
     },
-    structure: getReadOnlyTenantPortfolioStructureForScope,
-    targets: getBetaTargetPolicyModel,
+    structure: initialTargetReads.structure,
+    targets: initialTargetReads.targets,
     contribution: getBetaAdditionalContributionPreview,
     legacyPolicy: (args) =>
       args.scope.kind === "account"
@@ -64,7 +64,7 @@ export async function getBetaDomainRead(
         : Promise.resolve({ status: "missing", policy: null }),
     history: async (args) => {
       const [history, recoveredReturn] = await Promise.all([
-        getBetaHistoryRead(args),
+        getBetaHistoryRead({ ...args, historyWindow: options.historyWindow }),
         args.scope.kind === "account"
           ? readRecoveredReturnCurve(args.tenantContext, args.scope.accountId)
           : Promise.resolve(null),
@@ -76,6 +76,7 @@ export async function getBetaDomainRead(
   });
   return {
     ...read,
+    historyWindow: options.historyWindow,
     displayBinding,
     readReceipt: randomUUID(),
     readEpoch: canonicalBetaReadEpoch(params._betaRead),

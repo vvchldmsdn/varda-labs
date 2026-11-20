@@ -555,6 +555,7 @@ describe("market collection quote and history polling", () => {
   it("shows completed quotes while separately following comparison evidence, then stops all polling",async test=>{
     const h=await refreshHarness(test,{autoRespond:false});h.mountPolling(false,h.now);
     for(const [index,pending] of [2,1,0].entries()) {
+      if(index)h.advanceTime(10_000);
       const tick=h.runPollingInterval();h.respond(index,{state:'fresh',readVersion:`prices-close-${index}`,comparison:{pending,failed:0}});await tick;
       assert.equal(h.states.at(-1).state,'fresh');
       if(pending)assert.equal([...h.timeouts.values()][0].delay,10_000);
@@ -621,9 +622,19 @@ describe("market collection quote and history polling", () => {
     assert.equal(h.refreshCount,1,'job status and count changes alone do not reload the whole page');
     assert.equal([...h.timeouts.values()][0].delay,10_000);
     const tick=h.runPollingInterval();h.respond(13,{state:'queued',readVersion:'new-fx'});await tick;
-    assert.equal(h.refreshCount,2);assert.equal([...h.timeouts.values()][0].delay,2_000);
+    assert.equal(h.refreshCount,1,'a burst within the coalescing window updates progress without another page read');assert.equal([...h.timeouts.values()][0].delay,2_000);
     h.advanceTime(30*60_000+1);await h.runPollingInterval();
+    assert.equal(h.refreshCount,2,'timeout flushes the last confirmed evidence even without another successful poll');
     assert.equal(h.requests.length,14);assert.equal(h.states.at(-1).state,'waiting');assert.equal(h.timeouts.size,0);
+  });
+  it("keeps all rapid progress receipts while coalescing page reads and flushing partial completion",async test=>{
+    const h=await refreshHarness(test,{autoRespond:false}),receipts=[];h.mountPolling(false,h.now,data=>receipts.push(data));
+    for(let index=0;index<4;index++) {
+      if(index)h.advanceTime(2_000);
+      const tick=h.runPollingInterval();h.respond(index,{state:index===3?'partial':'queued',readVersion:`version-${index}`,freshTargetCount:index,targetCount:4});await tick;
+      assert.equal(h.refreshCount,index===3?2:1);
+    }
+    assert.equal(receipts.length,4);assert.equal(receipts.at(-1).state,'partial');assert.equal(h.timeouts.size,0);
   });
   it("refreshes changed prices and FX even when ready instrument counts stay the same", async test => {
     const h = await refreshHarness(test, { autoRespond: false });

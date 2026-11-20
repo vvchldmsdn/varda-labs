@@ -8,7 +8,7 @@ import { buildPortfolioGroupHistoryRows, type HistoryPositionScopeCandidate, typ
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { betaHistoryValuationDate, commonBetaHistoryValuationDate } from "./history-date";
-import { BETA_HISTORY_PORTFOLIO_ROWS_SQL, BETA_HISTORY_GROUP_POSITION_ROWS_SQL } from "./history-read-sql";
+import { BETA_HISTORY_PORTFOLIO_ROWS_SQL, BETA_HISTORY_GROUP_POSITION_ROWS_SQL, recentBetaHistorySql } from "./history-read-sql";
 
 type DatedRawRow = PortfolioHistoryRawRow & { valuationDate: string | null };
 type DatedPositionRow = HistoryPositionScopeCandidate & { valuationDate: string | null };
@@ -24,6 +24,7 @@ type ReadArgs = {
   analysisScopes: readonly PortfolioAnalysisScope[];
   tenantContext: TenantContext;
   scope: PortfolioAnalysisScope;
+  historyWindow?: "recent";
 };
 
 /** Called only after the existing active-session and owned-scope resolver.
@@ -35,8 +36,8 @@ export async function getBetaHistoryRead(args: ReadArgs): Promise<BetaHistoryRea
   try {
     assertResolvedScope(args.scope, args.analysisScopes);
     const rawRows = args.scope.kind === "portfolio_group"
-      ? await loadGroupRows(args.tenantContext, args.scope)
-      : await loadAccountRows(args.tenantContext, args.scope);
+      ? await loadGroupRows(args.tenantContext, args.scope, args.historyWindow)
+      : await loadAccountRows(args.tenantContext, args.scope, args.historyWindow);
     const account = args.scope.kind === "account" ? args.scope.accountCode : args.scope.key;
     const expectedAccounts = args.analysisScopes.flatMap(row => row.kind === "account" ? [row.accountCode] : []);
     const displayRows = buildPortfolioHistoryDisplayRows({ rows: rawRows, account, expectedAccounts });
@@ -59,21 +60,21 @@ export async function getBetaHistoryRead(args: ReadArgs): Promise<BetaHistoryRea
   }
 }
 
-async function loadAccountRows(tenant: TenantContext, scope: Exclude<PortfolioAnalysisScope, { kind: "portfolio_group" }>): Promise<DatedRawRow[]> {
+async function loadAccountRows(tenant: TenantContext, scope: Exclude<PortfolioAnalysisScope, { kind: "portfolio_group" }>, window?: "recent"): Promise<DatedRawRow[]> {
   const [rows] = await runTenantReadTransaction(tenant.ownerUserId, tx => [
-    tx.query(BETA_HISTORY_PORTFOLIO_ROWS_SQL, [scope.kind === "account" ? [scope.accountId] : null]),
+    tx.query(window ? recentBetaHistorySql(BETA_HISTORY_PORTFOLIO_ROWS_SQL) : BETA_HISTORY_PORTFOLIO_ROWS_SQL, [scope.kind === "account" ? [scope.accountId] : null]),
   ]);
   return rows.map(projectPortfolioRow);
 }
 
-async function loadGroupRows(tenant: TenantContext, scope: Extract<PortfolioAnalysisScope, { kind: "portfolio_group" }>): Promise<DatedRawRow[]> {
+async function loadGroupRows(tenant: TenantContext, scope: Extract<PortfolioAnalysisScope, { kind: "portfolio_group" }>, window?: "recent"): Promise<DatedRawRow[]> {
   const memberships = await loadTenantPortfolioGroupMemberships({ mode: "all", portfolioGroupId: scope.portfolioGroupId, tenantContext: tenant });
   const accountIds = [...new Set(memberships.accountMemberships.map(row => row.targetId))];
   const assetIds = [...new Set(memberships.assetMemberships.map(row => row.targetId))];
   if (!accountIds.length && !assetIds.length) return [];
   const start = [...memberships.accountMemberships, ...memberships.assetMemberships].map(row => row.validFrom).sort()[0]!;
   const [sqlRows] = await runTenantReadTransaction(tenant.ownerUserId, tx => [
-    tx.query(BETA_HISTORY_GROUP_POSITION_ROWS_SQL, [start, accountIds, assetIds]),
+    tx.query(window ? recentBetaHistorySql(BETA_HISTORY_GROUP_POSITION_ROWS_SQL) : BETA_HISTORY_GROUP_POSITION_ROWS_SQL, [start, accountIds, assetIds]),
   ]);
   const rows = sqlRows.map(projectPositionRow);
   const aggregate = buildPortfolioGroupHistoryRows({ ...memberships, rows, scopeKey: scope.key });

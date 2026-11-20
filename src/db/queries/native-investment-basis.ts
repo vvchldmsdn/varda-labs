@@ -9,7 +9,7 @@ import type { FxEvidence } from "../../lib/currency-valuation";
 /** Only existing effective owner ledger and stored historical FX. No provider,
  * write, collection, current-FX fallback or client-supplied owner identity. */
 export const loadNativeInvestmentBasis = cache(async (tenant: TenantContext, asOf?: string, inclusive = false) => {
-  const ledger = await readNativeLedger(tenant);
+  const ledger = await readNativeLedger(tenant, undefined, { includeSnapshots: false });
   if (!ledger.accountsComplete || !ledger.entriesComplete) throw new Error("investment_history_incomplete");
   const at = asOf ?? new Date().toISOString();
   const accounts = ledger.accounts.flatMap(account => {

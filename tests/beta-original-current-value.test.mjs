@@ -73,7 +73,7 @@ test('current presentation remains behind session, owned scope and stale-context
 
 test('home opts into the additional current presentation read',async()=>{
   let options;await readBetaHome({mode:'domain'},{domain:async(_params,value)=>{options=value;return {context:{mode:'domain'},view:blankDomainView('unavailable','pending')};},simulation:async()=>{throw new Error('unexpected_simulation');}});
-  assert.deepEqual(options,{includeHeatmap:true,includeCurrentValue:true});
+  assert.deepEqual(options,{includeHeatmap:true,includeCurrentValue:true,historyWindow:'recent'});
 });
 
 test('the beta current detail renders the original component output without adding trade or contribution controls',async()=>{
