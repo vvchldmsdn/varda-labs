@@ -17,7 +17,7 @@ test("member activity identity requires verified matching session and fixed admi
    react:{cache:fn=>fn},
    "./current-session-subject":{readCurrentSessionSubject:async()=>({state:"authenticated",provider,providerSubject:"subject"})},
    "./current-tenant-context":{resolveCurrentTenantContext:async()=>active?{ok:true,tenantContext:{ownerUserId:owner}}:{ok:false}},
-   "./auth-transport-runtime":{getAuthTransportRuntime:()=>({state:"ready",auth:{getSession:async()=>({data:{user:{id,email,emailVerified:verified,name:"Member"}}})}})}
+   "./current-neon-session":{readCurrentNeonSession:async()=>({state:"read",data:{user:{id,email,emailVerified:verified,name:"Member"}}})}
   });return mod.readActivityIdentity();
  }
  assert.equal((await identity()).isAdmin,true);

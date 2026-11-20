@@ -63,7 +63,7 @@ export function movementEvidenceRows(dashboard: DashboardData) {
   const exclusions: BetaMovementExclusion[] = dashboard.todayMovement.exclusions.map(row => ({subject:row.subject,reason:row.reason,source:row.source,ticker:row.ticker,assetName:row.assetName,account:row.account,currency:row.currency,valueKrw:row.valueKrw}));
   return { rows, exclusions };
 }
-export type DomainRead = { context: BetaContext; view: BetaView; readReceipt?: string; readEpoch?: string; displayBinding?: string };
+export type DomainRead = { context: BetaContext; view: BetaView; readReceipt?: string; readEpoch?: string; displayBinding?: string; historyWindow?: "recent" };
 export const requestKey = (context: BetaContext) => JSON.stringify([context.mode, context.scope, context.currency, context.cashAmountKrw, ...(context.excludeSell!==undefined?[context.excludeSell]:[])]);
 export function blankDomainView(state: ReadState, message: string): BetaView {
   return { rows: [], totalKrw: null, history: [], priceMoveKrw: 0, fxMoveKrw: 0, todayMoveKrw: null,
@@ -76,6 +76,28 @@ export function blankDomainView(state: ReadState, message: string): BetaView {
 // A pending URL never renders data from another scope/currency, even while an older RSC response exists.
 export function visibleDomainRead(read: DomainRead, context: BetaContext): BetaView {
   return requestKey(read.context) === requestKey(context) ? read.view : blankDomainView("loading", "새 조회 범위를 확인하는 중");
+}
+/** Shared initial/lazy projection. Full-history reads replace history evidence
+ * only; current holdings, cash, targets and valuation retain their parent read. */
+export function applyBetaHistory(view: BetaView, history: BetaHistoryRead, currency: BetaCurrency) {
+  const supported = currency === "KRW";
+  const trajectory = buildPortfolioHistoryTrajectory({ rows: history.portfolioRows, account: history.selectedScope.key });
+  const observed = history.observationPolicy === "production_observed_v1" ? historyObservationPoints(history.portfolioRows, true) : null;
+  const ambiguous = !observed && (trajectory.sourceCount > 1 || trajectory.ambiguousPointCount > 0);
+  let rows: BetaView["history"] = history.portfolioRows.map(row => ({ date: row.snapshotDate, source: row.source, rowKind: row.rowKind, account: row.account, includedAccounts: [...row.derivedFromAccounts],
+    segment: trajectory.segments.find(s => s.source === row.source && s.rowKind === row.rowKind && s.points.some(p => p.date === row.snapshotDate))?.key ?? row.snapshotDate,
+    valueKrw: supported && !ambiguous ? row.totalMarketValue : null,
+    exampleReturnPct: supported && !ambiguous && row.rowKind !== "partial" ? row.totalReturnPct : null,
+  })).sort((a, b) => a.date.localeCompare(b.date));
+  if (observed && supported) rows = observed.rows;
+  const state: ReadState = !supported || ambiguous || history.readStatus === "unavailable" ? "unavailable" :
+    !history.portfolioRows.length ? "empty" : observed && !observed.rows.length ? "unavailable" : history.readStatus === "partial" || history.portfolioRows.some(r => r.rowKind === "partial") ? "partial" : "ready";
+  return { view: { ...view, history: rows, domain: view.domain ? { ...view.domain,
+    historyState: state, historySourceCount: trajectory.sourceCount,
+    recoveredReturn: history.recoveredReturn, historyRecords: history.portfolioRows, historyObservationPolicy: history.observationPolicy,
+    historyViewSource: observed ? "observed" : undefined, historyObservedExcludedCount: observed?.excludedCount,
+    historyReadStatus: history.readStatus, historyDisplayCurrency: currency,
+  } : undefined }, ambiguous, supported };
 }
 export function adaptBetaRead({ dashboard, structure, history, context }: {
   dashboard: DashboardData; structure: PortfolioStructureResult; history: BetaHistoryRead; context: BetaContext;
@@ -100,21 +122,14 @@ export function adaptBetaRead({ dashboard, structure, history, context }: {
   view.scopeLabel = dashboard.selectedScope.label;
   view.asOf = dashboard.generatedAt;
   // KRW saved records lack historical reporting FX. Do not rewrite them with today's rate.
-  const historyCurrencySupported = context.currency === "KRW";
-  const trajectory = buildPortfolioHistoryTrajectory({ rows: history.portfolioRows, account: history.selectedScope.key });
-  const observed = history.observationPolicy === "production_observed_v1" ? historyObservationPoints(history.portfolioRows, true) : null;
-  const ambiguousHistory = !observed && (trajectory.sourceCount > 1 || trajectory.ambiguousPointCount > 0);
-  view.history = history.portfolioRows.map(row => ({ date: row.snapshotDate, source: row.source, rowKind: row.rowKind, account: row.account, includedAccounts: [...row.derivedFromAccounts],
-    segment: trajectory.segments.find(s => s.source === row.source && s.rowKind === row.rowKind && s.points.some(p => p.date === row.snapshotDate))?.key ?? row.snapshotDate,
-    valueKrw: historyCurrencySupported && !ambiguousHistory ? row.totalMarketValue : null,
-    exampleReturnPct: historyCurrencySupported && !ambiguousHistory && row.rowKind !== "partial" ? row.totalReturnPct : null,
-  })).sort((a, b) => a.date.localeCompare(b.date));
-  if (observed && historyCurrencySupported) view.history = observed.rows;
+  const historyProjection = applyBetaHistory(view, history, context.currency);
+  const historyCurrencySupported = historyProjection.supported, ambiguousHistory = historyProjection.ambiguous;
+  view.history = historyProjection.view.history;
+  view.domain = historyProjection.view.domain;
   // Price/FX decomposition is not independently exposed by this contract: do not synthesize it.
   view.todayMoveKrw = empty || (context.currency === "USD" && !(dashboard.usdKrwRate > 0)) || partial || dashboard.todayMovement.exclusions.length > 0 || !dashboard.todayMovement.ready ? null : dashboard.todayChangeKrw;
   const movementState: ReadState = empty ? "empty" : view.todayMoveKrw === null ? "unavailable" : "ready";
-  const historyState: ReadState = !historyCurrencySupported || ambiguousHistory || history.readStatus === "unavailable" ? "unavailable" :
-    !history.portfolioRows.length ? "empty" : observed && !observed.rows.length ? "unavailable" : history.readStatus === "partial" || history.portfolioRows.some(r => r.rowKind === "partial") ? "partial" : "ready";
+  const historyState = view.domain!.historyState;
   view.domain = { ...view.domain!, state: valueState === "unavailable" ? "unavailable" : empty ? "empty" :
       partial || historyState !== "ready" || movementState !== "ready" ? "partial" : "ready",
     investmentReturn: alignedInvestmentReturn(dashboard, structure),
@@ -123,8 +138,7 @@ export function adaptBetaRead({ dashboard, structure, history, context }: {
     priceObservedAt: structure.holdingRows.map(r => r.priceAsOf),
     valuationBasis: partial ? "확인 가능한 자산 소계 · 제외 자산 별도" : "현재 투자자산 평가 · 기존 구조 read model",
     snapshotDate: dashboard.movementBaselineDate, comparisonDate: dashboard.marketPriceReferenceDate,
-    movementSource: dashboard.todayMovement.source, movementReason: dashboard.todayMovement.reason, movementReturnPct: view.todayMoveKrw === null ? null : dashboard.todayMovement.returnPct, movementExcludedCount: dashboard.todayMovement.exclusions.length, historySourceCount: trajectory.sourceCount,
-    recoveredReturn: history.recoveredReturn, historyRecords: history.portfolioRows, historyObservationPolicy: history.observationPolicy, historyViewSource: observed ? "observed" : undefined, historyObservedExcludedCount: observed?.excludedCount, historyReadStatus: history.readStatus, historyDisplayCurrency: context.currency,
+    movementSource: dashboard.todayMovement.source, movementReason: dashboard.todayMovement.reason, movementReturnPct: view.todayMoveKrw === null ? null : dashboard.todayMovement.returnPct, movementExcludedCount: dashboard.todayMovement.exclusions.length,
     currentHoldingMovement,
     movementRows: movementEvidence.rows, movementExclusions: movementEvidence.exclusions,
     movementRead: { ready: dashboard.todayMovement.ready, changeKrw: dashboard.todayMovement.changeKrw ?? null, returnPct: dashboard.todayMovement.returnPct, includedCount: dashboard.todayMovement.contributionRows?.length ?? 0, excludedCount: dashboard.todayMovement.exclusions.filter(row => row.subject !== "aggregate").length, reasons: [...new Set(dashboard.todayMovement.exclusions.map(row => row.reason))] }, rateDate: null,

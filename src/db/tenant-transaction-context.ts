@@ -1,4 +1,5 @@
 import "server-only";
+import { measureDatabaseRead } from "@/lib/database-read-metrics";
 
 import type {
   NeonQueryFunctionInTransaction,
@@ -81,7 +82,7 @@ async function executeTenantReadTransaction(
   const canonicalOwnerUserId = normalizeTenantContextOwnerUserId(ownerUserId);
   const tenantSqlClient = getTenantSqlClient();
   let requestedQueryCount = 0;
-  const results = await tenantSqlClient.transaction(
+  const results = await measureDatabaseRead("tenant.transaction", () => tenantSqlClient.transaction(
     (transaction) => {
       const requestedQueries = buildQueries(transaction);
       if (!Array.isArray(requestedQueries) || requestedQueries.length === 0) {
@@ -98,7 +99,7 @@ async function executeTenantReadTransaction(
       ];
     },
     transactionOptions(),
-  );
+  ));
 
   if (results.length !== requestedQueryCount + 2) {
     throw new TenantTransactionContextError("invalid_transaction_result");

@@ -3,6 +3,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MANUAL_REFRESH_MAX_CHECKS, type QuoteRefreshResponse } from "@/lib/market-data/quote-refresh-progress";
 import { quoteRefreshPollDelay } from "@/lib/market-data/quote-refresh-polling-policy";
+import { createQuoteReadRefreshGate } from "@/lib/market-data/quote-read-refresh-gate";
 import { readRefreshOperation, retainRefreshOperation, type QuoteRefreshOperation } from "@/lib/market-data/quote-refresh-operation";
 
 type WakeOutcome = { state: string; signature: string; data?: QuoteRefreshResponse };
@@ -47,11 +48,13 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
     let lastData: QuoteRefreshResponse | undefined;
     const maximum = startedAt && !keepCheckingHistory ? MANUAL_REFRESH_MAX_CHECKS : 12;
     const manual = Boolean(startedAt) && !keepCheckingHistory;
+    const refreshGate = createQuoteReadRefreshGate();
     let timer: number;
     const recordOutcome = (state: string) => setOutcome({ state, generation, startedAt, keepCheckingHistory });
     const tick = async () => {
       if (cancelled || count >= maximum) return;
       if (startedAt && Date.now() - Date.parse(startedAt) > 30 * 60_000) {
+        if (manual && refreshGate.take(Date.now(), true)) startTransition(() => router.refresh());
         recordOutcome(["fresh", "partial", "empty"].includes(lastState) ? lastState : "waiting"); return;
       }
       if (document.visibilityState !== "visible") { timer = window.setTimeout(tick, 10_000); return; }
@@ -75,7 +78,11 @@ export function useMarketCollectionPolling(active: boolean, generation?: unknown
       // Refresh changed evidence too: equal ready counts can hide price/FX updates.
       // History progresses in separate 30s checks.
       const readVersion = data?.readVersion ?? signature;
-      if (state !== "unavailable" && (readVersion !== previousReadVersion || keepCheckingHistory && (count % 3 === 1 || count === 12))) {
+      if (state !== "unavailable") refreshGate.observe(readVersion);
+      const terminal = count >= maximum || complete && !data?.comparison?.pending;
+      const refreshRead = manual ? refreshGate.take(Date.now(), terminal)
+        : state !== "unavailable" && (readVersion !== previousReadVersion || keepCheckingHistory && (count % 3 === 1 || count === 12));
+      if (refreshRead) {
         startTransition(() => router.refresh());
       }
       if (state !== "unavailable") previousReadVersion = readVersion;

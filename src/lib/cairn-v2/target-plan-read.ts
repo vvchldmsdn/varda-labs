@@ -1,5 +1,5 @@
 import "server-only";
-import { getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfolio-target-policy";
+import { createInitialPortfolioTargetReadPorts, getReadOnlyTenantPortfolioTargetPolicyModel } from "@/db/queries/portfolio-target-policy";
 import type { TargetModel } from "./planning-contract";
 
 type Args = Parameters<typeof getReadOnlyTenantPortfolioTargetPolicyModel>[0];
@@ -21,6 +21,16 @@ export const TARGET_PLAN_READ_SQL = `
 `;
 export async function getBetaTargetPolicyModel(args: Args): Promise<TargetModel> {
  const base = await getReadOnlyTenantPortfolioTargetPolicyModel(args);
+ return presentTargetPolicyModel(base);
+}
+export function createBetaInitialTargetReadPorts() {
+ const reads = createInitialPortfolioTargetReadPorts();
+ return {
+  structure: reads.structure,
+  targets: async (args: Args): Promise<TargetModel> => presentTargetPolicyModel(await reads.targets(args)),
+ };
+}
+function presentTargetPolicyModel(base: Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>): TargetModel {
  // Canonical reader already validates v2 plans, ownership and held/unheld identity.
  // Add presentation-only rows without issuing a second, divergent policy query.
  return {

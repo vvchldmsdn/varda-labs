@@ -53,11 +53,14 @@ const RECENT_FX_OBSERVATION_LIMIT = 260;
 
 export async function getReadOnlyTenantPortfolioDashboardSources({
   demand = { surface: "home" },
+  sourceMode = "full",
   scope,
   serviceDate,
   tenantContext,
 }: {
   demand?: PortfolioDashboardDemand;
+  /** Currency valuation consumes its own ledger/history; do not fetch unrelated dashboard evidence. */
+  sourceMode?: "full" | "valuation";
   scope: PortfolioAnalysisScope;
   serviceDate: string;
   tenantContext: TenantContext;
@@ -94,8 +97,8 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
   // Attach both dependent branches immediately, including their rejection handlers.
   // Slow history/settings reads must not postpone asset-dependent market reads.
   const [sources, quotes] = await Promise.all([
-    loadDashboardContextSources({ assetRowsPromise, demand, scope, serviceDate, targets, tenantContext }),
-    assetRowsPromise.then(loadDashboardQuoteRows),
+    loadDashboardContextSources({ assetRowsPromise, demand, sourceMode, scope, serviceDate, targets, tenantContext }),
+    assetRowsPromise.then(rows => loadDashboardQuoteRows(rows, sourceMode === "full")),
   ]);
   return { ...sources, ...quotes };
 }
@@ -103,6 +106,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
 async function loadDashboardContextSources({
   assetRowsPromise,
   demand,
+  sourceMode,
   scope,
   serviceDate,
   targets,
@@ -110,6 +114,7 @@ async function loadDashboardContextSources({
 }: {
   assetRowsPromise: Promise<(typeof assets.$inferSelect)[]>;
   demand: PortfolioDashboardDemand;
+  sourceMode: "full" | "valuation";
   scope: PortfolioAnalysisScope;
   serviceDate: string;
   targets: Awaited<ReturnType<typeof getPortfolioAnalysisScopeTargets>>;
@@ -188,7 +193,7 @@ async function loadDashboardContextSources({
     eventRows,
     unmatchedSnapshotCountRows,
   ] = await Promise.all([
-    positionScopePredicate === null
+    sourceMode === "valuation" || positionScopePredicate === null
       ? Promise.resolve([])
       : db
           .select(getTableColumns(dailyPositionSnapshots))
@@ -212,7 +217,7 @@ async function loadDashboardContextSources({
             sql`${dailyPositionSnapshots.capturedAt} desc nulls last`,
             desc(dailyPositionSnapshots.createdAt),
           ),
-    historyPositionPredicate === null
+    sourceMode === "valuation" || historyPositionPredicate === null
       ? Promise.resolve([])
       : db
           .select({
@@ -252,10 +257,17 @@ async function loadDashboardContextSources({
             desc(dailyPositionSnapshots.createdAt),
           )
           .limit(selectedPositionRowLimit),
-    demand.surface !== "home" || wholeAccountIds.length === 0
+    sourceMode === "valuation" || demand.surface !== "home" || wholeAccountIds.length === 0
       ? Promise.resolve([])
       : db
-          .select(getTableColumns(dailyPortfolioSnapshots))
+          .select({
+            snapshotDate: dailyPortfolioSnapshots.snapshotDate,
+            account: dailyPortfolioSnapshots.account,
+            totalMarketValue: dailyPortfolioSnapshots.totalMarketValue,
+            totalCost: dailyPortfolioSnapshots.totalCost,
+            totalPnl: dailyPortfolioSnapshots.totalPnl,
+            totalReturnPct: dailyPortfolioSnapshots.totalReturnPct,
+          })
           .from(dailyPortfolioSnapshots)
           .innerJoin(accounts, eq(dailyPortfolioSnapshots.accountId, accounts.id))
           .where(
@@ -273,7 +285,7 @@ async function loadDashboardContextSources({
             desc(dailyPortfolioSnapshots.createdAt),
           )
           .limit(selectedAccountRowLimit),
-    eventScopePredicate === null
+    sourceMode === "valuation" || eventScopePredicate === null
       ? Promise.resolve([])
       : db
           .select(getTableColumns(eventLedgerEntries))
@@ -285,10 +297,13 @@ async function loadDashboardContextSources({
               eventScopePredicate,
               eq(eventLedgerEntries.account, accounts.code),
               eq(eventLedgerEntries.isSample, false),
+              // Native events are projected below from the effective ledger.
+              // Do not transfer their full state JSON only to discard it in JS.
+              or(isNull(eventLedgerEntries.nativeData), sql`${eventLedgerEntries.nativeData} = 'null'::jsonb`),
               lte(eventLedgerEntries.eventDate, serviceDate),
             ),
           ),
-    positionScopePredicate === null
+    sourceMode === "valuation" || positionScopePredicate === null
       ? Promise.resolve([{ count: 0 }])
       : db
           .select({
@@ -313,7 +328,8 @@ async function loadDashboardContextSources({
   );
 
   let investmentBasis: Awaited<ReturnType<typeof loadNativeInvestmentBasis>> = [];
-  if (allAccountRows.some(row => row.nativeState != null)) {
+  const includeNativePerformance = sourceMode === "full" && allAccountRows.some(row => row.nativeState != null);
+  if (includeNativePerformance) {
     try { investmentBasis = await loadNativeInvestmentBasis(tenantContext); }
     catch { /* Preserve current valuation; unavailable cost is never fabricated. */ }
   }
@@ -330,18 +346,18 @@ async function loadDashboardContextSources({
     recentPositionRows,
     historyAssetIds,
     recentPortfolioRows,
-    nativeHoldingCosts: allAccountRows.some(row => row.nativeState != null)
+    nativeHoldingCosts: includeNativePerformance
       ? await loadNativeHoldingCosts(tenantContext, { investmentBasis }) : [],
     eventRows: [
       ...eventRows.filter(row => row.nativeData == null),
-      ...(allAccountRows.some(row => row.nativeState != null) ? await loadNativeLegacyTrades(tenantContext, { investment: true, investmentBasis }) : [])
+      ...(includeNativePerformance ? await loadNativeLegacyTrades(tenantContext, { investment: true, investmentBasis }) : [])
         .filter(row => row.eventDate <= serviceDate && row.accountId && (wholeAccountIds.includes(row.accountId) || (row.assetId && directAssetIds.has(row.assetId)))),
     ],
     unmatchedSnapshotCountRows,
   };
 }
 
-async function loadDashboardQuoteRows(assetRows: readonly (typeof assets.$inferSelect)[]) {
+async function loadDashboardQuoteRows(assetRows: readonly (typeof assets.$inferSelect)[], includeCloseHistory = true) {
   const quoteTickers = uniqueStrings(
     assetRows
       .map((asset) => normalizeTicker(asset.ticker))
@@ -359,7 +375,7 @@ async function loadDashboardQuoteRows(assetRows: readonly (typeof assets.$inferS
           .orderBy(desc(livePriceQuotes.fetchedAt))
           .limit(Math.max(100, quoteTickers.length * 4))
       : Promise.resolve([]),
-    selectedPriceInstruments.length > 0
+    includeCloseHistory && selectedPriceInstruments.length > 0
       ? db
           .select()
           .from(assetPriceSnapshots)

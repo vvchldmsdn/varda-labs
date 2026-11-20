@@ -26,7 +26,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
   const historicalFxEvidence = options.collect === false ? readTwelveDataHistoricalFx : requestTwelveDataHistoricalFx;
   const splitRiskEvidence = options.collect === false ? readTwelveDataSplitRisk : requestTwelveDataSplitRisk;
   const serviceDate = resolveSnapshotCycle(now).snapshotDate;
-  const sources = await getReadOnlyTenantPortfolioDashboardSources({ tenantContext: tenant, scope, serviceDate });
+  const sources = await getReadOnlyTenantPortfolioDashboardSources({ tenantContext: tenant, scope, serviceDate, sourceMode: "valuation" });
   if (sources.assetRows.some(asset => asset.canonicalOwnerUserId !== tenant.ownerUserId)) throw new Error("currency_owner_scope_mismatch");
   const at = now.toISOString();
   const positions = await Promise.all(sources.assetRows.map(async (asset): Promise<TrackedNativePosition> => {

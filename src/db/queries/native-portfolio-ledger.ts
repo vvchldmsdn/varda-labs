@@ -67,18 +67,19 @@ export const requiresNativePortfolioSurface = cache(async (tenant: TenantContext
 });
 
 /** The SQL connection remains the tenant role; owner predicates AND RLS apply. */
-export async function readNativeLedger(tenant: TenantContext, accountId?: string) {
+export async function readNativeLedger(tenant: TenantContext, accountId?: string, options: { includeSnapshots?: boolean } = {}) {
   if (!UUID.test(tenant.ownerUserId) || (accountId && !UUID.test(accountId))) throw new Error("native_invalid_scope");
   const sql = getTenantSqlClient();
   const result = await sql.transaction(tx => [
     tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
     tx.query(NATIVE_ACCOUNTS_QUERY, [tenant.ownerUserId, accountId ? [accountId] : null]),
     tx.query(NATIVE_ENTRIES_QUERY, [tenant.ownerUserId, accountId ?? null]),
-    tx.query(NATIVE_SNAPSHOTS_QUERY, [tenant.ownerUserId, accountId ?? null]),
+    ...(options.includeSnapshots === false ? [] : [tx.query(NATIVE_SNAPSHOTS_QUERY, [tenant.ownerUserId, accountId ?? null])]),
   ], { isolationLevel: "RepeatableRead", readOnly: true });
   const accountsComplete = result[1].length <= 200;
   const entriesComplete = result[2][0]?.complete === true;
-  const historyComplete = accountsComplete && entriesComplete && result[3][0]?.complete === true;
+  // Omitted history is not complete history. Full readers keep their existing contract.
+  const historyComplete = options.includeSnapshots !== false && accountsComplete && entriesComplete && result[3][0]?.complete === true;
   // Current balances and original cost lots live in account state. A bounded
   // historical read must not make that state, or future transactions, unusable.
   // Do not present a truncated ledger as complete cash-flow/performance evidence.

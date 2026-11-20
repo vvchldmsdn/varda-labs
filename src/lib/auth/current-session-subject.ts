@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { getAuthTransportRuntime } from "@/lib/auth/auth-transport-runtime";
+import { readCurrentNeonSession } from "@/lib/auth/current-neon-session";
 import { isCanonicalSessionProviderSubject } from "@/lib/auth/session-subject-binding";
 import { readNaverSession } from "@/lib/auth/naver-auth-runtime";
 import {
@@ -22,24 +22,10 @@ export const readCurrentSessionSubject = cache(
 );
 
 async function readNeonSessionSubject(): Promise<CurrentSessionSubjectResult> {
-  let runtime: ReturnType<typeof getAuthTransportRuntime>;
-  try {
-    runtime = getAuthTransportRuntime();
-  } catch {
-    return state("unavailable");
-  }
-  if (runtime.state !== "ready") return state("unavailable");
-
-  let providerSubject: unknown;
-  let emailVerified = false;
-  try {
-    const session = await runtime.auth.getSession();
-    if (session.error) return state("unavailable");
-    providerSubject = session.data?.user.id;
-    emailVerified = session.data?.user.emailVerified === true;
-  } catch {
-    return state("unavailable");
-  }
+  const session = await readCurrentNeonSession();
+  if (session.state !== "read") return state(session.state);
+  const providerSubject: unknown = session.data?.user.id;
+  const emailVerified = session.data?.user.emailVerified === true;
 
   if (providerSubject === undefined || providerSubject === null) {
     return state("unauthenticated");

@@ -42,20 +42,50 @@ import { unionTargetPlanRows, targetInstrumentIdentity, TARGET_PLAN_VERSION } fr
 
 const INVESTMENT_ASSET_TYPES = ["etf", "stock", "pension", "commodity"];
 
-export async function getReadOnlyTenantPortfolioTargetPolicyModel({
-  scope,
-  serviceDate,
-  tenantContext,
-}: {
+type PortfolioTargetPolicyReadArgs = {
   scope: PortfolioAnalysisScope;
   serviceDate: string;
   tenantContext: TenantContext;
-}) {
-  const targets = await getPortfolioAnalysisScopeTargets({
-    scope,
-    serviceDate,
-    tenantContext,
-  });
+};
+
+export async function getReadOnlyTenantPortfolioTargetPolicyModel(args: PortfolioTargetPolicyReadArgs) {
+  return loadPortfolioTargetPolicyModel(args);
+}
+
+/** One admitted page read may share its initial valuation, but the post-calculation
+ * target read must recheck both policy and valuation evidence. Never cache that read. */
+export function createInitialPortfolioTargetReadPorts() {
+  let initialStructure: {
+    key: string;
+    value: ReturnType<typeof getReadOnlyTenantPortfolioStructureForScope>;
+  } | undefined;
+  let targetReadStarted = false;
+  const structure = (args: PortfolioTargetPolicyReadArgs) => {
+    const key = JSON.stringify([args.tenantContext, args.scope, args.serviceDate]);
+    if (initialStructure?.key === key) return initialStructure.value;
+    const value = getReadOnlyTenantPortfolioStructureForScope(args);
+    if (!initialStructure) initialStructure = { key, value };
+    return value;
+  };
+  return {
+    structure,
+    targets(args: PortfolioTargetPolicyReadArgs) {
+      const initial = !targetReadStarted ? structure(args) : undefined;
+      targetReadStarted = true;
+      return loadPortfolioTargetPolicyModel(args, initial);
+    },
+  };
+}
+
+async function loadPortfolioTargetPolicyModel({
+  scope,
+  serviceDate,
+  tenantContext,
+}: PortfolioTargetPolicyReadArgs, initialStructure?: ReturnType<typeof getReadOnlyTenantPortfolioStructureForScope>) {
+  const [targets, sharedStructure] = await Promise.all([
+    getPortfolioAnalysisScopeTargets({ scope, serviceDate, tenantContext }),
+    initialStructure,
+  ]);
   const scopePredicate = targets.includesAllOwnedAccounts
     ? undefined
     : combineScopePredicates([
@@ -107,7 +137,7 @@ export async function getReadOnlyTenantPortfolioTargetPolicyModel({
             asc(assets.ticker),
             asc(assets.name),
           ),
-    getReadOnlyTenantPortfolioStructureForScope({
+    sharedStructure ?? getReadOnlyTenantPortfolioStructureForScope({
       scope,
       serviceDate,
       tenantContext,

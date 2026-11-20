@@ -116,3 +116,21 @@ export const BETA_HISTORY_GROUP_POSITION_ROWS_SQL = `
   order by snapshot.snapshot_date, snapshot.source, snapshot.account,
     snapshot.asset_name
 `;
+
+/** Home displays at most six months until the user requests all/detail. Bound
+ * transferred rows after the same ownership/correction filters. Use observation
+ * dates, not a repair's storage date; keep a one-week margin for chart boundaries.
+ * The unbounded SQL remains the default for all other consumers. */
+export function recentBetaHistorySql(sql: string) {
+  return `with eligible_history as (${sql}), dated_history as (
+    select eligible_history.*,
+      case when source='varda_manual_daily_snapshot' or source like 'broker_reconstructed_close_v1:%'
+        then coalesce((cycle_end_at::timestamptz at time zone 'Asia/Seoul')::date,snapshot_date::date)-1
+        else snapshot_date::date end as observation_date
+    from eligible_history
+  ) select * from dated_history
+    where exists (select 1 from dated_history cohort
+      where cohort.snapshot_date=dated_history.snapshot_date and cohort.source=dated_history.source
+        and cohort.observation_date >= (select max(observation_date)-190 from dated_history))
+    order by snapshot_date, account, source`;
+}
