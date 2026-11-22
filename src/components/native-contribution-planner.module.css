@@ -10,3 +10,25 @@
 .accounts { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
 .accounts a { border:1px solid var(--line); border-radius:999px; padding:10px 14px; font-size:13px; }
 .accounts a[aria-current=page] { background:var(--ink); color:var(--paper); }
+.result {
+  min-width: 0;
+  margin: 20px 0 24px;
+  padding-block: 18px;
+  border-block: 1px solid var(--line);
+  scroll-margin-block-start: 88px;
+}
+.result:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.resultHeading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 18px; }
+.resultHeading h3 { margin: 0; }
+.resultHeading > span, .cashResult dt { color: var(--muted); font-size: 13px; }
+.cashResult { margin: 16px 0 8px; }
+.cashResult > div, .targetList > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding-block: 8px;
+}
+.cashResult dd { margin: 0; font-variant-numeric: tabular-nums; }
+.targets { border-block-end: 1px solid var(--line); }
+.targets summary { min-height: 44px; padding-block: 12px; color: var(--ink); cursor: pointer; }
+.targetList > div { font-size: 14px; }
+.targetList span { overflow-wrap: anywhere; }
+.targetList strong { font-weight: 550; font-variant-numeric: tabular-nums; }

@@ -7,6 +7,7 @@ import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { parseContributionInput } from "@/lib/cairn-v2/planning-contract";
 import type { BetaView } from "@/lib/cairn-v2/read-contract";
 import { ContributionHome } from "./home-contribution";
+import { HomeCard } from "./home-card";
 import styles from "./home-contribution.module.css";
 
 function wonFromManwon(value: string) {
@@ -16,38 +17,46 @@ function wonFromManwon(value: string) {
   return parseContributionInput(won).state === "ready" ? won : null;
 }
 
-export function ContributionEntry({ view, context, dirty, colors, onView }: {
+export function ContributionEntry({ view, context, dirty, colors, className, onView }: {
   view: BetaView; context: BetaContext; dirty: boolean; colors: readonly string[];
+  className?: string;
   onView: (trigger: HTMLElement, amount?: string) => void;
 }) {
   const amountId = useId();
+  const amountRef = useRef<HTMLInputElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
   const [draft, setDraft] = useState<{ base: BetaContext["cashAmountKrw"]; text: string } | null>(null);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [validate, setValidate] = useState(false);
   const saved = parseContributionInput(context.cashAmountKrw).amount;
   const initial = saved === null ? "" : String(saved / 10000);
-  const text = draft && draft.base === context.cashAmountKrw ? draft.text : initial;
+  const currentDraft = draft?.base === context.cashAmountKrw ? draft : null;
+  const text = currentDraft?.text ?? initial;
   const won = wonFromManwon(text);
   const invalid = validate && !won;
   const canCalculate = context.currency === "KRW";
 
-  return <>
+  function openAllocation(trigger: HTMLElement, submitting = false) {
+    const requestedAmount = canCalculate && (submitting || currentDraft !== null) ? won : undefined;
+    if (requestedAmount === null) {
+      setValidate(true);
+      amountRef.current?.focus();
+      return;
+    }
+    setValidate(false);
+    setPresetsOpen(false);
+    onView(trigger, requestedAmount);
+  }
+
+  return <HomeCard kind="contribution" className={className} onOpen={(_, trigger) => openAllocation(trigger)}>
     {canCalculate ? <Form className={styles.entry} noValidate onSubmit={event => {
       event.preventDefault();
-      if (!won) {
-        setValidate(true);
-        document.getElementById(amountId)?.focus();
-        return;
-      }
-      setValidate(false);
-      setPresetsOpen(false);
-      if (submitRef.current) onView(submitRef.current, won);
+      if (submitRef.current) openAllocation(submitRef.current, true);
     }}>
       <Field htmlFor={amountId}>얼마를 더 투자할까요?</Field>
       <div className={styles.inputRow}>
         <div className={styles.inputWrap}>
-          <Input presentation="amount" id={amountId} aria-label="추가 투자 금액 (만원)" inputMode="decimal" autoComplete="off" placeholder="0"
+          <Input ref={amountRef} presentation="amount" id={amountId} aria-label="추가 투자 금액 (만원)" inputMode="decimal" autoComplete="off" placeholder="0"
             aria-invalid={invalid || undefined} aria-describedby={invalid ? amountId + "-error" : undefined}
             value={text} onFocus={() => setPresetsOpen(true)}
             onChange={event => setDraft({ base: context.cashAmountKrw, text: event.target.value })} />
@@ -61,7 +70,7 @@ export function ContributionEntry({ view, context, dirty, colors, onView }: {
           onClick={() => { setDraft({ base: context.cashAmountKrw, text: String(value) }); setPresetsOpen(false); setValidate(false); submitRef.current?.focus(); }}>{value}만원</Button>)}
         <Button type="button" variant="bare" onClick={() => { setPresetsOpen(false); submitRef.current?.focus(); }}>닫기</Button>
       </div>}
-    </Form> : <Button variant="secondary" type="button" onClick={e => onView(e.currentTarget)}>배분 보기</Button>}
+    </Form> : <Button variant="secondary" type="button" onClick={e => openAllocation(e.currentTarget)}>배분 보기</Button>}
     <ContributionHome view={view} dirty={dirty || (canCalculate && text !== initial && won !== String(saved))} colors={colors} />
-  </>;
+  </HomeCard>;
 }

@@ -1,98 +1,96 @@
-.surface { composes: surface from "./theme-surface.module.css"; }
-.surface .form { min-width:0; }
-.surface .form > label { font-size:13px; font-weight:500; }
-.surface .amountInput { display:flex; align-items:baseline; gap:7px; margin-top:25px; padding-bottom:14px; border-bottom:1px solid var(--line); transition:border-color 160ms; }
-.surface .amountInput input { min-width:0; width:100%; border:0; outline:none; background:transparent; padding:0; color:var(--ink); font-size:clamp(30px,3.1vw,47px); font-weight:450; letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
-.surface .amountInput:focus-within { border-color:var(--accent); box-shadow:0 1px 0 var(--accent); }
-.surface .amountInput > span { color:var(--muted); font-size:14px; }
-.surface .presets { display:flex; gap:5px; margin-top:13px; }
-.surface .presets button { padding:7px 10px; border-radius:var(--cairn-ui-radius-button,10px); background:var(--paper); color:var(--muted); font-size:13px; white-space:nowrap; transition:color 150ms,background 150ms; }
-.surface .presets button:hover { background:var(--ink); color:var(--paper); }
-.surface .submitRow { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:25px; }
-.surface .calculate { display:inline-flex; align-items:center; justify-content:space-between; gap:24px; border-radius:var(--cairn-ui-radius-button,10px); background:var(--ink); color:var(--paper); padding:12px 18px; font-size:12px; font-weight:500; }
-.surface .calculate:hover { background:var(--brand); }
-.surface .calculate:disabled { opacity:.75; cursor:wait; }
-.surface .hint { color:var(--faint); font-size:12px; line-height:1.7; margin-top:15px; }
-.surface .fundingPanel { min-width:0; transition:opacity 180ms; }
-.surface .fundingSources { display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; color:var(--muted); font-size:12px; }
-.surface .fundingSources i { font-style:normal; font-size:13px; color:var(--accent); }
-.surface .fundingTotal { margin-top:20px; }
-.surface .fundingTotal > span { display:block; color:var(--muted); font-size:13px; margin-bottom:7px; }
-.surface .fundingTotal strong { font-size:clamp(24px,2.8vw,40px); letter-spacing:-.055em; font-weight:480; font-variant-numeric:tabular-nums; }
-.surface .fundingBar { display:flex; height:78px; margin-top:23px; border-radius:0; background:var(--wash); }
-.surface .fundingSegment { position:relative; height:100%; min-height:0; min-width:0; padding:0; border:0; border-radius:0; flex-shrink:0; cursor:pointer; transform-origin:bottom; animation:bar-grow 320ms cubic-bezier(.2,.8,.2,1) both; animation-delay:var(--bar-delay); transition:filter 180ms; }
-.surface .fundingSegment + .fundingSegment { border-left:2px solid var(--surface); }
-.surface .fundingSegment[aria-pressed="true"] { box-shadow:inset 0 -4px 0 rgb(0 0 0 / .22); z-index:1; }
-.surface .fundingSegment:focus-visible { outline:2px solid var(--ink); outline-offset:3px; z-index:2; }
-.surface .fundingSelection { display:flex; align-items:center; gap:8px; margin-top:15px; font-size:13px; min-height:24px; }
-.surface .fundingSelection > span { flex:1; min-width:0; line-height:1.5; }
-.surface .fundingSelection strong { font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.surface .fundingSelection svg { color:var(--accent); flex-shrink:0; }
-.surface .fundingLegend { display:flex; flex-wrap:wrap; gap:3px 10px; padding-top:11px; border-top:1px solid var(--line); margin-top:12px; }
-.surface .fundingLegend button { display:inline-flex; align-items:center; gap:7px; min-height:44px; max-width:100%; padding:6px 0; border:0; border-radius:0; background:transparent; font-size:13px; color:var(--muted); text-align:left; overflow-wrap:anywhere; }
-.surface .fundingLegend button[aria-pressed="true"] { color:var(--ink); text-decoration:underline; text-underline-offset:5px; }
-.surface .fundingLegend i { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.surface .footerNumbers { display:flex; flex-wrap:wrap; gap:10px 24px; }
-.surface .footerNumbers > div { display:flex; align-items:baseline; gap:10px; }
-.surface .footerNumbers dt { font-size:13px; color:var(--muted); }
-.surface .footerNumbers dd { font-size:19px; font-weight:500; font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
-@keyframes bar-grow { from { opacity:.4; transform:scaleY(.25); } to { opacity:1; transform:scaleY(1); } }
-@keyframes calculation-progress { from { transform:translateX(0); } to { transform:translateX(180%); } }
-@keyframes spin { to { transform:rotate(360deg); } }
-@media (max-width:1180px) { .surface .footerNumbers { gap:14px; } .surface .footerNumbers dd { font-size:16px; } }
-@media (max-width:980px) { }
-@media (max-width:760px) { .surface .form > label { font-size:13px; } .surface .amountInput { margin-top:13px; padding-bottom:9px; } .surface .amountInput input { font-size:39px; } .surface .presets { margin-top:9px; } .surface .presets button { padding:6px 12px; } .surface .submitRow { margin-top:15px; gap:10px; } .surface .calculate { padding:10px 16px; font-size:13px; } .surface .hint { margin-top:9px; font-size:12px; } .surface .fundingPanel { flex:1; display:flex; flex-direction:column; justify-content:center; min-height:0; border-top:1px solid var(--line); padding-top:16px; } .surface .fundingSources { font-size:12px; } .surface .fundingTotal { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:13px; } .surface .fundingTotal > span { font-size:12px; margin:0; } .surface .fundingTotal strong { font-size:26px; } .surface .fundingBar { height:54px; margin-top:19px; } .surface .fundingSelection { margin-top:11px; font-size:13px; } .surface .fundingLegend { display:none; } .surface .footerNumbers { justify-content:space-between; gap:10px; } .surface .footerNumbers > div { gap:7px; } .surface .footerNumbers dt { font-size:12px; } .surface .footerNumbers dd { font-size:15px; } }
-@media (max-height:760px) and (min-width:981px) { .surface .fundingBar { height:65px; } }
-@media (max-height:640px) { }
-@media (max-height:640px) and (max-width:760px) { }
-@media (prefers-reduced-motion:reduce) { .surface .fundingSegment { animation:none; } .surface .fundingSegment,.surface .fundingPanel,.surface .amountInput { transition:none; } .surface .fundingSegment[aria-pressed="true"] { translate:none; } }
-
-@media (max-width:760px), (max-width:1000px) and (max-height:500px) {
-  /* The shared mobile header already exposes the same refresh action. */
-  .surface .form > label { display:block; text-align:center; font-size:12px; color:var(--muted); }
-  .surface .amountInput { margin-top:12px; padding-bottom:10px; border:0; justify-content:center; }
-  .surface .amountInput input { font-size:clamp(38px,11vw,48px); text-align:center; }
-  .surface .presets { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-top:8px; }
-  .surface .presets button { min-height:44px; padding:10px 8px; font-size:12px; background:transparent; border:0; border-radius:0; }
-  .surface .submitRow { margin-top:18px; }
-  .surface .calculate { width:100%; min-height:50px; padding:14px 18px; font-size:14px; border-radius:12px; }
-  .surface .hint { margin-top:10px; font-size:13px; line-height:1.7; text-align:center; }
-  .surface .fundingPanel { flex:none; min-height:0; padding-top:8px; border:0; }
-  .surface .fundingSources { font-size:13px; gap:6px 8px; line-height:1.7; }
-  .surface .fundingTotal { display:block; margin-top:18px; }
-  .surface .fundingTotal > span { font-size:12px; margin-bottom:10px; }
-  .surface .fundingTotal strong { font-size:36px; }
-  .surface .fundingBar { height:48px; margin-top:22px; }
-  .surface .fundingSelection { font-size:12px; margin-top:16px; }
-  .surface .fundingLegend { display:flex; gap:4px 12px; margin-top:8px; padding-top:0; border:0; }
-  .surface .fundingLegend button { min-height:44px; font-size:12px; }
-  .surface .fundingLegend i { width:8px; height:8px; }
-  .surface .footerNumbers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
-  .surface .footerNumbers > div { display:block; }
-  .surface .footerNumbers dt { font-size:12px; }
-  .surface .footerNumbers dd { margin-top:8px; font-size:22px; }
+.surface {
+  composes: surface from "./theme-surface.module.css";
+  container-type: inline-size;
 }
 
-@media (min-width:761px) { }
+.receiptHead, .residual, .fundingTotal, .fundingSelection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.receiptHead h3 { font-size: 18px; font-weight: 550; letter-spacing: -.025em; }
+.receiptHead p, .residual > span { color: var(--muted); font-size: 13px; }
+.receiptHead p { margin-top: 4px; }
+.surface .receiptHead button[data-cairn-button] {
+  flex: none;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.receiptHead button:hover { background: var(--wash); }
+.residual { padding-block: 10px; border-block: 1px solid var(--line); }
+.residual strong, .fundingSelection strong { font-size: 15px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.surface [data-cairn-disclosure] > div { max-width: none; }
 
-.surface {container-type:inline-size;container-name:contribution;}
-.surface .layout{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.1fr);gap:60px;align-items:start;padding:12px 0 28px;background:transparent;}
-.surface .amountInput{border-bottom:1px solid var(--line)}
-.surface .amountInput input{font-size:clamp(28px,4.2cqw,47px)}
-.surface .calculate:disabled{cursor:not-allowed}
-.surface .footerNumbers dd{white-space:nowrap}
-.surface button:focus-visible{outline:2px solid var(--brand);outline-offset:4px}
-@container contribution (max-width:700px){.surface .layout{grid-template-columns:1fr;gap:28px}.surface .amountInput input{font-size:clamp(26px,7.3cqw,44px)}.surface .footerNumbers{display:flex;flex-wrap:wrap;gap:20px}.surface .footerNumbers>div{display:block}.surface .footerNumbers dd{font-size:22px}.surface .presets button{min-height:44px;font-size:12px}.surface .calculate{min-height:44px}.surface .fundingLegend button{min-height:44px;font-size:12px}}
+.form {
+  width: min(100%, 36rem);
+  align-self: center;
+  display: grid;
+  gap: 12px;
+  padding-block: 4px;
+}
+.form > label { color: var(--ink); font-size: 16px; font-weight: 550; }
+.amountInput {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+.amountInput:focus-within { outline: 2px solid var(--ink); outline-offset: 1px; }
+.surface .amountInput input[data-presentation=amount] {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--ink);
+  font: 500 clamp(26px, 5cqw, 32px)/1.35 "Cairn Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.amountInput > span, .form [role=alert] { font-size: 13px; color: var(--muted); }
+.presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.surface .presets button[data-cairn-button], .surface .submitRow button[data-variant=bare] {
+  min-height: 44px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.surface .presets button[aria-pressed=true], .surface .presets button:hover {
+  background: var(--wash); color: var(--ink);
+}
+.surface .submitRow { margin-top: 0; }
+.surface .submitRow .calculate {
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--paper);
+}
 
-.surface .amountInput input{font-size:clamp(38px,5cqw,47px)}@container contribution (max-width:700px){.surface .amountInput input{font-size:clamp(38px,10cqw,44px)}}.surface .amountInput input[data-long=true]{font-size:clamp(26px,6.5cqw,42px)}
-
-:global([data-reduced="true"]) .surface .fundingSegment { animation:none; }
-:global([data-reduced="true"]) .surface .fundingSegment,
-:global([data-reduced="true"]) .surface .fundingPanel,
-:global([data-reduced="true"]) .surface .amountInput,
-:global([data-reduced="true"]) .surface .presets button { transition:none; }
-:global([data-reduced="true"]) .surface .fundingSegment[aria-pressed="true"] { translate:none; }
-@media (prefers-reduced-motion:reduce) { .surface .presets button { transition:none; } }
-
-/* Shared contiguous composition bar owns segment interaction and geometry. */
-.surface .fundingBar {display:block;height:auto;--composition-height:56px;border-radius:0;}
+.fundingVisual { display: grid; gap: 12px; padding: 0 0 18px; }
+.fundingSources, .fundingLegend { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.fundingSources, .fundingTotal > span { color: var(--muted); font-size: 13px; }
+.fundingSources i { color: var(--accent); font-style: normal; }
+.fundingTotal strong { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.surface .fundingBar { --composition-height: 32px; }
+.fundingSelection { font-size: 13px; }
+.fundingLegend { border-bottom: 1px solid var(--line); }
+.surface .fundingLegend button[data-cairn-button] {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; font-size: 13px; color: var(--muted);
+}
+.surface .fundingLegend button[aria-pressed=true] {
+  color: var(--ink); text-decoration: underline; text-underline-offset: 4px;
+}
+.fundingLegend i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
