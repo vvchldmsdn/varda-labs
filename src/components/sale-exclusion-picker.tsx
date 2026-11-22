@@ -54,6 +54,7 @@ export function SaleExclusionPicker({ options, value, onChange, disabled = false
         <p>{en ? "Keep these holdings out of this sale calculation." : "이번 계산에서 팔지 않을 종목을 고르세요."}</p>
         {selected.size > 0 && (
           <Button variant="bare" className={styles.clear} type="button" disabled={disabled}
+            aria-label={en ? "Clear all sale exclusions" : "매도 제외 모두 해제"}
             onClick={event => {
               event.currentTarget.closest("details")?.querySelector("summary")?.focus();
               onChange([]);
