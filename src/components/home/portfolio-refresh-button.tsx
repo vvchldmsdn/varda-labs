@@ -149,7 +149,7 @@ export function PortfolioRefreshButton({
   }, [confirmed]);
   const busy = displayState === "syncing" || displayState === "queued";
   return (
-    <div className="relative inline-flex items-center gap-2" data-home-refresh={homeToolbar ? busy ? "busy" : confirmed && showCheck ? "done" : "idle" : undefined}>
+    <div className="relative inline-flex items-center gap-2" data-home-refresh={homeToolbar ? busy ? "busy" : confirmed && showCheck ? "done" : "idle" : undefined} data-home-progress={homeToolbar && !!receipt?.progress || undefined}>
     <CairnButton variant={homeToolbar ? "bare" : "secondary"}
       type="button"
       aria-label={t("실시간 시세 갱신", "Refresh live prices")}
@@ -172,7 +172,7 @@ export function PortfolioRefreshButton({
     {compact && !receipt?.progress && ["error", "cooldown", "waiting"].includes(displayState) && <span role="status" className="text-xs">{syncLabel(displayState)}</span>}
     {receipt?.progress && <details className="text-xs">
       <summary className="cursor-pointer whitespace-nowrap py-2" aria-live="polite">
-        {receipt.progress.completed}/{receipt.progress.total} {t("조회", "checked")}
+        {receipt.progress.completed}/{receipt.progress.total}{!homeToolbar && <> {t("조회", "checked")}</>}
         {displayState === "reconnecting" ? t(" · 연결 재시도 중", " · reconnecting") : providerWaiting ? t(" · 재시도 대기", " · retry scheduled") : displayState === "queued" ? t(" · 진행 중", " · in progress") : displayState === "waiting" ? t(" · 확인 중단", " · paused") : receipt.progress.failed ? t(" · 일부 실패", " · incomplete") : t(" · 완료", " · complete")}
       </summary>
       <div className="absolute right-0 top-full z-50 mt-2 max-h-80 w-[min(340px,calc(100vw-32px))] overflow-y-auto border border-[var(--line)] bg-[var(--paper)] p-4 text-[var(--ink)] shadow-sm">

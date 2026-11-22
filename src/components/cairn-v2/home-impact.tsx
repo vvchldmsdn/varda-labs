@@ -44,7 +44,7 @@ export function HomeImpactControls() {
   return <div className={styles.toggles} role="group" aria-label="일별 변동 막대">
     {impactTypes.map(type => {
       const available = chart.days.some(day => day[type] !== null);
-      return <Button key={type} variant="bare" type="button" data-impact={type}
+      return <Button key={type} variant="bare" type="button" data-impact={type} data-available={available}
         aria-label={impactNames[type] + " 일별 변동 막대"} aria-pressed={chart.visible[type]}
         disabled={!available} onClick={() => chart.toggle(type)}>
         {impactNames[type]} <small>{!available ? "자료 없음" : chart.visible[type] ? "표시 중" : "막대 보기"}</small>

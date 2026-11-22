@@ -28,4 +28,9 @@
 .toggles button[aria-pressed=true] { background:#ffffff14; border-color:#ffffff44; color:#fff; }
 .toggles button[aria-pressed=true] small { color:var(--effect); }
 .toggles small { font-size:10px; min-width:4em; text-align:center; }
-@media(max-width:600px) { .toggles button[data-impact] { min-height:44px; } }
+@media(max-width:600px) {
+  .toggles { gap:2px; }
+  .toggles button[data-impact] { min-height:44px;min-width:44px;padding:6px;border-color:transparent; }
+  .toggles button[data-available=true] small { display:none; }
+  .toggles button[aria-pressed=true] { border-color:#ffffff28; }
+}
