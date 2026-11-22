@@ -242,7 +242,7 @@
 .homeRing [data-allocation-ring]>p {position:absolute;top:245px;left:0;right:0;line-height:13px;margin:0;font-size:9px;}
 .scope[data-reduced=true] {background:#efefeb;}
 .scope[data-reduced=true] .card::before {display:none;}
-.scope[data-reduced=true] .card:not(.heatmap) {background:var(--cairn-v2-paper);border:1px solid var(--cairn-v2-line);}
+.scope[data-reduced=true] .card:not(.heatmap) {background:var(--cairn-v2-paper);border:var(--cairn-v2-reduced-card-border,1px solid var(--cairn-v2-line));}
 .scope[data-reduced=true] .glassPanel {backdrop-filter:none;background:var(--cairn-v2-paper);}
 .scope[data-reduced=true] [data-allocation-ring] path {transition:none;}
 @media (prefers-reduced-transparency:reduce) {

@@ -1,9 +1,15 @@
- .body { display:grid; min-width:0; gap:10px; }
-.headline { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; }
-.headline > span { font:400 clamp(32px,3vw,38px)/1.12 var(--home-display); letter-spacing:-.045em; overflow-wrap:anywhere; }
+.body { display:grid; min-width:0; gap:6px; text-align:center; }
+.headline { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:center; gap:4px 10px; }
+.headline > span { font:500 clamp(24px,2.4vw,30px)/1.2 "Cairn Pretendard",sans-serif; font-variant-numeric:tabular-nums; letter-spacing:-.035em; overflow-wrap:anywhere; }
 .headline small { margin-left:5px; font:500 12px/1.4 sans-serif; letter-spacing:0; color:var(--cairn-v2-muted); }
-.headline strong { font-size:clamp(15px,1.4vw,17px); font-variant-numeric:tabular-nums; }
-.note,.exclusions { color:var(--cairn-v2-muted); font-size:12px; line-height:1.5; }
-.exclusions summary { display:inline-flex; align-items:center; min-height:36px; cursor:pointer; text-decoration:underline; text-underline-offset:4px; }
-.exclusions ul { margin:0; padding-left:1.2em; }
-@media(max-width:600px) { .exclusions summary { min-height:44px; } }
+.headline strong { font-size:14px; font-weight:550; font-variant-numeric:tabular-nums; }
+.body > [data-compact] { justify-content:center; }
+.context { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:0 12px; }
+.context:empty { display:none; }
+.note,.exclusions,.unavailable { margin:0; color:var(--cairn-v2-muted); font-size:12px; line-height:1.5; }
+.unavailable { font-size:13px; }
+.exclusions summary { display:inline-flex; align-items:center; justify-content:center; min-height:44px; cursor:pointer; text-decoration:underline; text-underline-offset:4px; }
+.exclusions[open] { flex-basis:100%; }
+.exclusions ul { margin:0; padding-left:1.2em; text-align:left; }
+.exclusions li + li { margin-top:4px; }
+@media(max-width:600px) { .headline > span { font-size:24px; } }
