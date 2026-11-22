@@ -35,6 +35,48 @@ test('date form rejects missing, invalid, out-of-range and reversed dates in pla
   }
 });
 
+test('home contribution uses the entered amount and original focus target from all card entry points', async () => {
+  const runtime = hooks();
+  const [{ ContributionEntry }] = await importUiWithPorts(['src/components/cairn-v2/home-contribution-entry.tsx'], {
+    react: runtime.react,
+    '@/components/cairn-v2/home-contribution': { ContributionHome: () => null },
+  });
+  const opens = [];
+  const render = cashAmountKrw => {
+    runtime.begin();
+    const card = ContributionEntry({
+      view: {}, context: { currency: 'KRW', cashAmountKrw }, dirty: false, colors: [],
+      onView: (trigger, amount) => opens.push([trigger, amount]),
+    });
+    return card.type(card.props);
+  };
+  const button = (tree, label) => walk(tree).find(node => node.type === 'button' &&
+    (node.props['aria-label'] === label || text(node).trim() === label));
+  const input = tree => walk(tree).find(node => node.type === 'input');
+  const opening = { kind: 'open' }, title = { kind: 'title' }, submit = { kind: 'submit' };
+  const empty = render(undefined);
+  button(empty, '추가 투자').props.onClick({ currentTarget: title });
+  assert.deepEqual(opens.pop(), [title, undefined], 'an untouched card can open an empty form or recovery link');
+
+  input(render('1000000')).props.onChange({ target: { value: '300.0001' } });
+  const edited = render('1000000');
+  button(edited, '추가 투자 확대').props.onClick({ currentTarget: opening });
+  button(edited, '추가 투자').props.onClick({ currentTarget: title });
+  edited.props.onClick({ target: { closest: () => null }, currentTarget: { querySelector: () => opening } });
+  walk(edited).find(node => node.props.type === 'submit').props.ref.current = submit;
+  walk(edited).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.deepEqual(opens, [opening, title, opening, submit].map(trigger => [trigger, '3000001']));
+
+  input(edited).props.onChange({ target: { value: '' } });
+  const invalid = render('1000000');
+  let focused = false;
+  input(invalid).props.ref.current = { focus: () => { focused = true; } };
+  button(invalid, '추가 투자 확대').props.onClick({ currentTarget: opening });
+  assert.equal(focused, true);
+  assert.equal(input(render('1000000')).props['aria-invalid'], true);
+  assert.equal(opens.length, 4, 'clearing a submitted amount cannot open its old result');
+});
+
 test('selecting an instrument returns keyboard focus before the result button is removed',async()=>{
   const choice={id:'synthetic',name:'Synthetic',ticker:'SYN',market:'us',currency:'USD',assetType:'stock'};
   const h=hooks(['SYN',[choice],'ready']),calls=[];

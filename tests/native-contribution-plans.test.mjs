@@ -206,5 +206,31 @@ it('renders a saved USD decision on a KRW page without changing its frozen resul
   });
   const html=renderToStaticMarkup(createElement(ui.NativeContributionPlanner,{scopeKey:'account:'+account,currency:'KRW'}));
   assert.match(html,/<h3\b[^>]*>Saved plan · USD<\/h3>/);assert.match(html,/Profit currency.*USD/);assert.match(html,new RegExp('href="#native-plan-'+saved.request.id+'"'));
+  const sales=html.match(/<section[^>]*aria-label="Planned sales"[^>]*>(.*?)<\/section>/s)?.[1];
+  const buys=html.match(/<section[^>]*aria-label="Planned buys"[^>]*>(.*?)<\/section>/s)?.[1];
+  const dollars=amount=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(amount);
+  assert.ok(sales?.includes(dollars(saved.result.sales)));
+  assert.ok(buys?.includes(dollars(saved.result.buys)));
+  assert.match(sales,/<li><span>A<\/span>/);
+  assert.match(buys,/<li><span>B<\/span>/);
+  assert.ok(html.indexOf(sales)<html.indexOf('Target weights and calculation rules'));
   assert.match(html,/Edit approved targets/);assert.deepEqual(saved,original);
+});
+
+it('shows the two largest planned trades per side first and leaves zero trades out',async()=>{
+  const [{PlannedTrades}]=await importUiWithPorts(['src/components/additional-contribution/planned-trades.tsx'],{});
+  const rows=[
+    {key:'buy-small',name:'Small buy',buy:1,sell:0},
+    {key:'buy-large',name:'Shared holding',account:'ISA',buy:30,sell:0},
+    {key:'buy-middle',name:'Shared holding',account:'Brokerage',buy:5,sell:0},
+    {key:'idle',name:'Unchanged holding',buy:0,sell:0},
+  ];
+  const immutable=structuredClone(rows);
+  const html=renderToStaticMarkup(createElement(PlannedTrades,{
+    rows,totalSell:0,totalBuy:36,formatAmount:value=>String(value)+' USD',english:true,
+  }));
+  assert.match(html,/No planned sales/);
+  assert.doesNotMatch(html,/Unchanged holding/);
+  assert.match(html,/Planned buys.*36 USD.*ISA.*30 USD.*Brokerage.*5 USD.*<details><summary>1 more.*Small buy/s);
+  assert.deepEqual(rows,immutable);
 });

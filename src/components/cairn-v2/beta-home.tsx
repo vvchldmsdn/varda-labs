@@ -191,14 +191,15 @@ export function BetaHome({
           </Card>
 
           <div className={home.planning}>
-          <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
             {view.domain ? (
               <ContributionEntry key={context.scope} view={view} context={context} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}
+                className={!contributionReady ? home.contributionStatus : undefined}
                 onView={(trigger, amount) => {
                   if (amount !== undefined && amount !== context.cashAmountKrw) setContext({ ...context, cashAmountKrw: amount });
                   open("contribution", trigger);
                 }} />
             ) : (
+              <Card onOpen={open} kind="contribution" className={!contributionReady ? home.contributionStatus : undefined}>
               <div className={`${styles.contributionBody} ${!view.contribution.length ? home.noAllocation : ''}`}>
                 <div>
                   <div className={styles.mainNumber}>
@@ -241,8 +242,8 @@ export function BetaHome({
                   ))}
                 </div>
               </div>
+              </Card>
             )}
-          </Card>
 
             {!view.domain && <CairnButton variant="bare" className={home.planLink} type="button" onClick={event => open("contribution", event.currentTarget)}>배분 보기</CairnButton>}
           </div>
