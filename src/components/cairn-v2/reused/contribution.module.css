@@ -3,15 +3,20 @@
   container-type: inline-size;
 }
 
-.receiptHead, .residual, .fundingTotal, .fundingSelection {
+.receiptHead, .fundingTotal, .fundingSelection {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-.receiptHead h3 { font-size: 18px; font-weight: 550; letter-spacing: -.025em; }
-.receiptHead p, .residual > span { color: var(--muted); font-size: 13px; }
-.receiptHead p { margin-top: 4px; }
+.receiptHead {
+  position: relative;
+  padding-block: 2px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+.receiptHead strong { color: var(--ink); font-weight: 550; font-variant-numeric: tabular-nums; }
 .surface .receiptHead button[data-cairn-button] {
   flex: none;
   min-height: 44px;
@@ -23,9 +28,43 @@
   text-underline-offset: 4px;
 }
 .receiptHead button:hover { background: var(--wash); }
-.residual { padding-block: 10px; border-block: 1px solid var(--line); }
-.residual strong, .fundingSelection strong { font-size: 15px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.fundingSelection strong { font-size: 15px; font-weight: 550; font-variant-numeric: tabular-nums; }
 .surface [data-cairn-disclosure] > div { max-width: none; }
+.resultActions {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.resultActions .primaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+}
+.primaryLink span { transition: transform 160ms ease; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .primaryLink:hover span { transform: translateX(2px); }
+}
+.resultActions details { font-size: 13px; color: var(--muted); }
+.resultActions summary, .surface .evidence > summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+}
+.resultActions details div { display: grid; }
+.resultActions details a { display: flex; align-items: center; min-height: 44px; color: var(--ink); }
+.resultActions :is(a, summary):focus-visible, .evidence summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.surface .evidence { border-top: 1px solid var(--line); }
+.surface .evidence > summary { font-size: 13px; color: var(--muted); }
 
 .form {
   width: min(100%, 36rem);

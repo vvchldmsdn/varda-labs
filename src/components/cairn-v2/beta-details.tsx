@@ -381,7 +381,7 @@ export function BetaDetail({
           )}
         </div>
       )}
-      {!workspace && (
+      {!workspace && !(kind === "contribution" && view.domain) && (
         <footer className={styles.detailFooter}>
           <span>{view.domain ? "보유·거래·목표를 변경하지 않는 조회 화면" : fixtureNotice}</span>
           {implemented && (

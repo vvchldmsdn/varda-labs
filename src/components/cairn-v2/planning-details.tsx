@@ -2,7 +2,8 @@
 
 import { instrumentLabel } from "@/lib/instrument-display";
 import { RecoveryNotice } from '@/components/recovery/recovery-notice';
-import { ContributionNextSteps } from '@/components/additional-contribution/contribution-journey';
+import { RecoveryJourneyLink } from '@/components/recovery/recovery-return';
+import { contributionJourneyHref, type ContributionJourney } from '@/lib/contribution-journey';
 import { betaHref } from '@/lib/cairn-v2/navigation';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, FormActions as CairnFormActions, Status as CairnStatus, InfoDisclosure } from "@/components/cairn-ui";
 
@@ -20,7 +21,6 @@ import styles from "./beta.module.css";
 
 import {AdditionalContributionAllocationTable} from "./reused/allocation-list";
 import {MoneyInput} from "./reused/money-input";
-import {ContributionFundingVisual} from "./reused/contribution-funding";
 import presentation from "./reused/contribution.module.css";
 
 type ReadyContributionRow = ReadyContribution["rows"][number];
@@ -96,6 +96,7 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
   }
 
   const formatWon = (value: number) => locale === "en" ? `₩${krw(value)}` : `${krw(value)}원`;
+  const journey: ContributionJourney = { scope: context.scope, amount, currency: "KRW", beta: true, excludeSell: excludedSales };
   const trades = result?.rows.map((row, index) => ({
     key: row.allocationKey ?? `${row.accountCode}:${row.ticker ?? row.name}:${index}`,
     name: instrumentLabel(row), account: context.scope === "all" ? row.accountName : undefined,
@@ -138,36 +139,41 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
 
     {!showForm && result && trades && <>
       <div className={presentation.receiptHead}>
-        <div>
-          <h3 ref={receiptRef} tabIndex={-1}>{t("예상 배분", "Projected allocation")}</h3>
-          <p>{t("투자금", "New money")} {formatWon(result.cashAmountKrw)}{excludedSales.length > 0 && ` · ${t(`매도 제외 ${excludedSales.length}건`, `${excludedSales.length} excluded from sales`)}`}</p>
-        </div>
+        <h3 ref={receiptRef} tabIndex={-1} className={styles.visuallyHidden}>{t("예상 배분", "Projected allocation")}</h3>
+        <span>{t("새 투자금", "New money")} <strong>{formatWon(result.cashAmountKrw)}</strong>{excludedSales.length > 0 && ` · ${t(`매도 제외 ${excludedSales.length}건`, `${excludedSales.length} excluded from sales`)}`}</span>
         <CairnButton type="button" variant="bare" onClick={() => {
           setEditorKey(queryKey);
           requestAnimationFrame(() => document.getElementById(inputId)?.focus());
         }}>{t("조건 변경", "Edit inputs")}</CairnButton>
       </div>
       <PlannedTrades rows={trades} totalSell={result.totalTrimProceedsKrw} totalBuy={result.totalAllocatedKrw}
+        available={result.totalAvailableFundsKrw} remainingCash={result.residualCashKrw}
         formatAmount={formatWon} english={locale === "en"} />
-      <div className={presentation.residual}><span>{t("남는 현금", "Remaining cash")}</span><strong>{formatWon(result.residualCashKrw)}</strong></div>
-      <InfoDisclosure summary={t("투자금 구성과 종목별 비중", "Funding and portfolio weights")}>
-        <ContributionFundingVisual cash={result.cashAmountKrw} trims={result.totalTrimProceedsKrw} total={result.totalAvailableFundsKrw}
-          residual={result.residualCashKrw} rows={trades.map(row => ({ key: row.key, name: row.name, amount: row.buy }))} />
-        <AdditionalContributionAllocationTable preview={result} />
-      </InfoDisclosure>
-      {available && <ContributionNextSteps compact journey={{ scope: context.scope, amount, currency: "KRW", beta: true, excludeSell: excludedSales }} />}
-      <details className={styles.planningEvidence} onToggle={event => {
+      {available && <nav className={presentation.resultActions} aria-label={t("투자 계획 이어가기", "Continue your plan")}>
+        <RecoveryJourneyLink className={presentation.primaryLink} prefetch={false} href={contributionJourneyHref("plan", journey)}>
+          {t("이 조건으로 계획 만들기", "Create a plan with these inputs")} <span aria-hidden="true">→</span>
+        </RecoveryJourneyLink>
+        <details>
+          <summary>{t("다른 작업", "More actions")}</summary>
+          <div>
+            <RecoveryJourneyLink prefetch={false} href={contributionJourneyHref("compare", journey)}>{t("새 투자금 배분 비교", "Compare new-money allocations")}</RecoveryJourneyLink>
+            <RecoveryJourneyLink prefetch={false} href={contributionJourneyHref("tracking", journey)}>{t("저장한 배분안 보기", "View saved allocations")}</RecoveryJourneyLink>
+          </div>
+        </details>
+      </nav>}
+      <details className={`${styles.planningEvidence} ${presentation.evidence}`} onToggle={event => {
         if (event.target === event.currentTarget) setEvidenceOpen(event.currentTarget.open);
       }}>
-        <summary>{t("상세 계산 보기", "Calculation details")}</summary>
+        <summary>{t("종목별 비중과 계산 근거", "Weights and calculation details")}</summary>
         {evidenceOpen && <>
+          <AdditionalContributionAllocationTable preview={result} />
           <p>{result.policyLabel} · {result.policyVersion}
             {read?.approvalRevision != null && ` · ${t("승인", "Revision")} ${read.approvalRevision}`}
             {result.source === "legacy_account_policy" && ` · ${t("기존 계좌 정책", "Legacy account policy")}`}
           </p>
           <p>{t("적용일", "Effective date")} {result.effectiveServiceDate ?? "—"} · {t("평가 기준일", "Valuation date")} {result.serviceDate}</p>
           <p>{t("투입 후 비중은 남는 현금을 포함한 총액을 기준으로 계산해요.", "Weights use the projected total including remaining cash.")} {formatWon(result.postTopupTotalKrw)}</p>
-          <p>{t("수수료·세금·체결 단위는 반영하지 않았습니다.", "Fees, taxes and lot sizes are excluded.")}</p>
+          <p>{t("가상 계산이며 수수료·세금·체결 단위는 반영하지 않았습니다.", "This projection excludes fees, taxes and lot sizes.")}</p>
           {view.domain?.planning?.targets.rows.some(row => row.plannedOnly) && <p>{t("미보유 계획 종목은 현재 보유액 0으로 계산합니다.", "Planned holdings start with zero current value.")}</p>}
           {result.rows.map((row, index) => <details key={trades[index].key}>
             <summary>{instrumentLabel(row)}{context.scope === "all" && ` · ${row.accountName}`}</summary>

@@ -71,6 +71,10 @@ export async function runContributionUiCases({page,check,admin,owner,account,ass
     // Saving is not a purchase: the known position and cash stay exactly as before.
     const state=(await admin.query('select native_state from accounts where id=$1',[account])).rows[0].native_state;
     assert.equal(state.positions[0].quantity,'10');assert.equal(state.cash.KRW,'101000');
+    await planner.getByRole('button',{name:'입력으로 돌아가기',exact:true}).click();
+    const draftAmount=planner.getByRole('textbox',{name:'새 투자금',exact:true});
+    await expect(draftAmount).toBeFocused();
+    assert.equal((await draftAmount.inputValue()).replaceAll(',',''),'10000');
   });
   await recovery.retryNativeRead();
   await check('fullapp-contribution-en-mobile-refresh-frozen-plan-and-evidence',async()=>{

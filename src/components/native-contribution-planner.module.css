@@ -1,4 +1,4 @@
-.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
 .saved { margin-top: 24px; }
 .saved h3 { font-size: 18px; font-weight: 550; }
 .savedRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.7; }
@@ -12,21 +12,24 @@
 .accounts a[aria-current=page] { background:var(--ink); color:var(--paper); }
 .result {
   min-width: 0;
-  margin: 20px 0 24px;
-  padding-block: 18px;
-  border-block: 1px solid var(--line);
+  margin: 0;
   scroll-margin-block-start: 88px;
 }
 .result:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-.resultHeading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 18px; }
-.resultHeading h3 { margin: 0; }
-.resultHeading > span, .cashResult dt { color: var(--muted); font-size: 13px; }
-.cashResult { margin: 16px 0 8px; }
-.cashResult > div, .targetList > div {
+.resultHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 14px; }
+.resultHeading h3 { margin: 0; font-weight: 550; font-size: 16px; }
+.resultHeading span { color: var(--muted); font-size: 13px; }
+.resultHeading > div { min-width: 0; overflow-wrap: anywhere; }
+.secondaryAction { min-height: 44px; padding: 6px 0; font-size: 13px; color: var(--muted); text-decoration: underline; text-underline-offset: 4px; }
+.secondaryAction:hover { color: var(--ink); }
+.resultActions { margin-block: 12px 20px; }
+.resultActions button { min-height: 44px; }
+.result > details, .morePlans { margin-top: 0; border-top: 1px solid var(--line); }
+.result > details > summary, .morePlans > summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-weight: 500; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.targetList > div {
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
   padding-block: 8px;
 }
-.cashResult dd { margin: 0; font-variant-numeric: tabular-nums; }
 .targets { border-block-end: 1px solid var(--line); }
 .targets summary { min-height: 44px; padding-block: 12px; color: var(--ink); cursor: pointer; }
 .targetList > div { font-size: 14px; }

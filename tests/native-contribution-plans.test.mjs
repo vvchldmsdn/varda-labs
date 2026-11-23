@@ -212,9 +212,10 @@ it('renders a saved USD decision on a KRW page without changing its frozen resul
   assert.ok(sales?.includes(dollars(saved.result.sales)));
   assert.ok(buys?.includes(dollars(saved.result.buys)));
   assert.match(sales,/<li><span>A<\/span>/);
-  assert.match(buys,/<li><span>B<\/span>/);
-  assert.ok(html.indexOf(sales)<html.indexOf('Target weights and calculation rules'));
-  assert.match(html,/Edit approved targets/);assert.deepEqual(saved,original);
+  assert.match(buys,/<li><button\b[^>]*aria-label="B, [^"]+"[^>]*aria-pressed="false"/);
+  assert.match(html,/Back to inputs/);
+  assert.doesNotMatch(html,/<form\b|Recalculate and save/);
+  assert.deepEqual(saved,original);
 });
 
 it('shows the two largest planned trades per side first and leaves zero trades out',async()=>{
@@ -227,9 +228,11 @@ it('shows the two largest planned trades per side first and leaves zero trades o
   ];
   const immutable=structuredClone(rows);
   const html=renderToStaticMarkup(createElement(PlannedTrades,{
-    rows,totalSell:0,totalBuy:36,formatAmount:value=>String(value)+' USD',english:true,
+    rows,totalSell:0,totalBuy:36,available:40,remainingCash:4,formatAmount:value=>String(value)+' USD',english:true,
   }));
   assert.match(html,/No planned sales/);
+  assert.match(html,/Shared holding · ISA, 30 USD, 75.0%/);
+  assert.match(html,/Remaining cash, 4 USD, 10.0%/);
   assert.doesNotMatch(html,/Unchanged holding/);
   assert.match(html,/Planned buys.*36 USD.*ISA.*30 USD.*Brokerage.*5 USD.*<details><summary>1 more.*Small buy/s);
   assert.deepEqual(rows,immutable);
