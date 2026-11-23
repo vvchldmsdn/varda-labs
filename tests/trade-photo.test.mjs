@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTradePhoto, tradePhotoNumber, tradePhotoDate } from '../src/lib/trade-photo.ts';
+import { normalizeBrokerageContrast } from '../src/lib/brokerage-photo-contrast.ts';
 import { importIssue, preparePhotoTrade, samePhotoTrade, savePhotoTrades, PhotoSaveError, photoOrderingEntries } from '../src/lib/trade-photo-import.ts';
 import { applyNativeEvent, projectNativeInvestmentEvent, resolveNativeTrade } from '../src/lib/native-portfolio-ledger.ts';
 import { Decimal } from '../src/lib/money.ts';
@@ -9,6 +10,33 @@ const detail=()=>[line('매수 소수점',50,200),line('마이크로소프트',5
 test('detail reads actual fill quantity/price, not order quantity or settlement cash',()=>{
  const {rows}=parseTradePhoto([...detail(),line('10월 28일 체결금액의 결제가 완료됩니다.',100,400,700)],1000,2000);assert.equal(rows.length,1);
  assert.deepEqual(rows[0],{label:'마이크로소프트',side:'buy',date:'2026-10-26',quantity:'0.633088',price:'527.92',currency:'USD',gross:'334.22',priceSource:'reported'});
+});
+test('local screenshot preparation keeps gray text visible on dark and light app backgrounds',()=>{
+ for (const [background,ink] of [[30,180],[248,180]]) {
+  const image=new Uint8ClampedArray([background,background,background,255,background,background,background,255,ink,ink,ink,255]);
+  normalizeBrokerageContrast(image);
+  assert.ok(image[0]-image[8]>=140);
+  assert.deepEqual([image[3],image[7],image[11]],[255,255,255]);
+ }
+});
+test('trade receipt reads prefixed prices and explicit fill dates without guessing a dollar currency',()=>{
+ const receipt=(unit,total)=>[...detail().map(l=>({...l,text:l.text==='527.92USD'?unit:l.text==='334.22USD'?total:l.text})),
+    line('체결일시',50,1000),line('2026.10.27',700,1000)];
+ for (const [unit,total,currency,gross] of [['USD 527.92','$334.22','USD','334.22'],['$527.92','US$334.22','USD','334.22'],
+  ['$527.92','$334.22','','334.22'],['₩527.92','￦334.22','KRW','334.22'],['$527.92','334.22원','',''],['US$527.92','334.22원','USD','']]) {
+  const [trade]=parseTradePhoto(receipt(unit,total),1000,2000).rows;
+  assert.deepEqual([trade.price,trade.gross,trade.currency,trade.date,trade.quantity],['527.92',gross,currency,'2026-10-27','0.633088']);
+ }
+ const completed=receipt('CAD 527.92','CAD 334.22').map(l=>l.text==='매수 소수점'?{...l,text:'매수 완료'}:l);
+ assert.equal(parseTradePhoto(completed,1000,2000).rows.length,0);
+ const badDate=receipt('527.92USD','334.22USD').map(l=>l.text==='2026.10.27'?{...l,text:'2026.02.30'}:l);
+ assert.equal(parseTradePhoto(badDate,1000,2000).rows[0].date,'');
+});
+test('a known OCR miss in an isolated quantity label requires execution-money evidence from the same trade',()=>{
+ const receipt=detail().map(l=>l.text==='체결수량'?{...l,text:'세 결 수량'}:l);
+ assert.equal(parseTradePhoto(receipt,1000,2000).rows[0].quantity,'0.633088');
+ assert.equal(parseTradePhoto(receipt.filter(l=>!['체결가격','체결금액'].includes(l.text)),1000,2000).rows.length,0);
+ assert.equal(parseTradePhoto(receipt.map(l=>l.text==='세 결 수량'?{...l,text:'미체결수량'}:l),1000,2000).rows.length,0);
 });
 test('completed and executed headings require positive fill quantity and actual fill price or amount',()=>{
  for(const heading of ['매수 완료','매도 완료','매수 체결','매수완료','매도체결']){

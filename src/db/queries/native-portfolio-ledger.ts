@@ -197,7 +197,7 @@ export async function writeNativeMutation(tenant: TenantContext, input: NativeMu
   const at = input.opening?.at ?? input.event?.at ?? "";
   if (!Number.isFinite(Date.parse(at)) || Date.parse(at) > Date.now()) return { status: "invalid" as const, reason: "invalid_time" };
   if (input.history) {
-    const complete = await readNativeLedger(tenant);
+    const complete = await readNativeLedger(tenant, undefined, { includeSnapshots: false });
     if (!complete.entriesComplete || !complete.accountsComplete) return { status: "invalid" as const, reason: "historical_scope_too_large" };
     if (complete.accounts.find(row => row.id === input.accountId)?.state?.sequence !== input.expectedSequence) {
       // An identical request may commit between the two repeatable-read
@@ -247,7 +247,23 @@ export async function writeNativeMutation(tenant: TenantContext, input: NativeMu
     tx.query("select set_config('app.current_user_id',$1,true),set_config('lock_timeout','2000',true),set_config('statement_timeout','8000',true),set_config('app.trade_reliability_version','0059',true)", [tenant.ownerUserId]),
     tx.query("select 1/(case when rolsuper or rolbypassrls then 0 else 1 end) as safe from pg_roles where rolname=current_user"),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`varda.portfolio_mutation.v1:${tenant.ownerUserId}`]),
-    tx.query("select apply_native_portfolio_tenant_mutation($1::uuid,$2::uuid,$3::jsonb,$4::jsonb) as status", [tenant.ownerUserId, input.operationId, JSON.stringify(input), JSON.stringify(changes)]),
+    // The native writer already fences cash-inclusive captures. Holdings-only
+    // accounts publish a different snapshot source under this same owner lock.
+    // Route a late fill through the revision writer so its historical holdings
+    // valuations are invalidated and queued atomically with the corrected ledger.
+    tx.query(`select case when $3::jsonb->'event'->>'type' in ('buy','sell')
+      and exists(select 1 from daily_portfolio_snapshots s
+        where s.canonical_owner_user_id=$1::uuid and s.account_id=($3::jsonb->>'accountId')::uuid
+          and s.source='varda_manual_daily_snapshot' and not s.is_sample
+          and ($3::jsonb->'event'->>'at')::timestamptz <= coalesce(s.cycle_end_at,
+            (s.snapshot_date::timestamp at time zone 'Asia/Seoul')+interval '7 hours'))
+      and not exists(select 1 from event_ledger_entries e
+        where e.canonical_owner_user_id=$1::uuid and e.native_operation_id=$2::uuid)
+      and not exists(select 1 from native_operation_cancellations c
+        where c.canonical_owner_user_id=$1::uuid and c.operation_id=$2::uuid)
+      then 'event_precedes_recorded_snapshot'
+      else apply_native_portfolio_tenant_mutation($1::uuid,$2::uuid,$3::jsonb,$4::jsonb)
+      end as status`, [tenant.ownerUserId, input.operationId, JSON.stringify(input), JSON.stringify(changes)]),
   ], { isolationLevel: "ReadCommitted" });
   const rows = resultRows[3];
   const status = rows[0]?.status;

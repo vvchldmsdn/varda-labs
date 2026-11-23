@@ -2655,6 +2655,7 @@ export const dailyPortfolioSnapshots = pgTable(
     source: varchar("source", { length: 100 }).default("base44_import").notNull(),
     ruleVersion: varchar("rule_version", { length: 100 }),
     nativeEvidence: jsonb("native_evidence"),
+    closingPerformance: jsonb("closing_performance"),
     description: text("description"),
     isSample: boolean("is_sample").default(false).notNull(),
 

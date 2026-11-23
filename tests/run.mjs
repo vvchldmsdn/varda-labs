@@ -48,6 +48,7 @@ import "./beta-home-impact.test.mjs";
 import "./beta-period-attribution-route.test.mjs";
 import "./beta-period-attribution.test.mjs";
 import "./history-period-attribution-read.test.mjs";
+import "./closing-performance.test.mjs";
 import "./portfolio-target-policy-ui.test.mjs";
 import "./investment-lab-panel.test.mjs";
 import "./research-detail-boundary.test.mjs";

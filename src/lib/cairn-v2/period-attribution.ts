@@ -37,9 +37,9 @@ const dayTime = (value: string) => Date.parse(value + "T00:00:00Z");
 function validDay(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(dayTime(value)) && dateAt(dayTime(value)) === value;
 }
-export function validateAttributionRange(range: PeriodAttributionRange, today: string) {
+export function validateAttributionRange(range: PeriodAttributionRange, today: string, maxDays = MAX_ATTRIBUTION_DAYS) {
   return validDay(today) && validDay(range.start) && validDay(range.end) && range.start <= range.end &&
-    range.end <= today && (dayTime(range.end) - dayTime(range.start)) / DAY < MAX_ATTRIBUTION_DAYS;
+    range.end <= today && (dayTime(range.end) - dayTime(range.start)) / DAY < maxDays;
 }
 export function calendarAttributionRange(preset: "thisMonth" | "lastMonth", today: string): PeriodAttributionRange {
   if (!validDay(today)) throw new RangeError("Invalid service date");

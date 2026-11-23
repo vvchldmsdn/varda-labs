@@ -19,12 +19,33 @@ export function tradePhotoDate(text: string): string {
   return Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date ? date : "";
 }
 const center = (line: BalanceTextLine) => (line.bbox.y0 + line.bbox.y1) / 2;
-const currencyOf = (text: string): TradePhotoCandidate["currency"] => /USD|달러/i.test(text) ? "USD" : /KRW|원/i.test(text) ? "KRW" : "";
+const startsValue = (text: string) => /^(?:\d|(?:US\$|USD|KRW|\$|₩)\s*\d)/i.test(text.normalize("NFKC").trim());
+
+/** A bare dollar sign identifies an amount but not the specific dollar currency. */
+function fillMoney(text: string): { amount: string; currency: TradePhotoCandidate["currency"] | "dollar" } {
+  const value = /^(US\$|USD|KRW|\$|₩)?\s*([\d,.]+)\s*(USD|KRW|달러|원|\$|₩)?$/i.exec(text.normalize("NFKC").trim());
+  const amount = value && tradePhotoNumber(value[2]);
+  if (!value || !amount) return { amount: "", currency: "" };
+  const markers = [value[1], value[3]].filter(Boolean).join(" ");
+  const won = /KRW|원|₩/i.test(markers);
+  if (won && /USD|달러|\$/i.test(markers)) return { amount: "", currency: "" };
+  if (won) return { amount, currency: "KRW" };
+  if (/USD|US\$|달러/i.test(markers)) return { amount, currency: "USD" };
+  return { amount, currency: markers.includes("$") ? "dollar" : "" };
+}
+
+function quantityLabel(lines: BalanceTextLine[]) {
+  // The Korean model can read the first glyph in 체결수량 as 세. Accept this
+  // isolated label only alongside a separately recognized execution-money field.
+  const hasFillAmount = lines.some(line => /^체결(?:가격|단가|금액)/.test(compact(line.text)));
+  return hasFillAmount ? /^(?:체결수량|세결수량$)/ : /^체결수량/;
+}
 
 /** Only the explicitly labeled fill-quantity cells get a numeric OCR pass. */
 export function tradeQuantityRegions(lines: BalanceTextLine[], width: number, height: number) {
   const detail = lines.some(line => /체결가격|체결단가|주문일시/.test(compact(line.text)));
-  return lines.filter(line => compact(line.text) === "체결수량").slice(0, 50).map(label => {
+  const pattern = quantityLabel(lines);
+  return lines.filter(line => compact(line.text).length === 4 && pattern.test(compact(line.text))).slice(0, 50).map(label => {
     const h = label.bbox.y1 - label.bbox.y0;
     const left = Math.floor(detail ? width * .55 : Math.max(0, label.bbox.x0 - width * .025));
     const top = Math.floor(detail ? Math.max(0, label.bbox.y0 - h * .3) : label.bbox.y1 + 2);
@@ -61,24 +82,30 @@ export function parseTradePhoto(lines: BalanceTextLine[], width: number, height:
     const partialCancellation = cancelled && block.some(line => /부분체결|일부체결/.test(compact(line.text)));
     const unfilled = block.some(line => /미체결/.test(compact(line.text).replace(/미체결(?:수량|금액|잔량)/g, "")));
     if (unfilled || (cancelled && !partialCancellation)) { excluded++; continue; }
-    const quantityHeader = block.find(line => /체결수량/.test(compact(line.text)));
+    const quantityPattern = quantityLabel(block);
+    const quantityHeader = block.find(line => quantityPattern.test(compact(line.text)));
     if (!quantityHeader) continue;
     const detail = block.some(line => /체결가격|체결단가|주문일시/.test(compact(line.text)));
     function field(pattern: RegExp) {
       const label = block.find(line => compact(line.text).match(pattern)?.index === 0); if (!label) return "";
       const inline = compact(label.text).replace(pattern, "");
-      if (/^\d/.test(inline)) return inline;
-      const candidates = block.filter(line => line !== label && /^\d/.test(line.text.trim()));
+      if (startsValue(inline)) return inline;
+      const candidates = block.filter(line => line !== label && startsValue(line.text));
       const near = detail ? candidates.filter(line => line.bbox.x0 > label.bbox.x1 && Math.abs(center(line) - center(label)) <= Math.max(24, label.bbox.y1 - label.bbox.y0))
         : candidates.filter(line => line.bbox.y0 >= label.bbox.y1 && line.bbox.y0 - label.bbox.y1 < height * .055 && Math.abs(line.bbox.x0 - label.bbox.x0) < width * .09);
       return near.toSorted((a, b) => Math.abs(center(a) - center(label)) - Math.abs(center(b) - center(label)))[0]?.text ?? "";
     }
-    const rawQuantity = field(/체결수량/);
+    const rawQuantity = field(quantityPattern);
     if (/^0(?:\.0+)?(?:주)?$/.test(compact(rawQuantity))) { excluded++; continue; }
-    const quantity = tradePhotoNumber(rawQuantity, 6) ?? "";
+    const quantity = /^[\d,.]+\s*주?$/.test(rawQuantity.trim()) ? tradePhotoNumber(rawQuantity, 6) ?? "" : "";
     const rawPrice = detail ? field(/체결가격|체결단가/) : "";
-    const rawGross = field(/체결금액/), gross = tradePhotoNumber(rawGross) ?? "";
-    let price = tradePhotoNumber(rawPrice) ?? "";
+    const unit = fillMoney(rawPrice), total = fillMoney(field(/체결금액/));
+    // A total in another currency cannot be used as the execution price's total.
+    const mixedCurrency = unit.currency && total.currency && unit.currency !== total.currency &&
+      (unit.currency === "KRW" || total.currency === "KRW");
+    const gross = mixedCurrency ? "" : total.amount;
+    const currency = [unit.currency, mixedCurrency ? "" : total.currency].find(c => c === "USD" || c === "KRW") ?? "";
+    let price = unit.amount;
     let priceSource: TradePhotoCandidate["priceSource"] = price ? "reported" : "missing";
     // A completed status (including a progress strip) is not itself evidence of
     // a fill. Partial cancellation needs an explicit positive executed portion.
@@ -90,7 +117,10 @@ export function parseTradePhoto(lines: BalanceTextLine[], width: number, height:
     if (!detail && quantity && gross) {
       try { price = tradePhotoNumber(Decimal.from(gross).div(quantity).toExactString()) ?? ""; if (price) priceSource = "derived"; } catch { /* Recurring averages need an explicit price; never round it. */ }
     }
-    const date = block.map(line => tradePhotoDate(line.text)).find(Boolean) ?? "";
+    const executionDateLabel = /^체결일(?:시|자)?/;
+    const date = block.some(line => executionDateLabel.test(compact(line.text)))
+      ? tradePhotoDate(field(executionDateLabel))
+      : block.map(line => tradePhotoDate(line.text)).find(Boolean) ?? "";
     const firstField = block.find(line => /주문일시|주문금액|체결가격|체결단가/.test(compact(line.text)))?.bbox.y0 ?? quantityHeader.bbox.y0;
     const labels = block.filter(line => !group.includes(line) && line.bbox.y0 < firstField && line.bbox.x0 < width * .7 &&
       /[가-힣A-Za-z]/.test(line.text) && !/^(접수|처리|대기|가능)$/.test(compact(line.text)) && !/예약|주문|체결|결제|소수점|완료|정정|취소|USD|KRW|계좌|확인|국내|해외|일반/.test(compact(line.text)) && !tradePhotoDate(line.text));
@@ -98,7 +128,7 @@ export function parseTradePhoto(lines: BalanceTextLine[], width: number, height:
     const label = nameLines.map(line => line.text.trim()).join(" · ").slice(0, 120);
     // No usable fill evidence: don't fabricate a blank transaction from a clipped card.
     if (!quantity && !gross && !price) continue;
-    rows.push({ label: label || "종목 확인 필요", side: start.text.trim().startsWith("매수") ? "buy" : "sell", date, quantity, price, currency: currencyOf(rawPrice) || currencyOf(rawGross), gross, priceSource });
+    rows.push({ label: label || "종목 확인 필요", side: start.text.trim().startsWith("매수") ? "buy" : "sell", date, quantity, price, currency, gross, priceSource });
   }
   return { rows, excluded };
 }

@@ -16,6 +16,7 @@ import { cardTitles, type CardKind } from "./card-definition";
 import { MetricControls, PeriodControls } from "./history-detail-controls";
 import { HomeToday } from "./home-today";
 import { HomeImpactControls, HomeImpactProvider } from "./home-impact";
+import { HomePerformanceProvider, usePeriodPerformance } from "./home-performance";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
@@ -40,6 +41,11 @@ import home from './home-layout.module.css';
 
 import { HOME_ALLOCATION_COLORS } from "@/components/portfolio/allocation-colors";
 
+function HistoryFooter() {
+  const performance = usePeriodPerformance();
+  return <div className={home.historyFooter}>{!performance && <HomeImpactControls />}<PeriodControls /></div>;
+}
+
 export function BetaHome({
   initialContext,
   read,
@@ -48,9 +54,11 @@ export function BetaHome({
   read?: DomainRead;
 }) {
   const [context, setContext] = useBetaContext(initialContext);
-  const { selected, setSelected, period } = useBetaPreferences();
+  const { selected, setSelected, period, metric } = useBetaPreferences();
   const [expanded, setExpanded] = useState<{ kind: CardKind; origin: ExpansionOrigin } | null>(null);
-  const history = useHomeHistoryRead(useBetaView(context, read), read, context, period === "ALL" || expanded?.kind === "history");
+  const needsFullHistory = period === "ALL" || expanded?.kind === "history" ||
+    metric === "return" && !context.scope.startsWith("portfolio:");
+  const history = useHomeHistoryRead(useBetaView(context, read), read, context, needsFullHistory);
   const view = history.view;
   const originalValue = view.domain?.currentValuePresentation ? originalCurrentValueSummary(view.domain.currentValuePresentation,context.currency) : null;
   const composition = view.domain?.currentValuePresentation ? originalCurrentComposition(view.domain.currentValuePresentation, context.currency) : null;
@@ -106,6 +114,7 @@ export function BetaHome({
   return (
     <BetaShell context={context} setContext={setContext} readView={view} homeSummary={homeSummary}>
       <HomeImpactProvider read={view.domain?.heatmap}>
+      <HomePerformanceProvider view={view} context={context} read={read}>
       <div className={home.dashboard}>
         <div className={home.hero}>
           <div className={home.summary}>
@@ -151,7 +160,7 @@ export function BetaHome({
           <div className={home.history}>
             <Card onOpen={open} kind="history" className={!view.history.length ? home.noHistory : undefined} controls={<MetricControls compact />}>
               <HistoryChart view={view} compact interactive currency={context.currency} />
-              <div className={home.historyFooter}><HomeImpactControls /><PeriodControls /></div>
+              <HistoryFooter />
               {history.error && <CairnStatus as="div" role="status">
                 <p>{history.error === 'session' ? '계좌 연결이 바뀌었어요. 화면을 새로고침해 주세요.' : '전체 이력을 불러오지 못했어요.'}</p>
                 <CairnButton type="button" variant="bare" onClick={() => history.error === 'session' ? window.location.reload() : history.retry()}>{history.error === 'session' ? '새로고침' : '다시 조회'}</CairnButton>
@@ -304,6 +313,7 @@ export function BetaHome({
           )}
         </BetaDialog>
       )}
+      </HomePerformanceProvider>
       </HomeImpactProvider>
     </BetaShell>
   );

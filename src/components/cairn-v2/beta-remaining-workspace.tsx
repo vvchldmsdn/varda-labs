@@ -3,7 +3,7 @@ import { parseMoneyInput } from '@/lib/money';
 import { PlanProjection } from './plan-projection';
 import type {UserAllocationBasis} from '@/lib/user-allocation-comparison';
 import { DetailHeader } from './ui/molecules';
-import {Status as CairnStatus} from '@/components/cairn-ui';
+import {Field as CairnField, Select as CairnSelect, Status as CairnStatus} from '@/components/cairn-ui';
 import {T} from '@/components/i18n/localized-text';
 import { carryRecoveryFragment } from '@/lib/recovery-navigation';
 import { ContributionNextSteps } from '@/components/additional-contribution/contribution-journey';
@@ -33,8 +33,12 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner,u
  useLayoutEffect(()=>{observed?.(read.readReceipt,read.readEpoch)},[observed,read.readReceipt,read.readEpoch,freshness?.epoch]);
  const blocked=pending||remainingWorkspaceQueryKey(read.kind,query)!==read.queryKey||!!store?.blocked(read.readReceipt,read.readEpoch),ready=!blocked&&available&&read.state==='ready';
  const generation=JSON.stringify([read.queryKey,read.readReceipt,read.readEpoch]),current=useRef(generation);useLayoutEffect(()=>{current.current=generation;return()=>{current.current='unmounted'}},[generation]);
+ const choosingTradeAccount = read.kind === 'ledger' && !read.selection.accountId && !context.scope.startsWith('account:')
+   && (read.selection.action === 'buy' || read.selection.action === 'sell');
  const move=(next:typeof context)=>{
-  const selection = read.selection.accountId && next.scope === 'account:' + read.selection.accountId ? read.selection : undefined;
+  const selection = choosingTradeAccount
+    ? { action:read.selection.action, accountId:next.scope.startsWith('account:') ? next.scope.slice(8) : undefined }
+    : read.selection.accountId && next.scope === 'account:' + read.selection.accountId ? read.selection : undefined;
   setSaved(null);
   current.current='navigation';
   start(()=>router.push(carryRecoveryFragment(remainingWorkspaceHref(read.kind,next,store?.pendingEpoch(),selection),location.hash),{scroll:false}));
@@ -48,7 +52,7 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner,u
  const allocation=draft && projection?.rows.some(row=>row.buyable && row.allocationKey===draft.allocation) ? draft.allocation : 'ratio';
  const budgetKrw=parseMoneyInput(budget,'KRW');
  const journalLanding = useSyncExternalStore(subscribeToFragment,()=>location.hash==='#choose-record-account',()=>true);
- const selectLedgerAccount = journalLanding && read.kind==='ledger' && !read.selection.accountId && !context.scope.startsWith('account:');
+ const selectLedgerAccount = choosingTradeAccount || (journalLanding && read.kind==='ledger' && !read.selection.accountId && !context.scope.startsWith('account:'));
  const ledgerSelection = read.selection.accountId || !context.scope.startsWith('account:') ? read.selection : {...read.selection,accountId:context.scope.slice(8)};
  const ledgerNavigation=betaLedgerNavigation(context,store?.pendingEpoch(),read.selection);
  return <BetaShell workspace={read.kind} context={context} setContext={move} readView={shell} originalPath={read.kind==='ledger'?'/portfolio/ledger':'/plans'}>
@@ -57,7 +61,16 @@ export function BetaRemainingWorkspace({read,projection,reason,projectionOwner,u
    {(blocked||read.state!=='ready')&&<p role="status">{blocked?'불러오는 중…':read.message}</p>}
 
    {ready&&saved&&saved.epoch===read.readEpoch&&saved.queryKey===read.queryKey&&<CairnStatus as="p" tone="success" role="status"><T ko="기록했어요. 아래 거래 목록에서 확인할 수 있어요." en="Recorded. You can review it in the transaction list below." /></CairnStatus>}
-   {ready && selectLedgerAccount && <p id="choose-record-account" role="status">계좌별 거래 기록은 상단에서 계좌를 선택해 확인하세요. <Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),store?.pendingEpoch())}>이 범위의 평가 기록 보기 →</Link></p>}
+   {ready && choosingTradeAccount && <div className={styles.accountChoice}>
+     {read.scopes.some(scope=>scope.key.startsWith('account:')) ? <CairnField>
+       <T ko="어느 계좌의 거래인가요?" en="Which account is this trade for?" />
+       <CairnSelect value="" onChange={event=>move({...context,scope:event.currentTarget.value})}>
+         <option value="" disabled><T ko="계좌 선택" en="Choose an account" /></option>
+         {read.scopes.filter(scope=>scope.key.startsWith('account:')).map(scope=><option key={scope.key} value={scope.key}>{scope.label}</option>)}
+       </CairnSelect>
+     </CairnField> : <Link prefetch={false} href={ledgerNavigation.accountsHref}><T ko="거래를 기록할 계좌 추가" en="Add an account to record trades" /></Link>}
+   </div>}
+   {ready && selectLedgerAccount && !choosingTradeAccount && <p id="choose-record-account" role="status">계좌별 거래 기록은 상단에서 계좌를 선택해 확인하세요. <Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),store?.pendingEpoch())}>이 범위의 평가 기록 보기 →</Link></p>}
    {read.kind==='plans'?<div hidden={!ready} inert={!ready} aria-hidden={!ready}>
     <SavedPlanLibrary generation={generation} suspended={!ready} projectionOwner={projectionOwner} projection={ready && <>
      <PlanProjection key={generation} amount={budget} allocation={allocation} basis={projection}

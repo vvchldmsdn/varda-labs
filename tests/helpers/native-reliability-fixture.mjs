@@ -10,6 +10,7 @@ const quote = value => `"${value.replaceAll('"', '""')}"`;
  */
 export async function addNativeReliabilityFixtureTables(pg) {
   const [schema] = await importWithPorts(['src/db/schema.ts'], {});
+  await pg.exec('alter table daily_portfolio_snapshots add column if not exists cycle_end_at timestamptz');
   for (const table of [schema.accountBalanceSnapshots, schema.dailyPositionSnapshots]) {
     const { name, columns } = getTableConfig(table);
     const present = (await pg.query('select to_regclass($1) as relation', [`public.${name}`])).rows[0].relation;

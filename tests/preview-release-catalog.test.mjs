@@ -5,11 +5,12 @@ import { PGlite } from '@electric-sql/pglite';
 import { readPreviewReleaseCatalog, assertPreviewReleaseCatalog, readPreviewProtectedContent, assertPreviewProtectedContentPreserved, PREVIEW_PROTECTED_TABLES } from '../scripts/lib/preview-release-catalog.mjs';
 
 const expected = JSON.parse(readFileSync(new URL('../scripts/fixtures/preview-release-catalog.json', import.meta.url), 'utf8'));
-test('Preview current catalog attests actual 0047/0064 SQL and rejects weakened schema', async () => {
+test('Preview current catalog attests actual 0047/0064/0065 SQL and rejects weakened schema', async () => {
   const db = new PGlite();
   try {
     await db.exec(`create role varda_tenant_app; create table app_users(id uuid primary key); create table accounts(id uuid primary key,canonical_owner_user_id uuid,is_active boolean); create function investment_plan_tenant_active() returns boolean language sql as 'select false';`);
-    for (const tag of ['0047_member_activity','0064_contribution_effects']) await db.exec(readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint',''));
+    await db.exec('create table daily_portfolio_snapshots(id uuid primary key)');
+    for (const tag of ['0047_member_activity','0064_contribution_effects','0065_snapshot_closing_performance']) await db.exec(readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint',''));
     const read = () => readPreviewReleaseCatalog(async q => (await db.query(q)).rows);
     assertPreviewReleaseCatalog(await read(), expected);
     for (const sql of [
@@ -21,6 +22,10 @@ test('Preview current catalog attests actual 0047/0064 SQL and rejects weakened 
       'alter table contribution_effects alter column document drop not null',
       'alter table contribution_effects drop constraint contribution_effects_revision_check',
       'drop index contribution_effects_owner_account_idx',
+      'alter table daily_portfolio_snapshots drop column closing_performance',
+      'alter table daily_portfolio_snapshots alter column closing_performance set not null',
+      "alter table daily_portfolio_snapshots alter column closing_performance set default '{}'::jsonb",
+      'alter table daily_portfolio_snapshots alter column closing_performance type json using closing_performance::json',
     ]) {
       await db.exec('begin');
       try {

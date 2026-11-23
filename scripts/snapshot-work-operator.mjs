@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {snapshotWorkRevisionAppliesSql} from '../src/lib/snapshots/holdings-revision-policy.ts';
 
 export const REQUEUE_REASONS=['evidence_restored','transient_issue_resolved','lease_interruption_reviewed'];
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,7 +25,7 @@ async function verifyLocalServer(client) {
 }
 const scopedQuery=`select w.id,w.canonical_owner_user_id as "ownerId",w.account_id as "accountId",w.snapshot_date::text as "snapshotDate",w.stage,w.revision,w.generation,w.status,w.attempts,w.reason,w.next_attempt_at as "nextAttemptAt",w.lease_until as "leaseUntil",
   a.is_active and u.status='active' and u.role in('user','admin') and ((w.stage='native' and a.native_state is not null) or (w.stage='legacy' and a.native_state is null)) as eligible,
-  coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=w.account_id and r.canonical_owner_user_id=w.canonical_owner_user_id and r.affected_at<=(w.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'),0) as "effectiveRevision"
+  coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=w.account_id and r.canonical_owner_user_id=w.canonical_owner_user_id and ${snapshotWorkRevisionAppliesSql("w")}),0) as "effectiveRevision"
   from daily_snapshot_work w join accounts a on a.id=w.account_id and a.canonical_owner_user_id=w.canonical_owner_user_id join app_users u on u.id=w.canonical_owner_user_id
   where w.id=$1::uuid and w.canonical_owner_user_id=$2::uuid and w.account_id=$3::uuid and w.revision=$4`;
 const parameters=scope=>[scope.workId,scope.ownerId,scope.accountId,scope.revision];

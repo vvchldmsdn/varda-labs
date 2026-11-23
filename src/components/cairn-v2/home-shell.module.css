@@ -163,6 +163,20 @@
 .shell.shell[data-home-theme=dark] { background:#0d151c; }
 .shell.shell[data-home-theme=dark] > aside { --bar-bg:#0d151cf2; --bar-line:#293640; }
 
+.shell.shell[data-home-dashboard] > aside > .tradeEntry {
+  display:inline-flex;align-items:center;justify-content:center;flex:none;
+  min-height:44px;height:auto;margin:0 0 0 auto;padding:0 12px;border-radius:8px;
+  font:inherit;font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none;
+  background:var(--cairn-ui-surface);color:var(--cairn-ui-ink);
+}
+.shell.shell[data-home-dashboard] > aside > .tradeEntry + .themeToggle { margin-left:0; }
+.tradeEntry:focus-visible { outline:2px solid currentColor;outline-offset:2px; }
+@media (hover:hover) {
+  .shell.shell[data-home-dashboard] > aside > .tradeEntry:hover {
+    background:color-mix(in srgb,var(--cairn-ui-ink) 9%,var(--cairn-ui-surface));
+  }
+}
+
 .shell[data-home-theme=dark] > aside img { filter:invert(1); }
 .shell[data-home-theme=dark] [data-home-refresh=done] > button { color:var(--cairn-ui-success); }
 .shell[data-home-theme=dark] .scopeMenu input,

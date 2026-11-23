@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     const selected = context.resolution.scope;
     const [history, recoveredReturn] = await Promise.all([
       getBetaHistoryRead({ tenantContext, scope: selected, analysisScopes: context.catalog.scopes }),
-      selected.kind === 'account' ? readRecoveredReturnCurve(tenantContext, selected.accountId) : Promise.resolve(null),
+      selected.kind === 'account' ? readRecoveredReturnCurve(tenantContext, selected.accountId, true) : Promise.resolve(null),
     ]);
     if (history.readStatus === 'unavailable') return reply({ error: 'history_unavailable' }, 503);
     return reply({ scope, currency, displayBinding: binding, readReceipt: randomUUID(), readEpoch: epoch ?? undefined,

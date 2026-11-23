@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildPeriodAttribution, calendarAttributionRange, validateAttributionRange } from "../src/lib/cairn-v2/period-attribution.ts";
 import { periodChartSeries } from "../src/lib/cairn-v2/period-chart-series.ts";
+import { buildPeriodPerformance } from "../src/lib/cairn-v2/period-performance.ts";
 
 const accounts = [{ id: "isa", name: "ISA" }];
 const end = { start: "2026-11-01", end: "2026-11-01" };
@@ -11,6 +12,98 @@ const snapshot = (date, positions, extra) => ({ date, accountId: "isa", expected
 const trade = (quantityDelta, price, fxRate, extra) => ({ date: end.end, accountId: "isa", assetId: "abc", quantityDelta, price, fxRate, ...extra });
 const calc = (before, after, trades = []) => buildPeriodAttribution(end, { accounts,
   observations: [snapshot("2026-10-31", before), snapshot(end.end, after)], trades });
+
+test("return adjusts buys and sales on dated shares and retains losses during net investment", () => {
+  const range = {start:"2026-11-01", end:"2026-11-04"};
+  const frames = [[1,1,100],[2,2,90],[3,1,99],[4,1,99]].map(([d,q,p]) =>
+    snapshot("2026-11-0"+d, [position(q,p,1)], {source:"manual_daily"}));
+  const trades = [trade(1,90,1,{date:"2026-11-02"}),trade(-1,99,1,{date:"2026-11-03"})];
+  const input={accounts:[{id:"isa",holdings:true}], observations:frames,trades,cashFlows:[]};
+  const result=buildPeriodPerformance(range,input);
+  assert.equal(result.basis,"invested_assets_excluding_cash");
+  assert.deepEqual(result.gaps,[]);
+  assert.deepEqual(result.points.map(p=>Math.round(p.returnPct)),[0,-10,-1,-1]);
+  assert.deepEqual(result.points.map(p=>p.dailyReturnPct===null?null:Math.round(p.dailyReturnPct)),[null,-10,10,0]);
+  assert.ok(result.points.every(p=>p.segment===range.start));
+  // KRW settlement suffices even when its native unit price or FX is unknown.
+  assert.deepEqual(buildPeriodPerformance(range,{...input,trades:[{...trades[0],fxRate:null,price:null,flowKrw:90},trades[1]]}),result);
+  const missing=buildPeriodPerformance(range,{...input,trades:[trades[1]]});
+  assert.deepEqual(missing.gaps,[{start:"2026-11-02",end:"2026-11-02",reason:"trade"}]);
+  assert.equal(missing.points[0].returnPct,null);
+  assert.equal(missing.points[1].segment,null);
+  assert.equal(missing.points[1].returnPct,null);
+  assert.equal(missing.points[1].dailyReturnPct,null);
+  assert.equal(missing.points[2].segment,"2026-11-02");
+  assert.ok(Math.abs(missing.points[2].dailyReturnPct-10)<1e-8);
+});
+
+test("a provisional valuation never bridges a missing preceding cutoff", () => {
+  const range={start:"2026-09-13",end:"2026-09-15"};
+  const observations=[snapshot(range.start,[position(1,100,1)],{source:"varda_manual_daily_snapshot"}),
+    snapshot(range.end,[position(1,120,1)],{source:"current_investments",liveAsOf:"2026-09-15T10:00:00Z"})];
+  const result=buildPeriodPerformance(range,{accounts:[{id:"isa",holdings:true}],observations,trades:[],cashFlows:[]});
+  assert.ok(result.points.every(row=>row.returnPct===null && !row.liveAsOf));
+});
+
+test("unchanged carried manual marks support a disclosed stored-valuation estimate; scope and unexplained moves break it", () => {
+  const range={start:"2026-11-01",end:"2026-11-03"};
+  const obs=[100,100,150].map((p,i)=>snapshot("2026-11-0"+(i+1),[{...position(1,p,1),carriedMark:true}],{source:"manual_daily"}));
+  const input={accounts:[{id:"isa",holdings:true}],observations:obs,trades:[],cashFlows:[]};
+  const result=buildPeriodPerformance(range,input);
+  assert.equal(result.includesCarriedMarks,true);
+  assert.deepEqual(result.points.map(p=>p.returnPct),[0,0,null]);
+  assert.deepEqual(result.gaps,[{start:range.end,end:range.end,reason:"valuation"}]);
+  const multi=buildPeriodPerformance(range,{...input,accounts:[...input.accounts,{id:"second",holdings:false}]});
+  assert.equal(multi.basis,"mixed"); assert.deepEqual(multi.gaps,[{...range,reason:"scope"}]);
+  const incomplete=buildPeriodPerformance(range,{...input,accounts:[...input.accounts,{id:"second",holdings:true}]});
+  assert.ok(incomplete.points.every(p=>p.returnPct===null));
+});
+
+test("an absent close stays empty; the next measured close uses all intervening flows and calendar weights", () => {
+  const range = {start:"2026-11-01",end:"2026-11-04"};
+  const input = { accounts:[{id:"isa",holdings:true}], trades:[trade(1,100,1,{date:"2026-11-02"})], cashFlows:[],
+    observations:[[1,1,100],[3,2,110],[4,2,110]].map(([d,q,p]) =>
+      snapshot("2026-11-0"+d,[position(q,p,1)],{source:"manual_daily"})) };
+  const result = buildPeriodPerformance(range,input);
+  assert.deepEqual(result.gaps,[{start:"2026-11-02",end:"2026-11-02",reason:"valuation"}]);
+  assert.equal(result.points[1].returnPct,null); assert.equal(result.points[2].dailyReturnPct,null);
+  assert.ok(Math.abs(result.points[2].returnPct-20/150*100)<1e-9);
+  assert.equal(result.points[2].segment,range.start);
+  assert.equal(result.points[3].dailyReturnPct,0);
+  const missingFx = buildPeriodPerformance(range,{...input,trades:[{...input.trades[0],fxRate:null}]});
+  assert.ok(missingFx.gaps.some(g=>g.reason==="trade" && g.end==="2026-11-03"));
+  const closingFx = buildPeriodPerformance(range,{...input,trades:[{...input.trades[0],closingFx:true}]});
+  assert.deepEqual(closingFx.points.map(p=>Boolean(p.estimatedFx)),[false,false,true,true]);
+  assert.equal(closingFx.includesClosingFx,true);
+});
+
+test("one missing account close leaves only that date blank when the surrounding aggregate balances reconcile", () => {
+  const range = { start: "2026-11-01", end: "2026-11-03" };
+  const rows = [1, 2, 3].map(d => snapshot("2026-11-0"+d, [position(1, 100 + 10*(d-1), 1)], {source:"daily"}));
+  const second = d => snapshot("2026-11-0"+d, [position(1,100,1)], {source:"daily", accountId:"second"});
+  const input = { accounts:[{id:"isa",holdings:true},{id:"second",holdings:true}], observations:[...rows,second(1),second(3)], trades:[], cashFlows:[] };
+  const result = buildPeriodPerformance(range,input);
+  assert.deepEqual(result.gaps,[{start:"2026-11-02",end:"2026-11-02",reason:"valuation"}]);
+  assert.equal(result.points[1].returnPct,null);
+  assert.equal(result.points[2].dailyReturnPct,null);
+  assert.equal(result.points[2].segment,range.start);
+  assert.ok(Math.abs(result.points[2].returnPct-10)<1e-9);
+  const invalid = buildPeriodPerformance(range,{...input,observations:[...input.observations,{...second(2),expectedPositions:2}]});
+  assert.equal(invalid.points[2].returnPct,null);
+});
+
+test("a native account that lost all capital keeps its terminal loss when a new deposit restarts it", () => {
+  const range={start:"2025-11-01",end:"2025-11-03"};
+  const input={accounts:[{id:"isa",holdings:false}],trades:[],observations:[100,0,150].map((v,i)=>
+    snapshot("2025-11-0"+(i+1),[position(1,v,1)],{source:"native",at:"2025-11-0"+(i+1)+"T22:00:00Z"})),
+    cashFlows:[{date:"2025-11-03",accountId:"isa",at:"2025-11-03T10:00:00Z",amountKrw:100}]};
+  const result=buildPeriodPerformance(range,input);
+  assert.deepEqual(result.points.map(p=>p.dailyReturnPct),[null,-100,100]);
+  assert.deepEqual(result.points.map(p=>p.returnPct),[0,-100,100]);
+  assert.equal(result.points[1].segment,range.start); assert.equal(result.points[2].segment,"2025-11-02");
+  const unknown=buildPeriodPerformance(range,{...input,cashFlows:[{...input.cashFlows[0],amountKrw:null}]});
+  assert.deepEqual(unknown.gaps,[{start:range.end,end:range.end,reason:"cash_flow"}]);
+});
 
 test("calendar presets and inclusive custom bounds use real dates, including leap days and year changes", () => {
   assert.deepEqual(calendarAttributionRange("lastMonth", "2024-03-01"), { start: "2024-02-01", end: "2024-02-29" });

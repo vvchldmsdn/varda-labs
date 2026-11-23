@@ -66,7 +66,7 @@ export async function getBetaDomainRead(
       const [history, recoveredReturn] = await Promise.all([
         getBetaHistoryRead({ ...args, historyWindow: options.historyWindow }),
         args.scope.kind === "account"
-          ? readRecoveredReturnCurve(args.tenantContext, args.scope.accountId)
+          ? readRecoveredReturnCurve(args.tenantContext, args.scope.accountId, true)
           : Promise.resolve(null),
       ]);
       return { ...history, recoveredReturn };

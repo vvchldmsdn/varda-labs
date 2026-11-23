@@ -1,4 +1,14 @@
 {
+  "closingPerformance": [
+    {
+      "data_type": "jsonb",
+      "udt_schema": "pg_catalog",
+      "udt_name": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null,
+      "is_generated": "NEVER"
+    }
+  ],
   "tables": [
     {
       "name": "contribution_effects",

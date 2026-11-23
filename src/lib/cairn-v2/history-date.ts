@@ -40,3 +40,9 @@ function shiftIsoDate(value: string, dayDelta: number) {
   const at = Date.parse(`${value}T00:00:00Z`);
   return new Date(at + dayDelta * 86_400_000).toISOString().slice(0, 10);
 }
+
+/** A valuation after midnight can belong to the previous Korean service day. */
+export function formatLiveValuationTime(asOf: string) {
+  const kst = new Date(Date.parse(asOf) + 9 * 60 * 60 * 1000).toISOString();
+  return kst.slice(5, 10).replace("-", ".") + " " + kst.slice(11, 16) + " KST";
+}

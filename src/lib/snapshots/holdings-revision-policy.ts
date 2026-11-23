@@ -21,9 +21,13 @@ export function holdingsRevisionValidSql(alias: string, scopeAccountsSql?: strin
       and (${scopeAccountsSql.replaceAll("recovery.account_id", "revision.account_id")}))`;
 }
 
-export function snapshotWorkRevisionCutoffSql(alias: string) {
-  return `coalesce((select s.cycle_end_at from daily_portfolio_snapshots s
-    where ${alias}.stage='legacy' and s.account_id=${alias}.account_id and s.canonical_owner_user_id=${alias}.canonical_owner_user_id
+/** Native closing frames exclude an event at exactly 07:00. A holdings repair
+ * uses the source row's actual cutoff, as does its revision enqueue trigger. */
+export function snapshotWorkRevisionAppliesSql(alias: string) {
+  const scheduled = `(${alias}.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours'`;
+  return `case when ${alias}.stage='native' then r.affected_at < ${scheduled}
+    else r.affected_at <= coalesce((select s.cycle_end_at from daily_portfolio_snapshots s
+    where s.account_id=${alias}.account_id and s.canonical_owner_user_id=${alias}.canonical_owner_user_id
       and s.snapshot_date=${alias}.snapshot_date and s.source='varda_manual_daily_snapshot' and not s.is_sample limit 1),
-    (${alias}.snapshot_date::timestamp AT TIME ZONE 'Asia/Seoul')+interval '7 hours')`;
+    ${scheduled}) end`;
 }

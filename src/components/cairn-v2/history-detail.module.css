@@ -57,6 +57,13 @@
 .evidence>p {font-size:11px;line-height:1.65;color:var(--cairn-v2-muted);margin-top:6px;}
 .empty {padding:60px 0;text-align:center;color:var(--cairn-v2-muted);}
 .scopeNotice { display:grid; justify-items:start; gap:12px; padding:22px 0; color:var(--cairn-v2-muted); }
+.performanceEvidence {display:grid;gap:4px;margin-top:16px;padding:14px 0;border-top:1px solid var(--cairn-v2-line);color:var(--cairn-v2-muted);font-size:13px;line-height:1.55;}
+.recordsLink {display:inline-flex;min-height:44px;align-items:center;gap:6px;color:var(--cairn-v2-ink);font-size:13px;}
+.gapList {display:grid;gap:12px;margin-block:14px 0;}
+.gapList dt {font-variant-numeric:tabular-nums;color:var(--cairn-v2-ink);}
+.gapList dd {margin:2px 0 0;}
+.savedDisclosure {border-top:1px solid var(--cairn-v2-line);}
+.savedDisclosure>div {max-width:none;color:var(--cairn-v2-ink);}
 @media(max-width:1100px) {.stage {grid-template-columns:minmax(180px,27%) minmax(0,1fr);gap:26px;}.value {font-size:32px;}.periodValue {font-size:23px;}}
 @container history-detail (max-width:760px) {.stage {grid-template-columns:1fr;gap:24px;}.hero {display:block;}.plot>figure>[data-history-plot] {height:270px;}}
 @media(max-width:699px) {

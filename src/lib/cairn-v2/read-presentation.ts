@@ -16,11 +16,14 @@ const day = (date: string) => Date.parse(date + "T00:00:00Z") / 86400000;
 export function historyRows(view: BetaView, period: HistoryPeriod) {
   const rows = view.history.filter(r => Number.isFinite(day(r.date))).toSorted((a, b) => a.date.localeCompare(b.date));
   if (period === "ALL" || !rows.length) return rows;
-  const end = new Date(rows.at(-1)!.date + "T00:00:00Z");
+  const start = historyWindowStart(rows.at(-1)!.date, period);
+  return rows.filter(r => r.date >= start);
+}
+export function historyWindowStart(endDate: string, period: Exclude<HistoryPeriod, "ALL">) {
+  const end = new Date(endDate + "T00:00:00Z");
   const months = period === "1M" ? 1 : period === "3M" ? 3 : 6;
   const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - months + 1, 0)).getUTCDate();
-  const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - months, Math.min(end.getUTCDate(), lastDay))).toISOString().slice(0, 10);
-  return rows.filter(r => r.date >= start);
+  return new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - months, Math.min(end.getUTCDate(), lastDay))).toISOString().slice(0, 10);
 }
 export function historyAxis(rows: HistoryPoint[]) {
   const dates = [...new Set(rows.map(r => r.date))].sort();

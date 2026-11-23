@@ -18,7 +18,7 @@ import { fxFactor } from "@/lib/currency-valuation";
 import { getTwelveDataServerConfig, requestTwelveDataEvidence, readTwelveDataEvidence, resolveTwelveDataTarget, requestTwelveDataHistoricalFx, readTwelveDataHistoricalFx, readTwelveDataSplitRisk, requestTwelveDataSplitRisk } from "@/lib/market-data/twelve-data-service";
 
 /** Preserve native decimal quantities/prices. Existing account/asset ownership predicates remain authoritative. */
-export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: PortfolioAnalysisScope, reporting: Currency, options: { asOf?: Date; collect?: boolean; investmentsOnly?: boolean } = {}): Promise<TrackedPortfolioEvidence & { contributionPolicy: ReturnType<typeof resolveAdditionalContributionPolicyParameters> }> {
+export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: PortfolioAnalysisScope, reporting: Currency, options: { asOf?: Date; collect?: boolean; investmentsOnly?: boolean; currentOnly?: boolean } = {}): Promise<TrackedPortfolioEvidence & { contributionPolicy: ReturnType<typeof resolveAdditionalContributionPolicyParameters> }> {
   const now = options.asOf ?? new Date();
   if (!Number.isFinite(now.getTime()) || now.getTime() > Date.now()) throw new Error("currency_valuation_time_invalid");
   // Page reads never create live-price or spot-FX demand. Explicit collection remains opt-in.
@@ -59,7 +59,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
     fx: sources.recentFxRows.flatMap(row => row.observedAt && row.fetchedAt && row.source && (row.rateKind === "spot" || row.rateKind === "daily_reference")
       ? [{ base: "USD" as const, quote: "KRW" as const, rate: String(row.usdKrw), observedAt: row.observedAt.toISOString(), fetchedAt: row.fetchedAt.toISOString(), source: row.source, kind: row.rateKind }] : []),
     maxFxAgeMs: 3 * 86400000, maxPriceAgeMs: 10 * 86400000 };
-  const ledger = await readNativeLedger(tenant, scope.kind === "account" ? scope.accountId : undefined);
+  const ledger = await readNativeLedger(tenant, scope.kind === "account" ? scope.accountId : undefined, { includeSnapshots: !options.currentOnly });
   const config = getTwelveDataServerConfig();
   if (config?.provider.audience === "member_display") {
     const targets = new Map<string, { target: Extract<ReturnType<typeof resolveTwelveDataTarget>, { status: "resolved" }>["target"]; assets: typeof sources.assetRows }>();
@@ -126,7 +126,7 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
   }
   const selection = scope.kind === "portfolio_group" ? resolveNativeGroupSelection(await loadTenantPortfolioGroupMemberships({ mode: "all", portfolioGroupId: scope.portfolioGroupId, tenantContext: tenant }), at) : undefined;
   const projected = attachNativeLedgerEvidence(evidence, ledger, scope.kind, selection);
-  if (config?.provider.audience === "member_display") {
+  if (!options.currentOnly && config?.provider.audience === "member_display") {
     const requestedAt = nativeHistoricalFxTimes(projected);
     if (requestedAt.length) {
       // Provider/cache failures leave the dated valuation incomplete, never erase other positions.
