@@ -2,8 +2,8 @@
   "version": 1,
   "authority": "packages/cairn-financial-domain/src",
   "files": {
-    "portfolio-math.ts": "5d042b97b700b6a6e0f71b301cb216ae3c7e3f7d46718f61214bfa6872c132e4",
-    "portfolio-movement.ts": "cf9980383c0c20bae1d1ea30ccd9c376d5c4f419f610c826e5c53729d662f9b1",
-    "current-holding-movement.ts": "d032722b0d5245e131272f26ae9615e98177efac6f84795515da17ee25fe12e2"
+    "portfolio-math.ts": "e14e9885131aeb93389fa343b921e07098be3df59ca7e35cc58387215b51a48f",
+    "portfolio-movement.ts": "49f3544b3527148293f102f971894489815c60631ea7b3575569de83530fc009",
+    "current-holding-movement.ts": "9f704b5336d9e1600ffaf3a26e293051bd8b0dcbe63f20b9b38237312100a33d"
   }
 }

@@ -14,7 +14,8 @@ const scope = { kind: 'account', key: `account:${accountId}`, accountId, account
 const holding = { id: assetId, accountId, canonicalOwnerUserId: owner, account: 'brokerage', ticker: 'TEST', market: 'us', currency: 'USD', quantity: '0.896567', assetType: 'etf', legacyBase44Id: null };
 const portfolio = { snapshotDate: '2026-11-01', account: 'brokerage', totalMarketValue: '12000', totalCost: null, totalPnl: null, totalReturnPct: null, nativeEvidence: { privatePayload: 'x'.repeat(5000) } };
 
-async function dashboardFixture() {
+async function dashboardFixture({ basisRead = async () => [], accountRows = [{ id: accountId, code: 'brokerage', nativeState: {sequence: 1} }],
+  all = false, targetRows, selectedAssets = [holding], selectedScope } = {}) {
   const trace = [], nativeCalls = [];
   const dialect = new PgDialect();
   const db = { select(projection) {
@@ -26,8 +27,8 @@ async function dashboardFixture() {
       orderBy() { return builder; }, limit() { return builder; },
       then(resolve, reject) {
         trace.push(request);
-        let rows = request.table === 'assets' ? [holding]
-          : request.table === 'accounts' ? [{ id: accountId, code: 'brokerage', nativeState: { sequence: 1 } }]
+        let rows = request.table === 'assets' ? selectedAssets
+          : request.table === 'accounts' ? accountRows
           : request.table === 'daily_portfolio_snapshots' ? [portfolio]
           : request.table === 'live_price_quotes' ? [{ ticker: 'TEST', price: '100.125', currency: 'USD' }]
           : request.projection?.count ? [{ count: 0 }] : [];
@@ -38,27 +39,30 @@ async function dashboardFixture() {
   } };
   const [reader] = await importWithPorts(['src/db/queries/portfolio-dashboard.ts'], {
     '@/db/client': { db },
-    '@/db/queries/portfolio-analysis-scope-targets': { getPortfolioAnalysisScopeTargets: async () => ({ includesAllOwnedAccounts: false, wholeAccountIds: [accountId], directAssetIds: [] }) },
+    '@/db/queries/portfolio-analysis-scope-targets': { getPortfolioAnalysisScopeTargets: async () => targetRows ?? ({ includesAllOwnedAccounts: all, wholeAccountIds: [accountId], directAssetIds: [] }) },
     '@/db/queries/tenant-group-reads': { loadActiveTenantAllocationGroups: async () => [] },
     '@/db/queries/tenant-settings': { loadLatestTenantPortfolioSettingsRows: async () => [{ usdKrwRate: '1400' }] },
     '@/db/queries/portfolio-fx-rates': { loadUsablePortfolioFxRows: async () => [{ rateDate: '2026-11-01', usdKrw: '1400' }] },
-    '@/db/queries/native-investment-basis': { loadNativeInvestmentBasis: async () => { nativeCalls.push('basis'); return []; } },
+    '@/db/queries/native-investment-basis': { loadNativeInvestmentBasis: async (...args) => { nativeCalls.push('basis'); return basisRead(...args); } },
     '@/db/queries/native-legacy-trades': {
       loadNativeHoldingCosts: async () => { nativeCalls.push('cost'); return []; },
       loadNativeLegacyTrades: async () => { nativeCalls.push('trades'); return []; },
     },
   });
-  return { trace, nativeCalls, read: sourceMode => reader.getReadOnlyTenantPortfolioDashboardSources({ tenantContext, scope, serviceDate: '2026-11-02', sourceMode }) };
+  return { trace, nativeCalls, read: (sourceMode, includeInvestmentReturn) => reader.getReadOnlyTenantPortfolioDashboardSources({ tenantContext, includeInvestmentReturn,
+    scope: selectedScope ?? (all ? {kind: 'all', key: 'all', label: 'All'} : scope), serviceDate: '2026-11-02', sourceMode }) };
 }
 
 it('valuation demand preserves scoped fractional holdings, quotes and FX without downloading unused dashboard history', async () => {
   const full = await dashboardFixture(), current = await dashboardFixture();
-  const before = await full.read(), after = await current.read('valuation');
+  const before = await full.read(), after = await current.read('valuation', true);
+  assert.equal(before.investmentReturnBasis, null);
   for (const key of ['accountRows', 'assetRows', 'settingsRows', 'recentFxRows', 'liveQuoteRows']) assert.deepEqual(after[key], before[key], key);
   assert.equal(after.assetRows[0].quantity, '0.896567');
   assert.deepEqual(after.recentPortfolioRows, []);
   assert.deepEqual(after.recentPositionRows, []);
   assert.deepEqual(after.eventRows, []);
+  assert.equal(after.investmentReturnBasis, null);
   assert.deepEqual(current.nativeCalls, []);
   const tables = current.trace.map(read => read.table);
   for (const table of ['daily_portfolio_snapshots', 'daily_position_snapshots', 'event_ledger_entries', 'asset_price_snapshots']) assert.equal(tables.includes(table), false, table);
@@ -79,19 +83,62 @@ it('full dashboard excludes native payloads in SQL and its smaller snapshot proj
   assert.equal(buildPortfolioDashboardSnapshotTrend(result.recentPortfolioRows)[0].totalPnl, null);
 });
 
+it('fails closed for stale or unavailable scoped ledger evidence while healthy and legacy accounts stay comparable', async () => {
+  const healthy = {id: accountId, code: 'brokerage', nativeState: {sequence: 3}};
+  const stale = {id: assetId, code: 'isa', nativeState: {sequence: 2}};
+  const legacy = {id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', code: 'savings', nativeState: null};
+  const scopeRead = await dashboardFixture({accountRows: [healthy, stale, legacy], all: true,
+    basisRead: async () => [{accountId, sourceSequence: 3, splits: []}, {accountId: assetId, sourceSequence: 1, splits: []}]});
+  const result = await scopeRead.read('full', true);
+  assert.deepEqual(result.movementEventRows.map(row => [row.account, row.eventType]), [['isa', 'ledger_evidence_unavailable']]);
+  assert.equal(result.investmentReturnBasis, null);
+  const basisReads = [];
+  const failed = await dashboardFixture({ accountRows: [healthy, stale, legacy], basisRead: async (context, asOf, inclusive, selectedId) => {
+    basisReads.push([context.ownerUserId, selectedId]);
+    throw new Error('isolated injected failure');
+  }});
+  const failedResult = await failed.read('full', true);
+  assert.deepEqual(failedResult.movementEventRows.map(row => row.account), ['brokerage']);
+  assert.equal(failedResult.investmentReturnBasis, null);
+  assert.deepEqual(basisReads, [[owner, accountId]]);
+});
+
+it('shares one verified ledger read for cost and trades, exposing only the selected group holdings and cost fields', async () => {
+  const selected = {assetId, currency: 'USD', quantity: '0.896567', costKrw: '828000'};
+  const privateId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const otherSelected = {...selected, assetId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', costKrw: null};
+  const resultRows = [{accountId, sourceSequence: 1, splits: [], trades: [{memo: 'private'}], positions: [
+    {...selected, costLots: ['private']}, otherSelected, {...selected, assetId: privateId}]},
+    {accountId: privateId, sourceSequence: 2, splits: [], positions: [{...selected, costKrw: '1'}]}];
+  const selectedGroup = await dashboardFixture({ basisRead: async () => resultRows, selectedAssets: [holding, {...holding, id: otherSelected.assetId}],
+    selectedScope: {kind: 'portfolio_group', portfolioGroupId: privateId, key: 'group', label: 'Group'},
+    targetRows: {includesAllOwnedAccounts: false, wholeAccountIds: [], directAssetIds: [assetId, otherSelected.assetId]} });
+  assert.deepEqual((await selectedGroup.read('full', true)).investmentReturnBasis, {positions: [selected, otherSelected]});
+  assert.deepEqual(selectedGroup.nativeCalls, ['basis', 'cost', 'trades']);
+
+  const legacy = await dashboardFixture({ accountRows: [{id: accountId, code: 'brokerage', nativeState: null}] });
+  assert.deepEqual((await legacy.read('full', true)).investmentReturnBasis, {positions: []});
+  assert.deepEqual(legacy.nativeCalls, []);
+});
+
 it('SQL event filtering preserves legacy SQL-null and JSON-null rows while excluding native state', async () => {
   const f = await dashboardFixture(); await f.read();
   const { sql, params } = f.trace.find(read => read.table === 'event_ledger_entries').predicate;
   const local = new PGlite();
   try {
     await local.exec(`create table accounts (id uuid, canonical_owner_user_id uuid, is_active boolean, code text);
-      create table event_ledger_entries (id text, account_id uuid, asset_id uuid, legacy_asset_id text, account text, is_sample boolean, event_date date, native_data jsonb);`);
+      create table event_ledger_entries (id text, account_id uuid, asset_id uuid, legacy_asset_id text, account text, is_sample boolean,
+        event_date date, native_data jsonb, canonical_owner_user_id uuid, source text, broker_recovery_data jsonb);`);
     await local.query('insert into accounts values ($1,$2,true,\'brokerage\')', [accountId, owner]);
     for (const [id, payload] of [['sql-null', null], ['json-null', 'null'], ['native-state', '{"state":{"positions":[]}}']]) {
-      await local.query('insert into event_ledger_entries values ($1,$2,$3,null,\'brokerage\',false,\'2026-11-01\',$4::jsonb)', [id, accountId, assetId, payload]);
+      await local.query('insert into event_ledger_entries values ($1,$2,$3,null,\'brokerage\',false,\'2026-11-01\',$4::jsonb,$5,null,null)', [id, accountId, assetId, payload, owner]);
     }
+    await local.query(`insert into event_ledger_entries values
+      ('wrong-owner',$1,$2,null,'brokerage',false,'2026-11-01',null,$2,null,null),
+      ('overnight',$1,$2,null,'brokerage',false,'2026-11-03',null,$3,'broker_recovery_v1','{"executedAt":"2026-11-03T01:00:00+09:00"}'),
+      ('tomorrow-date-only',$1,$2,null,'brokerage',false,'2026-11-03',null,$3,'broker_recovery_v1','{}')`, [accountId, assetId, owner]);
     const result = await local.query(`select event_ledger_entries.id from event_ledger_entries join accounts on accounts.id=event_ledger_entries.account_id where ${sql} order by event_ledger_entries.id`, params);
-    assert.deepEqual(result.rows.map(row => row.id), ['json-null', 'sql-null']);
+    assert.deepEqual(result.rows.map(row => row.id), ['json-null', 'overnight', 'sql-null']);
   } finally { await local.close(); }
 });
 

@@ -7,7 +7,8 @@ import type { eventLedgerEntries } from "@/db/schema";
 import { projectNativeHoldingCosts, projectNativeLegacyTrade } from "@/lib/native-legacy-trade-projection";
 import type { NativePortfolioState } from "@/lib/native-portfolio-ledger";
 
-type NativeReadBoundary = { asOf?: Date; boundary?: "before" | "inclusive"; investment?: boolean; investmentBasis?: Awaited<ReturnType<typeof loadNativeInvestmentBasis>> };
+type NativeReadBoundary = { asOf?: Date; boundary?: "before" | "inclusive"; accountIds?: readonly string[];
+  investment?: boolean; investmentBasis?: Awaited<ReturnType<typeof loadNativeInvestmentBasis>> };
 
 /** Read current cost lots, or the effective state at a requested valuation
  * boundary (exclusive by default). Never fill history with today's state. */
@@ -28,9 +29,10 @@ export async function loadNativeHoldingCosts(tenant: TenantContext, options: Nat
         order by e.native_sequence desc limit 1
       ) prior on true
       where a.canonical_owner_user_id=$1::uuid and a.is_active and a.native_state is not null
+        ${options.accountIds ? "and a.id=any($4::uuid[])" : ""}
         and ($2::timestamptz is null or (a.native_state->>'startedAt')::timestamptz<$2::timestamptz
           or ($3::boolean and (a.native_state->>'startedAt')::timestamptz=$2::timestamptz))
-      order by a.id limit 201`, [tenant.ownerUserId, asOf, options.boundary === "inclusive"]),
+      order by a.id limit 201`, [tenant.ownerUserId, asOf, options.boundary === "inclusive", ...(options.accountIds ? [options.accountIds] : [])]),
   ], { readOnly: true });
   if (result[1].length > 200) throw new Error("native_holding_cost_scope_too_large");
   const investment = options.investmentBasis ?? await loadNativeInvestmentBasis(tenant, asOf ?? undefined, options.boundary === "inclusive");
@@ -55,10 +57,11 @@ export async function loadNativeLegacyTrades(tenant: TenantContext, options: Nat
       join assets h on h.id::text=e.native_data->'event'->>'assetId'
         and h.account_id=a.id and h.canonical_owner_user_id=e.canonical_owner_user_id
       where e.canonical_owner_user_id=$1::uuid and a.is_active
+        ${options.accountIds ? "and a.id=any($4::uuid[])" : ""}
         and e.native_data->'event'->>'type' in ('buy','sell')
         and ($2::timestamptz is null or (e.native_data->'event'->>'at')::timestamptz<$2::timestamptz
           or ($3::boolean and (e.native_data->'event'->>'at')::timestamptz=$2::timestamptz))
-      order by e.recorded_at,e.native_sequence limit 10001`, [tenant.ownerUserId, asOf, options.boundary === "inclusive"]),
+      order by e.recorded_at,e.native_sequence limit 10001`, [tenant.ownerUserId, asOf, options.boundary === "inclusive", ...(options.accountIds ? [options.accountIds] : [])]),
   ], { readOnly: true });
   if (result[1].length > 10000) throw new Error("native_trade_history_too_large");
   const investment = options.investment ? options.investmentBasis ?? await loadNativeInvestmentBasis(tenant, asOf ?? undefined, options.boundary === "inclusive") : [];

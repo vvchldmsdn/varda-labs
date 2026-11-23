@@ -419,6 +419,57 @@ describe("dashboard query demand and independent market reads", () => {
     assert.deepEqual(today.eventActivity, []);
     assert.equal(home.eventActivity.length, 2);
   });
+
+  it("uses the opening mark for today's move and the remaining purchase cost for the holding return in one dashboard read", async (t) => {
+    const now = new Date("2026-09-08T03:00:00Z");
+    t.mock.timers.enable({ apis: ["Date"], now });
+    const fx = 1400;
+    const opening = { id: "opening", snapshotDate: "2026-09-08", assetId, account: "brokerage",
+      ticker: "QQQ", assetName: "QQQ", assetType: "etf", currency: "USD", quantity: "10", unitPrice: "300",
+      marketValueKrw: String(10 * 300 * fx), fxRate: String(fx) };
+    const fill = { ...event, id: "buy-five", eventDate: "2026-09-08", eventType: "buy", quantityDelta: "5",
+      price: "250", amountKrw: String(5 * 250 * fx), beforeValue: {quantity: 10}, afterValue: {quantity: 15},
+      createdAt: new Date("2026-09-08T01:00:00Z") };
+    for (const [quantity, averageCost, eventRows, dayChangeUsd, costUsd] of [
+      ["10", "400", [], -1000, 4000],
+      ["15", "350", [fill], -1250, 5250],
+    ]) {
+      const f = await fixture({ assetRows: [{ ...baseAsset, quantity, averageCost, currentPrice: "200" }],
+        baselineRows: [opening], eventRows,
+        liveRows: [{ticker: "QQQ", market: "us", currency: "USD", price: "200", status: "ok", quoteType: "live", priceAsOf: now, fetchedAt: now}] });
+      const home = await f.model.getPortfolioDashboard({analysisScopes: [scope], scope, tenantContext, includeInvestmentReturn: true});
+      assert.equal(home.currentHoldingMovement.changeKrw / fx, dayChangeUsd);
+      assert.equal(home.investmentReturn.costKrw / fx, costUsd);
+      assert.equal(home.investmentReturn.pnlKrw / fx, Number(quantity) * 200 - costUsd);
+      assert.equal(Number(home.investmentReturn.returnPct.toFixed(2)), eventRows.length ? -42.86 : -50);
+      assert.equal(f.trace.filter(read => read.table === "event_ledger_entries").length, 1);
+    }
+  });
+
+  it("uses an overnight overseas fill in Home and Today, keeps the dollar gain available without estimating its won proceeds", async (t) => {
+    const now = new Date("2026-09-09T06:30:00+09:00");
+    t.mock.timers.enable({ apis: ["Date"], now });
+    const date = "2026-09-09";
+    const fill = { ...event, id: "overnight", eventType: "buy", eventDate: date,
+      source: "broker_recovery_v1", price: null, amountKrw: null, fxRate: null,
+      quantityDelta: "1", beforeValue: {quantity: "10"}, afterValue: {quantity: "11"},
+      brokerRecoveryData: { version: 1, assetId, tradeDate: date, side: "buy", quantity: "1", executedAt: date + "T04:00:00+09:00",
+        executionGross: {currency: "USD", amount: "105.00"}, orderUnitPrice: {currency: "USD", amount: "200"} } };
+    const f = await fixture({ assetRows: [{ ...baseAsset, quantity: "11" }], eventRows: [fill],
+      baselineRows: [{ id: "snapshot", snapshotDate: "2026-09-08", accountId, account: "brokerage", assetId, ticker: "QQQ",
+        currency: "USD", quantity: "10", marketValueKrw: "1400000", unitPrice: "100", fxRate: "1400", assetType: "etf" }],
+      liveRows: [{ ticker: "QQQ", market: "us", currency: "USD", price: "110", quoteType: "live", status: "ok", priceAsOf: now, fetchedAt: now }] });
+    const args = { scope, analysisScopes: [scope], tenantContext };
+    const home = await f.model.getPortfolioDashboard(args);
+    const today = await f.model.getPortfolioDashboard({ ...args, demand: {surface: "today", holdingDetail: selectedDetail} });
+    assert.deepEqual(today.currentHoldingMovement, home.currentHoldingMovement);
+    assert.equal(home.currentHoldingMovement.changeKrw, null);
+    assert.equal(home.todayMovement.changeKrw, null);
+    const excluded = home.currentHoldingMovement.exclusions.find(row => row.holdingId === assetId);
+    assert.equal(excluded.reason, "missing_trade_fx");
+    assert.equal(excluded.localPurchases.buyPriceChangeLocal, 5);
+    assert.equal(excluded.localPurchases.totalPriceChangeLocal, 105);
+  });
 });
 
 

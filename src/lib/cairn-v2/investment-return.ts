@@ -1,6 +1,5 @@
 import { Decimal } from "../money.ts";
 import type { DashboardData } from "../portfolio-dashboard";
-import type { loadNativeInvestmentBasis } from "../../db/queries/native-investment-basis";
 import type { PortfolioStructureResult } from "../portfolio-structure";
 
 export type InvestmentCostRow = {
@@ -16,7 +15,7 @@ export type InvestmentReturn = {
 };
 
 /** The value hero and cost read must describe the same holdings and prices. */
-export function alignedInvestmentReturn(dashboard: DashboardData & { investmentReturn?: InvestmentReturn }, structure: PortfolioStructureResult) {
+export function alignedInvestmentReturn(dashboard: DashboardData, structure: PortfolioStructureResult) {
   const result = dashboard.investmentReturn;
   if (!result) return undefined;
   const keys = (rows: (readonly unknown[])[]) => rows.map(row => JSON.stringify(row)).sort();
@@ -25,15 +24,27 @@ export function alignedInvestmentReturn(dashboard: DashboardData & { investmentR
   return !structure.exclusions.length && JSON.stringify(a) === JSON.stringify(b) ? result
     : { ...result, costKrw: null, pnlKrw: null, returnPct: null, coverage: undefined, rows: undefined, reason: "valuation_basis_changed" };
 }
-/** Current holding return, not an account cash return or period/TWR. Disposal
- * reduces remaining cost through the shared ledger's proportional policy. */
-export function investmentHoldingReturn(dashboard: DashboardData, native: Awaited<ReturnType<typeof loadNativeInvestmentBasis>>): InvestmentReturn {
+type BasisPosition = { assetId: string; currency: string; quantity: string; costKrw: string | null };
+
+/** Compare the current holdings with their remaining purchase cost after disposals. */
+export function investmentHoldingReturn(holdings: DashboardData["holdings"], basis: { positions: BasisPosition[] } | null): InvestmentReturn {
   const result: InvestmentReturn = { basis: "investment_assets_excluding_cash", currency: "KRW", costKrw: null, pnlKrw: null, returnPct: null, reason: null };
-  if (!dashboard.holdings.length) return { ...result, reason: "empty" };
+  if (basis) {
+    try {
+      return calculateHoldingReturn(holdings, basis.positions, result);
+    } catch {
+      // Malformed cost evidence must not prevent the rest of the dashboard from loading.
+    }
+  }
+  return { ...result, reason: "investment_read_unavailable" };
+}
+
+function calculateHoldingReturn(holdings: DashboardData["holdings"], basis: BasisPosition[], result: InvestmentReturn): InvestmentReturn {
+  if (!holdings.length) return { ...result, reason: "empty" };
   let cost = Decimal.from(0), value = Decimal.from(0);
   const rows: InvestmentCostRow[] = [];
-  const positions = new Map(native.flatMap(a => a.positions).map(p => [p.assetId, p]));
-  for (const row of dashboard.holdings) {
+  const positions = new Map(basis.map(p => [p.assetId, p]));
+  for (const row of holdings) {
     const p = positions.get(row.id);
     const aligned = !p || (p.currency === row.currency && Decimal.from(p.quantity).compare(row.quantity) === 0);
     const c = p ? aligned ? p.costKrw : null : row.costBasisKrw;

@@ -42,6 +42,7 @@ import {
   selectLatestPortfolioDashboardBaselineRows,
 } from "@/lib/portfolio-dashboard-baseline";
 import { normalizeTicker, uniqueStrings } from "@/lib/portfolio-math";
+import { projectDashboardMovementEvents } from "@/lib/portfolio-dashboard-movement-events";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 
 const RECENT_PORTFOLIO_DATE_COUNT = 190;
@@ -54,16 +55,20 @@ const RECENT_FX_OBSERVATION_LIMIT = 260;
 export async function getReadOnlyTenantPortfolioDashboardSources({
   demand = { surface: "home" },
   sourceMode = "full",
+  includeInvestmentReturn = false,
   scope,
   serviceDate,
   tenantContext,
+  now = new Date(),
 }: {
   demand?: PortfolioDashboardDemand;
   /** Currency valuation consumes its own ledger/history; do not fetch unrelated dashboard evidence. */
   sourceMode?: "full" | "valuation";
+  includeInvestmentReturn?: boolean;
   scope: PortfolioAnalysisScope;
   serviceDate: string;
   tenantContext: TenantContext;
+  now?: Date;
 }) {
   const targets = await getPortfolioAnalysisScopeTargets({
     scope,
@@ -97,7 +102,7 @@ export async function getReadOnlyTenantPortfolioDashboardSources({
   // Attach both dependent branches immediately, including their rejection handlers.
   // Slow history/settings reads must not postpone asset-dependent market reads.
   const [sources, quotes] = await Promise.all([
-    loadDashboardContextSources({ assetRowsPromise, demand, sourceMode, scope, serviceDate, targets, tenantContext }),
+    loadDashboardContextSources({ assetRowsPromise, demand, sourceMode, includeInvestmentReturn, scope, serviceDate, targets, tenantContext, now }),
     assetRowsPromise.then(rows => loadDashboardQuoteRows(rows, sourceMode === "full")),
   ]);
   return { ...sources, ...quotes };
@@ -107,18 +112,22 @@ async function loadDashboardContextSources({
   assetRowsPromise,
   demand,
   sourceMode,
+  includeInvestmentReturn,
   scope,
   serviceDate,
   targets,
   tenantContext,
+  now,
 }: {
   assetRowsPromise: Promise<(typeof assets.$inferSelect)[]>;
   demand: PortfolioDashboardDemand;
   sourceMode: "full" | "valuation";
+  includeInvestmentReturn: boolean;
   scope: PortfolioAnalysisScope;
   serviceDate: string;
   targets: Awaited<ReturnType<typeof getPortfolioAnalysisScopeTargets>>;
   tenantContext: TenantContext;
+  now: Date;
 }) {
   const [allAccountRows, assetGroupRows, assetRows, settingsRows, recentFxRows] =
     await Promise.all([
@@ -140,12 +149,10 @@ async function loadDashboardContextSources({
         activeAccountIds.has(accountId),
       );
   const directAssetIds = new Set(targets.directAssetIds);
-  const directAssetLegacyIds = uniqueStrings(
-    assetRows
-      .filter((asset) => directAssetIds.has(asset.id))
-      .map((asset) => asset.legacyBase44Id)
-      .filter((legacyId): legacyId is string => Boolean(legacyId)),
-  );
+  const directLegacyScopes = assetRows.flatMap(asset =>
+    directAssetIds.has(asset.id) && asset.accountId && asset.legacyBase44Id
+      ? [and(eq(eventLedgerEntries.accountId, asset.accountId), isNull(eventLedgerEntries.assetId),
+          eq(eventLedgerEntries.legacyAssetId, asset.legacyBase44Id))!] : []);
   const visibleAccountIds = new Set([
     ...wholeAccountIds,
     ...assetRows
@@ -169,7 +176,7 @@ async function loadDashboardContextSources({
   const eventScopePredicate = combineScopePredicates([
     inArrayWhenPresent(eventLedgerEntries.accountId, wholeAccountIds),
     inArrayWhenPresent(eventLedgerEntries.assetId, targets.directAssetIds),
-    inArrayWhenPresent(eventLedgerEntries.legacyAssetId, directAssetLegacyIds),
+    ...directLegacyScopes,
   ]);
   const selectedAccountRowLimit =
     RECENT_PORTFOLIO_DATE_COUNT *
@@ -295,12 +302,16 @@ async function loadDashboardContextSources({
             and(
               ...activeOwnedAccountPredicates(tenantContext),
               eventScopePredicate,
+              eq(eventLedgerEntries.canonicalOwnerUserId, tenantContext.ownerUserId),
               eq(eventLedgerEntries.account, accounts.code),
               eq(eventLedgerEntries.isSample, false),
               // Native events are projected below from the effective ledger.
               // Do not transfer their full state JSON only to discard it in JS.
               or(isNull(eventLedgerEntries.nativeData), sql`${eventLedgerEntries.nativeData} = 'null'::jsonb`),
-              lte(eventLedgerEntries.eventDate, serviceDate),
+              or(lte(eventLedgerEntries.eventDate, serviceDate), and(
+                eq(eventLedgerEntries.source, "broker_recovery_v1"),
+                sql`${eventLedgerEntries.eventDate} = ${serviceDate}::date + 1 and ${eventLedgerEntries.brokerRecoveryData}->>'executedAt' is not null`,
+              )),
             ),
           ),
     sourceMode === "valuation" || positionScopePredicate === null
@@ -328,10 +339,41 @@ async function loadDashboardContextSources({
   );
 
   let investmentBasis: Awaited<ReturnType<typeof loadNativeInvestmentBasis>> = [];
-  const includeNativePerformance = sourceMode === "full" && allAccountRows.some(row => row.nativeState != null);
+  const nativeAccounts = sourceMode === "full" ? accountRows.filter(row => row.nativeState != null) : [];
+  const nativeAccountIds = nativeAccounts.map(row => row.id);
+  const includeNativePerformance = nativeAccounts.length > 0;
   if (includeNativePerformance) {
-    try { investmentBasis = await loadNativeInvestmentBasis(tenantContext); }
+    try { investmentBasis = await loadNativeInvestmentBasis(tenantContext, undefined, false,
+      nativeAccountIds.length === 1 ? nativeAccountIds[0] : undefined, true); }
     catch { /* Preserve current valuation; unavailable cost is never fabricated. */ }
+  }
+  const nativeHoldingCosts = includeNativePerformance
+    ? await loadNativeHoldingCosts(tenantContext, { investmentBasis, accountIds: nativeAccountIds }) : [];
+  const nativeTrades = includeNativePerformance
+    ? await loadNativeLegacyTrades(tenantContext, { investment: true, investmentBasis, accountIds: nativeAccountIds }) : [];
+  const scopedTrades = [...eventRows.filter(row => row.nativeData == null),
+    ...nativeTrades.filter(row => row.accountId && (wholeAccountIds.includes(row.accountId) ||
+      (row.assetId && directAssetIds.has(row.assetId))))];
+  const movementSplits = investmentBasis.flatMap(basis => {
+    const account = accountRows.find(row => row.id === basis.accountId);
+    if (!account) return [];
+    return basis.splits.filter(split => wholeAccountIds.includes(account.id) || directAssetIds.has(split.assetId))
+      .map(split => ({ ...split, account: account.code, accountId: account.id }));
+  });
+  const unverifiedAccounts = nativeAccounts.filter(account =>
+    !investmentBasis.some(basis => basis.accountId === account.id &&
+      basis.sourceSequence === (account.nativeState as {sequence?: number}).sequence),
+  ).map(account => account.code);
+  // Only expose the cost of visible holdings. A direct-asset group can select
+  // one holding from an account whose verified ledger contains many more.
+  let investmentReturnBasis: {positions: typeof investmentBasis[number]["positions"]} | null = null;
+  if (includeInvestmentReturn && sourceMode === "full" && !unverifiedAccounts.length) {
+    const visibleNativeHoldings = new Map(assetRows
+      .filter(asset => asset.accountId && nativeAccountIds.includes(asset.accountId))
+      .map(asset => [asset.id, asset.accountId]));
+    investmentReturnBasis = { positions: investmentBasis.flatMap(basis => basis.positions
+      .filter(position => visibleNativeHoldings.get(position.assetId) === basis.accountId)
+      .map(({ assetId, currency, quantity, costKrw }) => ({ assetId, currency, quantity, costKrw }))) };
   }
   return {
     accountRows,
@@ -346,13 +388,11 @@ async function loadDashboardContextSources({
     recentPositionRows,
     historyAssetIds,
     recentPortfolioRows,
-    nativeHoldingCosts: includeNativePerformance
-      ? await loadNativeHoldingCosts(tenantContext, { investmentBasis }) : [],
-    eventRows: [
-      ...eventRows.filter(row => row.nativeData == null),
-      ...(includeNativePerformance ? await loadNativeLegacyTrades(tenantContext, { investment: true, investmentBasis }) : [])
-        .filter(row => row.eventDate <= serviceDate && row.accountId && (wholeAccountIds.includes(row.accountId) || (row.assetId && directAssetIds.has(row.assetId)))),
-    ],
+    nativeHoldingCosts,
+    investmentReturnBasis,
+    eventRows: scopedTrades.filter(row => row.eventDate <= serviceDate),
+    movementEventRows: projectDashboardMovementEvents({ rows: scopedTrades, splits: movementSplits, unverifiedAccounts, assets: assetRows,
+      positions: baselineSelection.isCurrent ? baselineSelection.rows : [], serviceDate, now }),
     unmatchedSnapshotCountRows,
   };
 }

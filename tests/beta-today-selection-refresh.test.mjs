@@ -12,6 +12,43 @@ const movementView = (movement, fxRate = 1300, state = 'ready') => ({
 });
 const homeMarkup = (view, currency = 'KRW') => renderToStaticMarkup(createElement(HomeToday, { view, currency }));
 
+it('shows the opening shares and today’s fills in their own currency even when KRW attribution is unavailable', async () => {
+  const [{ TodayDetail }, { movementEvidenceRows }] = await importUiWithPorts([
+    'src/components/cairn-v2/today-detail.tsx', 'src/lib/cairn-v2/read-contract.ts',
+  ], {
+    'next/link': { default: () => null },
+    '@/components/cairn-v2/beta-provider': { useBetaReadFreshness: () => null },
+    '@/components/cairn-v2/home-impact': { impactTypes: ['price', 'fx'], impactNames: { price: '가격', fx: '환율' } },
+  });
+  const purchase = { openingQuantity: 1, boughtQuantity: 1, averageBuyPrice: 338.50, currentPrice: 337.40,
+    buyPriceChangeLocal: -1.10, buyPriceReturnPctLocal: -1.10 / 338.50 * 100, openingPriceChangeLocal: 18.69, totalPriceChangeLocal: 17.59, currency: 'USD' };
+  const excluded = { subject: 'holding', holdingId: 'r', ticker: 'TSM', reason: 'missing_trade_fx', localPurchases: purchase };
+  const base = { basis: 'execution_adjusted_price_fx', changeKrw: null, returnPct: null, includedCount: 0, excludedCount: 1,
+    partial: true, rows: [], exclusions: [excluded] };
+  const context = { mode: 'domain', scope: 'account:qa', currency: 'KRW' };
+  const details = movement => renderToStaticMarkup(createElement(TodayDetail, { view: movementView(movement), context }));
+  const excludedDetail = details(base);
+  assert.match(excludedDetail, /체결 환율 확인 필요/);
+  assert.match(excludedDetail, /기존 보유 1주<\/dt><dd>\+18.69 USD/);
+  assert.match(excludedDetail, /오늘 매수 1주<\/dt><dd>-1.10 USD/);
+  assert.match(excludedDetail, /\(-0.32%\)/);
+  assert.match(excludedDetail, /가격손익 합계<\/dt><dd>\+17.59 USD/);
+  assert.match(homeMarkup(movementView(base)), /1종목 제외/);
+  assert.match(homeMarkup(movementView(base)), /원화 변동액 확인 전/);
+  assert.doesNotMatch(homeMarkup(movementView(base)), /오늘 변동액/);
+
+  const execution = { ...purchase, soldQuantity: 0, buyAmountKrw: 338500, sellAmountKrw: 0,
+    buyMarkChangeKrw: -1100, openingMarkChangeKrw: 18690, sellAdjustmentKrw: 0 };
+  const { rows } = movementEvidenceRows({ holdings: [{ id: 'r', ticker: 'TSM', name: 'TSMC', market: 'us', account: 'qa', currency: 'USD' }],
+    accountSummaries: [], todayMovement: { exclusions: [], contributionRows: [{
+      holdingId: 'r', source: 'daily_position_snapshot', changeKrw: 17590, previousValueKrw: 318710, tradeFlowKrw: 338500,
+      currentPrice: 337.40, priceChangeKrw: 17590, fxChangeKrw: 0, returnPct: null, execution,
+    }] } });
+  const included = { ...base, rows, exclusions: [], excludedCount: 0, includedCount: 1, partial: false, changeKrw: 17590 };
+  assert.match(details(included), /오늘 매수 1주<\/dt><dd>-1.10 USD/);
+  assert.match(homeMarkup(movementView(included)), /오늘 변동액 · KRW[^>]*>\+17,590/);
+});
+
 it('compact home movement preserves signed totals, independent factors and every exclusion reason', () => {
   const view = movementView({ changeKrw: -1000, returnPct: -1.25, includedCount: 2, excludedCount: 2,
     priceChangeKrw: -1500, fxChangeKrw: 500,

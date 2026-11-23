@@ -38,3 +38,11 @@
   .rowBreakdown { grid-area:effects; }
   .bar { grid-area:bar; }
 }
+.localOnly { margin:16px 0; }
+.localOnly > div { padding:10px 0; border-bottom:1px solid var(--cairn-v2-line); }
+.purchase { margin:10px 0; }
+.purchase > dl { display:grid; gap:4px; margin:0; }
+.detail .purchase > dl > div { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:0; }
+.detail .purchase dt, .purchase p { color:var(--cairn-v2-muted); font-size:12px; }
+.detail .purchase dd { margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+.purchase p { margin:6px 0 0; }

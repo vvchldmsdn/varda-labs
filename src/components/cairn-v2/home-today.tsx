@@ -16,11 +16,12 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
   const rate = market?.returnPct;
   const unavailable = amount === "—";
   const excluded = market?.exclusions?.filter(row => row.subject !== "aggregate") ?? [];
+  const hasLocalPriceEvidence = excluded.some(row => row.localPurchases);
   const showFactors = market ? market.includedCount > 0 : !domain && view.rows.length > 0 && change !== null;
   return <div className={styles.body} data-available={!unavailable}>
     <div className={styles.headline}>
       {unavailable
-        ? <p className={styles.unavailable} role="status">{change != null && currency === "USD" ? "환산할 환율 확인 전" : "비교 근거 확인 전"}</p>
+        ? <p className={styles.unavailable} role="status">{change != null && currency === "USD" ? "환산할 환율 확인 전" : hasLocalPriceEvidence ? "원화 변동액 확인 전" : "비교 근거 확인 전"}</p>
         : <span aria-label={`오늘 변동액 · ${currency}`}>{amount}<small>{currency === "KRW" ? "원" : "USD"}</small></span>}
       {rate != null && <strong aria-label="오늘 변동률 · KRW 기준" data-tone={rate === 0 ? "neutral" : rate > 0 ? "positive" : "negative"}>{formatPercent(rate, 2, true)}</strong>}
     </div>

@@ -29,7 +29,9 @@ account fixture is needed for verification or synthetic tests.
 The beta frontend also tests its holding-cost DTO and partial coverage with
 `node --import tsx scripts/test-current-holding-financial-read.ts`.
 
-The current-basket comparison holds quantities constant and excludes unknown
-price/FX attribution. It is separate from actual trade-adjusted portfolio change.
+The current-basket comparison holds quantities constant. The dashboard's daily
+movement uses the opening position and effective fills. A purchase starts at
+its execution price. When execution FX is missing, verified USD price changes
+can appear in the detail while the position is excluded from the KRW subtotal.
 Missing original acquisition cost remains unknown; a verified subset must not be
 presented as the complete portfolio's holding return.

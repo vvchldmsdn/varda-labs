@@ -1,8 +1,6 @@
 import "server-only";
 import { readOriginalCurrentValue } from "./server-current-value";
 import { readRecoveredReturnCurve } from "@/db/queries/period-return-recovery";
-import { loadNativeInvestmentBasis } from "@/db/queries/native-investment-basis";
-import { investmentHoldingReturn } from "./investment-return";
 import { getBetaHeatmapRead } from "./heatmap-read";
 import { randomUUID } from "node:crypto";
 import { canonicalBetaReadEpoch } from "./read-freshness";
@@ -28,30 +26,7 @@ export async function getBetaDomainRead(
       if (scopes.state === "ready") displayBinding = displayBindingForScopes(args.tenantContext, scopes.catalog);
       return scopes;
     },
-    dashboard: async (args) => {
-      const basisPromise = loadNativeInvestmentBasis(args.tenantContext).then(
-        (value) => ({ value }),
-        () => ({ value: null }),
-      );
-      const dashboard = await getPortfolioDashboard(args);
-      try {
-        const basis = (await basisPromise).value;
-        if (!basis) throw new Error("investment_basis_unavailable");
-        return { ...dashboard, investmentReturn: investmentHoldingReturn(dashboard, basis) };
-      } catch {
-        return {
-          ...dashboard,
-          investmentReturn: {
-            basis: "investment_assets_excluding_cash" as const,
-            currency: "KRW" as const,
-            costKrw: null,
-            pnlKrw: null,
-            returnPct: null,
-            reason: "investment_read_unavailable",
-          },
-        };
-      }
-    },
+    dashboard: args => getPortfolioDashboard({ ...args, includeInvestmentReturn: true }),
     structure: initialTargetReads.structure,
     targets: initialTargetReads.targets,
     contribution: getBetaAdditionalContributionPreview,
