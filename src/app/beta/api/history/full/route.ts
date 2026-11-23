@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     if (request.headers.get(HISTORY_BINDING_HEADER) !== binding) return reply({ error: 'session_changed' }, 409);
     const selected = context.resolution.scope;
     const [history, recoveredReturn] = await Promise.all([
-      getBetaHistoryRead({ tenantContext, scope: selected, analysisScopes: context.catalog.scopes }),
+      getBetaHistoryRead({ tenantContext, scope: selected, analysisScopes: context.catalog.scopes, currency: currency ?? undefined }),
       selected.kind === 'account' ? readRecoveredReturnCurve(tenantContext, selected.accountId, true) : Promise.resolve(null),
     ]);
     if (history.readStatus === 'unavailable') return reply({ error: 'history_unavailable' }, 503);

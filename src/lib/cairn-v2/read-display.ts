@@ -2,6 +2,7 @@ import { historyObservationPoints, historyObservationDate } from "./history-obse
 import type { BetaView } from "./read-contract";
 import { buildPortfolioHistoryTrajectory } from "../history-trajectory";
 import { readStateText } from "./read-presentation";
+import { reviewedValues } from "./reviewed-history-series.ts";
 
 // Presentation only: retain original evidence; observed view selects original rows, never repairs missing data.
 export function historySourceView(base: BetaView, requested?: string, preferredDate?: string | null) {
@@ -24,9 +25,10 @@ export function historySourceView(base: BetaView, requested?: string, preferredD
     const group = groups.find(g=>g.source===choice);
     const projected = historyObservationPoints(group?.rows ?? domain.historyRecords, !group);
     const partial = domain.historyReadStatus === "partial" || projected.rows.some(r=>r.rowKind === "partial");
-    const state = !projected.rows.length ? domain.historyRecords.length ? "unavailable" : "empty" : partial ? "partial" : "ready";
+    const rows = !group && domain.accountHistoryReview ? reviewedValues(projected.rows, domain.accountHistoryReview) : projected.rows;
+    const state = !rows.length ? domain.historyRecords.length ? "unavailable" : "empty" : partial ? "partial" : "ready";
     const selected = group?.source ?? "observed";
-    const view: BetaView = {...base,history:projected.rows,domain:{...domain,historyViewSource:selected,historyObservedExcludedCount:projected.excludedCount,historyState:state}};
+    const view: BetaView = {...base,history:rows,domain:{...domain,historyViewSource:selected,historyObservedExcludedCount:projected.excludedCount,historyState:state}};
     return {view,options,selected,label:options.find(o=>o.value===selected)!.label};
   }
   // Legacy source-only evidence presentation stays available for older read ports.

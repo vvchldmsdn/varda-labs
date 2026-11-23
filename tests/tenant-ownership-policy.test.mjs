@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES,
   CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES,
   CANONICAL_OWNER_CONTRACT,
   CANONICAL_OWNER_ROLLOUT_SCOPES,
@@ -35,10 +36,22 @@ import {
 } from "../scripts/lib/tenant-ownership-policy.mjs";
 
 const PRE_REPAIR_TABLE_POLICIES = EXPANDED_TENANT_TABLE_POLICIES.filter(
-  policy => !HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES.includes(policy),
+  policy => !HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES.includes(policy) && !ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES.includes(policy),
 );
 
 describe("tenant ownership policy", () => {
+  it("classifies reviewed historical estimates as account owned only when installed", () => {
+    const names = CORE_EXPANDED_TENANT_TABLE_POLICIES.map(({ table }) => table);
+    const [review] = ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES;
+    assert.equal(review.classification, "user_owned");
+    assert.equal(review.currentOwnerColumn, "canonical_owner_user_id");
+    assert.equal(review.canonicalOwnerRequired, true);
+    assert.equal(CANONICAL_OWNER_IN_SCOPE_USER_TABLE_NAMES.includes(review.table), false);
+    assert.deepEqual(resolveTenantTablePolicies([...names, review.table]), [...CORE_EXPANDED_TENANT_TABLE_POLICIES, review]);
+    for (const required of ["accounts", "app_users", "auth_identities"]) {
+      assert.throws(() => resolveTenantTablePolicies([...names.filter(name => name !== required), review.table]), /require identity and account ownership/);
+    }
+  });
   it("adds the private 0063 archive only after its dependencies without changing the 0059 contract", () => {
     const priorNames = PRE_REPAIR_TABLE_POLICIES.map(({ table }) => table);
     const prior = resolveTenantTablePolicies(priorNames);
@@ -244,11 +257,11 @@ describe("tenant ownership policy", () => {
     assert.equal(holdingOnboardingExpandedNames.length, 36);
     assert.equal(portfolioTargetPolicyExpandedNames.length, 39);
     assert.equal(holdingStateCorrectionExpandedNames.length, 40);
-    assert.equal(expandedNames.length, 65);
+    assert.equal(expandedNames.length, 66);
     for (const name of ["simulation_execution_service", "simulation_execution_frequency"]) {
       assert.equal(EXPANDED_TENANT_TABLE_POLICIES.find(policy => policy.table === name)?.classification, "admin_system");
     }
-    const withoutEvidence = expandedNames.filter(name => ![...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES, ...SNAPSHOT_CUTOFF_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES].some(policy => policy.table === name));
+    const withoutEvidence = expandedNames.filter(name => ![...ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES, ...HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES, ...SNAPSHOT_CUTOFF_TABLE_POLICIES, ...PROVIDER_EVIDENCE_TABLE_POLICIES].some(policy => policy.table === name));
     assert.equal(resolveTenantTablePolicies(withoutEvidence.filter(name => !name.startsWith("market_collection_") && name !== "market_provider_budgets" && name !== "market_provider_reservations")).length, 56);
     assert.throws(() => resolveTenantTablePolicies(withoutEvidence.filter(name => name !== "market_provider_budgets" && name !== "market_provider_reservations")), /market collection tables must be expanded atomically/);
     assert.deepEqual(resolveTenantTablePolicies(currentNames), TENANT_TABLE_POLICIES);
@@ -327,7 +340,7 @@ describe("tenant ownership policy", () => {
     assert.deepEqual(
       summarizeTenantClassifications(EXPANDED_TENANT_TABLE_POLICIES),
       {
-        user_owned: 40,
+        user_owned: 41,
         shared_reference: 9,
       admin_system: 12,
         identity_system: 4,

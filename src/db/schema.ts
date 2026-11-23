@@ -3359,6 +3359,30 @@ export const holdingsSnapshotRepairArchive = pgTable("holdings_snapshot_repair_a
 
 export { instrumentCatalog } from "@/db/instrument-catalog-schema";
 
+export const accountHistoryReviews = pgTable("account_history_reviews", {
+  canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+  accountId: uuid("account_id").notNull(),
+  evidenceHash: varchar("evidence_hash", {length: 64}).notNull(),
+  capturedRevision: integer("captured_revision").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  excludedLabels: text("excluded_labels").array().notNull(),
+  points: jsonb("points").notNull(),
+  evidence: jsonb("evidence").notNull(),
+  createdAt: timestamp("created_at", {withTimezone: true}).notNull().default(sql`clock_timestamp()`),
+}, t => [
+  primaryKey({columns: [t.accountId, t.evidenceHash]}),
+  foreignKey({columns: [t.accountId, t.canonicalOwnerUserId], foreignColumns: [accounts.id, accounts.canonicalOwnerUserId]}).onDelete("cascade"),
+  index("account_history_reviews_latest").on(t.canonicalOwnerUserId, t.accountId, t.createdAt.desc()),
+  check("account_history_reviews_evidence_hash_check", sql`${t.evidenceHash} ~ '^[0-9a-f]{64}$'`),
+  check("account_history_reviews_captured_revision_check", sql`${t.capturedRevision} >= 0`),
+  check("account_history_reviews_dates_check", sql`${t.endDate} >= ${t.startDate} and ${t.endDate} - ${t.startDate} < 366`),
+  check("account_history_reviews_excluded_labels_check", sql`cardinality(${t.excludedLabels}) <= 100 and array_position(${t.excludedLabels}, NULL) is null`),
+  check("account_history_reviews_points_check", sql`jsonb_typeof(${t.points}) = 'array' and jsonb_array_length(${t.points}) = ${t.endDate} - ${t.startDate} + 1`),
+  check("account_history_reviews_evidence_check", sql`jsonb_typeof(${t.evidence}) = 'object' and ${t.evidence} @> '{"version":1,"basis":"reviewed_holdings_excluding_cash","currency":"KRW"}'::jsonb`),
+  pgPolicy("account_history_reviews_owner", {for:"select", to:tenantDatabaseRole, using:currentTenantOwns(t.canonicalOwnerUserId)}),
+]).enableRLS();
+
 export const recoveredCloseValuations=pgTable('recovered_close_valuations',{
  canonicalOwnerUserId:uuid('canonical_owner_user_id').notNull().references(()=>appUsers.id),
  accountId:uuid('account_id').notNull(),revision:integer('revision').notNull(),

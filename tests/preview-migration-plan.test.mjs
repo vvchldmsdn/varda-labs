@@ -135,11 +135,11 @@ describe("documented migration artifact compatibility", () => {
     const before = JSON.stringify(recorded);
     assert.equal("sha256:" + hash(JSON.stringify(recorded.map(canonicalizePreviewMigrationEvidence))), PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger.sha256);
     const input = { localMigrations: local, appliedMigrations: recorded, allowedPendingMigrations: PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations };
-    assert.equal(planPreviewMigrations(input).appliedCount, 66);
+    assert.equal(planPreviewMigrations(input).appliedCount, 67);
     assert.equal(JSON.stringify(recorded), before, "comparison must preserve every raw applied hash");
     assert.deepEqual(planPreviewMigrations(input).pendingTags, []);
-    assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -1) }), /not allowlisted: 0065_snapshot_closing_performance/);
-    assert.throws(() => planPreviewMigrations({ ...input, localMigrations: [...local, migration("0066_unreviewed", local.at(-1).createdAt + 1, "f")] }), /not allowlisted: 0066_unreviewed/);
+    assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -1) }), /not allowlisted: 0066_account_history_reviews/);
+    assert.throws(() => planPreviewMigrations({ ...input, localMigrations: [...local, migration("0067_unreviewed", local.at(-1).createdAt + 1, "f")] }), /not allowlisted: 0067_unreviewed/);
     assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: [...recorded.slice(0, 47), { ...knownApplied, sha256: "f".repeat(64) }, ...recorded.slice(48)] }), /ledger diverges at local migration 0047_member_activity/);
   });
 });

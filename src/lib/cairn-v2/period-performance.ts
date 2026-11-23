@@ -5,7 +5,7 @@ import type { AttributionAccountObservation, AttributionPosition, AttributionTra
 
 export type PerformanceBasis = "invested_assets_excluding_cash" | "portfolio_including_cash" | "mixed";
 export type PerformanceGapReason = "valuation" | "trade" | "cash_flow" | "capital" | "scope";
-export type PerformancePoint = { date: string; returnPct: number | null; dailyReturnPct: number | null; segment: string | null; estimatedFx?: boolean; liveAsOf?: string; recovered?: true };
+export type PerformancePoint = { date: string; returnPct: number | null; dailyReturnPct: number | null; segment: string | null; estimatedFx?: boolean; liveAsOf?: string; recovered?: true; accountReview?: true; reviewEstimated?: boolean };
 export type PeriodPerformance = {
   range: PeriodAttributionRange; basis: PerformanceBasis; currency: "KRW"; includesCarriedMarks: boolean; includesClosingFx: boolean;
   points: PerformancePoint[]; gaps: { start: string; end: string; reason: PerformanceGapReason }[];

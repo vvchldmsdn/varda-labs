@@ -43,7 +43,7 @@ export type BetaReadPorts = {
   currentValue?: (args: ReadArgs & {currency:BetaCurrency;dashboard:DashboardData}) => Promise<OriginalCurrentValuePresentation>;
   structure: (args: ReadArgs) => Promise<PortfolioStructureResult>;
   heatmap?: (args: ReadArgs & { dashboard: DashboardData }) => Promise<BetaHeatmapRead>;
-  history: (args: ReadArgs) => Promise<BetaHistoryRead>;
+  history: (args: ReadArgs & {currency:BetaCurrency}) => Promise<BetaHistoryRead>;
   targets?: (args: ReadArgs) => Promise<TargetModel>;
   contribution?: (
     args: ReadArgs & { cashAmountKrw: number; now: Date; excludedSellKeys?: readonly string[] },
@@ -174,7 +174,7 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
     const results = await Promise.allSettled([
       dashboardPromise,
       ports.structure(args),
-      ports.history(args),
+      ports.history({ ...args, currency: context.currency }),
     ]);
     if (results.some((r) => r.status !== "fulfilled"))
       return failed("unavailable", "읽기 조회 실패 · 예시로 대체하지 않음");

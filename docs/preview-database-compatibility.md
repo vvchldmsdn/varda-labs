@@ -14,20 +14,22 @@ the other three were read from an actual integration-created Preview on October 
 The build accepts only these four known artifacts for comparison; it does not
 update SQL, timestamps or stored hashes. Any other mismatch still stops the build.
 
-The reviewed baseline is 0000–0064 (65 entries). New pending migrations are not
+The reviewed baseline is 0000–0066 (67 entries). New pending migrations are not
 automatically approved. A future schema release must review its SQL and update the
 baseline, catalog evidence and tests together.
 
-The gate retains the original catalog checks and verifies the 0047 and 0064 table
+The gate retains the original catalog checks and verifies the 0047, 0064 and 0066 table
 columns, constraints, indexes, RLS flags, policies, grants, trigger and function
-against a fixture generated from those SQL files in an isolated database.
+against a fixture generated from those SQL files in an isolated database. It verifies
+the 0065 closing-performance column and the exact column-level grants on reviewed
+history, including the private evidence column.
 Every database query uses a read-only transaction with an explicit search path and
 UTC timezone, including the Neon HTTP transport where separate calls do not share
 a session. PostgreSQL 18's separate NOT NULL constraint entries are excluded because column
 nullability already covers PostgreSQL 17 and 18 identically.
 
 Before and after the migration step, the build compares protected row counts,
-content fingerprints for 14 financial/activity tables and the complete raw
+content fingerprints for 15 financial/activity tables and the complete raw
 migration ledger. The fingerprints are calculated inside the database; member
 identities, financial rows and connection secrets are never logged. A mismatch
 stops the build rather than repairing or deleting data.

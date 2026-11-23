@@ -110,8 +110,8 @@ function useVisiblePlot() {
   return [ref, bounds] as const;
 }
 
-export function HomeHistoryTooltip({ id, date, returns, value, impact, performance, plot, anchor, points }: {
-  id: string; date: string; returns: boolean; value: string;
+export function HomeHistoryTooltip({ id, date, returns, value, reviewed, impact, performance, plot, anchor, points }: {
+  id: string; date: string; returns: boolean; value: string; reviewed?: boolean;
   impact?: { price: number | null; fx: number | null };
   performance?: Pick<PerformancePoint, "segment" | "dailyReturnPct" | "liveAsOf">;
   plot: Size; anchor: Point; points: (Point | null)[];
@@ -133,7 +133,7 @@ export function HomeHistoryTooltip({ id, date, returns, value, impact, performan
     <div id={id} role="tooltip" data-history-tooltip className={styles.card}>
       <div className={styles.meta}>
         <time dateTime={date} data-tooltip-date={date} aria-label={date}>{date.slice(2).replaceAll("-", ".")}</time>
-        <span>{performance ? t("누적 수익률 · KRW", "Cumulative return · KRW") : t("기여 · 현재 보유 기준", "Effects · current holdings")}</span>
+        <span>{reviewed ? t("사용자 확인 복원", "Reconstructed history") : performance ? t("누적 수익률 · KRW", "Cumulative return · KRW") : t("기여 · 현재 보유 기준", "Effects · current holdings")}</span>
       </div>
       {performance?.liveAsOf && <div className={styles.meta}>
         <span>{t("잠정", "Provisional")}</span>
@@ -146,7 +146,7 @@ export function HomeHistoryTooltip({ id, date, returns, value, impact, performan
       </div></dl>
       <dl>{performance ? <div><dt>{t("일간 수익률", "Daily return")}</dt>
         <dd>{performance.dailyReturnPct === null ? "—" : performance.dailyReturnPct.toFixed(2) + "%"}</dd>
-      </div> : series.map(row => <div key={row.key} data-tooltip-series={row.key}>
+      </div> : !reviewed && series.map(row => <div key={row.key} data-tooltip-series={row.key}>
         <dt>{row.label}</dt><dd aria-label={row.value === "—" ? t("자료 없음", "Unavailable") : undefined}>{row.value}</dd>
       </div>)}</dl>
     </div>

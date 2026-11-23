@@ -66,7 +66,8 @@ export function PerformanceDetail({ performance, view, context, metricControls, 
             {selected?.liveAsOf && <p className={styles.note}>
               {t("잠정 수익률 · 평가 시각", "Provisional return · valued at")} <time dateTime={selected.liveAsOf}>{formatLiveValuationTime(selected.liveAsOf)}</time>
             </p>}
-            {selected?.recovered && <p className={styles.note}>{t("복구한 거래·평가 기록 기준", "From reconstructed trade and valuation records")}</p>}
+            {(selected?.recovered || selected?.accountReview) && <p className={styles.note}>{t("복구한 거래·평가 기록 기준", "From reconstructed trade and valuation records")}</p>}
+            {selected?.reviewEstimated && <p className={styles.note}>{t("거래·평가 자료에 추정치 포함", "Includes estimates from trade or valuation evidence")}</p>}
             {selected?.estimatedFx && <p className={styles.note}>{t("평가 환율을 적용한 추정치", "Estimated using a valuation exchange rate")}</p>}
             {selected?.segment && <p className={styles.caption}>{t(
               selected.segment + " 기준 누적 수익률", "Cumulative return since " + selected.segment,

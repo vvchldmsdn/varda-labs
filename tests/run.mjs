@@ -3,6 +3,8 @@ import "./neon-egress-cache.test.mjs";
 import "./neon-egress-queries.test.mjs";
 import "./neon-egress-auth-refresh.test.mjs";
 import "./neon-egress-home.test.mjs";
+import "./reviewed-history-series.test.mjs";
+import "./account-history-review.test.mjs";
 import "./import-ports-isolation.test.mjs";
 import "./interaction-recovery.test.mjs";
 import "./ui-context-convergence.test.mjs";
