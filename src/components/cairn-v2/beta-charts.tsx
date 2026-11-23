@@ -3,7 +3,9 @@ import { Field as CairnField, Input as CairnInput, Status as CairnStatus } from 
 
 import dynamic from "next/dynamic";
 import { useId, useState, type PointerEvent, type KeyboardEvent } from "react";
+import { useI18n } from "@/components/i18n/locale-provider";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
+import { formatLiveValuationTime } from "@/lib/cairn-v2/history-date";
 import type { BetaCurrency } from "@/lib/cairn-v2/navigation";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import styles from "./beta.module.css";
@@ -13,6 +15,7 @@ import { useBetaPreferences } from "./beta-provider";
 import { useMeasuredPlot } from "@/components/use-measured-plot";
 import { alignedRanges, CompactImpactBasis, ImpactLegend, ImpactBars, useHomeImpact } from "./home-impact";
 import { HomeHistoryTooltip } from "./home-history-tooltip";
+import { PerformanceCaption, PerformanceStatus, usePeriodPerformance } from "./home-performance";
 
 import { historyRows, historyAxis, historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
 import { percentOrNull } from "@/lib/portfolio-math";
@@ -32,24 +35,36 @@ export function HistoryChart({
   compact = false,
   interactive = false,
   currency = "KRW",
+  savedOnly = false,
 }: {
   view: FixtureView;
   compact?: boolean;
   interactive?: boolean;
   currency?: BetaCurrency;
+  savedOnly?: boolean;
 }) {
   const { metric, period, historyDate, setHistoryDate } = useBetaPreferences();
-  const impact = useHomeImpact();
+  const i18n = useI18n();
+  const homeImpact = useHomeImpact();
+  const performanceRead = usePeriodPerformance();
+  const performance = metric === "return" && !savedOnly ? performanceRead : null;
+  const impact = performance ? null : homeImpact;
+  const data = performance?.data;
   const [measured, setPlotElement] = useMeasuredPlot();
   const [inspecting, setInspecting] = useState(false);
   const canExplore = !compact || interactive;
   const historySource = historySourceView(inputView, undefined, historyDate);
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
-  const rows = historyRows(view, period);
+  const rows: FixtureView["history"] = data ? data.points.map(point => ({
+    date: point.date, valueKrw: null, exampleReturnPct: point.returnPct, segment: point.segment ?? undefined,
+  })) : historyRows(view, period);
   const gradientId = useId().replaceAll(":", "");
   const stateText = readStateText(view.domain?.historyState, "저장된 평가가 없습니다.");
-  if (metric === "return" && inputView.domain?.recoveredReturn)
+  if (performance && !data) return <PerformanceStatus />;
+  if (data && !data.points.some(point => point.returnPct !== null && point.segment !== point.date))
+    return <PerformanceCaption data={data} empty />;
+  if (!data && metric === "return" && inputView.domain?.recoveredReturn)
     return (
       <ReturnTimelineChart
         renderOverlay={impact ? plot => <ImpactBars chart={impact} plot={plot} /> : undefined}
@@ -66,7 +81,7 @@ export function HistoryChart({
         onSelect={setHistoryDate}
       />
     );
-  if (stateText)
+  if (stateText && !data)
     return (
       <CairnStatus as="div" className={styles.empty} role="status">
         {stateText}
@@ -112,6 +127,14 @@ export function HistoryChart({
   );
   const pointSegment = (i: number) =>
     metric === "value" ? (rows[i]?.valueSegment ?? rows[i]?.segment) : rows[i]?.segment;
+  const liveIndex = data?.points.findIndex(point => point.liveAsOf && point.returnPct !== null) ?? -1;
+  const livePoint = points[liveIndex];
+  const currentLinkIndex = metric === "value" && rows.at(-1)?.source === CURRENT_VALUATION_SOURCE
+    ? rows.length - 1
+    : liveIndex > 0 && pointSegment(liveIndex) === pointSegment(liveIndex - 1) &&
+      axis.day(rows[liveIndex].date) - axis.day(rows[liveIndex - 1].date) === 1 ? liveIndex : -1;
+  const currentStart = points[currentLinkIndex - 1];
+  const currentEnd = points[currentLinkIndex];
   const segments: string[] = [];
   let segment = "";
   points.forEach((p, i) => {
@@ -119,7 +142,7 @@ export function HistoryChart({
       segments.push(segment);
       segment = "";
     }
-    if (p) segment += `${segment ? " L" : "M"}${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+    if (p && i !== liveIndex) segment += `${segment ? " L" : "M"}${p.x.toFixed(2)},${p.y.toFixed(2)}`;
     else if (segment) {
       segments.push(segment);
       segment = "";
@@ -127,25 +150,31 @@ export function HistoryChart({
   });
   if (segment) segments.push(segment);
   const matchedIndex = rows.findIndex((r) => r.date === historyDate);
-  const selectedIndex = matchedIndex >= 0 ? matchedIndex : rows.length - 1;
+  const lastVerified = data?.points.findLastIndex(point => point.returnPct !== null && point.segment !== point.date) ?? -1;
+  const latestIndex = lastVerified >= 0 ? lastVerified : rows.length - 1;
+  const selectedIndex = matchedIndex >= 0 ? matchedIndex : latestIndex;
   const selectedRow = rows[selectedIndex];
-  const selectedMoney = displayReadMoney(view, selectedRow.valueKrw, currency);
+  const selectedMoney = metric === "value" ? displayReadMoney(view, selectedRow.valueKrw, currency) : "—";
   const selectedValue = metric === "return"
-    ? selectedRow.exampleReturnPct == null ? "—" : selectedRow.exampleReturnPct.toFixed(2) + "%"
+    ? selectedRow.exampleReturnPct == null ? "—" : (data?.points[selectedIndex].estimatedFx ? "≈ " : "") + selectedRow.exampleReturnPct.toFixed(2) + "%"
     : selectedMoney === "—" ? "—" : selectedMoney + (currency === "KRW" ? "원" : " USD");
-  const first = values[0], last = values.at(-1) ?? null;
+  const first = values[0], last = values[latestIndex] ?? null;
+  const selectedLiveAsOf = data?.points[selectedIndex].liveAsOf;
+  const selectedDateLabel = selectedLiveAsOf
+    ? `${selectedRow.date} · ${i18n.t("잠정 수익률", "Provisional return")} ${selectedValue} · ${formatLiveValuationTime(selectedLiveAsOf)}`
+    : selectedRow.date;
   const periodRate = metric === "value"
     ? percentOrNull(historyComparison(rows, !!view.domain).value, first)
     : rows.length > 1 && first !== null && last !== null && pointSegment(0) === pointSegment(rows.length - 1)
       ? last - first : null;
-  const latestMoney = displayReadMoney(view, last, currency);
+  const latestMoney = metric === "value" ? displayReadMoney(view, last, currency) : "—";
   const latestValue = metric === "value"
     ? latestMoney === "—" ? "자료 없음" : latestMoney + (currency === "KRW" ? "원" : " USD")
-    : last === null ? "자료 없음" : last.toFixed(2) + "%";
-  const periodLabel = metric === "value"
+    : last === null ? "자료 없음" : (data?.points[latestIndex].estimatedFx ? "≈ " : "") + last.toFixed(2) + "%";
+  const periodLabel = data ? "최근 확인 구간 수익률" : metric === "value"
     ? periodRate === null ? "최근 평가액" : "평가액 변동"
     : periodRate === null ? "최근 수익률" : "수익률 변화";
-  const periodValue = periodRate === null ? latestValue :
+  const periodValue = data || periodRate === null ? latestValue :
     periodRate.toLocaleString("ko-KR", {signDisplay:"exceptZero", maximumFractionDigits:2}) + (metric === "return" ? "%p" : "%");
   const inspectedImpact = impact?.days.find(day => day.date === selectedRow.date);
   const selectedPoint = points[selectedIndex];
@@ -187,13 +216,14 @@ export function HistoryChart({
   return (
     <figure
       className={compact ? styles.compactChart : styles.historyChart}
-      aria-label={`${metric === "value" ? "평가액" : view.domain ? "기존 저장 수익률" : "예시 수익률"} 추이 · ${view.domain ? "도메인 읽기" : "가상 데이터"}`}
+      aria-label={data ? "누적 수익률 추이 · 원화" : `${metric === "value" ? "평가액" : view.domain ? "기존 저장 수익률" : "예시 수익률"} 추이 · ${view.domain ? "도메인 읽기" : "가상 데이터"}`}
     >
-      {view.domain && metric === "return" && <p className={styles.muted}>{returnSummary}</p>}
-      {historySource.options.length > 1 && metric === "return" && !compact && (
+      {data && compact && <PerformanceCaption data={data} />}
+      {!data && view.domain && metric === "return" && <p className={styles.muted}>{returnSummary}</p>}
+      {!data && historySource.options.length > 1 && metric === "return" && !compact && (
         <p className={styles.muted}>{historySource.label} 기준</p>
       )}
-      {view.domain && metric === "return" && !compact && (
+      {!data && view.domain && metric === "return" && !compact && (
         <p className={styles.muted}>
           {returnRows.length < rows.length && (
             <>
@@ -204,13 +234,13 @@ export function HistoryChart({
           날짜가 빠지거나 출처·포함 범위가 바뀐 구간은 선을 분리합니다.
         </p>
       )}
-      {view.domain?.historyState === "partial" && (
+      {!data && view.domain?.historyState === "partial" && (
         <p className={styles.muted}>부분 이력 포함 · 확인 소계 · 전체 비교 주의</p>
       )}
       <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
       {showTooltip && <HomeHistoryTooltip id={tooltipId}
         date={selectedRow.date} returns={metric === "return"} value={selectedValue}
-        impact={inspectedImpact} plot={plot} points={tooltipPoints}
+        impact={inspectedImpact} performance={data?.points[selectedIndex]} plot={plot} points={tooltipPoints}
         anchor={{x: selectedX, y: selectedPoint?.y ?? height / 2}} />}
       <svg
         viewBox={`0 0 ${plot.width} ${plot.height}`}
@@ -225,7 +255,7 @@ export function HistoryChart({
                 ? "확인된 관측점을 잇는 평가 추이, 누락 날짜의 평가를 생성하지 않습니다"
                 : "기존 저장 추이, 서로 다른 근거와 누락 날짜는 연결하지 않습니다"
               : "개발용 fixture 추이, 누락된 날짜는 선을 연결하지 않습니다"
-            : `히스토리 날짜 탐색 · ${rows[selectedIndex].date} · 좌우 방향키로 날짜 선택`
+            : `히스토리 날짜 탐색 · ${selectedDateLabel} · 좌우 방향키로 날짜 선택`
         }
         onPointerDown={
           !canExplore
@@ -287,13 +317,9 @@ export function HistoryChart({
             />
           </g>
         ))}
-        {metric === "value" &&
-          rows.at(-1)?.source === CURRENT_VALUATION_SOURCE &&
-          points.length > 1 &&
-          points.at(-2) &&
-          points.at(-1) && (
+        {currentStart && currentEnd && (
             <path
-              d={`M${points.at(-2)!.x},${points.at(-2)!.y} L${points.at(-1)!.x},${points.at(-1)!.y}`}
+              d={`M${currentStart.x},${currentStart.y} L${currentEnd.x},${currentEnd.y}`}
               fill="none"
               stroke="var(--home-chart-line, #c64623)"
               strokeWidth="1.4"
@@ -316,6 +342,7 @@ export function HistoryChart({
         )}
         {points.map((p, i) =>
           p &&
+          i !== liveIndex &&
           i !== selectedIndex &&
           (!points[i - 1] || (view.domain && pointSegment(i - 1) !== pointSegment(i))) &&
           (!points[i + 1] || (view.domain && pointSegment(i + 1) !== pointSegment(i))) ? (
@@ -329,7 +356,10 @@ export function HistoryChart({
             />
           ) : null,
         )}
-        {selectedPoint && (
+        {livePoint && <circle data-observed-date={rows[liveIndex].date} data-live-as-of={data?.points[liveIndex].liveAsOf}
+          cx={livePoint.x} cy={livePoint.y} r={showTooltip && selectedIndex === liveIndex ? 5 : 4}
+          stroke="var(--home-chart-line, #c64623)" strokeWidth="2" fill="var(--cairn-v2-paper)" />}
+        {selectedPoint && selectedIndex !== liveIndex && (
           <circle
             data-observed-date={rows[selectedIndex].date}
             cx={selectedPoint.x}
@@ -376,7 +406,7 @@ export function HistoryChart({
             min={axis.start}
             max={axis.end}
             step="any"
-            aria-valuetext={rows[selectedIndex].date}
+            aria-valuetext={selectedDateLabel}
             value={axis.day(rows[selectedIndex].date)}
             onKeyDown={(e) => {
               const delta =

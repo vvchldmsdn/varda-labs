@@ -190,6 +190,40 @@ it("keeps a holdings portfolio in its existing surface after an actual full sale
     "an inactive native-only peer cannot replace the active holdings portfolio's surface");
 });
 
+it("rechecks late market evidence once per later cutoff inside the discovery window", async t => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 11, 22) });
+  const { pg, durableWork } = await fixture();
+  async function enqueue(date, reason, accountId = account, ownerId = owner) {
+    const id = randomUUID();
+    await pg.query(`insert into daily_snapshot_work(id,canonical_owner_user_id,account_id,snapshot_date,stage,revision,status,reason,finished_at)
+      values($1,$2,$3,$4,'native',0,$5,$6,($4::date+time '07:10') at time zone 'Asia/Seoul')`,
+      [id, ownerId, accountId, date, reason ? "blocked" : "pending", reason]);
+    return id;
+  }
+  const late = await enqueue("2026-09-10", "missing_cutoff_price_evidence");
+  const pending = await enqueue("2026-09-11", null);
+  await enqueue("2026-09-07", "missing_cutoff_price_evidence");
+  await enqueue("2026-09-09", "cutoff_evidence_missing");
+  await enqueue("2026-09-10", "missing_fx_rate", foreign, owner);
+  const claim = date => durableWork.claimSnapshotWork("native", date);
+  assert.equal(await claim("2026-09-10"), null, "the same cutoff cannot repeatedly retry a missing price");
+  const first = await claim("2026-09-11");
+  assert.equal(first.id, pending, "new work takes priority over delayed evidence");
+  await durableWork.finishSnapshotWork(first, "completed", null);
+  const retry = await claim("2026-09-11");
+  assert.equal(retry.id, late);
+  await durableWork.finishSnapshotWork(retry, "blocked", "missing_cutoff_price_evidence");
+  // The database clock is real. Place this synthetic receipt at the actual retry cutoff.
+  await pg.query("update daily_snapshot_work set finished_at='2026-09-10T22:10:00Z' where id=$1", [late]);
+  assert.equal(await claim("2026-09-11"), null);
+  const last = await claim("2026-09-12");
+  assert.equal(last.id, late);
+  await durableWork.finishSnapshotWork(last, "completed", null);
+  assert.equal(await claim("2026-09-12"), null, "completed and other owners' work cannot be reclaimed");
+  await pg.query("update daily_snapshot_work set status='blocked',reason='missing_fx_rate',finished_at='2026-09-11T22:10:00Z' where id=$1", [late]);
+  assert.equal(await claim("2026-09-13"), null, "outside the window even a market evidence gap stays parked");
+});
+
 it("connects group membership SQL and tenant RLS to the same native writer, snapshot and currency engines", async t => {
   t.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 8, 10, 22) });
   const f = await fixture(), tenant = { ownerUserId: owner }, groupId = "55555555-5555-4555-8555-555555555555";

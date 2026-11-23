@@ -7,10 +7,9 @@ import {
   accounts,
   assets,
   eventLedgerEntries,
-  livePriceQuotes,
 } from "@/db/schema";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
-import { isDashboardInvestmentAsset, type PortfolioDashboardDemand } from "@/lib/portfolio-dashboard-demand";
+import { isDashboardInvestmentAsset, markDashboardInvestmentAssets, type PortfolioDashboardDemand } from "@/lib/portfolio-dashboard-demand";
 import {
   assetMetricKey,
   buildReturnMetricsSummary,
@@ -66,7 +65,6 @@ const DEFAULT_TRIM_DRIFT_THRESHOLD = 12;
 
 type AssetRow = typeof assets.$inferSelect;
 type AssetGroupRow = Readonly<{ id: string; name: string }>;
-type LivePriceQuoteRow = typeof livePriceQuotes.$inferSelect;
 type EventLedgerRow = typeof eventLedgerEntries.$inferSelect;
 
 type MovementSource = PortfolioMovementSource;
@@ -298,13 +296,7 @@ export async function getPortfolioDashboard(
   const baselineIsDelayed = movementBaselineDate !== null && !baselineIsCurrent;
 
   const investmentAssetRows = assetRows.filter(isDashboardInvestmentAsset);
-  const liveQuotesByAssetKey = buildLiveQuotesByAssetKey(liveQuoteRows);
-  const valuationAssetRows = investmentAssetRows.map((asset) =>
-    applyLiveQuote(
-      asset,
-      liveQuotesByAssetKey.get(assetLiveQuoteKey(asset)),
-    ),
-  );
+  const valuationAssetRows = markDashboardInvestmentAssets(investmentAssetRows, liveQuoteRows);
   const selectedInvestmentAssetRows = valuationAssetRows;
   const setting = settingsRows[0] ?? null;
   const latestFxRow = latestFxRows[0] ?? null;
@@ -626,40 +618,6 @@ function buildDashboardMovementCycle(now: Date): DashboardMovementCycle {
     liveWindowStartAt,
     liveWindowEndAt: new Date(liveWindowStartAt.getTime() + 24 * 60 * 60 * 1000),
   };
-}
-
-function buildLiveQuotesByAssetKey(rows: LivePriceQuoteRow[]) {
-  const quotes = new Map<string, LivePriceQuoteRow>();
-
-  for (const row of rows) {
-    const key = liveQuoteKey(row.market, row.ticker, row.currency);
-    if (!quotes.has(key)) quotes.set(key, row);
-  }
-
-  return quotes;
-}
-
-function applyLiveQuote(asset: AssetRow, quote: LivePriceQuoteRow | undefined) {
-  if (!quote || quote.status !== "ok") return asset;
-
-  return {
-    ...asset,
-    currentPrice: quote.price,
-    priceSource: quote.source,
-    priceFetchedAt: quote.fetchedAt,
-    priceAsOf: quote.priceAsOf,
-    priceQuoteType: quote.quoteType,
-    priceStatus: quote.status,
-    priceError: quote.error,
-  };
-}
-
-function assetLiveQuoteKey(asset: Pick<AssetRow, "market" | "ticker" | "currency">) {
-  return liveQuoteKey(asset.market, normalizeTicker(asset.ticker) ?? "", asset.currency);
-}
-
-function liveQuoteKey(market: string, ticker: string, currency: string) {
-  return `${market}:${normalizeTicker(ticker) ?? ""}:${currency}`;
 }
 
 function buildHolding({

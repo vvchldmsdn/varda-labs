@@ -1,6 +1,8 @@
 "use client";
 
 import { useI18n } from "@/components/i18n/locale-provider";
+import { formatLiveValuationTime } from "@/lib/cairn-v2/history-date";
+import type { PerformancePoint } from "@/lib/cairn-v2/period-performance";
 import { useLayoutEffect, useRef, useState } from "react";
 import styles from "./home-history-tooltip.module.css";
 
@@ -108,9 +110,10 @@ function useVisiblePlot() {
   return [ref, bounds] as const;
 }
 
-export function HomeHistoryTooltip({ id, date, returns, value, impact, plot, anchor, points }: {
+export function HomeHistoryTooltip({ id, date, returns, value, impact, performance, plot, anchor, points }: {
   id: string; date: string; returns: boolean; value: string;
   impact?: { price: number | null; fx: number | null };
+  performance?: Pick<PerformancePoint, "segment" | "dailyReturnPct" | "liveAsOf">;
   plot: Size; anchor: Point; points: (Point | null)[];
 }) {
   const { locale, t } = useI18n();
@@ -130,13 +133,20 @@ export function HomeHistoryTooltip({ id, date, returns, value, impact, plot, anc
     <div id={id} role="tooltip" data-history-tooltip className={styles.card}>
       <div className={styles.meta}>
         <time dateTime={date} data-tooltip-date={date} aria-label={date}>{date.slice(2).replaceAll("-", ".")}</time>
-        <span>{t("기여 · 현재 보유 기준", "Effects · current holdings")}</span>
+        <span>{performance ? t("누적 수익률 · KRW", "Cumulative return · KRW") : t("기여 · 현재 보유 기준", "Effects · current holdings")}</span>
       </div>
+      {performance?.liveAsOf && <div className={styles.meta}>
+        <span>{t("잠정", "Provisional")}</span>
+        <time dateTime={performance.liveAsOf}>{formatLiveValuationTime(performance.liveAsOf)}</time>
+      </div>}
       <dl><div data-tooltip-series="value">
-        <dt>{returns ? t("수익률", "Return") : t("평가액", "Value")}</dt>
+        <dt>{performance?.segment ? t(performance.segment.slice(5).replace("-", ".") + "부터", "Since " + performance.segment) :
+          returns ? t("수익률", "Return") : t("평가액", "Value")}</dt>
         <dd aria-label={value === "—" ? t("자료 없음", "Unavailable") : undefined}>{value}</dd>
       </div></dl>
-      <dl>{series.map(row => <div key={row.key} data-tooltip-series={row.key}>
+      <dl>{performance ? <div><dt>{t("일간 수익률", "Daily return")}</dt>
+        <dd>{performance.dailyReturnPct === null ? "—" : performance.dailyReturnPct.toFixed(2) + "%"}</dd>
+      </div> : series.map(row => <div key={row.key} data-tooltip-series={row.key}>
         <dt>{row.label}</dt><dd aria-label={row.value === "—" ? t("자료 없음", "Unavailable") : undefined}>{row.value}</dd>
       </div>)}</dl>
     </div>

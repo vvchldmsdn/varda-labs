@@ -2,7 +2,7 @@
 import { Button as CairnButton, SectionTitle as CairnSectionTitle, Status as CairnStatus, InfoDisclosure, ActionGroup, ActionContent, ChoiceGroup } from "@/components/cairn-ui";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
@@ -17,6 +17,8 @@ import { HistoryChart, historyRows } from "./beta-charts";
 import { CairnSelect } from "./reused/cairn-select";
 import { MetricControls } from "./history-detail-controls";
 import { PeriodAttributionPanel } from "./period-attribution-panel";
+import { usePeriodPerformance } from "./home-performance";
+import { PerformanceDetail } from "./performance-detail";
 import styles from "./history-detail.module.css";
 import {
   CURRENT_VALUATION_SOURCE,
@@ -41,9 +43,47 @@ export function HistoryDetail({
   onAllAccounts?: () => void;
 }) {
   const { t } = useI18n();
-  const { period, setPeriod, metric, historyDate, setHistoryDate } = useBetaPreferences();
-  const [source, setSource] = useState<string>();
+  const { period, setPeriod, metric } = useBetaPreferences();
   const [impactActive, setImpactActive] = useState(false);
+  const [source, setSource] = useState<string>();
+  const performance = usePeriodPerformance();
+  const periodControls = <ChoiceGroup appearance="segmented" label={t("히스토리 기간", "History period")}>
+    {(["1M", "3M", "6M", "ALL"] as const).map(option => (
+      <CairnButton variant="selection" key={option} type="button" aria-pressed={option === period} onClick={() => setPeriod(option)}>
+        {{"1M": t("1개월", "1M"), "3M": t("3개월", "3M"), "6M": t("6개월", "6M"), "ALL": t("전체", "All")}[option]}
+      </CairnButton>
+    ))}
+  </ChoiceGroup>;
+  const metricControls = <MetricControls impactActive={impactActive} onImpactChange={context.mode === "domain" ? setImpactActive : undefined} />;
+  if (impactActive && context.mode === "domain") {
+    const state = inputView.domain?.state;
+    const binding = historyRead?.displayBinding;
+    const ready = state !== undefined && state !== "loading" && state !== "unauthorized";
+    return <div className={styles.surface}>
+      <div className={styles.toolbar}>
+        <span className={styles.sourceLabel}>{t("당시 보유 종목 · KRW", "Holdings during the period · KRW")}</span>
+        {metricControls}
+      </div>
+      {context.scope.startsWith("portfolio:") ? <div className={styles.scopeNotice}>
+        <p>{t("계좌 또는 전체 계좌를 선택하면 기간별 영향을 볼 수 있어요.", "Select an account or all accounts to see period impact.")}</p>
+        {onAllAccounts && <CairnButton variant="secondary" onClick={onAllAccounts}>{t("전체 계좌로 조회", "View all accounts")}</CairnButton>}
+      </div> : ready && binding ? <PeriodAttributionPanel scope={context.scope} binding={binding} receipt={historyRead?.readReceipt} />
+        : <p role="status" className={styles.empty}>{state === "loading" ? t("계좌를 확인하고 있어요.", "Checking your account.") : t("계좌 연결을 확인한 뒤 다시 열어 주세요.", "Check your account connection and reopen history.")}</p>}
+    </div>;
+  }
+  if (metric === "return" && performance) {
+    return <PerformanceDetail view={inputView} context={context} performance={performance} metricControls={metricControls} periodControls={periodControls}>
+      <SavedHistoryDetail view={inputView} context={context} source={source} setSource={setSource} embedded />
+    </PerformanceDetail>;
+  }
+  return <SavedHistoryDetail view={inputView} context={context} source={source} setSource={setSource} metricControls={metricControls} periodControls={periodControls} />;
+}
+
+function SavedHistoryDetail({ view: inputView, context, source, setSource, periodControls, metricControls, embedded = false }: {
+  view: FixtureView; context: BetaContext; source?: string; setSource: (source: string) => void;
+  periodControls?: ReactNode; metricControls?: ReactNode; embedded?: boolean;
+}) {
+  const { period, metric, historyDate, setHistoryDate } = useBetaPreferences();
   const historySource = historySourceView(inputView, source, historyDate);
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
@@ -90,30 +130,6 @@ export function HistoryDetail({
     ) : (
       <p className={styles.sourceLabel}>{view.domain ? "저장된 관측 이력" : "가상 데이터"}</p>
     );
-  const periodControls = <ChoiceGroup appearance="segmented" label="히스토리 기간">
-    {(["1M", "3M", "6M", "ALL"] as const).map((option) => (
-      <CairnButton variant="selection" key={option} type="button" aria-pressed={option === period} onClick={() => setPeriod(option)}>
-        {{"1M":"1개월","3M":"3개월","6M":"6개월","ALL":"전체"}[option]}
-      </CairnButton>
-    ))}
-  </ChoiceGroup>;
-  const metricControls = <MetricControls impactActive={impactActive} onImpactChange={context.mode === "domain" ? setImpactActive : undefined} />;
-  if (impactActive && context.mode === "domain") {
-    const state = inputView.domain?.state;
-    const binding = historyRead?.displayBinding;
-    const ready = state !== undefined && state !== "loading" && state !== "unauthorized";
-    return <div className={styles.surface}>
-      <div className={styles.toolbar}>
-        <span className={styles.sourceLabel}>{t("당시 보유 종목 · KRW", "Holdings during the period · KRW")}</span>
-        {metricControls}
-      </div>
-      {context.scope.startsWith("portfolio:") ? <div className={styles.scopeNotice}>
-        <p>{t("계좌 또는 전체 계좌를 선택하면 기간별 영향을 볼 수 있어요.", "Select an account or all accounts to see period impact.")}</p>
-        {onAllAccounts && <CairnButton variant="secondary" onClick={onAllAccounts}>{t("전체 계좌로 조회", "View all accounts")}</CairnButton>}
-      </div> : ready && binding ? <PeriodAttributionPanel scope={context.scope} binding={binding} receipt={historyRead?.readReceipt} />
-        : <p role="status" className={styles.empty}>{state === "loading" ? t("계좌를 확인하고 있어요.", "Checking your account.") : t("계좌 연결을 확인한 뒤 다시 열어 주세요.", "Check your account connection and reopen history.")}</p>}
-    </div>;
-  }
   if (stateText && !timeline.length)
     return (
       <div className={styles.surface}>
@@ -211,7 +227,7 @@ export function HistoryDetail({
             <CairnSectionTitle level="h3">{metric === "value" ? "평가액의 흐름" : "수익률의 흐름"}</CairnSectionTitle>
 
           </div>
-          <HistoryChart view={view} currency={context.currency} />
+          <HistoryChart view={view} currency={context.currency} savedOnly />
           {periodControls}
           {view.domain && sourceKinds.length > 1 && (
             <div
@@ -277,7 +293,7 @@ export function HistoryDetail({
           {view.domain && selectedDate && (
             <>
               <Link
-                id="history-evidence"
+                id={embedded ? undefined : "history-evidence"}
                 prefetch={false}
                 href={historyEventHref(context, selectedDate, freshness?.store.pendingEpoch(), {
                   date: selectedDate,

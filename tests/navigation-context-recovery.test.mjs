@@ -26,6 +26,35 @@ function stateHooks() {
 }
 const [intent, history, recovery] = await importWithPorts(['src/lib/trade-record-intent.ts', 'src/lib/cairn-v2/read-presentation.ts', 'src/lib/recovery-navigation.ts'], {});
 
+it('the beta home opens trade entry in the viewed account and currency, only where record entry is available', async () => {
+  let allowed = true;
+  const epoch = '55555555-5555-4555-8555-555555555555';
+  const [ui] = await importUiWithPorts(['src/components/cairn-v2/beta-shell.tsx'], {
+    'next/link': { default: link },
+    'next/navigation': { usePathname: () => '/beta', useRouter: () => ({}) },
+    '@/components/recovery/recovery-return': { RecoveryJourneyLink: link },
+    '@/components/home/portfolio-refresh-button': { PortfolioRefreshButton: () => null },
+    '@/components/cairn-v2/beta-provider': {
+      useBetaReadFreshness: () => ({store:{pendingEpoch: () => epoch}}),
+      useBetaExistingCrudAvailable: () => allowed, useBetaPreferences: () => ({}),
+    },
+  });
+  const render = (selected, mode = 'domain') => renderToStaticMarkup(React.createElement(ui.BetaShell, {
+    context:{ scope:selected, mode, currency:'USD', fixture:'standard', cashAmountKrw:'500000' }, setContext() {},
+  }));
+  for (const selected of [scope, 'all', 'group:' + otherAccount]) {
+    const match = render(selected).match(/href="([^"]+)"[^>]*>매수·매도 기록<\/a>/);
+    assert.ok(match);
+    const url = new URL(match[1].replaceAll('&amp;', '&'), origin);
+    assert.equal(url.pathname, '/beta/portfolio/ledger');
+    assert.deepEqual(Object.fromEntries(url.searchParams), {mode:'domain',scope:selected,currency:'USD',
+      cashAmountKrw:'500000', ...(selected === scope ? {accountId} : {}), action:'buy', _betaRead:epoch});
+  }
+  assert.doesNotMatch(render('fixture-account-a', null), /매수·매도 기록/);
+  allowed = false;
+  assert.doesNotMatch(render(scope), /매수·매도 기록/);
+});
+
 it('recovery retains a canonical holding only for ledger routes and keeps supported reporting currencies separate from KRW-only editors', () => {
   for (const beta of [false, true]) {
     const source = `${beta ? '/beta' : ''}/portfolio/ledger?accountId=${accountId}&assetId=${assetId}&action=sell&currency=USD`;
@@ -103,6 +132,15 @@ it('confirming a conflicting ledger account retains its holding and trade side o
   assert.deepEqual(Object.fromEntries(pushed[0].searchParams), { mode:'domain', scope:'account:' + otherAccount, currency:'USD', ...selection });
   tree.props.setContext({ ...tree.props.context, scope });
   assert.deepEqual(Object.fromEntries(pushed[1].searchParams), { mode:'domain', scope, currency:'USD' });
+
+  // Home opens an entry intent from an aggregate view without selecting any default account.
+  query.set('scope', 'all'); query.set('action', 'buy'); query.delete('accountId'); query.delete('assetId');
+  const chooser = ui.BetaRemainingWorkspace({ read: { ...read, selection:{action:'buy'},
+    scopes:[{key:scope,label:'계좌 A'}, {key:'account:'+otherAccount,label:'계좌 B'}],
+    queryKey:routes.remainingWorkspaceQueryKey('ledger', query.toString()) } });
+  assert.equal(nodes(chooser).some(node => node.type === Ledger), false);
+  nodes(chooser).find(node => node.type === 'select').props.onChange({currentTarget:{value:scope}});
+  assert.deepEqual(Object.fromEntries(pushed[2].searchParams), {mode:'domain',scope,currency:'USD',accountId,action:'buy'});
 });
 
 it('photo-import page carries navigation hints into its UI and its sign-in continuation', async () => {

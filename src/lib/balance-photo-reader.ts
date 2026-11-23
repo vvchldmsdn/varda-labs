@@ -1,5 +1,6 @@
 import type { Worker } from "tesseract.js";
 import { parseBalancePhoto } from "./balance-photo";
+import { normalizeBrokerageContrast } from "./brokerage-photo-contrast";
 
 async function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   let cancel: () => void = () => {};
@@ -23,10 +24,7 @@ export async function readBrokeragePhotoText(file: File, signal: AbortSignal, pr
     if (!context) throw new Error("canvas");
     context.fillStyle = "white"; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(bitmap, 0, 0);
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-    for (let offset = 0; offset < pixels.data.length; offset += 4) {
-      const value = pixels.data[offset] * .2126 + pixels.data[offset + 1] * .7152 + pixels.data[offset + 2] * .0722 < 220 ? 0 : 255;
-      pixels.data[offset] = pixels.data[offset + 1] = pixels.data[offset + 2] = value;
-    }
+    normalizeBrokerageContrast(pixels.data);
     context.putImageData(pixels, 0, 0);
     const { createWorker } = await import("tesseract.js");
     const base = new URL("/onboarding-ocr/v1/", window.location.origin).href;

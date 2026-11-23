@@ -18,7 +18,9 @@ async function harness({ authenticated = true, permitted = true, fail = false } 
       return { state: "ready", catalog: { scopes: [scope] }, resolution: permitted && args.scope === scope.key ? { state: "resolved", scope } : { state: "blocked" } };
     } },
     "@/lib/cairn-v2/display-session": { displayBindingForScopes: () => binding },
-    "@/lib/cairn-v2/period-attribution-read": { readPeriodAttribution: async args => {
+    "@/lib/cairn-v2/period-attribution-read": { readPeriodPerformance: async args => {
+      reads.push(args); return { range: args.range, basis: "invested_assets_excluding_cash", points: [], gaps: [] };
+    }, readPeriodAttribution: async args => {
       reads.push(args);
       if (fail) throw Error("Private database error");
       return { range, state: "partial", priceKrw: 2500, fxKrw: -100, totalKrw: 2400 };
@@ -40,6 +42,18 @@ test("period reads use the admitted tenant, scope and exact inclusive dates", as
   assert.equal(response.headers.get("x-cairn-display-binding"), binding);
   assert.equal((await response.json()).totalKrw, 2400);
   assert.deepEqual(reads, [{ tenantContext: tenant, scope, range }]);
+});
+
+test("return reads preserve scope and validate the full multi-year window and metric", async () => {
+  const { request, reads } = await harness();
+  const query = new URLSearchParams({ scope: scope.key, start: "2021-01-01", end: "2025-01-31", metric: "return" });
+  const response = await request(query);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).range, {start: "2021-01-01", end: "2025-01-31"});
+  assert.equal((await request(query, "invalid")).status, 409);
+  query.set("metric", "other"); assert.equal((await request(query)).status, 400);
+  query.set("metric", "return"); query.set("start", "1990-01-01"); assert.equal((await request(query)).status, 400);
+  assert.equal(reads.length, 1);
 });
 
 test("period reads reject changed sessions, inaccessible scopes, and malformed date ranges before reading holdings", async () => {

@@ -24,7 +24,7 @@ import { assertPreviewReleaseCatalog, readPreviewReleaseCatalog, readPreviewProt
 const PHASE = readArgument("--phase");
 const EVIDENCE_FILE = join(
   tmpdir(),
-  "varda-preview-database-preflight-v23.json",
+  "varda-preview-database-preflight-v24.json",
 );
 const MIGRATIONS_FOLDER = resolve("drizzle");
 
@@ -76,7 +76,7 @@ async function run() {
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);
     const evidence = {
-      evidenceVersion: "preview_database_build_preflight_v23",
+      evidenceVersion: "preview_database_build_preflight_v24",
       protectedContent,
       appliedMigrations: state.appliedMigrations,
       targetFingerprint: state.target.targetFingerprint,
@@ -106,7 +106,7 @@ async function run() {
   const before = JSON.parse(readFileSync(EVIDENCE_FILE, "utf8"));
   assert.equal(
     before.evidenceVersion,
-    "preview_database_build_preflight_v23",
+    "preview_database_build_preflight_v24",
     "Preview preflight evidence version drifted",
   );
   assert.equal(
@@ -193,7 +193,7 @@ function logEvidence(phase, state, plan, protectedContent) {
       ...publicPreviewDatabaseEvidence(state),
       migrationPlan: plan,
       compatibleHistoricalHashes: state.appliedMigrations.filter(row => canonicalizePreviewMigrationEvidence(row).sha256 !== row.sha256).length,
-      releaseCatalog: '0047_0064_exact',
+      releaseCatalog: '0047_0064_0065_exact',
       protectedContent: { tables: protectedContent.length, sha256: previewContentDigest(protectedContent) },
     })}`,
   );

@@ -18,6 +18,114 @@ before(async()=>{
 });
 after(()=>pg.close());
 
+async function workerPorts() {
+  const transport = (asTenant = false) => ({
+    transaction: async build => {
+      const commands = build({query: (text, params = []) => ({text, params})});
+      return pg.transaction(async tx => {
+        if (asTenant) await tx.exec('set local role varda_tenant_app');
+        const results = [];
+        for (const {text, params} of commands) results.push((await tx.query(text, params)).rows);
+        return results;
+      });
+    }
+  });
+  return importWithPorts([
+    'src/db/queries/native-portfolio-ledger.ts', 'src/lib/snapshots/holdings-revision-repair.ts',
+    'src/lib/snapshots/durable-work.ts', 'src/lib/cairn-v2/period-attribution-sql.ts'
+  ], {
+    '@/db/tenant-client': {getTenantSqlClient: () => transport(true)},
+    '@/db/client': {db: drizzle(pg), sqlClient: transport()},
+    '@/db/tenant-transaction-context': {runTenantReadTransaction: async (owner,build) => {
+      const rows = await transport(true).transaction(tx => [tx.query("select set_config('app.current_user_id',$1,true)",[owner]), ...build(tx)]);
+      return rows.slice(1);
+    }},
+  });
+}
+
+it('replays late buys and sells against saved holdings marks, including dates outside daily discovery', async () => {
+  const owner = randomUUID(), account = randomUUID(), asset = randomUUID(), code = 'late_fills';
+  const tenant = { ownerUserId: owner, role: 'user' };
+  const [ledger, repair, queue, read] = await workerPorts();
+  await pg.query("insert into app_users(id,status,role) values($1,'active','user')",[owner]);
+  await pg.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,$3,'Late fills','brokerage','KRW')",[account,owner,code]);
+  await pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price) values($1,$2,$3,$4,'Synthetic','SYN','korea','KRW','stock',10,999)",[asset,owner,account,code]);
+
+  for (const [day, price] of [['2020-05-01',90], ['2020-05-03',100], ['2020-05-04',100], ['2020-05-05',100], ['2020-05-06',120], ['2020-05-11',120]]) {
+    const args = [owner, account, code, day, day+'T07:00:00+09:00', price];
+    await pg.query(`insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,num_assets,total_market_value,cycle_end_at,captured_at,description)
+      values($1,$2,$3,$4,'varda_manual_daily_snapshot',1,10*$6::numeric,$5,$5,'snapshot_status=complete; expected_positions=1')`, args);
+    await pg.query(`insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,cycle_end_at,captured_at,asset_id,asset_name,ticker,market,currency,source_type,price_source,price_basis,quantity,total_quantity,unit_price,market_value_krw)
+      values($1,$2,$3,$4,'varda_manual_daily_snapshot',$5,$5,$7,'Synthetic','SYN','korea','KRW','listed','synthetic_close','official_close',10,10,$6,10*$6::numeric)`, [...args, asset]);
+  }
+  const write = request => ledger.writeNativeMutation(tenant, request);
+  const first = await write({accountId:account,operationId:randomUUID(),expectedSequence:null,
+    opening:{at:'2020-05-01T02:00:00Z',cash:{KRW:'1000',USD:'0'},positions:[{assetId:asset,currency:'KRW',quantity:'10',costLots:null}]}});
+  assert.equal(first.status, 'created');
+  for (const [type, day, quantity, sequence] of [['sell','2020-05-03','2',0],['buy','2020-05-04','1',1]]) {
+    const request = {accountId:account,operationId:randomUUID(),expectedSequence:sequence,
+      event:{type,at:day+'T02:00:00Z',quantity,currency:'KRW',assetId:asset,price:'100',
+        fee:{amount:'0',currency:'KRW'},tax:{amount:'0',currency:'KRW'}}};
+    assert.deepEqual(await write(request), {status:'invalid',reason:'event_precedes_recorded_snapshot'});
+    const confirmed = {...request, history:{notInOpening:true,reason:'Omitted fill'}};
+    assert.equal((await write(confirmed)).status,'created');
+    assert.equal((await write(confirmed)).status,'existing');
+  }
+  const visibleHoldings = () => pg.transaction(async tx => {
+    await tx.exec('set local role varda_tenant_app');
+    await tx.query("select set_config('app.current_user_id',$1,true)",[owner]);
+    return (await tx.query(read.PERFORMANCE_ENDS_SQL, [account,'2020-04-30','2020-05-11'])).rows.map(row=>row.date);
+  });
+  assert.deepEqual(await visibleHoldings(), ['2020-04-30','2020-05-02'], 'the chart hides stale later valuations before work runs');
+  for (const date of ['2020-05-04', '2020-05-05', '2020-05-06', '2020-05-11']) {
+    const work = await queue.claimSnapshotWork('legacy', '2020-06-01');
+    assert.equal(work?.snapshotDate, date);
+    const result = await queue.snapshotFence.run(work, () => repair.repairHoldingsSnapshotRevisions(tenant,date,code,false));
+    assert.deepEqual(result, {status:'ready',repaired:1});
+    assert.equal(await queue.finishValuedSnapshot(work), true);
+  }
+  assert.equal(await queue.claimSnapshotWork('legacy', '2020-06-01'), null);
+  assert.deepEqual(await visibleHoldings(), ['2020-04-30','2020-05-02','2020-05-03','2020-05-04','2020-05-05','2020-05-10']);
+  const rows = await pg.query(`select p.quantity::float8 as quantity, s.total_market_value::float8 as value,
+    (s.closing_performance->>'dailyReturnPct')::float8 as earned, s.closing_performance->>'reason' as gap
+    from daily_position_snapshots p join daily_portfolio_snapshots s using(account_id,snapshot_date,source,canonical_owner_user_id)
+    where s.canonical_owner_user_id=$1 and s.account_id=$2 order by s.snapshot_date`, [owner,account]);
+  assert.deepEqual(rows.rows.map(r=>[r.quantity,r.value]), [[10,900],[10,1000],[8,800],[9,900],[9,1080],[9,1080]]);
+  const [, , sale, purchase, marketGain, missingPriorDay] = rows.rows;
+  assert.equal(sale.earned, 0);
+  assert.equal(purchase.earned, 0);
+  assert.ok(Math.abs(marketGain.earned - 20) < 1e-8);
+  assert.equal(missingPriorDay.earned,null);
+  assert.equal(missingPriorDay.gap,'valuation');
+});
+
+it('a revision exactly at the exclusive native cutoff cannot supersede the preceding repair', async () => {
+  const [ledger, , queue] = await workerPorts();
+  const owner = randomUUID(), account = randomUUID(), asset = randomUUID(), code = 'exclusive_native';
+  const tenant = {ownerUserId:owner,role:'user'};
+  await pg.query("insert into app_users(id,status,role) values($1,'active','user')",[owner]);
+  await pg.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,$3,'Native cutoff','brokerage','KRW')",[account,owner,code]);
+  await pg.query("insert into assets(id,canonical_owner_user_id,account_id,account,name,ticker,market,currency,asset_type,quantity,current_price) values($1,$2,$3,$4,'Synthetic','NAT','korea','KRW','stock',1,10)",[asset,owner,account,code]);
+  const opening = await ledger.writeNativeMutation(tenant, {
+    accountId:account, operationId:randomUUID(),expectedSequence:null,
+    opening:{at:'2020-04-30T23:00:00Z',cash:{KRW:'100',USD:'0'},positions:[{assetId:asset,currency:'KRW',quantity:'1',costLots:null}]}
+  });
+  assert.equal(opening.status, 'created');
+  for (const [marker, at] of [[1,'2020-05-01T21:59:59.999Z'], [2,'2020-05-01T22:00:00.000Z']]) {
+    const result = await ledger.writeNativeMutation(tenant, {accountId:account,operationId:randomUUID(),expectedSequence:marker-1,
+      event:{type:'buy',at,assetId:asset,quantity:'1',currency:'KRW',price:'10'},history:{notInOpening:true,reason:'Late fill'}});
+    assert.equal(result.status,'created');
+  }
+  await queue.discoverSnapshotWork('native', '2020-05-03');
+  const cutoffWork = await queue.claimSnapshotWork('native', '2020-06-01');
+  assert.equal(cutoffWork.snapshotDate,'2020-05-02');
+  assert.equal(cutoffWork.revision,1);
+  await queue.finishSnapshotWork(cutoffWork,'completed',null);
+  const following = await queue.claimSnapshotWork('native', '2020-06-01');
+  assert.equal(following.snapshotDate,'2020-05-03');
+  assert.equal(following.revision,2);
+});
+
 async function fixture(){
   const owner=randomUUID(),other=randomUUID(),account=randomUUID(),asset=randomUUID(),portfolio=randomUUID(),position=randomUUID();
   const code=`test_${account.slice(0,8)}`;
@@ -59,10 +167,15 @@ async function fixture(){
 }
 
 it('repairs retained historical holdings evidence once and archives exact before-images without changing financial source rows',async()=>{
-  const f=await fixture(),before=await f.read();
+  const f=await fixture();
+  const originalReturn = {version:1,date:'2026-08-15',currency:'KRW',dailyReturnPct:10};
+  await pg.query('update daily_portfolio_snapshots set closing_performance=$2::jsonb where id=$1',[f.portfolio,JSON.stringify(originalReturn)]);
+  const before=await f.read();
   const originalAssets=(await pg.query('select to_jsonb(a) as row from assets a where id=$1',[f.asset])).rows;
   assert.deepEqual(await f.run(),{status:'ready',repaired:1});
   const saved=await f.read();
+  assert.equal(saved.portfolio.closing_performance,null);
+  assert.deepEqual(saved.archive[0].portfolio.closing_performance,originalReturn);
   assert.equal(saved.portfolio.total_market_value,800);assert.equal(saved.portfolio.total_cost,640);assert.equal(saved.portfolio.cash_value,0);
   assert.equal(saved.positions[0].quantity,8);assert.equal(saved.positions[0].unit_price,100);assert.equal(saved.positions[0].market_value_krw,800);
   assert.equal(saved.portfolio.cycle_end_at,before.portfolio.cycle_end_at);assert.equal(saved.portfolio.captured_at,before.portfolio.captured_at);

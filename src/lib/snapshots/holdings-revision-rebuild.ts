@@ -56,7 +56,7 @@ export function buildHoldingsRevisionAggregate(
       return percent(amount, total);
     };
     return { status: "ready", portfolio: {
-      ...original, cashValue: "0", totalMarketValue: stored(total), investedAmount: stored(cost), totalCost: stored(cost), totalPnl: stored(pnl), totalReturnPct: null,
+      ...original, cashValue: "0", totalMarketValue: stored(total), investedAmount: stored(cost), totalCost: stored(cost), totalPnl: stored(pnl), totalReturnPct: null, closingPerformance: null,
       numAssets: count("numAssets"), numGroups: count("numGroups"),
       krWeight: weighted("krWeight"), usWeight: weighted("usWeight"), usdExposurePct: weighted("usdExposurePct"), thematicWeight: weighted("thematicWeight"),
       topHoldingName: null, topHoldingWeight: null,
@@ -129,6 +129,9 @@ function rebuild({ portfolio, positions, state, revision, positionTemplates = []
       investedAmount: stored(cost), totalCost: stored(cost), totalMarketValue: stored(total), totalPnl: stored(pnl),
       // Native remaining lots do not prove cumulative realized profit or time returns.
       totalReturnPct: null,
+      // The original receipt remains in the archive. Only the closing worker
+      // may publish a return calculated from the corrected daily valuations.
+      closingPerformance: null,
       numAssets: rebuilt.length,
       numGroups: new Set(rebuilt.map(row => row.legacyGroupId ?? row.groupName).filter(Boolean)).size,
       topHoldingName: top?.assetName ?? null,

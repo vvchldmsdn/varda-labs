@@ -2,7 +2,8 @@ import { resolveCurrentTenantContext } from "@/lib/auth/current-tenant-context";
 import { getReadOnlyTenantPortfolioAnalysisScopeContext } from "@/db/queries/portfolio-analysis-scopes";
 import { displayBindingForScopes } from "@/lib/cairn-v2/display-session";
 import { validateAttributionRange } from "@/lib/cairn-v2/period-attribution";
-import { readPeriodAttribution } from "@/lib/cairn-v2/period-attribution-read";
+import { readPeriodAttribution, readPeriodPerformance } from "@/lib/cairn-v2/period-attribution-read";
+import { MAX_PERFORMANCE_DAYS } from "@/lib/cairn-v2/period-performance";
 import { requireBetaFixtureAccess } from "@/lib/cairn-v2/server-access";
 import { currentKstDate } from "@/lib/current-kst-date";
 
@@ -19,11 +20,12 @@ function reply(body: object, status: number, binding?: string) {
 export async function GET(request: Request) {
   await requireBetaFixtureAccess();
   const query = new URL(request.url).searchParams;
-  const keys = ["scope", "start", "end"];
+  const performance = query.get("metric") === "return";
+  const keys = performance ? ["scope", "start", "end", "metric"] : ["scope", "start", "end"];
   const scope = query.get("scope");
   const range = { start: query.get("start") ?? "", end: query.get("end") ?? "" };
   if (query.size !== keys.length || keys.some(key => !query.has(key)) || !scope ||
-      !validateAttributionRange(range, currentKstDate(new Date()))) {
+      !validateAttributionRange(range, currentKstDate(new Date()), performance ? MAX_PERFORMANCE_DAYS : undefined)) {
     return reply({ error: "invalid_request" }, 400);
   }
   try {
@@ -39,7 +41,8 @@ export async function GET(request: Request) {
     const binding = displayBindingForScopes(tenantContext, context.catalog);
     if (request.headers.get(bindingHeader) !== binding) return reply({ error: "session_changed" }, 409);
     if (context.resolution.scope.kind === "portfolio_group") return reply({ error: "select_account" }, 422);
-    const result = await readPeriodAttribution({ tenantContext, scope: context.resolution.scope, range });
+    const read = performance ? readPeriodPerformance : readPeriodAttribution;
+    const result = await read({ tenantContext, scope: context.resolution.scope, range });
     return reply(result, 200, binding);
   } catch {
     return reply({ error: "history_unavailable" }, 503);

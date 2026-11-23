@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
-// These two release boundaries supplement the existing 0000-0026 catalog gate.
+// These release boundaries supplement the existing 0000-0026 catalog gate.
 // Never infer schema equivalence from a migration hash exception alone.
 const TABLES = "'member_activity_daily','member_activity_profiles','contribution_effects'";
 export async function readPreviewReleaseCatalog(query) {
   const statements = {
+    closingPerformance: `select data_type,udt_schema,udt_name,is_nullable,column_default,is_generated from information_schema.columns where table_schema='public' and table_name='daily_portfolio_snapshots' and column_name='closing_performance'`,
     tables: `select relname as name, relrowsecurity as rls, relforcerowsecurity as forced from pg_class where relnamespace='public'::regnamespace and relname in (${TABLES}) order by relname`,
     columns: `select table_name, column_name, data_type, udt_name, character_maximum_length, numeric_precision, numeric_scale, datetime_precision, is_nullable, column_default from information_schema.columns where table_schema='public' and table_name in (${TABLES}) order by table_name, ordinal_position`,
     // PostgreSQL 18 catalogs NOT NULL separately; columns.is_nullable already
@@ -24,7 +25,7 @@ export function assertPreviewReleaseCatalog(actual, expected) {
   for (const key of Object.keys(expected)) {
     // Avoid assertion diffs containing database definitions in deployment logs.
     if (JSON.stringify(actual[key]) !== JSON.stringify(expected[key])) {
-      throw new Error(`Preview 0047/0064 schema evidence differs: ${key}.`);
+      throw new Error(`Preview 0047/0064/0065 schema evidence differs: ${key}.`);
     }
   }
   assert.equal(Object.keys(actual).length, Object.keys(expected).length, 'Unexpected Preview schema evidence');

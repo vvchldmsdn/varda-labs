@@ -20,7 +20,14 @@ export async function runNativeDailySnapshotJob({ dryRun = true, now = new Date(
       const evidence=await readNativeCutoffEvidence(tenant,work.accountId,work.snapshotDate,at);
       if(!evidence) return {status:"blocked",reason:"cutoff_evidence_missing"};
       const saved=await saveNativeCutoffSnapshots(tenant,evidence,work.snapshotDate,at);
-      return saved.status==="ready" ? {status:"completed"} : {status:saved.status==="stale" ? "deferred" : "blocked",reason:saved.status};
+      if (saved.status === "ready") return {status:"completed"};
+      if (saved.status === "stale") return {status:"deferred",reason:saved.status};
+      const issues = buildTrackedCurrencyPortfolio({ ...evidence, reporting: "KRW" }).current?.issues;
+      if (issues?.length && issues.every(issue => ["native_price_evidence_missing", "fx_missing", "fx_stale"].includes(issue.code))) {
+        const missingPrice = issues.some(issue => issue.code === "native_price_evidence_missing");
+        return {status:"blocked",reason:missingPrice ? "missing_cutoff_price_evidence" : "missing_fx_rate"};
+      }
+      return {status:"blocked",reason:saved.status};
     },{discover});
     return {status:result.failedCount||result.blockedCount ? "partial" as const : "completed" as const,dryRun,...result,created:result.writtenCount};
   }

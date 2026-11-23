@@ -626,6 +626,39 @@ it('keeps 10 × 105 × 1300 at the cutoff after cache replacement, even with an 
   assert.equal(original.fx[0].timestampBasis,'collection');
 });
 
+it('rebuilds a missing market cutoff from a late verified close without a new trade or quote request', async t => {
+  t.mock.timers.enable({ apis:['Date'], now: Date.parse('2026-09-02T22:10:00Z') });
+  const f = await fixture();
+  await f.open(account, { KRW:'0', USD:'1000' });
+  await f.mutate({ type:'buy', assetId:asset, quantity:'5', price:'100', currency:'USD', at:'2026-09-01T21:00:00Z' },
+    account, { newAsset:{ id:asset, name:'Synthetic', ticker:'TEST', market:'us', currency:'USD', assetType:'stock' } });
+  await f.pg.query("insert into fx_rates(usdkrw,date,observed_at,fetched_at,source,rate_kind,status) values(1300,'2026-09-02',null,'2026-09-01T21:59:00Z','kis_overseas_price_detail:NAS',null,'ok')");
+  let outcome;
+  const [job] = await importWithPorts(['src/lib/snapshots/native-daily-job.ts'], {
+    '@/db/client':{ db:drizzle(f.pg) },
+    '@/db/queries/native-cutoff-evidence':f.cutoff,
+    '@/db/queries/native-portfolio-snapshots':f.snapshots,
+    './durable-work':{ runSnapshotWork:async (_stage, snapshotDate, execute) => {
+      outcome = await execute({ownerUserId:owner, role:'user', accountId:account, snapshotDate});
+      return {targetCount:1, writtenCount:Number(outcome.status === 'completed'), blockedCount:Number(outcome.status === 'blocked'), failedCount:0};
+    } },
+  });
+  const run = () => job.runNativeDailySnapshotJob({dryRun:false, durable:true, snapshotDate:'2026-09-02'});
+  await run();
+  assert.deepEqual(outcome,{status:'blocked',reason:'missing_cutoff_price_evidence'});
+  assert.equal((await f.pg.query('select count(*)::int as count from daily_portfolio_snapshots')).rows[0].count,0);
+  await f.pg.query("insert into asset_price_snapshots values('TEST','us','USD',105,'kis_overseas_daily_price','2026-09-01','2026-09-02T08:00:00Z',false,'TEST','NAS')");
+  await run();
+  assert.equal(outcome.status,'completed');
+  await run();
+  const rows = (await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows;
+  assert.equal(rows.length,1);
+  const observation = rows[0].native_evidence.frame.positions.find(item=>item.id===asset).observation;
+  assert.equal(Number(observation.quantity),5);
+  assert.equal(Number(observation.price),105);
+  assert.equal(observation.priceReferenceDate,'2026-09-01');
+});
+
 it('does not choose between retained 105 and cache 110 for the same receipt; only a verified close can replace the conflict',async()=>{
   const f=await fixture();await f.open(account,{KRW:'0',USD:'1000'});
   await f.mutate({type:'buy',assetId:asset,quantity:'10',price:'100',currency:'USD',at:'2026-09-01T21:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});

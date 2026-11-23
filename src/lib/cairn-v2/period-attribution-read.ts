@@ -1,6 +1,7 @@
 import "server-only";
 
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
+import { ownedRecoveredReturnSql, recoveredCurveAtClose } from "@/db/queries/period-return-recovery";
 import { fxFactor, valuePosition, type FxEvidence } from "../currency-valuation";
 import type { TrackedNativePosition } from "../currency-tracked-portfolio";
 import { isCurrency } from "../money";
@@ -9,11 +10,16 @@ import type { PortfolioAnalysisScope } from "../portfolio-analysis-scope";
 import { toNumber } from "../portfolio-math";
 import type { TenantContext } from "../session-resolver-contract";
 import { SNAPSHOT_FX_REFERENCE_MAX_AGE_MS } from "../snapshots/cutoff-fx";
+import { resolveSnapshotCycle } from "../snapshots/market-calendar";
 import {
   buildPeriodAttribution, type AttributionAccountObservation, type AttributionPosition, type AttributionTrade,
   type PeriodAttributionRange,
 } from "./period-attribution";
-import { ATTRIBUTION_ACCOUNTS_SQL, ATTRIBUTION_ENDS_SQL, ATTRIBUTION_TRADES_SQL } from "./period-attribution-sql";
+import { ATTRIBUTION_ACCOUNTS_SQL, ATTRIBUTION_ENDS_SQL, ATTRIBUTION_TRADES_SQL,
+  PERFORMANCE_ACCOUNTS_SQL, PERFORMANCE_CASH_SQL, PERFORMANCE_ENDS_SQL, PERFORMANCE_LIVE_SCOPE_SQL, PERFORMANCE_TRADES_SQL } from "./period-attribution-sql";
+import { buildPeriodPerformance, joinRecoveredPerformance, type PerformanceFlow, type PerformanceObservation } from "./period-performance";
+import { performanceLiveFrame } from "./period-performance-live";
+import { readPerformanceMarks } from "./period-performance-market-read";
 
 type Row = Readonly<Record<string, unknown>>;
 const text = (value: unknown) => typeof value === "string" ? value : null;
@@ -91,4 +97,154 @@ export async function readPeriodAttribution({ tenantContext, scope, range }: {
     accounts: accounts.map(a => ({ id: String(a.id), name: String(a.name) })),
     observations: ends.map(row => observation(row, tenantContext.ownerUserId)), trades: events.map(trade),
   });
+}
+
+function performanceObservation(row: Row, ownerId: string): PerformanceObservation {
+  const result = observation(row, ownerId);
+  if (!row.frame_at) return { ...result, source: String(row.source), recoveryOpeningKrw: toNumber(row.recovery_opening_krw) };
+  const positions: TrackedNativePosition[] = Array.isArray(row.positions) ? row.positions : [];
+  const cash = positions.filter(p => p?.kind === "cash");
+  // Both balances (including explicit zero) are stored by the native cutoff writer.
+  // A holdings subtotal is never a proxy for an account with cash.
+  const cashComplete = cash.length === 2 && ["KRW", "USD"].every(currency => cash.some(p =>
+    p.id === "cash:" + result.accountId + ":" + currency && p.observation?.currency === currency &&
+    p.observation.source === "native_ledger_cash" && p.observation.price === "1"));
+  const cutoff = Date.parse(String(row.frame_at));
+  const valid = cashComplete && cutoff === Date.parse(result.date + "T22:00:00Z") &&
+    Array.isArray(row.available_currencies) && row.available_currencies.includes("KRW");
+  return { ...result, source: "native_ledger_cutoff", at: String(row.frame_at),
+    expectedPositions: valid ? result.expectedPositions : null };
+}
+
+function performanceFlows(rows: readonly Row[], ends: readonly Row[], accounts: readonly Row[]): PerformanceFlow[] {
+  const withinScope = new Set(accounts.map(a => a.id));
+  const fx = new Map<string, FxEvidence[]>();
+  for (const end of ends) if (Array.isArray(end.native_fx)) {
+    fx.set(String(end.account_id) + "/" + String(end.date), end.native_fx);
+  }
+  const transfers = new Map<unknown, Row[]>();
+  for (const row of rows) if (row.type === "transfer") {
+    const pair = transfers.get(row.transfer_id) ?? [];
+    pair.push(row); transfers.set(row.transfer_id, pair);
+  }
+  const flows: PerformanceFlow[] = [];
+  for (const row of rows) {
+    const date = String(row.date), at = String(row.at), accountId = String(row.account_id);
+    const sign = row.type === "deposit" || row.direction === "in" ? 1 : -1;
+    const leg = Array.isArray(row.legs) && row.legs.length === 1 ? row.legs[0] : null;
+    const amount = toNumber(row.amount);
+    const admitted = leg && amount !== null && amount > 0 && leg.currency === row.currency &&
+      leg.kind === (row.type === "transfer" ? "transfer" : "external") && toNumber(leg.delta) === sign * amount;
+    if (!admitted || !isCurrency(row.currency) ||
+        row.type === "transfer" && (!text(row.peer) || !text(row.transfer_id) || !["in", "out"].includes(String(row.direction)))) {
+      flows.push({ date, accountId, at, amountKrw: null }); continue;
+    }
+    if (row.type === "transfer" && withinScope.has(row.peer)) {
+      const pair = transfers.get(row.transfer_id) ?? [];
+      if (pair.length !== 2 || !pair.some(other => other.account_id === row.peer && other.peer === row.account_id &&
+        other.at === row.at && other.currency === row.currency && toNumber(other.amount) === amount && other.direction !== row.direction)) {
+        flows.push({ date, accountId, at, amountKrw: null });
+      }
+      continue;
+    }
+    const previous = new Date(Date.parse(date + "T00:00:00Z") - 86_400_000).toISOString().slice(0,10);
+    const evidence = [...(fx.get(accountId + "/" + previous) ?? []), ...(fx.get(accountId + "/" + date) ?? [])];
+    const rate = fxFactor(row.currency, "KRW", at, row.date_only ? evidence.filter(item => item.kind === "daily_reference") : evidence,
+      SNAPSHOT_FX_REFERENCE_MAX_AGE_MS);
+    flows.push({ date, accountId, at, amountKrw: rate.ok ? sign * amount * rate.value.toNumber() : null });
+  }
+  return flows;
+}
+
+export async function readPeriodPerformance({ tenantContext, scope, range, now = new Date(), includeLive = true, onClosedEvidence }: {
+  tenantContext: TenantContext; scope: PortfolioAnalysisScope; range: PeriodAttributionRange;
+  now?: Date; includeLive?: boolean; onClosedEvidence?: (rows: readonly {date: string; snapshotId: string}[]) => void;
+}) {
+  if (scope.kind === "portfolio_group") throw new Error("period_performance_group_unsupported");
+  const account = scope.kind === "account" ? scope.accountId : null;
+  const params = [account, range.start, range.end];
+  const serviceDay = resolveSnapshotCycle(now).snapshotDate;
+  const open = includeLive && range.start <= serviceDay && serviceDay <= range.end &&
+    now.getTime() > Date.parse(serviceDay + "T07:00:00+09:00");
+  const readRecovery = includeLive && account !== null;
+  const [accounts, ends, trades, cash, ...extra] = await runTenantReadTransaction(tenantContext.ownerUserId, tx => [
+    tx.query(PERFORMANCE_ACCOUNTS_SQL, [account]), tx.query(PERFORMANCE_ENDS_SQL, params),
+    tx.query(PERFORMANCE_TRADES_SQL, params), tx.query(PERFORMANCE_CASH_SQL, params),
+    ...(open ? [tx.query(PERFORMANCE_LIVE_SCOPE_SQL, [account])] : []),
+    ...(readRecovery ? [tx.query(ownedRecoveredReturnSql(true), [tenantContext.ownerUserId, account, range.start, range.end])] : []),
+  ]);
+  const guards = open ? extra[0] : undefined;
+  const recoveryRow = readRecovery ? extra[open ? 1 : 0]?.[0] : undefined;
+  const recovery = account ? recoveredCurveAtClose(recoveryRow, ends, account) : null;
+  onClosedEvidence?.(ends.flatMap(row => typeof row.snapshot_id === "string" ? [{ date: String(row.date), snapshotId: row.snapshot_id }] : []));
+  const observations = ends.map(row => performanceObservation(row, tenantContext.ownerUserId));
+  if (recovery) {
+    const opening = observations.find(o => o.accountId === account && o.date === recovery.baseDate);
+    if (opening && !opening.at) opening.recoveryOpeningKrw = recovery.points[0].valueKrw;
+  }
+  const fxEnds: Row[] = [...ends];
+  const executionEnds = new Map<string, {date: string; at: number}>();
+  for (const row of ends) {
+    if (typeof row.execution_end_at !== "string") continue;
+    const at = new Date(row.execution_end_at);
+    if (Number.isFinite(at.getTime())) {
+      executionEnds.set(String(row.account_id) + "/" + resolveSnapshotCycle(at).snapshotDate, { date: String(row.date), at: at.getTime() });
+    }
+  }
+  // Translate only a recorded foreign execution at its own service-day portfolio mark.
+  // This is a reporting convention, not an inferred exchange or settlement.
+  const closeRates = new Map<string, Set<number>>();
+  for (const [index, observation] of observations.entries()) {
+    if (observation.at || observation.expectedPositions !== observation.positions.length) continue;
+    const rates = new Set(observation.positions.flatMap(p => p.currency === "USD" && p.fxRate !== null &&
+      Number.isFinite(p.fxRate) && p.fxRate > 0 ? [p.fxRate] : []));
+    // A final sale can leave no USD position at this close. The same completed
+    // portfolio snapshot retains the FX quote used by its writer.
+    const portfolioRate = toNumber(ends[index].portfolio_usd_krw);
+    if (portfolioRate !== null && portfolioRate > 0) rates.add(portfolioRate);
+    closeRates.set(observation.accountId + "/" + observation.date, rates);
+  }
+  const holdings = accounts.every(row => row.holdings === true);
+  if (open && accounts.length && guards?.length && (holdings || accounts.every(row => row.holdings === false)) &&
+      accounts.every(a => guards.some(row => row.account_id === a.id)) &&
+      accounts.every(a => ends.some(row => row.account_id === a.id && String(row.date) < serviceDay)) &&
+      !ends.some(row => row.date === serviceDay) &&
+      accounts.every(a => (executionEnds.get(a.id + "/" + serviceDay)?.at ?? 0) < now.getTime())) {
+    // Market data and the current ledger are re-read with server-owned scope.
+    // A failed price read only affects the provisional tip.
+    const latest = new Map<string, { at: string; observation: PerformanceObservation }>();
+    for (const [i, observation] of observations.entries()) {
+      if (observation.date < serviceDay && observation.expectedPositions === observation.positions.length &&
+          typeof ends[i].captured_at === "string") latest.set(observation.accountId, { at: String(ends[i].captured_at), observation });
+    }
+    const evidence = await readPerformanceMarks(tenantContext, scope, now, holdings, latest).catch(() => null);
+    const live = evidence && performanceLiveFrame(evidence, tenantContext.ownerUserId, guards, holdings, serviceDay, now.toISOString());
+    if (live) {
+      observations.push(...live.observations);
+      for (const observation of live.observations) {
+        if (live.portfolioUsdKrw !== null) closeRates.set(observation.accountId + "/" + serviceDay, new Set([live.portfolioUsdKrw]));
+        fxEnds.push({ account_id: observation.accountId, date: serviceDay, native_fx: live.fx });
+      }
+    }
+  }
+  const byNow = (row: Row, at: unknown) => !open || row.date !== serviceDay || at == null || Date.parse(String(at)) <= now.getTime();
+  const result = buildPeriodPerformance(range, {
+    accounts: accounts.map(a => ({ id: String(a.id), holdings: a.holdings === true })),
+    observations, trades: trades.flatMap(row => {
+      // A current holdings writer values through its actual cycle_end_at,
+      // including executions exactly at that instant. A retrospective cutoff
+      // uses the usual exclusive 07:00 boundary regardless of when it was saved.
+      const previousClose = executionEnds.get(String(row.account_id) + "/" + String(row.date));
+      const nativeEvent = row.native_event as {dateEvidence?: unknown} | null;
+      const exact = typeof row.executed_at === "string" && !nativeEvent?.dateEvidence;
+      const date = previousClose && exact && Date.parse(String(row.executed_at)) <= previousClose.at ? previousClose.date : String(row.date);
+      if (date < range.start || date > range.end || !byNow(row, exact ? row.executed_at : null)) return [];
+      const leg = { ...trade(row), date };
+      const rates = closeRates.get(leg.accountId + "/" + leg.date);
+      if (leg.currency !== "USD" || leg.flowKrw !== null || leg.fxRate !== null ||
+          !leg.price || !leg.quantityDelta || rates?.size !== 1) return leg;
+      return { ...leg, fxRate: [...rates][0], closingFx: true };
+    }), cashFlows: performanceFlows(cash.filter(row => byNow(row, row.at)), fxEnds, accounts),
+  });
+  return recovery && account ? joinRecoveredPerformance(result, recovery, account, observations) : result;
 }

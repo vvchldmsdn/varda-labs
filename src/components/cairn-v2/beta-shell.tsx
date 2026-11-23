@@ -1,5 +1,6 @@
 "use client";
 import { Check, ChevronDown, Moon, Sun } from "lucide-react";
+import { T } from "@/components/i18n/localized-text";
 import { useHomeTheme } from "./use-home-theme";
 import homeNavigation from "@/components/home/home-navigation.module.css";
 import homeDesign from "./home-shell.module.css";
@@ -112,6 +113,12 @@ return <div ref={rootRef} className={`${styles.scope} ${tokens.scope} ${styles.s
           <span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>
         </Link> : <a className={styles.purposeLink} href={originalHref(item.original, context)} title="기존 화면에서 계속"><span className={styles.navIcon}><img src={`/cairn-v2/figma/${item.icon}`} alt="" /></span><span>{item.label}</span>{workspace && <small>기존 ↗</small>}</a>}
       </div>)}</nav>
+      {!workspace && context.mode === "domain" && existingCrudAvailable && (
+        <Link prefetch={false} className={homeDesign.tradeEntry}
+          href={readHref(remainingWorkspaceHref("ledger", context, undefined, { accountId: ledgerAccount, action: "buy" }))}>
+          <T ko="매수·매도 기록" en="Record a trade" />
+        </Link>
+      )}
       <CairnButton variant="bare" className={workspace ? controls.workspaceThemeToggle : homeDesign.themeToggle} type="button" aria-label={dark ? "라이트 모드로 전환" : "다크 모드로 전환"} onClick={toggle}>
         {dark ? <Sun key="sun" size={17} aria-hidden /> : <Moon key="moon" size={17} aria-hidden />}
       </CairnButton>

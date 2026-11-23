@@ -28,7 +28,7 @@ export async function repairHoldingsSnapshotRevisions(tenant: TenantContext, sna
   let repaired = 0;
   for (const original of portfolios) {
     if (!original.accountId || original.account === "all") continue;
-    const ledger = await readNativeLedger(tenant, original.accountId);
+    const ledger = await readNativeLedger(tenant, original.accountId, { includeSnapshots: false });
     if (!ledger.accountsComplete || !ledger.entriesComplete) return { status: "blocked" as const, reason: "revision_ledger_incomplete" };
     const storedAccount = ledger.accounts.find(row => row.id === original.accountId);
     const cutoff = original.cycleEndAt && new Date(original.cycleEndAt).getTime();
