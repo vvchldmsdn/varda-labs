@@ -8,7 +8,8 @@ import type { ReadOnlyHistoryBalance } from "../../db/queries/history-balance";
 import type { PortfolioStructureResult } from "../portfolio-structure";
 import type { BetaContext, BetaCurrency } from "./navigation";
 import type { getFixtureView } from "./fixtures";
-export type BetaHistoryRead = Omit<Pick<ReadOnlyHistoryBalance, "selectedScope" | "readStatus" | "portfolioRows">, "portfolioRows"> & { portfolioRows: HistoryReadRow[]; recoveredReturn?: import('../period-return-recovery').RecoveredReturnCurve | null; observationPolicy?: "production_observed_v1" };
+import { reviewedValues, type AccountHistoryReview } from "./reviewed-history-series.ts";
+export type BetaHistoryRead = Omit<Pick<ReadOnlyHistoryBalance, "selectedScope" | "readStatus" | "portfolioRows">, "portfolioRows"> & { portfolioRows: HistoryReadRow[]; recoveredReturn?: import('../period-return-recovery').RecoveredReturnCurve | null; accountHistoryReview?: AccountHistoryReview | null; reviewUnavailable?: boolean; observationPolicy?: "production_observed_v1" };
 export type DemoView = ReturnType<typeof getFixtureView>;
 export type ReadState = "ready" | "empty" | "partial" | "unavailable" | "unauthorized" | "loading";
 export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" | "history"> & {
@@ -19,6 +20,8 @@ export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" |
   domain?: {
     currentValuePresentation?: import("./current-value-presentation").OriginalCurrentValuePresentation;
     recoveredReturn?: import('../period-return-recovery').RecoveredReturnCurve | null;
+    accountHistoryReview?: AccountHistoryReview | null;
+    reviewUnavailable?: boolean;
     investmentReturn?: import("./investment-return").InvestmentReturn;
     planning?: BetaPlanningRead;
     heatmap?: BetaHeatmapRead;
@@ -89,12 +92,13 @@ export function applyBetaHistory(view: BetaView, history: BetaHistoryRead, curre
     valueKrw: supported && !ambiguous ? row.totalMarketValue : null,
     exampleReturnPct: supported && !ambiguous && row.rowKind !== "partial" ? row.totalReturnPct : null,
   })).sort((a, b) => a.date.localeCompare(b.date));
-  if (observed && supported) rows = observed.rows;
+  const review = supported && history.selectedScope.kind === "account" && history.readStatus !== "unavailable" ? history.accountHistoryReview : null;
+  if (observed && supported) rows = review ? reviewedValues(observed.rows, review) : observed.rows;
   const state: ReadState = !supported || ambiguous || history.readStatus === "unavailable" ? "unavailable" :
-    !history.portfolioRows.length ? "empty" : observed && !observed.rows.length ? "unavailable" : history.readStatus === "partial" || history.portfolioRows.some(r => r.rowKind === "partial") ? "partial" : "ready";
+    !rows.length ? history.portfolioRows.length ? "unavailable" : "empty" : history.readStatus === "partial" || history.portfolioRows.some(r => r.rowKind === "partial") ? "partial" : "ready";
   return { view: { ...view, history: rows, domain: view.domain ? { ...view.domain,
     historyState: state, historySourceCount: trajectory.sourceCount,
-    recoveredReturn: history.recoveredReturn, historyRecords: history.portfolioRows, historyObservationPolicy: history.observationPolicy,
+    recoveredReturn: history.recoveredReturn, accountHistoryReview: review, reviewUnavailable: supported && history.reviewUnavailable, historyRecords: history.portfolioRows, historyObservationPolicy: history.observationPolicy,
     historyViewSource: observed ? "observed" : undefined, historyObservedExcludedCount: observed?.excludedCount,
     historyReadStatus: history.readStatus, historyDisplayCurrency: currency,
   } : undefined }, ambiguous, supported };

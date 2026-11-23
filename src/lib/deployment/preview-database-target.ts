@@ -17,15 +17,15 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0065_snapshot_closing_performance",
-    createdAt: 1795392000000,
+    tag: "0066_account_history_reviews",
+    createdAt: 1795478400000,
     sha256:
-      "361923dc2ef07008a37e68eafcd1dd279cc6e420cdfb04c7ddb0acdf0a2f1987",
+      "2e55bed836057d4374aa09865fed396e3021e19ad0cd4766c608a800b409f347",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 66,
+    entryCount: 67,
     sha256:
-      "sha256:24aa68560edf572947fe3dcb07f5d0c98cd97fbf5230ae300c08a6eb60521399",
+      "sha256:26699bbdbca19d1e5d228c9f5e896f553369238773cd88a29c2a3dd1d408e41c",
   }),
   // Current inherited databases only. New DDL requires a separate reviewed release.
   allowedPendingMigrations: Object.freeze([]),

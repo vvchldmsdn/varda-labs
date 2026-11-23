@@ -8,6 +8,7 @@ import { formatLiveValuationTime, historyObservationDate } from "@/lib/cairn-v2/
 import { HISTORY_BINDING_HEADER, homeHistoryGeneration } from "@/lib/cairn-v2/home-history-read";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { MAX_PERFORMANCE_DAYS, type PeriodPerformance } from "@/lib/cairn-v2/period-performance";
+import { reviewedPerformance } from "@/lib/cairn-v2/reviewed-history-series";
 import type { BetaView, DomainRead } from "@/lib/cairn-v2/read-contract";
 import { historyWindowStart, type HistoryPeriod } from "@/lib/cairn-v2/read-presentation";
 import { currentKstDate } from "@/lib/current-kst-date";
@@ -44,7 +45,7 @@ export function nextPerformanceReadAt(now: Date, missingClose: boolean) {
 function earliestPerformanceDate(view: BetaView, end: string) {
   const domain = view.domain;
   if (!domain) return;
-  const dates = [domain.recoveredReturn?.baseDate, ...view.history.map(row => row.date)];
+  const dates = [domain.accountHistoryReview?.startDate, domain.recoveredReturn?.baseDate, ...view.history.map(row => row.date)];
   for (const row of domain.historyRecords) {
     const date = historyObservationDate(row);
     // Native 07:00 cutoffs can use the next calendar day's storage key.
@@ -131,7 +132,8 @@ export function HomePerformanceProvider({ view, context, read, children }: {
     });
     return () => { mounted = false; request.cancel(); };
   }, [authorized, binding, end, group, key, rangeUnavailable, readingAll, ready, scope, start]);
-  const data = current?.data ? visiblePerformance(current.data, period) : null;
+  const review = authorized && context.currency === "KRW" && scope.startsWith("account:") ? domain.accountHistoryReview : null;
+  const data = current?.data ? visiblePerformance(review ? reviewedPerformance(current.data, review) : current.data, period) : null;
   let state = current ?? pending;
   if (!authorized || readingAll) state = pending;
   else if (group) state = { status: "error", data: null, message: ["기간 수익률을 볼 계좌를 선택해 주세요.", "Select an account to view period returns."] };

@@ -20,6 +20,8 @@ export function historyWithCurrentValue(view: BetaView): BetaView {
   const observed = Date.parse(domain.refreshedAt);
   if (!Number.isFinite(observed)) return view;
   const date = new Date(observed + 9 * 3600000).toISOString().slice(0, 10);
+  const review = domain.accountHistoryReview;
+  if (review && date >= review.startDate && date <= review.endDate) return view;
   const saved = view.history.filter((row) => row.source !== CURRENT_VALUATION_SOURCE);
   if (saved.some((row) => row.date > date)) return view;
   const point: BetaView["history"][number] = {

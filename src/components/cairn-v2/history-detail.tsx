@@ -7,6 +7,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { historySourceView } from "@/lib/cairn-v2/read-display";
+import { reviewedSource } from "@/lib/cairn-v2/reviewed-history-series";
 import { historyComparison, readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
 import { historySnapshotHref } from "@/lib/cairn-v2/snapshot-contract";
@@ -73,7 +74,7 @@ export function HistoryDetail({
   }
   if (metric === "return" && performance && performance.status !== "empty") {
     return <PerformanceDetail view={inputView} context={context} performance={performance} metricControls={metricControls} periodControls={periodControls}>
-      <SavedHistoryDetail view={inputView} context={context} source={source} setSource={setSource} embedded />
+      <SavedHistoryDetail view={inputView.domain?.accountHistoryReview ? { ...inputView, domain: { ...inputView.domain, accountHistoryReview: null } } : inputView} context={context} source={source} setSource={setSource} embedded />
     </PerformanceDetail>;
   }
   return <SavedHistoryDetail view={inputView} context={context} source={source} setSource={setSource} metricControls={metricControls} periodControls={periodControls} />;
@@ -106,6 +107,7 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
       : [];
   const { returnPoint, selectedDate, selected, latestDate } = selectHistoryPoint(rows, timeline, historyDate);
   const isCurrent = selected?.source === CURRENT_VALUATION_SOURCE;
+  const isReviewed = selected?.source === reviewedSource;
   const comparison = historyComparison(
     rows.filter((row) => row.source !== CURRENT_VALUATION_SOURCE),
     !!view.domain,
@@ -150,7 +152,7 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
         : selected?.exampleReturnPct;
   const caption =
     metric === "value"
-      ? isCurrent
+      ? isReviewed ? "사용자 확인 복원 평가액" : isCurrent
         ? "홈과 같은 현재 투자자산 평가액"
         : selected?.rowKind === "partial"
           ? "확인 소계 · 부분 이력"
@@ -204,7 +206,7 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
               <small>{metric === "return" ? "%" : unit}</small>
             </p>
             <p className={styles.caption}>{caption}</p>
-            {view.domain?.historyObservationPolicy && (
+            {view.domain?.historyObservationPolicy && !isReviewed && (
               <p className={styles.note}>
                 {isCurrent ? (
                   currentValuationTime(view)
@@ -303,7 +305,7 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
               >
                 <ActionContent title="이날 거래 보기" description={selectedDate} />
               </Link>
-              {!isCurrent && selected && (
+              {!isCurrent && !isReviewed && selected && (
                 <Link
                   prefetch={false}
                   href={historySnapshotHref(
@@ -352,7 +354,7 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
             </div>
           </dl>
           <p>
-            저장된 원래 금액과 수익률을 표시합니다. 표시 통화가 바뀌어도 과거 KRW 기록을 현재 환율로
+            {isReviewed ? "선택 날짜는 거래 내역으로 복원한 값입니다." : "저장된 원래 금액과 수익률을 표시합니다."} 표시 통화가 바뀌어도 과거 KRW 기록을 현재 환율로
             환산해 과거 USD 성과로 만들지 않습니다.
           </p>
           <p>
@@ -377,7 +379,7 @@ function sourceFamily(source: string | undefined) {
     ? "current"
     : source === "base44_import"
       ? "imported"
-      : source?.startsWith("broker_reconstructed_close_v1:")
+      : source === reviewedSource || source?.startsWith("broker_reconstructed_close_v1:")
         ? "reconstructed"
         : source === "varda_manual_daily_snapshot" || source === "varda_daily_snapshot_v1"
           ? "stored"

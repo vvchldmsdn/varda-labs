@@ -10,6 +10,7 @@ import type { BetaCurrency } from "@/lib/cairn-v2/navigation";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import styles from "./beta.module.css";
 import { historySourceView } from "@/lib/cairn-v2/read-display";
+import { reviewedSource, withinReview } from "@/lib/cairn-v2/reviewed-history-series";
 import { CURRENT_VALUATION_SOURCE, historyWithCurrentValue } from "@/lib/cairn-v2/history-current";
 import { useBetaPreferences } from "./beta-provider";
 import { useMeasuredPlot } from "@/components/use-measured-plot";
@@ -48,7 +49,9 @@ export function HistoryChart({
   const homeImpact = useHomeImpact();
   const performanceRead = usePeriodPerformance();
   const performance = metric === "return" && !savedOnly ? performanceRead : null;
-  const impact = performance ? null : homeImpact;
+  const review = inputView.domain?.historyViewSource === "observed" ? inputView.domain.accountHistoryReview : null;
+  const impact = performance || !homeImpact ? null : review
+    ? { ...homeImpact, days: homeImpact.days.filter(day => !withinReview(review, day.date)) } : homeImpact;
   const data = performance?.data;
   const [measured, setPlotElement] = useMeasuredPlot();
   const [inspecting, setInspecting] = useState(false);
@@ -57,7 +60,7 @@ export function HistoryChart({
   const view =
     metric === "value" ? historyWithCurrentValue(historySource.view) : historySource.view;
   const rows: FixtureView["history"] = data ? data.points.map(point => ({
-    date: point.date, valueKrw: null, exampleReturnPct: point.returnPct, segment: point.segment ?? undefined,
+    date: point.date, valueKrw: null, exampleReturnPct: point.returnPct, segment: point.accountReview ? reviewedSource + ":" + point.segment : point.segment ?? undefined,
   })) : historyRows(view, period);
   const gradientId = useId().replaceAll(":", "");
   const stateText = readStateText(view.domain?.historyState, "저장된 평가가 없습니다.");
@@ -129,7 +132,7 @@ export function HistoryChart({
     metric === "value" ? (rows[i]?.valueSegment ?? rows[i]?.segment) : rows[i]?.segment;
   const liveIndex = data?.points.findIndex(point => point.liveAsOf && point.returnPct !== null) ?? -1;
   const livePoint = points[liveIndex];
-  const currentLinkIndex = metric === "value" && rows.at(-1)?.source === CURRENT_VALUATION_SOURCE
+  const currentLinkIndex = metric === "value" && rows.at(-1)?.source === CURRENT_VALUATION_SOURCE && rows.at(-2)?.source !== reviewedSource
     ? rows.length - 1
     : liveIndex > 0 && pointSegment(liveIndex) === pointSegment(liveIndex - 1) &&
       axis.day(rows[liveIndex].date) - axis.day(rows[liveIndex - 1].date) === 1 ? liveIndex : -1;
@@ -184,7 +187,7 @@ export function HistoryChart({
   const tooltipPoints = showTooltip ? points.flatMap((point, index) => {
     const sourceBreak = view.domain && index > 0 && pointSegment(index) !== pointSegment(index - 1);
     const dottedLink = index === rows.length - 1 && metric === "value" &&
-      rows[index].source === CURRENT_VALUATION_SOURCE;
+      rows[index].source === CURRENT_VALUATION_SOURCE && rows[index - 1]?.source !== reviewedSource;
     return sourceBreak && !dottedLink ? [null, point] : [point];
   }) : [];
   const selectPointerDate = (event: PointerEvent<SVGSVGElement>) => {
@@ -218,6 +221,10 @@ export function HistoryChart({
       className={compact ? styles.compactChart : styles.historyChart}
       aria-label={data ? "누적 수익률 추이 · 원화" : `${metric === "value" ? "평가액" : view.domain ? "기존 저장 수익률" : "예시 수익률"} 추이 · ${view.domain ? "도메인 읽기" : "가상 데이터"}`}
     >
+      {review && rows.some(row => withinReview(review, row.date)) && <p className={styles.muted}>{i18n.t(
+        `${review.startDate} – ${review.endDate} 사용자 확인 복원 · 현금·${review.excludedLabels.join("·")} 제외${review.usesEstimates ? " · 추정 포함" : ""}`,
+        `${review.startDate} – ${review.endDate} reconstructed · excludes cash and ${review.excludedLabels.join(", ")}${review.usesEstimates ? " · includes estimates" : ""}`)}</p>}
+      {inputView.domain?.reviewUnavailable && <p className={styles.muted}>{i18n.t("복원 이력을 읽지 못해 기존 기록을 표시해요.", "Showing saved records because reconstructed history is unavailable.")}</p>}
       {data && compact && <PerformanceCaption data={data} />}
       {!data && view.domain && metric === "return" && <p className={styles.muted}>{returnSummary}</p>}
       {!data && historySource.options.length > 1 && metric === "return" && !compact && (
@@ -239,7 +246,7 @@ export function HistoryChart({
       )}
       <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
       {showTooltip && <HomeHistoryTooltip id={tooltipId}
-        date={selectedRow.date} returns={metric === "return"} value={selectedValue}
+        date={selectedRow.date} returns={metric === "return"} value={selectedValue} reviewed={selectedRow.source === reviewedSource || data?.points[selectedIndex]?.accountReview}
         impact={inspectedImpact} performance={data?.points[selectedIndex]} plot={plot} points={tooltipPoints}
         anchor={{x: selectedX, y: selectedPoint?.y ?? height / 2}} />}
       <svg

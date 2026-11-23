@@ -40,7 +40,7 @@ export function useHomeHistoryRead(base: BetaView, read: DomainRead | undefined,
   if (active?.value) return { view: applyBetaHistory(base, active.value.history, context.currency).view, error: undefined, retry };
   if (!needed) return { view: base, error: undefined, retry };
   // Never label the recent subset as ALL or show old data while another scope loads.
-  const view: BetaView = { ...base, history: [], domain: { ...base.domain!, historyRecords: [], recoveredReturn: null,
+  const view: BetaView = { ...base, history: [], domain: { ...base.domain!, historyRecords: [], recoveredReturn: null, accountHistoryReview: null,
     historyState: active?.error ? 'unavailable' : 'loading', historyReadStatus: active?.error ? 'unavailable' : 'ready' } };
   return { view, error: active?.error, retry };
 }

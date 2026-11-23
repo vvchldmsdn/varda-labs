@@ -113,7 +113,7 @@ export function BetaHome({
   };
   return (
     <BetaShell context={context} setContext={setContext} readView={view} homeSummary={homeSummary}>
-      <HomeImpactProvider read={view.domain?.heatmap}>
+      <HomeImpactProvider read={view.domain?.heatmap} review={view.domain?.accountHistoryReview}>
       <HomePerformanceProvider view={view} context={context} read={read}>
       <div className={home.dashboard}>
         <div className={home.hero}>

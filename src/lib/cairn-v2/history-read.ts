@@ -1,5 +1,8 @@
 import "server-only";
 
+import { readAccountHistoryReview } from "@/db/queries/account-history-review";
+import type { AccountHistoryReview } from "./reviewed-history-series";
+
 import { loadTenantPortfolioGroupMemberships } from "@/db/queries/tenant-group-reads";
 import { runTenantReadTransaction } from "@/db/tenant-transaction-context";
 import type { ReadOnlyHistoryBalance } from "@/db/queries/history-balance";
@@ -19,12 +22,15 @@ export type BetaHistoryReadRow = PortfolioHistoryDisplayRow & {
 export type BetaHistoryRead = Pick<ReadOnlyHistoryBalance, "selectedScope" | "readStatus"> & {
   observationPolicy: "production_observed_v1";
   portfolioRows: BetaHistoryReadRow[];
+  accountHistoryReview?: AccountHistoryReview | null;
+  reviewUnavailable?: boolean;
 };
 type ReadArgs = {
   analysisScopes: readonly PortfolioAnalysisScope[];
   tenantContext: TenantContext;
   scope: PortfolioAnalysisScope;
   historyWindow?: "recent";
+  currency?: string;
 };
 
 /** Called only after the existing active-session and owned-scope resolver.
@@ -35,9 +41,14 @@ type ReadArgs = {
 export async function getBetaHistoryRead(args: ReadArgs): Promise<BetaHistoryRead> {
   try {
     assertResolvedScope(args.scope, args.analysisScopes);
-    const rawRows = args.scope.kind === "portfolio_group"
-      ? await loadGroupRows(args.tenantContext, args.scope, args.historyWindow)
-      : await loadAccountRows(args.tenantContext, args.scope, args.historyWindow);
+    const [rawRows, reviewRead] = await Promise.all([
+      args.scope.kind === "portfolio_group" ? loadGroupRows(args.tenantContext, args.scope, args.historyWindow)
+        : loadAccountRows(args.tenantContext, args.scope, args.historyWindow),
+      args.scope.kind === "account" && args.currency === "KRW"
+        ? readAccountHistoryReview(args.tenantContext, args.scope.accountId)
+            .then(review => ({ review, unavailable: false }), () => ({ review: null, unavailable: true }))
+        : null,
+    ]);
     const account = args.scope.kind === "account" ? args.scope.accountCode : args.scope.key;
     const expectedAccounts = args.analysisScopes.flatMap(row => row.kind === "account" ? [row.accountCode] : []);
     const displayRows = buildPortfolioHistoryDisplayRows({ rows: rawRows, account, expectedAccounts });
@@ -54,7 +65,8 @@ export async function getBetaHistoryRead(args: ReadArgs): Promise<BetaHistoryRea
         valuationDate: commonBetaHistoryValuationDate(included),
       };
     });
-    return { observationPolicy: "production_observed_v1", selectedScope: args.scope, readStatus: portfolioRows.some(row => row.valuationDate === null) ? "partial" : "ready", portfolioRows };
+    return { observationPolicy: "production_observed_v1", selectedScope: args.scope, readStatus: portfolioRows.some(row => row.valuationDate === null) ? "partial" : "ready", portfolioRows,
+      accountHistoryReview: reviewRead?.review, reviewUnavailable: reviewRead?.unavailable || undefined };
   } catch {
     return { observationPolicy: "production_observed_v1", selectedScope: args.scope, readStatus: "unavailable", portfolioRows: [] };
   }
