@@ -25,7 +25,6 @@ export default async function ContributionPlanPage({ searchParams }: { searchPar
   if (scope.state !== 'ready' || scope.resolution.state !== 'resolved') return <PortfolioAnalysisScopeBoundary basePath="/additional-contribution/plan" context={scope} title="보유 기반 투자계획" titleEn="Holdings plan" />;
   return <main className={styles.page}><SecondaryPageHeader /><div className={styles.content} id="varda-main-content">
     <PageTitle><PortfolioText ko="보유 기반 투자계획" en="Holdings-based investment plan" /></PageTitle>
-    <p className={styles.lead}><PortfolioText ko="현재 보유와 목표를 기준으로 계산하고, 저장 당시 결과를 다시 열어볼 수 있습니다." en="Calculate from your holdings and targets, then revisit the result as saved." /></p>
     <NativeContributionPlanner key={`${session.key}:${journey.scope}:${currency}`} scopeKey={journey.scope} currency={currency} accounts={scope.catalog.scopes.filter(item => item.kind === 'account').map(item => ({ key:item.key,label:item.label }))} />
   </div></main>;
 }

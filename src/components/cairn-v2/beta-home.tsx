@@ -38,7 +38,7 @@ import { useBetaContext } from "./use-beta-context";
 import styles from "./beta.module.css";
 import home from './home-layout.module.css';
 
-const HOME_ALLOCATION_COLORS = ["#F39579", "#868A84", "#DDBE9D", "#AFBEAC", "#718895", "#EE8A72", "#D2C4AF", "#B9C1BE"];
+import { HOME_ALLOCATION_COLORS } from "@/components/portfolio/allocation-colors";
 
 export function BetaHome({
   initialContext,

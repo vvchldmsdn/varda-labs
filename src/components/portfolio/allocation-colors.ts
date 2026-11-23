@@ -1,0 +1,1 @@
+export const HOME_ALLOCATION_COLORS = ["#F39579", "#868A84", "#DDBE9D", "#AFBEAC", "#718895", "#EE8A72", "#D2C4AF", "#B9C1BE"];
