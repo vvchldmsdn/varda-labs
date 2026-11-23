@@ -141,8 +141,9 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   assert.equal(state.accounts[0].state.sequence,seq);
   assert.equal(value.history.some(h=>h.at===originalSnapshot.frame.at && h.positions.find(p=>p.id===asset)?.observation.quantity==='7'),false,'invalid original quantity never returns');
  });
+ const boundaryAccount=randomUUID();
  await check('exclusive-millisecond-boundary-in-real-database',async()=>{
-  const a=randomUUID();await fixtureWrite("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'boundary','Synthetic boundary','brokerage','USD')",[a,owner]);
+  const a=boundaryAccount;await fixtureWrite("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'boundary','Synthetic boundary','brokerage','USD')",[a,owner]);
   await write({operationId:randomUUID(),accountId:a,expectedSequence:null,opening:{at:'2026-08-01T00:00:00Z',cash:{KRW:'0',USD:'1000'},positions:[]}});
   for(const [sequence,at,amount] of [[0,'2026-08-02T21:59:59.999Z','1'],[1,'2026-08-02T22:00:00.000Z','2']]) assert.equal((await write({operationId:randomUUID(),accountId:a,expectedSequence:sequence,event:{type:'deposit',currency:'USD',amount,at}})).status,'created');
   const data=await ledger.readNativeLedger(context,a);
@@ -153,23 +154,49 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
  });
  await check('retry-drains-only-unfinished-cutoffs-and-keeps-complete-records',async()=>{
   await fixtureWrite("update daily_snapshot_work set lease_until=clock_timestamp()-interval '1 second' where status='running'");
-  let first=true,failedId;const calls=[];
+  let failedId;const calls=[];
+  const savedCloses=async()=> (await admin.query(`select id,snapshot_date::text as day,native_evidence,closing_performance,xmin::text as row_version
+    from daily_portfolio_snapshots where canonical_owner_user_id=$1 and account_id=$2 and source='native_ledger_cutoff_v2'
+      and snapshot_date between '2026-08-03' and '2026-08-05' order by snapshot_date`,[owner,boundaryAccount])).rows;
   const execute=async item=>{
-   calls.push(item.id);if(first){first=false;failedId=item.id;throw new Error('synthetic transient transport error');}
+   calls.push(item.id);
+   if(!failedId && item.accountId===boundaryAccount && item.snapshotDate==='2026-08-03') {
+    failedId=item.id;throw new Error('synthetic transient transport error');
+   }
    const data=await ledger.readNativeLedger(context,item.accountId);
-   const evidence=cutoff.buildNativeCutoffEvidence(base('2026-08-05T01:00:00Z',item.snapshotDate),data,item.snapshotDate,'2026-08-05T01:00:00Z');
+   const marks=base('2026-08-05T01:00:00Z',item.snapshotDate);
+   if(item.accountId===boundaryAccount) {
+    const at=new Date(`${item.snapshotDate}T06:59:00+09:00`).toISOString();
+    marks.fx=[{base:'USD',quote:'KRW',rate:item.snapshotDate==='2026-08-03'?'1000':'1100',source:'synthetic',kind:'spot',observedAt:at,fetchedAt:at}];
+   }
+   const evidence=cutoff.buildNativeCutoffEvidence(marks,data,item.snapshotDate,'2026-08-05T01:00:00Z');
    const saved=await snapshots.saveNativeCutoffSnapshots(context,evidence,item.snapshotDate,'2026-08-05T01:00:00Z');
    assert.equal(saved.status,'ready');return {status:'completed'};
   };
   const before=await work.runSnapshotWork('native','2026-08-05',execute);assert.equal(before.failedCount,1);assert.ok(before.writtenCount>0);
+  const beforeRetry=await savedCloses();
+  assert.deepEqual(beforeRetry.map(row=>row.day),['2026-08-04','2026-08-05']);
+  const [unlinked]=beforeRetry;
+  assert.equal(unlinked.closing_performance.previousSnapshotId,null);
+  assert.equal(unlinked.closing_performance.dailyReturnPct,null);
   const completed=(await admin.query("select id from daily_snapshot_work where status='completed'")).rows.map(r=>r.id);
   const priorCalls=calls.length;
   await fixtureWrite("update daily_snapshot_work set next_attempt_at=clock_timestamp()-interval '1 second' where id=$1",[failedId]);
   const after=await work.runSnapshotWork('native','2026-08-05',execute);assert.equal(after.failedCount,0);assert.equal(after.blockedCount,0);
   assert.deepEqual(calls.slice(priorCalls),[failedId]);assert.ok(!completed.includes(failedId));
+  const linkedCloses=await savedCloses();
+  assert.deepEqual(linkedCloses.map(row=>row.day),['2026-08-03','2026-08-04','2026-08-05']);
+  const [opening,relinked,last]=linkedCloses;
+  assert.equal(relinked.id,unlinked.id);assert.deepEqual(relinked.native_evidence,unlinked.native_evidence);
+  assert.equal(relinked.closing_performance.previousSnapshotId,opening.id);
+  // USD 1,001 at the opening plus a USD 2 deposit, all valued at 1,000 then 1,100 KRW/USD.
+  assert.ok(Math.abs(relinked.closing_performance.dailyReturnPct-10)<1e-8,'Only the 10% FX change is performance');
+  assert.equal(relinked.closing_performance.reason,null);
+  assert.deepEqual(last,beforeRetry[1],'The later daily return already used the correct opening');
   const count=(await admin.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n;
   await work.runSnapshotWork('native','2026-08-05',execute);
   assert.equal(calls.length,priorCalls+1);assert.equal((await admin.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n,count);
+  assert.deepEqual(await savedCloses(),linkedCloses,'A repeat must preserve the closed valuations and return receipts');
  });
  await check('legacy-cutoff-real-reader-writer-and-completed-skip',async()=>{
   const a=randomUUID(),h=randomUUID();

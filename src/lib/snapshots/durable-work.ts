@@ -6,7 +6,7 @@ import { sqlClient } from "@/db/client";
 import {snapshotFence,snapshotDeadline} from "./write-context";
 export {snapshotFence,snapshotDeadline} from "./write-context";
 export const SNAPSHOT_RETRY_POLICY = { lookbackDays:3, maxTasks:30, maxDiscovery:300, maxAttempts:4, leaseSeconds:90, timeBudgetMs:60000 } as const;
-export type SnapshotWork = { id:string; ownerUserId:string; accountId:string; code:string; role:"user"|"admin"; snapshotDate:string; revision:number; generation:number };
+export type SnapshotWork = { id:string; ownerUserId:string; accountId:string; code:string; role:"user"|"admin"; snapshotDate:string; revision:number; generation:number; returnOnly?:boolean };
 async function queueWrite(query:string,parameters:unknown[]) {
   const results=await sqlClient.transaction(tx=>[
     tx.query("select set_config('app.trade_reliability_version','0059',true)"),
@@ -50,7 +50,9 @@ export async function claimSnapshotWork(stage:"legacy"|"native", snapshotDate:st
      and revision=coalesce((select max(marker_sequence) from native_ledger_revisions r where r.account_id=a.id and r.canonical_owner_user_id=w.canonical_owner_user_id and ${snapshotWorkRevisionAppliesSql("w")}),0)
     order by (w.status='blocked'),snapshot_date,w.id limit 1 for update of w skip locked
    ), claimed as(update daily_snapshot_work set status='running',generation=generation+1,attempts=attempts+1,started_at=clock_timestamp(),lease_until=clock_timestamp()+interval '90 seconds',updated_at=clock_timestamp() where id in(select id from due) returning *)
-   select c.id,c.canonical_owner_user_id as "ownerUserId",c.account_id as "accountId",a.code,u.role,c.snapshot_date::text as "snapshotDate",c.revision,c.generation from claimed c join accounts a on a.id=c.account_id join app_users u on u.id=c.canonical_owner_user_id`,[stage,snapshotDate,SNAPSHOT_RETRY_POLICY.lookbackDays]);
+   select c.id,c.canonical_owner_user_id as "ownerUserId",c.account_id as "accountId",a.code,u.role,c.snapshot_date::text as "snapshotDate",c.revision,c.generation,
+     (c.reason='previous_close_updated') is true as "returnOnly"
+   from claimed c join accounts a on a.id=c.account_id join app_users u on u.id=c.canonical_owner_user_id`,[stage,snapshotDate,SNAPSHOT_RETRY_POLICY.lookbackDays]);
   return (rows[0] as SnapshotWork|undefined) ?? null;
 }
 export async function finishSnapshotWork(work:SnapshotWork,status:"completed"|"blocked"|"failed"|"deferred",reason:string|null) {
@@ -58,7 +60,9 @@ export async function finishSnapshotWork(work:SnapshotWork,status:"completed"|"b
   // absent evidence, or lock contention refunds that reservation; only a real
   // failure/interrupted worker consumes it. Recent missing market data can be
   // checked once at each subsequent daily cutoff; other blocks require review.
-  const rows=await queueWrite(`update daily_snapshot_work set status=case when $3='deferred' then 'pending' else $3 end,reason=$4,finished_at=clock_timestamp(),lease_until=null,
+  const rows=await queueWrite(`update daily_snapshot_work set status=case when $3='deferred' then 'pending' else $3 end,
+   reason=case when reason='previous_close_updated' and ($3='deferred' or ($3='failed' and attempts<4)) then reason else $4 end,
+   finished_at=clock_timestamp(),lease_until=null,
    attempts=greatest(0,attempts-case when $3='failed' then 0 else 1 end),
    next_attempt_at=case when $3 in ('completed','blocked') then null when $3='deferred' then clock_timestamp()+interval '1 minute' when attempts>=4 then null else clock_timestamp()+interval '5 minutes'*power(2,attempts-1) end,updated_at=clock_timestamp()
    where id=$1::uuid and generation=$2 and status='running' and lease_until>clock_timestamp()
@@ -93,9 +97,11 @@ export async function finishValuedSnapshot(work: SnapshotWork) {
   ), retry_next as (
     -- A later day could have finished before this missing or revised opening
     -- was available. Recheck that one-day link even outside normal discovery.
-    update daily_snapshot_work n set status='pending',reason=null,lease_until=null,next_attempt_at=null,
+    update daily_snapshot_work n set status='pending',
+      reason=case when n.status='completed' or n.reason='previous_close_updated' then 'previous_close_updated' end,
+      lease_until=null,next_attempt_at=null,
       generation=n.generation+1,attempts=0,finished_at=null,updated_at=clock_timestamp()
-    from active w where exists(select 1 from persist)
+    from active w where w.reason is distinct from 'previous_close_updated' and exists(select 1 from persist)
       and n.canonical_owner_user_id=w.canonical_owner_user_id and n.account_id=w.account_id
       and n.stage=w.stage and n.snapshot_date=w.snapshot_date+1
       and n.status in ('completed','running')
@@ -126,6 +132,12 @@ export async function runSnapshotWork(stage:"legacy"|"native",snapshotDate:strin
   for(let count=0;count<SNAPSHOT_RETRY_POLICY.maxTasks && Date.now()<deadline;count++) {
     const work=await claimSnapshotWork(stage,snapshotDate); if(!work) break;
     try {
+      // Yesterday's recovered valuation changes today's daily return. Today's
+      // saved closing balance still supplies the same opening for tomorrow.
+      if (work.returnOnly) {
+        await finishValuedSnapshot(work);
+        continue;
+      }
       const result = await snapshotFence.run(work, () => execute(work));
       if (result.status === "completed") await finishValuedSnapshot(work);
       else await finishSnapshotWork(work, result.status, result.reason ?? null);

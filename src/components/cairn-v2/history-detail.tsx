@@ -71,7 +71,7 @@ export function HistoryDetail({
         : <p role="status" className={styles.empty}>{state === "loading" ? t("계좌를 확인하고 있어요.", "Checking your account.") : t("계좌 연결을 확인한 뒤 다시 열어 주세요.", "Check your account connection and reopen history.")}</p>}
     </div>;
   }
-  if (metric === "return" && performance) {
+  if (metric === "return" && performance && performance.status !== "empty") {
     return <PerformanceDetail view={inputView} context={context} performance={performance} metricControls={metricControls} periodControls={periodControls}>
       <SavedHistoryDetail view={inputView} context={context} source={source} setSource={setSource} embedded />
     </PerformanceDetail>;

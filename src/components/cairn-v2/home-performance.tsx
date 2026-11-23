@@ -15,7 +15,7 @@ import { buildCycleForSnapshotDate } from "@/lib/snapshots/market-calendar";
 import { useBetaPreferences } from "./beta-provider";
 import styles from "./beta.module.css";
 
-type Read = { status: "ready" | "loading" | "error"; data: PeriodPerformance | null; message?: [string, string]; retryable?: boolean; limitedHistory?: boolean };
+type Read = { status: "ready" | "loading" | "empty" | "error"; data: PeriodPerformance | null; message?: [string, string]; retryable?: boolean; limitedHistory?: boolean };
 const Context = createContext<(Read & { retry: () => void }) | null>(null);
 export const usePeriodPerformance = () => useContext(Context);
 const pending: Read = { status: "loading", data: null };
@@ -136,7 +136,7 @@ export function HomePerformanceProvider({ view, context, read, children }: {
   if (!authorized || readingAll) state = pending;
   else if (group) state = { status: "error", data: null, message: ["기간 수익률을 볼 계좌를 선택해 주세요.", "Select an account to view period returns."] };
   else if (rangeUnavailable) state = { status: "error", data: null, message: ["10년이 넘는 기록이에요. 더 짧은 기간을 선택해 주세요.", "Select a shorter period for histories over ten years."] };
-  else if (!start) state = { status: "error", data: null, message: ["기간을 정할 수 있는 평가 기록이 없어요.", "No dated valuations are available for this period."] };
+  else if (!start) state = { status: "empty", data: null, message: ["기간을 정할 수 있는 평가 기록이 없어요.", "No dated valuations are available for this period."] };
   else if (current?.status === "ready") state = { ...current, data, limitedHistory };
   if (domain?.state === "unauthorized") state = { status: "error", data: null, message: ["계좌 조회 권한을 다시 확인해 주세요.", "Please verify access to this account."] };
   const retry = () => setAttempt(previous => previous + 1);
