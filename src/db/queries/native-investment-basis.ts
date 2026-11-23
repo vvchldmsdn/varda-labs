@@ -8,14 +8,22 @@ import type { FxEvidence } from "../../lib/currency-valuation";
 
 /** Only existing effective owner ledger and stored historical FX. No provider,
  * write, collection, current-FX fallback or client-supplied owner identity. */
-export const loadNativeInvestmentBasis = cache(async (tenant: TenantContext, asOf?: string, inclusive = false) => {
-  const ledger = await readNativeLedger(tenant, undefined, { includeSnapshots: false });
+export const loadNativeInvestmentBasis = cache(async (
+  tenant: TenantContext, asOf?: string, inclusive = false, accountId?: string, allowPartialAccounts = false,
+) => {
+  const ledger = await readNativeLedger(tenant, accountId, { includeSnapshots: false });
   if (!ledger.accountsComplete || !ledger.entriesComplete) throw new Error("investment_history_incomplete");
   const at = asOf ?? new Date().toISOString();
   const accounts = ledger.accounts.flatMap(account => {
     if (!account.state) return [];
-    const projected = projectInvestmentAccount(account, ledger.entries, { asOf, boundary: inclusive ? "inclusive" : "before" });
-    return projected ? [{ accountId: account.id, projected }] : [];
+    try {
+      const projected = projectInvestmentAccount(account, ledger.entries, { asOf, boundary: inclusive ? "inclusive" : "before" });
+      return projected ? [{ accountId: account.id, projected }] : [];
+    } catch (error) {
+      // The dashboard checks every selected native account against this result.
+      if (!allowPartialAccounts) throw error;
+      return [];
+    }
   });
   const times = accounts.flatMap(a => [a.projected.state.startedAt, ...a.projected.state.positions.flatMap(p => p.costLots?.map(l => l.at) ?? []), ...a.projected.entries.map(e => e.data.event.at)]);
   let fx: FxEvidence[] = [];
@@ -30,5 +38,9 @@ export const loadNativeInvestmentBasis = cache(async (tenant: TenantContext, asO
     if (result.length > 5000) throw new Error("investment_fx_scope_too_large");
     fx = result.map(row => ({ base: "USD", quote: "KRW", rate: String(row.rate), observedAt: String(row.observedAt), fetchedAt: String(row.fetchedAt), source: String(row.source ?? ""), kind: "daily_reference" }));
   }
-  return accounts.map(account => ({ accountId: account.accountId, ...investmentKrwEvidence(account.projected, fx, at) }));
+  return accounts.map(account => ({ accountId: account.accountId, ...investmentKrwEvidence(account.projected, fx, at),
+    splits: account.projected.entries.flatMap(row => row.data.event.type === "split" ? [{
+      id: row.id, assetId: row.data.event.assetId, at: row.data.event.at, reportedDate: row.data.event.dateEvidence?.reportedDate,
+    }] : []),
+  }));
 });

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { buildCurrentHoldingMovement } from "../src/lib/current-holding-movement.ts";
 
 import {
   buildDailyPositionMovement,
@@ -89,6 +90,103 @@ function buildDaily(overrides = {}) {
     ...overrides,
   });
 }
+
+describe("execution-adjusted movement of currently held positions", () => {
+  const quote = "2026-07-08T01:00:00Z";
+  const mark = (quantity, extra = {}) => holding({ quantity, currentPrice: 110, valueKrw: quantity * 110, priceAsOf: quote, ...extra });
+  const fill = (side, quantity, price, extra = {}) => tradeEvent({
+    eventType: side, quantityDelta: quantity, price, amountKrw: quantity * price,
+    movementEffectiveAt: "2026-07-08T00:30:00Z", ...extra,
+  });
+  const run = (holdings, positionRows, eventRows, overrides = {}) => buildCurrentHoldingMovement({
+    holdings, positionRows, eventRows, priceRows: [], baselineDate: "2026-07-07",
+    usdKrwRate: 1300, movementCycle, ...overrides,
+  });
+  it("separates the opening holding and the actual buying price on a top-up", () => {
+    const result = run([mark(20)], [position({ quantity: 10 })], [fill("buy", 10, 108)]);
+    assert.equal(result.changeKrw, 120);
+    assert.equal(result.previousValueKrw, 1000);
+    assert.deepEqual([result.priceChangeKrw, result.fxChangeKrw, result.valuationChangeKrw, result.quantityChangeKrw], [120, 0, 1200, 1080]);
+    assert.deepEqual(result.rows[0].execution, { openingQuantity: 10, boughtQuantity: 10, soldQuantity: 0,
+      openingMarkChangeKrw: 100, buyMarkChangeKrw: 20, sellAdjustmentKrw: 0, buyAmountKrw: 1080, sellAmountKrw: 0,
+      averageBuyPrice: 108, buyPriceChangeLocal: 20, buyPriceReturnPctLocal: 20 / 1080 * 100,
+      openingPriceChangeLocal: 100, totalPriceChangeLocal: 120 });
+  });
+  it("starts a new purchase at execution, not at the previous close (even with a prior close on file)", () => {
+    const close = { ticker: "069500", market: "korea", currency: "KRW", priceDate: "2026-07-07", closePrice: 80 };
+    const result = run([mark(2)], [], [fill("buy", 2, 108, { beforeValue: { quantity: 0 } })], { priceRows: [close] });
+    assert.deepEqual([result.changeKrw, result.returnPct, result.rows[0].source], [4, null, "trade_execution"]);
+    const unmatched = run([mark(3)], [], [fill("buy", 2, 108)], { priceRows: [close] });
+    assert.equal(unmatched.changeKrw, null);
+    assert.equal(unmatched.exclusions[0].reason, "incomplete_trade_attribution");
+  });
+  it("counts partial-sale execution proceeds once and excludes fully exited positions from this view", () => {
+    const result = run([mark(6)], [position({ quantity: 10 })], [fill("sell", 4, 108)]);
+    assert.equal(result.changeKrw, 92);
+    assert.equal(result.rows[0].execution.sellAdjustmentKrw, -8);
+    assert.equal(result.rows[0].execution.buyPriceReturnPctLocal, null);
+    assert.equal(result.rows[0].tradeFlowKrw, -432);
+    assert.equal(run([], [position({ quantity: 10 })], [fill("sell", 10, 108)]).changeKrw, null);
+    const exited = run([mark(0)], [position({ quantity: 10 })], [fill("sell", 10, 108)]);
+    assert.deepEqual([exited.changeKrw, exited.includedCount, exited.excludedCount], [null, 0, 0]);
+  });
+  it("reconciles fractional buys and sales at their own execution FX without inferring realized lots", () => {
+    const us = mark(2.25, { market: "us", currency: "USD", ticker: "VOO", valueKrw: 2.25 * 110 * 1300 });
+    const previous = position({ ticker: "VOO", quantity: 2, currency: "USD", fxRate: 1200, marketValueKrw: 240000 });
+    const buy = fill("buy", .5, 108, { fxRate: 1250, amountKrw: 67500 });
+    const sell = fill("sell", .25, 105, { fxRate: 1270, amountKrw: 33337.5 });
+    const result = run([us], [previous], [buy, sell]);
+    const detail = result.rows[0].execution;
+    assert.equal(result.changeKrw, us.valueKrw - 240000 - (67500 - 33337.5));
+    assert.equal(result.changeKrw, result.priceChangeKrw + result.fxChangeKrw);
+    assert.equal(result.changeKrw, detail.openingMarkChangeKrw + detail.buyMarkChangeKrw + detail.sellAdjustmentKrw);
+    assert.equal(detail.buyPriceChangeLocal, 1);
+    assert.equal(detail.averageBuyPrice, 108);
+    assert.equal(run([us], [previous], [{ ...buy, fxRate: null }, sell]).changeKrw, null);
+  });
+  it("withholds unverified changes, splits, ambiguous corrections, stale quotes, and inconsistent gross", () => {
+    const opening = [position({ quantity: 10 })];
+    assert.equal(run([mark(12)], opening, []).changeKrw, null);
+    for (const invalid of [fill("split", 2, 108), fill("buy", 2, 108, { movementEvidence: "unresolved" }),
+      fill("buy", 2, 108, { amountKrw: 210 }), fill("buy", 2, 108, { movementEffectiveAt: "2026-07-08T01:01:00Z" })]) {
+      assert.equal(run([mark(12)], opening, [invalid]).changeKrw, null);
+    }
+    assert.equal(run([mark(12, { priceAsOf: null })], opening, [fill("buy", 2, 108)]).changeKrw, null);
+  });
+  it("does not apply a similarly named asset's executions across accounts or an unidentified trade to both", () => {
+    const h = mark(2);
+    const other = mark(5, { account: "isa", id: "isa-1" });
+    const prior = position({ account: "isa", assetId: "isa-1", quantity: 5, marketValueKrw: 500 });
+    const scoped = run([h, other], [prior], [fill("buy", 2, 108, { beforeValue: { quantity: 0 } })]);
+    assert.equal(scoped.changeKrw, 54);
+    const ambiguous = run([h, other], [prior], [fill("buy", 2, 108, { account: null, assetId: null, legacyAssetId: null })]);
+    assert.equal(ambiguous.changeKrw, null);
+    assert.ok(ambiguous.exclusions.every(e => e.reason === "ambiguous_trade_identity"));
+    const missingLedger = run([h, other], [prior], [fill("ledger_evidence_unavailable", 0, 0, {
+      movementEvidence: "unresolved", movementWindowResolved: true, assetId: null, legacyAssetId: null, ticker: null, assetName: null,
+    })]);
+    assert.deepEqual([missingLedger.changeKrw, missingLedger.exclusions[0].holdingId, missingLedger.exclusions[0].reason],
+      [50, h.id, "incomplete_trade_attribution"]);
+  });
+  it("publishes independent local-price evidence for old and new shares without inventing the fill FX", () => {
+    const us = mark(2, { market: "us", currency: "USD", currentPrice: 137.4, valueKrw: 357240 });
+    const opening = position({ quantity: 1, unitPrice: 118.71, marketValueKrw: 154323, fxRate: 1300, currency: "USD" });
+    const trade = fill("buy", 1, 138.5, { amountKrw: null, fxRate: null, beforeValue: { quantity: 1 } });
+    const result = run([us], [opening], [trade]);
+    assert.deepEqual([result.includedCount, result.excludedCount, result.changeKrw, result.returnPct], [0, 1, null, null]);
+    assert.equal(result.exclusions[0].reason, "missing_trade_fx");
+    const local = result.exclusions[0].localPurchases;
+    assert.deepEqual([local.currency, local.openingQuantity, local.boughtQuantity, local.averageBuyPrice], ["USD", 1, 1, 138.5]);
+    assertClose(local.openingPriceChangeLocal, 18.69);
+    assertClose(local.buyPriceChangeLocal, -1.10);
+    assertClose(local.buyPriceReturnPctLocal, -1.10 / 138.5 * 100);
+    assertClose(local.totalPriceChangeLocal, 17.59);
+    assert.equal(run([us], [], [trade]).exclusions[0].localPurchases.openingPriceChangeLocal, null);
+    assert.equal(run([us], [opening], [{...trade, movementEffectiveAt: undefined}]).exclusions[0].localPurchases, undefined);
+    assert.equal(run([us], [opening], [{...trade, movementEffectiveAt: undefined, createdAt: "2026-07-08T01:01:00Z"}]).exclusions[0].localPurchases, undefined);
+    assertClose(run([us], [opening], [{...trade, movementEffectiveAt: undefined, createdAt: "2026-07-08T00:55:00Z"}]).exclusions[0].localPurchases.totalPriceChangeLocal, 17.59);
+  });
+});
 
 describe("portfolio movement builder", () => {
   it("does not deduct an execution-baseline trade that is already included in its quantities", () => {
@@ -677,7 +775,7 @@ describe("portfolio movement builder", () => {
     );
   });
 
-  it("accounts for removed baseline positions in aggregate movement", () => {
+  it("keeps an unexplained disappearance out of the comparable subtotal", () => {
     const result = buildDaily({
       holdings: [
         holding({
@@ -734,8 +832,37 @@ describe("portfolio movement builder", () => {
 
     assert.equal(result.ready, true);
     assert.equal(contributionSum, -100);
-    assert.equal(result.previousTotalKrw, 3100);
-    assert.equal(result.changeKrw, -200);
+    assert.equal(result.previousTotalKrw, 3000);
+    assert.equal(result.changeKrw, -100);
+    assert.ok(result.exclusions.some(e => e.snapshotId === "snap-removed" && e.reason === "incomplete_trade_attribution"));
+  });
+
+  it("admits complete verified liquidation profits and losses when the account has no current positions", () => {
+    const pos = position({ quantity: 10, currency: "KRW" });
+    const sold = price => tradeEvent({ eventType: "sell", quantityDelta: -10, price, amountKrw: 10 * price });
+    for (const price of [105, 98, 100]) {
+      const result = buildDaily({ holdings: [], positionRows: [pos], eventRows: [sold(price)] });
+      assert.equal(result.ready, true);
+      assert.deepEqual([result.previousTotalKrw, result.changeKrw, result.tradeFlowKrw, result.priceChangeKrw, result.fxChangeKrw],
+        [1000, 10 * (price - 100), -10 * price, 10 * (price - 100), 0]);
+    }
+    for (const event of [{ ...sold(105), quantityDelta: -9, amountKrw: 945 }, { ...sold(105), assetId: "wrong-id" },
+      { ...sold(105), account: "isa" }, { ...sold(105), amountKrw: 1040 }]) {
+      const result = buildDaily({ holdings: [], positionRows: [pos], eventRows: [event] });
+      assert.equal(result.changeKrw, null);
+      assert.ok(result.exclusions.some(e => e.snapshotId === pos.id));
+    }
+  });
+
+  it("attributes closed foreign sale proceeds without needing a final quote or inventing an order between fills", () => {
+    const pos = position({ quantity: 2, currency: "USD", fxRate: 1000, marketValueKrw: 200000 });
+    const fills = [[95, 1050], [110, 1200]].map(([price, fxRate]) => tradeEvent({
+      eventType: "sell", quantityDelta: -1, price, fxRate, amountKrw: price * fxRate,
+    }));
+    for (const eventRows of [fills, [...fills].reverse()]) {
+      const result = buildDaily({ holdings: [], positionRows: [pos], eventRows });
+      assert.deepEqual([result.changeKrw, result.priceChangeKrw, result.fxChangeKrw], [31750, 5000, 26750]);
+    }
   });
 
   it("does not treat an excluded current holding as a removed baseline position", () => {

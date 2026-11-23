@@ -6,6 +6,7 @@ import {importWithPorts} from './helpers/import-with-ports.mjs';
 import {importUiWithPorts} from './helpers/import-ui-with-ports.mjs';
 import {originalCurrentComposition,originalCurrentValueSummary,originalLegacyValueView} from '../src/lib/cairn-v2/current-value-presentation.ts';
 import {getFixtureView} from '../src/lib/cairn-v2/fixtures.ts';
+import {investmentHoldingReturn} from '../src/lib/cairn-v2/investment-return.ts';
 const [{readBetaDomain},{blankDomainView,visibleDomainRead},{readBetaHome}]=await importWithPorts(['src/lib/cairn-v2/read-service.ts','src/lib/cairn-v2/read-contract.ts','src/lib/cairn-v2/home-read.ts'],{});
 
 const at='2026-09-02T00:00:00Z',owner='owned-user',scope={kind:'all',key:'all',label:'All'};
@@ -74,6 +75,88 @@ test('current presentation remains behind session, owned scope and stale-context
 test('home opts into the additional current presentation read',async()=>{
   let options;await readBetaHome({mode:'domain'},{domain:async(_params,value)=>{options=value;return {context:{mode:'domain'},view:blankDomainView('unavailable','pending')};},simulation:async()=>{throw new Error('unexpected_simulation');}});
   assert.deepEqual(options,{includeHeatmap:true,includeCurrentValue:true,historyWindow:'recent'});
+});
+
+function twoPurchaseHolding() {
+  const usdKrw = 1300;
+  const quantity = 15;
+  const holding = {
+    ...dashboard().holdings[0], quantity, currentPrice: 200, valueKrw: quantity * 200 * usdKrw,
+    costBasisKrw: quantity * 400 * usdKrw,
+  };
+  const position = {
+    assetId: holding.id, currency: holding.currency, quantity: String(quantity),
+    costKrw: String((10 * 400 + 5 * 250) * usdKrw),
+  };
+  return { holding, position };
+}
+
+test('beta requests the investment return once from the dashboard for the admitted account', async () => {
+  const accountScope = { kind: 'account', key: 'account:test-account', label: 'Account A', accountId: 'test-account', accountCode: 'A' };
+  const tenantContext = { ownerUserId: owner, role: 'member' };
+  const catalog = { scopes: [scope, accountScope] };
+  const { holding, position } = twoPurchaseHolding();
+  const investmentReturn = investmentHoldingReturn([holding], { positions: [position] });
+  const calls = [];
+  let separateBasisReads = 0;
+  const unused = () => assert.fail('unexpected read');
+  const [{ getBetaDomainRead }] = await importWithPorts(['src/lib/cairn-v2/server-read.ts'], {
+    '@/lib/auth/current-tenant-context': { resolveCurrentTenantContext: async () => ({ ok: true, tenantContext }) },
+    '@/db/queries/portfolio-analysis-scopes': { getReadOnlyTenantPortfolioAnalysisScopeContext: async ({ scope: key, tenantContext: tenant }) => {
+      assert.equal(key, accountScope.key);
+      assert.equal(tenant, tenantContext);
+      return { state: 'ready', catalog, resolution: { state: 'resolved', scope: accountScope } };
+    } },
+    '@/lib/portfolio-dashboard': { getPortfolioDashboard: async args => {
+      calls.push(args);
+      return { ...dashboard(), selectedScope: accountScope, analysisScopes: catalog.scopes, holdings: [holding], investmentReturn };
+    } },
+    '@/db/queries/native-investment-basis': { loadNativeInvestmentBasis: async () => { separateBasisReads++; return []; } },
+    '@/lib/cairn-v2/target-plan-read': { createBetaInitialTargetReadPorts: () => ({
+      structure: async () => ({ exclusions: [], dataHealth: { selectedAssetCount: 1 }, usdKrwRate: 1300,
+        totalValueKrw: holding.valueKrw, holdingRows: [{ ...holding, currentValueKrw: holding.valueKrw, currentWeightPct: 100 }] }),
+    }) },
+    '@/lib/cairn-v2/history-read': { getBetaHistoryRead: async () => ({ selectedScope: accountScope, readStatus: 'ready', portfolioRows: [] }) },
+    '@/db/queries/period-return-recovery': { readRecoveredReturnCurve: async () => null },
+    '@/lib/cairn-v2/server-current-value': { readOriginalCurrentValue: unused },
+    '@/lib/cairn-v2/heatmap-read': { getBetaHeatmapRead: unused },
+    '@/lib/cairn-v2/target-plan-contribution': { getBetaAdditionalContributionPreview: unused },
+    '@/db/queries/target-policy': { getReadOnlyTenantApprovedTargetPolicy: unused },
+  });
+
+  const read = await getBetaDomainRead({ mode: 'domain', scope: accountScope.key, currency: 'KRW' });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].includeInvestmentReturn, true);
+  assert.equal(calls[0].scope, accountScope);
+  assert.equal(calls[0].analysisScopes, catalog.scopes);
+  assert.equal(calls[0].tenantContext, tenantContext);
+  assert.match(calls[0].serviceDate, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(separateBasisReads, 0);
+  assert.equal(read.context.scope, accountScope.key);
+  assert.equal(read.view.domain.investmentReturn, investmentReturn);
+  assert.equal(investmentReturn.costKrw, 6_825_000);
+  assert.equal(investmentReturn.pnlKrw, -2_925_000);
+  assert.ok(Math.abs(investmentReturn.returnPct - (-42.8571428571)) < 0.000001);
+});
+
+test('unavailable, unpriced or mismatched native cost cannot turn a legacy cost into a confirmed return', () => {
+  const { holding, position } = twoPurchaseHolding();
+  for (const [basis, reason] of [
+    [null, 'investment_read_unavailable'],
+    [{ positions: [{ ...position, costKrw: null }] }, 'cost_coverage_incomplete'],
+    [{ positions: [{ ...position, quantity: '10' }] }, 'cost_coverage_incomplete'],
+    [{ positions: [{ ...position, currency: 'KRW' }] }, 'cost_coverage_incomplete'],
+  ]) {
+    const result = investmentHoldingReturn([holding], basis);
+    assert.equal(result.reason, reason);
+    assert.equal(result.costKrw, null);
+    assert.equal(result.pnlKrw, null);
+    assert.equal(result.returnPct, null);
+    if (basis) {
+      assert.equal(result.coverage.confirmed, 0);
+      assert.equal(result.rows[0].pnlKrw, null);
+    }
+  }
 });
 
 test('the beta current detail renders the original component output without adding trade or contribution controls',async()=>{

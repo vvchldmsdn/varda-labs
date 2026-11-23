@@ -177,6 +177,7 @@ import "./portfolio-special-holdings.test.mjs";
 import "./portfolio-dashboard-snapshots.test.mjs";
 import "./portfolio-dashboard-history.test.mjs";
 import "./portfolio-dashboard-query-demand.test.mjs";
+import "./portfolio-dashboard-movement-events.test.mjs";
 import "./portfolio-dashboard-baseline.test.mjs";
 import "./svg-monotone-curve.test.mjs";
 import "./holding-connection-graph.test.mjs";

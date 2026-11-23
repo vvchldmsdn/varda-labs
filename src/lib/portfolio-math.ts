@@ -158,6 +158,28 @@ export function calculateFxAwareSnapshotMovementKrw({
   };
 }
 
+/** No closing price exists for a sold-out holding. Value actual local
+ * proceeds at opening FX. For a same-day round trip use the acquisition FX
+ * weighted by local purchase consideration, independent of fill ordering. */
+export function calculateClosedPositionMovementKrw(
+  legs: readonly { quantityDelta: number; price: number; fxRate: number }[],
+  flow: number, openingLocal: number, previousValue: number, openingFx?: number,
+): { priceKrw: number; fxKrw: number } | "trade" | "valuation" {
+  let localProceeds = 0, localPurchases = 0, krwPurchases = 0;
+  for (const leg of legs) {
+    const consideration = leg.quantityDelta * leg.price;
+    if (consideration < 0) localProceeds -= consideration;
+    else { localPurchases += consideration; krwPurchases += consideration * leg.fxRate; }
+  }
+  const baseFx = openingFx ?? (localPurchases > 0 ? krwPurchases / localPurchases : null);
+  if (baseFx === null || !Number.isFinite(baseFx) || baseFx <= 0 || !localProceeds) return "trade";
+  const priceKrw = (localProceeds - localPurchases - openingLocal) * baseFx;
+  const fxKrw = legs.reduce((sum, leg) => sum - leg.quantityDelta * leg.price * (leg.fxRate - baseFx), 0);
+  const change = -flow - previousValue;
+  return Math.abs(priceKrw + fxKrw - change) <= Math.max(.01, Math.abs(change) * 1e-10)
+    ? { priceKrw, fxKrw } : "valuation";
+}
+
 export function percentOrNull(
   numerator: number | null,
   denominator: number | null,

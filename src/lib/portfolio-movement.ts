@@ -1,4 +1,5 @@
 import {
+  calculateClosedPositionMovementKrw,
   calculateFxAwarePositionMovementKrw,
   calculateFxAwareSnapshotMovementKrw,
   diffDays,
@@ -33,6 +34,7 @@ export type PortfolioMovementSelectedAccount = PortfolioMovementAccount | "all";
 export type PortfolioMovementSource =
   | "daily_position_snapshot"
   | "asset_price_snapshot"
+  | "trade_execution"
   | null;
 
 export type PortfolioMovementHoldingInput = {
@@ -90,6 +92,9 @@ export type PortfolioMovementEventInput = {
   memo?: string | null;
   recordedAt?: Date | string | null;
   createdAt?: Date | string;
+  movementEffectiveAt?: string;
+  movementEvidence?: "unresolved";
+  movementWindowResolved?: boolean;
 };
 
 export type PortfolioMovementPriceSnapshotInput = {
@@ -121,6 +126,21 @@ export type PortfolioMovementContribution = {
   currentPrice: number;
   previousFxRate: number;
   currentFxRate: number;
+  execution?: {
+    openingQuantity: number;
+    boughtQuantity: number;
+    soldQuantity: number;
+    openingMarkChangeKrw: number;
+    buyMarkChangeKrw: number;
+    sellAdjustmentKrw: number;
+    buyAmountKrw: number;
+    sellAmountKrw: number;
+    averageBuyPrice: number | null;
+    buyPriceChangeLocal: number;
+    buyPriceReturnPctLocal: number | null;
+    openingPriceChangeLocal: number | null;
+    totalPriceChangeLocal: number | null;
+  };
   source: Exclude<PortfolioMovementSource, null>;
 };
 
@@ -135,6 +155,7 @@ export type PortfolioMovementExclusionReason =
   | "missing_previous_close_fallback"
   | "unsupported_currency"
   | "missing_current_fx"
+  | "missing_trade_fx"
   | "missing_baseline_fx"
   | "missing_baseline_price"
   | "incomplete_trade_attribution"
@@ -154,6 +175,17 @@ export type PortfolioMovementExclusion = {
   account: string | null;
   currency: string | null;
   valueKrw: number | null;
+  localPurchases?: {
+    currency: "USD";
+    boughtQuantity: number;
+    averageBuyPrice: number;
+    currentPrice: number;
+    buyPriceChangeLocal: number;
+    buyPriceReturnPctLocal: number | null;
+    openingQuantity: number | null;
+    openingPriceChangeLocal: number | null;
+    totalPriceChangeLocal: number | null;
+  };
 };
 
 export type PortfolioMovementCoverage = {
@@ -206,7 +238,8 @@ export function buildDailyPositionMovement({
   usdKrwRate: number;
   movementCycle: PortfolioMovementCycle;
 }): PortfolioMovementResult {
-  const movementHoldings = holdings.filter(isPortfolioMovementEligibleHolding);
+  const movementHoldings = holdings.filter(holding => isPortfolioMovementEligibleHolding(holding) &&
+    (holding.quantity !== 0 || holding.valueKrw !== 0));
   const emptyCoverage = {
     currentCoveragePct: null,
     snapshotCoveragePct: null,
@@ -239,7 +272,7 @@ export function buildDailyPositionMovement({
     (holding) => holding.valueKrw,
   );
 
-  if (accountRows.length === 0 || snapshotTotalValue <= 0 || currentTotalValue <= 0) {
+  if (accountRows.length === 0 || snapshotTotalValue <= 0) {
     return emptyMovement("missing_baseline_snapshot", emptyCoverage, {
       exclusions: movementHoldings.map((holding) =>
         holdingExclusion(
@@ -418,11 +451,38 @@ export function buildDailyPositionMovement({
     fxChangeKrw += holdingFxChangeKrw ?? 0;
   }
 
-  const currentCoverage = currentTotalValue > 0 ? matchedCurrentValue / currentTotalValue : 0;
+  let closedChangeKrw = 0;
+  let provenExits = 0;
+  for (const row of accountRows) {
+    if (currentHoldingSnapshotIds.has(row.id)) continue;
+    const previousValue = snapshotMarketValue(row);
+    if (previousValue <= 0) continue;
+    const trades = tradeIndex.bySnapshot.get(row.id) ?? [];
+    const flow = sumTradeFlows(trades);
+    const movement = calculateExitedPositionAttribution(row, trades, previousValue, flow);
+    if (!movement) {
+      exclusions.push(snapshotExclusion(row, "incomplete_trade_attribution", "daily_position_snapshot"));
+      continue;
+    }
+    provenExits += 1;
+    matchedSnapshotIds.add(row.id);
+    matchedSnapshotValue += previousValue;
+    closedChangeKrw += movement.changeKrw;
+    if (movement.attribution) {
+      priceChangeKrw += movement.attribution.priceKrw;
+      fxChangeKrw += movement.attribution.fxKrw;
+    } else {
+      completeAttribution = false;
+      exclusions.push(snapshotExclusion(row, "incomplete_trade_attribution", "daily_position_snapshot"));
+    }
+    tradeFlowKrw += flow;
+  }
+  const verifiedEmptyClose = movementHoldings.length === 0 && provenExits > 0 ? 1 : 0;
+  const currentCoverage = currentTotalValue > 0 ? matchedCurrentValue / currentTotalValue : verifiedEmptyClose;
   const snapshotCoverage =
     snapshotTotalValue > 0 ? matchedSnapshotValue / snapshotTotalValue : 0;
   const countCoverage =
-    movementHoldings.length > 0 ? matchedCount / movementHoldings.length : 0;
+    movementHoldings.length > 0 ? matchedCount / movementHoldings.length : verifiedEmptyClose;
   const matchedSnapshotCountCoverage =
     accountRows.length > 0 ? matchedSnapshotIds.size / accountRows.length : 0;
   const coverage = {
@@ -456,27 +516,8 @@ export function buildDailyPositionMovement({
     });
   }
 
-  let comparablePreviousTotalKrw = matchedSnapshotValue;
-  let changeKrw = sumBy([...contributions.values()], (row) => row.changeKrw);
-  for (const row of accountRows) {
-    if (matchedSnapshotIds.has(row.id)) continue;
-    if (currentHoldingSnapshotIds.has(row.id)) continue;
-    const previousValueKrw = snapshotMarketValue(row);
-    if (previousValueKrw <= 0) continue;
-    comparablePreviousTotalKrw += previousValueKrw;
-    const removedTrades = tradeIndex.bySnapshot.get(row.id) ?? [];
-    const removedTradeFlowKrw = sumTradeFlows(removedTrades);
-    changeKrw += -previousValueKrw - removedTradeFlowKrw;
-    tradeFlowKrw += removedTradeFlowKrw;
-    const exitMovement = calculateExitedPositionAttribution(row, removedTrades, previousValueKrw, removedTradeFlowKrw);
-    if (exitMovement?.priceChangeKrw !== null && exitMovement?.priceChangeKrw !== undefined && exitMovement.fxChangeKrw !== null) {
-      priceChangeKrw += exitMovement.priceChangeKrw;
-      fxChangeKrw += exitMovement.fxChangeKrw;
-    } else {
-      completeAttribution = false;
-      exclusions.push(snapshotExclusion(row, "incomplete_trade_attribution", "daily_position_snapshot"));
-    }
-  }
+  const comparablePreviousTotalKrw = matchedSnapshotValue;
+  const changeKrw = sumBy([...contributions.values()], (row) => row.changeKrw) + closedChangeKrw;
 
   return {
     ready: true,
@@ -858,7 +899,7 @@ function isPortfolioMovementEligibleSnapshot(
   return isPortfolioMovementEligibleHolding(currentHolding ?? row);
 }
 
-function positionSnapshotMatchesHolding(
+export function positionSnapshotMatchesHolding(
   row: PortfolioMovementPositionSnapshotInput,
   holding: PortfolioMovementHoldingInput,
 ) {
@@ -870,7 +911,7 @@ function positionSnapshotMatchesHolding(
   return row.assetName === holding.name;
 }
 
-function eventMatchesHolding(
+export function eventMatchesHolding(
   event: PortfolioMovementEventInput,
   holding: PortfolioMovementHoldingInput,
   selectedAccount: PortfolioMovementSelectedAccount,
@@ -945,7 +986,8 @@ function positiveNumber(value: unknown) {
 }
 
 function isMovementTrade(event: PortfolioMovementEventInput, baselineDate: string) {
-  return event.eventDate > baselineDate && (event.eventType === "buy" || event.eventType === "sell");
+  return event.eventDate > baselineDate && (event.eventType === "buy" || event.eventType === "sell" ||
+    (event.movementWindowResolved && (event.movementEvidence === "unresolved" || event.eventType === "split")));
 }
 
 type ResolvedMovementTrade = PortfolioMovementEventInput & { amountKrw: number };
@@ -964,14 +1006,18 @@ function indexMovementTrades(
     !holdings.some((holding) => positionSnapshotMatchesHolding(snapshot, holding)),
   );
   for (const event of events.filter((row) => isMovementTrade(row, baselineDate))) {
+    const unresolved = event.movementWindowResolved && (event.movementEvidence === "unresolved" || event.eventType === "split");
+    if (unresolved && !event.assetId && !event.legacyAssetId && !normalizeTicker(event.ticker) && !event.assetName &&
+        (selectedAccount === "all" || !event.account || selectedAccount === event.account)) return { reason: "incomplete_trade_attribution" };
     const holdingMatches = holdings.filter((holding) => eventMatchesHolding(event, holding, selectedAccount));
     const snapshotMatches = exitedSnapshots.filter((snapshot) => eventMatchesSnapshot(event, snapshot, selectedAccount));
     if (holdingMatches.length + snapshotMatches.length > 1) return { reason: "ambiguous_trade_identity" };
     if (holdingMatches.length + snapshotMatches.length === 0) continue;
+    if (unresolved) return { reason: "incomplete_trade_attribution" };
     const baseline = holdingMatches.length === 1
       ? snapshots.find((snapshot) => positionSnapshotMatchesHolding(snapshot, holdingMatches[0]))
       : snapshotMatches[0];
-    if (baseline?.description?.split(/;\s*/).includes("valuation_policy=execution_collection_v1")) {
+    if (!event.movementWindowResolved && baseline?.description?.split(/;\s*/).includes("valuation_policy=execution_collection_v1")) {
       const capturedAt = baseline.capturedAt == null ? NaN : new Date(baseline.capturedAt).getTime();
       // A backdated event recorded after capture was not included in that
       // snapshot. Creation time is the ledger inclusion boundary, not its date.
@@ -1011,21 +1057,150 @@ function resolveMovementTradeAmount(event: PortfolioMovementEventInput, currency
   return Number.isFinite(amount) ? amount : null;
 }
 
+function movementTradeQuantity(event: PortfolioMovementEventInput) {
+  const before = toNumber(parseMovementObject(event.beforeValue).quantity);
+  const after = toNumber(parseMovementObject(event.afterValue).quantity);
+  return Math.abs(toNumber(event.quantityDelta) ?? (before !== null && after !== null ? after - before : 0));
+}
+
 function movementTradeLegs(events: PortfolioMovementEventInput[], requiresFx: boolean) {
   const legs: { quantityDelta: number; price: number; fxRate: number }[] = [];
   for (const event of events) {
-    const before = parseMovementObject(event.beforeValue);
-    const after = parseMovementObject(event.afterValue);
-    const beforeQuantity = toNumber(before.quantity);
-    const afterQuantity = toNumber(after.quantity);
-    const quantity = Math.abs(toNumber(event.quantityDelta) ??
-      (beforeQuantity !== null && afterQuantity !== null ? afterQuantity - beforeQuantity : 0));
+    const quantity = movementTradeQuantity(event);
     const price = positiveNumber(event.price);
     const fxRate = requiresFx ? positiveNumber(event.fxRate) : 1;
     if (!(quantity > 0) || price === null || fxRate === null) return null;
     legs.push({ quantityDelta: quantity * (event.eventType === "sell" ? -1 : 1), price, fxRate });
   }
   return legs;
+}
+
+function hasPostTradeQuote(holding: PortfolioMovementHoldingInput, events: PortfolioMovementEventInput[], cycle: PortfolioMovementCycle) {
+  const quoteTime = holding.priceAsOf == null ? NaN : new Date(holding.priceAsOf).getTime();
+  const start = cycle.liveWindowStartAt.getTime();
+  return hasFreshMovementPrice(holding, cycle) && holding.currentPrice > 0 && quoteTime >= start &&
+    quoteTime < cycle.liveWindowEndAt.getTime() && events.every(event => {
+      const knownBy = event.movementEffectiveAt ?? event.createdAt;
+      if (knownBy == null) return false;
+      const bound = new Date(knownBy).getTime();
+      return bound >= start && bound <= quoteTime;
+    });
+}
+
+function openingQuantityBeforePurchases(events: PortfolioMovementEventInput[]) {
+  const knownBefore = events.map(event => toNumber(parseMovementObject(event.beforeValue).quantity));
+  if (knownBefore.includes(0)) return 0;
+  return knownBefore.length && knownBefore.every((q): q is number => q !== null && q >= 0) ? Math.min(...knownBefore) : null;
+}
+
+/** Local-currency P&L of the identified purchases survives missing execution
+ * FX. Never treat it as KRW, or guess the remaining lots after a sale. */
+export function currentLocalPurchaseMovement(
+  holding: PortfolioMovementHoldingInput, snapshot: PortfolioMovementPositionSnapshotInput | undefined,
+  events: PortfolioMovementEventInput[], cycle: PortfolioMovementCycle,
+): PortfolioMovementExclusion["localPurchases"] {
+  if (holding.currency.trim().toUpperCase() !== "USD" || (snapshot?.currency && snapshot.currency.trim().toUpperCase() !== "USD") ||
+    !events.length || events.some(event => event.eventType !== "buy" || event.movementEvidence === "unresolved") ||
+    !hasPostTradeQuote(holding, events, cycle)) return;
+  // Only the quantity and original unit price are needed here.
+  const legs = movementTradeLegs(events, false);
+  if (!legs) return;
+  const boughtQuantity = sumBy(legs, leg => leg.quantityDelta);
+  // With buys only, the smallest confirmed pre-fill quantity is the opening
+  // if all fills carry it. An incomplete sequence is not a quantity anchor.
+  const fillOpening = openingQuantityBeforePurchases(events);
+  const opening = toNumber(snapshot?.quantity) ?? fillOpening;
+  const tolerance = Math.max(1e-8, holding.quantity * 1e-10);
+  if (boughtQuantity > holding.quantity + tolerance || (opening !== null &&
+    (opening < 0 || (fillOpening !== null && Math.abs(fillOpening - opening) > tolerance) ||
+    Math.abs(opening + boughtQuantity - holding.quantity) > tolerance))) return;
+  const localCost = sumBy(legs, leg => leg.quantityDelta * leg.price);
+  const buyPriceChangeLocal = boughtQuantity * holding.currentPrice - localCost;
+  const openingPrice = snapshot && snapshotPositionPrice(snapshot);
+  const openingPriceChangeLocal = opening === 0 ? 0 :
+    opening !== null && openingPrice ? opening * (holding.currentPrice - openingPrice) : null;
+  return { currency: "USD", boughtQuantity, averageBuyPrice: localCost / boughtQuantity, currentPrice: holding.currentPrice,
+    buyPriceChangeLocal, buyPriceReturnPctLocal: percentOrNull(buyPriceChangeLocal, localCost),
+    openingQuantity: opening, openingPriceChangeLocal,
+    totalPriceChangeLocal: openingPriceChangeLocal === null ? null : openingPriceChangeLocal + buyPriceChangeLocal };
+}
+
+/** Mark verified effective fills against the latest quote. Both the position
+ * quantity and its change net of gross trade consideration must reconcile. */
+export function currentExecutionContribution(
+  holding: PortfolioMovementHoldingInput,
+  snapshot: PortfolioMovementPositionSnapshotInput | undefined,
+  events: PortfolioMovementEventInput[],
+  usdKrwRate: number,
+  cycle: PortfolioMovementCycle,
+): PortfolioMovementContribution | PortfolioMovementExclusionReason {
+  const currentFx = resolveKrwFxRate(holding.currency, usdKrwRate);
+  if (!currentFx.ok) return currentFx.reason === "unsupported_currency" ? "unsupported_currency" : "missing_current_fx";
+  if (events.some(event => event.movementEvidence === "unresolved" || !["buy", "sell"].includes(event.eventType))) {
+    return "incomplete_trade_attribution";
+  }
+  // A provider fetch after a purchase can still carry a pre-purchase quote.
+  if (!hasPostTradeQuote(holding, events, cycle)) return movementPriceExclusionReason(holding);
+  if (snapshot?.currency && snapshot.currency.trim().toUpperCase() !== currentFx.currency) return "incomplete_trade_attribution";
+  if (currentFx.requiresFx && events.some(event => positiveNumber(event.fxRate) === null)) return "missing_trade_fx";
+  const legs = movementTradeLegs(events, currentFx.requiresFx);
+  const first = legs?.[0];
+  if (!legs || !first) return "incomplete_trade_attribution";
+  const amounts = events.map(event => resolveMovementTradeAmount(event, holding.currency));
+  if (amounts.some(amount => amount === null || amount <= 0)) return "missing_trade_amount";
+  let boughtQuantity = 0, soldQuantity = 0, localBuyCost = 0, buyAmountKrw = 0, sellAmountKrw = 0;
+  for (const [i, leg] of legs.entries()) {
+    const gross = amounts[i]!;
+    if (Math.abs(Math.abs(leg.quantityDelta) * leg.price * leg.fxRate - gross) > Math.max(.01, gross * 1e-10)) {
+      return "incomplete_trade_attribution";
+    }
+    if (leg.quantityDelta > 0) {
+      boughtQuantity += leg.quantityDelta;
+      localBuyCost += leg.quantityDelta * leg.price;
+      buyAmountKrw += gross;
+    } else {
+      soldQuantity -= leg.quantityDelta;
+      sellAmountKrw += gross;
+    }
+  }
+  const tolerance = Math.max(1e-8, holding.quantity * 1e-10);
+  // Without a saved opening, admit only a fully evidenced new buy. The first
+  // observed fill isn't a zero opening for a top-up to an existing position.
+  const openingQuantity = snapshot ? toNumber(snapshot.quantity) : 0;
+  if (openingQuantity === null || openingQuantity < 0 ||
+      Math.abs(openingQuantity + boughtQuantity - soldQuantity - holding.quantity) > tolerance) return "incomplete_trade_attribution";
+  const fillOpening = soldQuantity ? null : openingQuantityBeforePurchases(events);
+  if (fillOpening !== null && Math.abs(openingQuantity - fillOpening) > tolerance) return "incomplete_trade_attribution";
+  if (!snapshot) {
+    if (fillOpening !== 0) return "missing_baseline_snapshot";
+  }
+  const previousValueKrw = snapshot ? toNumber(snapshot.marketValueKrw) : 0;
+  if (previousValueKrw === null || previousValueKrw < 0 || (openingQuantity === 0) !== (previousValueKrw === 0)) return "missing_baseline_snapshot";
+  const previousPrice = openingQuantity && snapshot ? snapshotPositionPrice(snapshot) : first.price;
+  if (previousPrice === null) return "missing_baseline_price";
+  const previousFxRate = !currentFx.requiresFx ? 1 : openingQuantity && snapshot ?
+    positiveNumber(snapshot.fxRate) ?? positiveNumber(snapshot.previousFxRate) : first.fxRate;
+  if (previousFxRate === null) return "missing_baseline_fx";
+  const tradeFlowKrw = buyAmountKrw - sellAmountKrw;
+  const movement = calculateFxAwareSnapshotMovementKrw({ quantity: holding.quantity, previousQuantity: openingQuantity,
+    trades: legs, currentPrice: holding.currentPrice, currentValueKrw: holding.valueKrw, previousPrice, previousValueKrw,
+    currentFxRate: currentFx.rate, previousFxRate, tradeFlowKrw });
+  if (movement.priceChangeKrw === null || movement.fxChangeKrw === null) return "incomplete_trade_attribution";
+  const mark = holding.currentPrice * currentFx.rate;
+  const openingPriceChangeLocal = soldQuantity ? null : openingQuantity * (holding.currentPrice - previousPrice);
+  const buyPriceChangeLocal = boughtQuantity * holding.currentPrice - localBuyCost;
+  return { holdingId: holding.id, previousValueKrw, changeKrw: movement.changeKrw,
+    returnPct: percentOrNull(movement.changeKrw, previousValueKrw), tradeFlowKrw,
+    priceChangeKrw: movement.priceChangeKrw, fxChangeKrw: movement.fxChangeKrw,
+    previousPrice, currentPrice: holding.currentPrice, previousFxRate, currentFxRate: currentFx.rate,
+    source: openingQuantity > 0 ? "daily_position_snapshot" : "trade_execution",
+    execution: { openingQuantity, boughtQuantity, soldQuantity, buyAmountKrw, sellAmountKrw,
+      openingMarkChangeKrw: openingQuantity * (mark - previousPrice * previousFxRate),
+      buyMarkChangeKrw: boughtQuantity * mark - buyAmountKrw,
+      sellAdjustmentKrw: sellAmountKrw - soldQuantity * mark,
+      averageBuyPrice: boughtQuantity ? localBuyCost / boughtQuantity : null,
+      buyPriceChangeLocal, buyPriceReturnPctLocal: percentOrNull(buyPriceChangeLocal, localBuyCost), openingPriceChangeLocal,
+      totalPriceChangeLocal: openingPriceChangeLocal === null ? null : openingPriceChangeLocal + buyPriceChangeLocal } };
 }
 
 function calculateExitedPositionAttribution(
@@ -1035,28 +1210,20 @@ function calculateExitedPositionAttribution(
   tradeFlowKrw: number,
 ) {
   const currency = snapshot.currency?.trim().toUpperCase();
-  if (currency !== "KRW" && currency !== "USD") return null;
-  const orderedEvents = [...events].sort((left, right) =>
-    left.eventDate.localeCompare(right.eventDate) ||
-    timestampMs(left.recordedAt ?? left.createdAt) - timestampMs(right.recordedAt ?? right.createdAt),
-  );
-  const trades = movementTradeLegs(orderedEvents, currency === "USD");
-  const finalTrade = trades?.at(-1);
+  const openingQuantity = positiveNumber(snapshot.quantity);
+  if (!events.length || !openingQuantity || events.some(event => movementTradeQuantity(event) === 0 || !(Number(event.amountKrw) > 0))) return null;
+  const closingQuantity = openingQuantity + sumBy(events, event => movementTradeQuantity(event) * (event.eventType === "sell" ? -1 : 1));
+  if (Math.abs(closingQuantity) > Math.max(1e-8, openingQuantity * 1e-10)) return null;
+  // Complete quantity closure and verified KRW consideration prove the net
+  // result even when the instruments' local prices or FX decomposition do not.
+  const changeKrw = -tradeFlowKrw - previousValueKrw;
+  if (currency !== "KRW" && currency !== "USD") return { changeKrw, attribution: null };
+  const trades = movementTradeLegs(events, currency === "USD");
   const previousPrice = snapshotPositionPrice(snapshot);
   const previousFxRate = currency === "KRW" ? 1 : positiveNumber(snapshot.fxRate) ?? positiveNumber(snapshot.previousFxRate);
-  if (!finalTrade || previousPrice === null || previousFxRate === null) return null;
-  return calculateFxAwareSnapshotMovementKrw({
-    quantity: 0,
-    previousQuantity: toNumber(snapshot.quantity),
-    trades,
-    currentPrice: finalTrade.price,
-    currentValueKrw: 0,
-    previousPrice,
-    previousValueKrw,
-    currentFxRate: finalTrade.fxRate,
-    previousFxRate,
-    tradeFlowKrw,
-  });
+  if (!trades || previousPrice === null || previousFxRate === null) return { changeKrw, attribution: null };
+  const movement = calculateClosedPositionMovementKrw(trades, tradeFlowKrw, openingQuantity * previousPrice, previousValueKrw, previousFxRate);
+  return typeof movement === "string" ? null : { changeKrw, attribution: movement };
 }
 
 function parseMovementObject(value: unknown): Record<string, unknown> {

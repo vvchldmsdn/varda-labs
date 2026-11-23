@@ -1,4 +1,4 @@
-import { calculateFxAwareSnapshotMovementKrw, resolveKrwFxRate } from "../portfolio-math.ts";
+import { calculateClosedPositionMovementKrw, calculateFxAwareSnapshotMovementKrw, resolveKrwFxRate } from "../portfolio-math.ts";
 import { instrumentLabel } from "../instrument-display.ts";
 
 export type PeriodAttributionRange = { start: string; end: string };
@@ -86,27 +86,6 @@ function admittedLegs(trades: AttributionTrade[], currency: string | null) {
   return { legs, flow };
 }
 
-/** No closing price exists for a sold-out holding. Value its actual local
- * proceeds at the opening FX rate to separate the price result from FX.
- * For an intraday round trip the opening exposure is zero, so use the actual
- * acquisition FX weighted by local purchase consideration. This also works
- * when multiple same-date fills have no verified intraday ordering. */
-function closedImpact(legs: Leg[], flow: number, openingLocal: number, previousValue: number, openingFx?: number): Amounts | PeriodGapReason {
-  let localProceeds = 0, localPurchases = 0, krwPurchases = 0;
-  for (const leg of legs) {
-    const consideration = leg.quantityDelta * leg.price;
-    if (consideration < 0) localProceeds -= consideration;
-    else { localPurchases += consideration; krwPurchases += consideration * leg.fxRate; }
-  }
-  const baseFx = openingFx ?? (localPurchases > 0 ? krwPurchases / localPurchases : null);
-  if (!positive(baseFx) || !localProceeds) return "trade";
-  const priceKrw = (localProceeds - localPurchases - openingLocal) * baseFx;
-  const fxKrw = legs.reduce((sum, leg) => sum - leg.quantityDelta * leg.price * (leg.fxRate - baseFx), 0);
-  const change = -flow - previousValue;
-  return Math.abs(priceKrw + fxKrw - change) <= Math.max(.01, Math.abs(change) * 1e-10)
-    ? { priceKrw, fxKrw } : "valuation";
-}
-
 function holdingImpact(before: AttributionPosition | undefined, after: AttributionPosition | undefined,
   trades: AttributionTrade[]): Amounts | PeriodGapReason {
   const startQty = before ? before.quantity : 0;
@@ -130,7 +109,7 @@ function holdingImpact(before: AttributionPosition | undefined, after: Attributi
   if ((!startQty && previousValue > 0) || (!endQty && currentValue > 0)) return "valuation";
   if (!startQty && !endQty && !legs.length) return { priceKrw: 0, fxKrw: 0 };
 
-  if (!endQty) return closedImpact(legs, flow, startQty * (before?.price ?? 0), previousValue,
+  if (!endQty) return calculateClosedPositionMovementKrw(legs, flow, startQty * (before?.price ?? 0), previousValue,
     startQty && previousFx.ok ? previousFx.rate : undefined);
   const first = legs[0];
   // A proven empty opening carries no exposure. Its inert reference can be

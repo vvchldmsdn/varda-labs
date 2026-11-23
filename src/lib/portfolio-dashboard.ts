@@ -1,5 +1,6 @@
 import "server-only";
 import { buildCurrentHoldingMovement, type CurrentHoldingMovement } from "./current-holding-movement";
+import { investmentHoldingReturn, type InvestmentReturn } from "./cairn-v2/investment-return";
 import { resolveCurrentUsdKrwRate } from "@/lib/market-data/fx-rate-admission";
 
 import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
@@ -161,6 +162,7 @@ export type DashboardEventActivity = {
 };
 
 export type DashboardData = {
+  investmentReturn?: InvestmentReturn;
   currentHoldingMovement?: CurrentHoldingMovement;
   selectedScope: PortfolioAnalysisScope;
   analysisScopes: readonly PortfolioAnalysisScope[];
@@ -255,11 +257,13 @@ export async function getPortfolioDashboard(
   {
     analysisScopes,
     demand = { surface: "home" },
+    includeInvestmentReturn = false,
     scope,
     tenantContext,
   }: {
     analysisScopes: readonly PortfolioAnalysisScope[];
     demand?: PortfolioDashboardDemand;
+    includeInvestmentReturn?: boolean;
     scope: PortfolioAnalysisScope;
     tenantContext: TenantContext;
   },
@@ -280,15 +284,19 @@ export async function getPortfolioDashboard(
     historyAssetIds,
     recentPortfolioRows,
     eventRows,
+    movementEventRows,
     nativeHoldingCosts,
+    investmentReturnBasis,
     unmatchedSnapshotCountRows,
     liveQuoteRows,
     recentPriceRows,
   } = await getReadOnlyTenantPortfolioDashboardSources({
     demand,
+    includeInvestmentReturn,
     scope,
     tenantContext,
     serviceDate: movementCycle.snapshotDate,
+    now,
   });
 
   const movementBaselineDate = baselineReferenceDate;
@@ -357,7 +365,7 @@ export async function getPortfolioDashboard(
   const dailyPositionMovement = buildDailyPositionMovement({
     holdings: holdingsBase,
     positionRows: latestPositionRows,
-    eventRows,
+    eventRows: movementEventRows,
     selectedAccount: "all",
     baselineDate: activeMovementBaselineDate,
     usdKrwRate,
@@ -372,15 +380,13 @@ export async function getPortfolioDashboard(
   });
   const currentHoldingMovement = buildCurrentHoldingMovement({
     holdings: holdingsBase, positionRows: baselineIsDelayed ? [] : latestPositionRows,
+    eventRows: movementEventRows,
     priceRows: baselineIsDelayed ? [] : recentPriceRows,
     baselineDate: activeMovementBaselineDate, usdKrwRate, movementCycle,
   });
   // A current-quantity close comparison cannot replace a snapshot valuation
   // across trades, nor resolve an ambiguous trade-to-position identity.
-  const canUsePreviousCloseFallback = !eventRows.some((event) =>
-    movementBaselineDate !== null && event.eventDate > movementBaselineDate &&
-    (event.eventType === "buy" || event.eventType === "sell"),
-  );
+  const canUsePreviousCloseFallback = movementEventRows.length === 0;
   // Never relabel a delayed snapshot's multi-day move as today's change. The
   // historical baseline date remains visible, and live valuation stays intact.
   const movement = baselineIsDelayed
@@ -478,6 +484,7 @@ export async function getPortfolioDashboard(
 
   return {
     selectedScope: scope,
+    ...(includeInvestmentReturn ? { investmentReturn: investmentHoldingReturn(holdings, investmentReturnBasis) } : {}),
     currentHoldingMovement,
     analysisScopes,
     generatedAt: new Date().toISOString(),
