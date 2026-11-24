@@ -6,6 +6,7 @@ import { useId, useState, type PointerEvent, type KeyboardEvent } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { formatLiveValuationTime } from "@/lib/cairn-v2/history-date";
+import { currentKstDate } from "@/lib/current-kst-date";
 import type { BetaCurrency } from "@/lib/cairn-v2/navigation";
 import type { FixtureView } from "@/lib/cairn-v2/fixtures";
 import styles from "./beta.module.css";
@@ -162,8 +163,9 @@ export function HistoryChart({
     : selectedMoney === "—" ? "—" : selectedMoney + (currency === "KRW" ? "원" : " USD");
   const first = values[0], last = values[latestIndex] ?? null;
   const selectedLiveAsOf = selectedRow.liveAsOf ?? data?.points[selectedIndex].liveAsOf;
+  const selectedDate = selectedRow.liveAsOf ? currentKstDate(new Date(selectedRow.liveAsOf)) : selectedRow.date;
   const selectedDateLabel = selectedLiveAsOf
-    ? `${metric === "value" ? i18n.t("현재 평가액", "Current valuation") : i18n.t("잠정 수익률", "Provisional return")} ${selectedValue} · ${formatLiveValuationTime(selectedLiveAsOf)}`
+    ? `${selectedDate} · ${metric === "value" ? i18n.t("현재 평가액", "Current valuation") : i18n.t("잠정 수익률", "Provisional return")} ${selectedValue} · ${formatLiveValuationTime(selectedLiveAsOf)}`
     : selectedRow.date;
   const periodRate = metric === "value"
     ? percentOrNull(historyComparison(rows, !!view.domain).value, first)

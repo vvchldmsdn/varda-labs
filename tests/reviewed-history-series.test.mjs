@@ -87,6 +87,10 @@ test('the existing valuation and return charts show the new basis and break at t
     assert.doesNotMatch(html,/stroke-dasharray="3 4"/);
     assert.match(html,/data-history-line="true"/);
   }
+  prefs.metric='value';
+  prefs.historyDate=dates[3];
+  const live=renderToStaticMarkup(createElement(ui.HistoryChart,{view,compact:true,interactive:true}));
+  assert.match(live,/aria-label="히스토리 날짜 탐색 · 2026-05-04 · 현재 평가액 415원 · 05.04 13:00 KST/);
 });
 
 test('the same admitted amount feeds Home and the live chart while its change uses the preserved same-day close', () => {
