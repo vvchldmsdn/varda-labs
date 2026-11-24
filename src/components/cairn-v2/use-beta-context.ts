@@ -20,7 +20,9 @@ export function useBetaContext(initialContext: BetaContext) {
     if (context.mode !== "domain" && query !== undefined && `${pathname}?${query}` !== href) router.replace(href, { scroll: false });
   }, [context.mode, href, pathname, query, router]);
   const setContext = useCallback((requested: BetaContext, options?: { replace?: boolean }) => {
-    const next=requested.scope!==context.scope?{...requested,excludeSell:undefined}:requested;
+    const next = requested.scope !== context.scope
+      ? { ...requested, excludeSell: undefined, minBuyPct: undefined }
+      : requested;
     startTransition(() => {
       if (next.mode === "domain") selectPendingContext(next);
       const destination = betaHref(pathname, next.mode === "domain" ? next : normalizeBetaContext(next));

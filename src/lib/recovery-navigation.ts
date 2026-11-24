@@ -9,7 +9,7 @@ const paths = new Set([
   '/beta/portfolio/holdings/new', '/beta/portfolio/holdings/manage', '/beta/portfolio/ledger',
   '/beta/history/events', '/beta/history/snapshots', '/beta/portfolio/accounts', '/beta/portfolio/accounts/manage', '/beta/plans', '/beta/etfs', '/etfs',
 ]);
-const fields = new Set(['scope', 'account', 'accountId', 'assetId', 'currency', 'amount', 'cashAmountKrw',
+const fields = new Set(['scope', 'account', 'accountId', 'assetId', 'currency', 'amount', 'cashAmountKrw', 'minBuyPct',
   'excludeSell', 'fundingCurrency', 'useCash', 'from', 'mode', 'fixture', 'preview', 'window', 'effectId', 'pricePct', 'fxPct', 'scenarioRows', 'scenarioScope', 'scenarioCurrency', 'action',
   'horizon', 'end', 'start', 'period', 'metric', 'date', 'analysis', 'run', 'kodexWeight', 'basketAnchor', 'q', 'asOfDate',
   'view', 'detail', 'model', 'range', 'selectedDate', 'historyDate', 'historyPeriod', 'historyMetric', 'historySource',

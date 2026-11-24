@@ -72,7 +72,7 @@ export function movementEvidenceRows(dashboard: DashboardData) {
   return { rows, exclusions };
 }
 export type DomainRead = { context: BetaContext; view: BetaView; readReceipt?: string; readEpoch?: string; displayBinding?: string; historyWindow?: "recent" };
-export const requestKey = (context: BetaContext) => JSON.stringify([context.mode, context.scope, context.currency, context.cashAmountKrw, ...(context.excludeSell!==undefined?[context.excludeSell]:[])]);
+export const requestKey = (context: BetaContext) => JSON.stringify([context.mode, context.scope, context.currency, context.cashAmountKrw, ...(context.excludeSell!==undefined?[context.excludeSell]:[]), ...(context.minBuyPct !== undefined ? [{minBuyPct:context.minBuyPct}] : [])]);
 export function blankDomainView(state: ReadState, message: string): BetaView {
   return { rows: [], totalKrw: null, history: [], priceMoveKrw: 0, fxMoveKrw: 0, todayMoveKrw: null,
     drift: undefined, scopeLabel: "조회 범위", asOf: "확인 전", fxRate: null, contribution: [], scenario: [],

@@ -212,7 +212,7 @@ export function BetaHome({
 
           <div className={home.planning}>
             {view.domain ? (
-              <ContributionEntry key={context.scope + ":" + context.currency} view={view} context={context} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}
+              <ContributionEntry key={context.scope + ":" + context.currency} view={view} context={context} dirty={contributionDirty}
                 className={!contributionReady ? home.contributionStatus : undefined}
                 onCalculate={calculateContribution}
                 onView={(trigger, amount) => {
@@ -314,11 +314,12 @@ export function BetaHome({
               historyRead={read}
               onAllHistoryAccounts={() => setContext({ ...context, scope: "all" })}
               onContributionEdit={setContributionDirty}
-              onContributionCalculate={(amount, keys) =>
+              onContributionCalculate={(amount, keys, minBuyPct) =>
                 setContext({
                   ...context,
                   cashAmountKrw: amount,
                   excludeSell: keys?.length ? keys : undefined,
+                  minBuyPct,
                 })
               }
             />

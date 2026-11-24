@@ -1,7 +1,7 @@
 export type BetaCurrency = "KRW" | "USD";
 export type FixtureScope = "all" | "fixture-account-a" | "fixture-long-term";
 export type FixtureCase = "standard" | "empty" | "partial" | "large";
-export type BetaContext = { currency: BetaCurrency; scope: string; fixture: FixtureCase; mode?: "domain"; cashAmountKrw?: string | string[]; excludeSell?: string | string[]; analysis?: string | string[]; window?: string | string[]; horizon?: string | string[]; end?: string | string[]; run?: string | string[] };
+export type BetaContext = { currency: BetaCurrency; scope: string; fixture: FixtureCase; mode?: "domain"; cashAmountKrw?: string | string[]; minBuyPct?: string | string[]; excludeSell?: string | string[]; analysis?: string | string[]; window?: string | string[]; horizon?: string | string[]; end?: string | string[]; run?: string | string[] };
 const originalPaths = new Set(["/", "/history", "/today", "/portfolio/structure", "/portfolio/targets",
   "/portfolio/risk", "/etfs", "/market", "/additional-contribution", "/simulation", "/investment-lab",
   "/plans", "/portfolio/ledger", "/portfolio/onboarding", "/portfolio/accounts", "/portfolio/holdings", "/portfolio/holdings/new", "/portfolio/groups", "/portfolio/events",
@@ -43,6 +43,7 @@ export function betaHref(path: "/beta/portfolio/targets" | "/beta" | "/beta/hist
     for (const value of Array.isArray(context.cashAmountKrw) ? context.cashAmountKrw : [context.cashAmountKrw]) query.append("cashAmountKrw", value);
   }
   if (context.mode === "domain" && context.excludeSell!==undefined) for(const key of Array.isArray(context.excludeSell)?context.excludeSell:[context.excludeSell])query.append("excludeSell",key);
+  if (context.mode === "domain" && context.minBuyPct !== undefined) for (const value of Array.isArray(context.minBuyPct) ? context.minBuyPct : [context.minBuyPct]) query.append("minBuyPct", value);
   if (context.mode === "domain") for (const key of ["analysis", "window"] as const) { const raw=context[key]; if(raw !== undefined) for(const value of Array.isArray(raw)?raw:[raw]) query.append(key,value); }
   if (context.mode === "domain" && path === "/beta/simulation") for (const key of ["horizon", "end", "run"] as const) { const raw=context[key]; if(raw !== undefined) for(const value of Array.isArray(raw)?raw:[raw]) query.append(key,value); }
   return `${path}?${query}`;

@@ -8,13 +8,13 @@ import {
   defaultContributionOrderRule, displayOrderNativeAmount, getContributionWallets, projectContributionOrderPlan,
   type ContributionOrderBasis, type ContributionOrderKind, type ContributionOrderRule,
 } from "@/lib/cairn-v2/contribution-order-plan";
-import { parseContributionInput } from "@/lib/cairn-v2/planning-contract";
+import { parseContributionInput, type ReadyContribution } from "@/lib/cairn-v2/planning-contract";
 import { useContributionOrderPlan } from "./contribution-order-context";
 import styles from "./contribution-order-preview.module.css";
 
-export function ContributionOrderPreview({basis, totalBudgetKrw, formatWon, onIncludeCash}: {
+export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCash}: {
   basis: ContributionOrderBasis;
-  totalBudgetKrw: number;
+  preview: ReadyContribution;
   formatWon: (value: number) => string;
   onIncludeCash: (updatedTotal: string) => void;
 }) {
@@ -26,6 +26,7 @@ export function ContributionOrderPreview({basis, totalBudgetKrw, formatWon, onIn
   const id = useId();
   const result = projection?.result;
   const orders = result && result.status !== "unavailable" ? result.orders.filter(row => row.principalMinor > 0) : [];
+  const cappedOrders = result && result.status !== "unavailable" ? result.orders.filter(row => row.nextWholeOverCap) : [];
   const buyRows = basis.rows.filter(row => row.targetKrw > 0);
   const saleRows = projection?.sales ?? [];
   const rowsByKey = new Map(basis.rows.map(row => [row.key, row]));
@@ -51,7 +52,7 @@ export function ContributionOrderPreview({basis, totalBudgetKrw, formatWon, onIn
   function includeCash(event: FormEvent) {
     event.preventDefault();
     const parsed = parseContributionInput(additionalCash.trim());
-    const total = parsed.amount === null ? null : String(parsed.amount + totalBudgetKrw);
+    const total = parsed.amount === null ? null : String(parsed.amount + preview.cashAmountKrw);
     if (total === null || parseContributionInput(total).state !== "ready") {
       setMessage(t("예비비를 뺀 금액을 원 단위로 입력해 주세요.", "Enter available cash after reserves in whole won."));
       return;
@@ -63,23 +64,39 @@ export function ContributionOrderPreview({basis, totalBudgetKrw, formatWon, onIn
 
   return <section className={styles.orderPanel} aria-labelledby={id}>
     <div className={styles.head}>
-      <h3 id={id}>{t("예상 주문", "Estimated orders")}</h3>
+      <h3 id={id}>{t("수량으로 환산한 주문", "Orders at executable sizes")}</h3>
       <span>{settings.useCashLimits ? t("입력한 통화별 잔액", "Entered cash by currency") : t("입력한 투자금 기준", "Based on entered funding")}</span>
     </div>
     {result && result.status !== "unavailable" ? <>
       <dl className={styles.totals}>
-        <div><dt>{t("주문 예산", "Order budget")}</dt><dd>{formatWon(basis.budgetKrw)}</dd></div>
-        <div><dt>{t("매수 원금", "Buy principal")}</dt><dd>{formatWon(result.principalKrw)}</dd></div>
-        <div><dt>{t("예상 비용", "Estimated fees")}</dt><dd>{formatWon(result.feesKrw)}</dd></div>
-        <div><dt>{t("예산 잔액", "Budget remaining")}</dt><dd>{formatWon(result.remainingKrw)}</dd></div>
+        <div><dt>{t("규칙 적용 후 주문 예산", "Order budget after rules")}</dt><dd>{formatWon(basis.budgetKrw)}</dd></div>
+        <div><dt>{t("주문 가능한 매수 원금", "Estimated buy principal")}</dt><dd>{formatWon(result.principalKrw)}</dd></div>
       </dl>
+      {preview.totalTrimProceedsKrw > 0 && <p>{t(
+        `전략 배분은 예상 매도대금 ${formatWon(preview.totalTrimProceedsKrw)}을 포함해요. 주문 예산은 새 투자금 한도에서 계산해요.`,
+        `The allocation includes ${formatWon(preview.totalTrimProceedsKrw)} in projected sales. The order budget is capped at the entered funding.`
+      )}</p>}
       {orders.length ? <ul className={styles.orderList}>{orders.map(order => {
         const row = rowsByKey.get(order.key)!;
         return <li key={row.key}><span>{instrumentLabel(row)}<small>{row.accountName}</small></span>
           <span>{order.quantity === null ? t("금액 주문", "Amount order") : quantityText(order.quantity, row.unit)}
             <small>{order.currency === "KRW" ? formatWon(order.principalKrw) : `USD ${displayOrderNativeAmount(order.principalMinor, "USD")} · ${formatWon(order.principalKrw)}`}</small></span></li>;
       })}</ul> : <p>{t("예산과 주문 조건에 맞는 매수 수량이 없어요.", "No buy size meets the budget and order terms.")}</p>}
-      {result.status === "approximate" && <Status as="p" role="status">{t("시간 한도 내에 찾은 주문 조합이에요.", "Best order combination found within the search limit.")}</Status>}
+      {result.remainingKrw > 0 && <p>{t(
+        `주문 단위와 종목별 매수 상한, 수수료${settings.useCashLimits ? "·통화별 잔액" : ""}을 적용한 뒤 주문 예산에서 ${formatWon(result.remainingKrw)}이 남아요.`,
+        `${formatWon(result.remainingKrw)} remains within the order budget after order increments, per-holding caps, fees${settings.useCashLimits ? " and currency balances" : ""}.`
+      )}</p>}
+      {result.remainingKrw > 0 && cappedOrders.length > 0 && <details className={styles.sales}>
+        <summary>{t("한 단위 더 사면 상한을 넘는 종목", "Holdings where the next unit exceeds the cap")}</summary>
+        <ul className={styles.orderList}>{cappedOrders.map(order => {
+          const row = rowsByKey.get(order.key)!;
+          const next = order.nextWholeOverCap!;
+          return <li key={row.key}><span>{instrumentLabel(row)}<small>{row.accountName}</small></span>
+            <span>{quantityText(next.quantity, row.unit)} · {formatWon(next.principalKrw)}
+              <small>{t("매수 상한", "Buy cap")} {formatWon(next.maxPrincipalKrw)}</small></span></li>;
+        })}</ul>
+      </details>}
+      {result.status === "approximate" && <Status as="p" role="status">{t("탐색 한도 안에서 찾은 주문 조합이에요.", "Best order combination found within the search limit.")}</Status>}
       {projection?.relaxed && <p>{t("예산과 잔액에 맞는 더 적은 정수 수량도 비교했어요.", "Smaller whole-unit orders were also considered to meet the cash limits.")}</p>}
     </> : <Status as="p" role="status">{t("계좌 잔액과 주문 단위를 확인해 주세요.", "Check the cash available and order increments.")}</Status>}
     {saleRows.length > 0 && <details className={styles.sales}><summary>{t("예상 매도 수량", "Estimated sale quantities")}</summary>

@@ -116,12 +116,14 @@ async function buildLegacyPreviewFromEvidence({
 
 export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
   excludedSellKeys,
+  minimumBuyPct,
   cashAmountKrw,
   scope,
   tenantContext,
   now = new Date(),
 }: {
   excludedSellKeys?: readonly string[];
+  minimumBuyPct?: number;
   cashAmountKrw: number;
   scope: PortfolioAnalysisScope;
   tenantContext: TenantContext;
@@ -139,7 +141,10 @@ export async function getReadOnlyTenantAdditionalContributionPreviewForScope({
   const ma120Mode = resolveMa120Mode(
     settingsRows[0]?.useTrendFilter ?? false,
   );
-  const policyParameters = resolvePolicyParameters(settingsRows[0]);
+  const savedParameters = resolvePolicyParameters(settingsRows[0]);
+  const policyParameters = minimumBuyPct === undefined ? savedParameters : {
+    ...savedParameters, minimumExecutionRatioPct: minimumBuyPct,
+  };
 
   if (model.status !== "ready") {
     return scopedBlocked(scope, serviceDate, ["valuation_universe_invalid"]);
@@ -416,7 +421,7 @@ function mapPolicyResult<T extends Readonly<{
   source: "portfolio_target_policy" | "legacy_account_policy";
 }) {
   const totalReductionKrw = result.rows.reduce(
-    (total, row) => total + Math.max(0, row.strategicAllocationKrw - row.allocationKrw),
+    (total, row) => total + Math.max(0, row.strategicAllocationKrw - row.rawAllocationKrw),
     0,
   );
   return Object.freeze({
@@ -435,11 +440,14 @@ function mapPolicyResult<T extends Readonly<{
     totalTrimProceedsKrw: result.totalTrimProceedsKrw,
     totalAvailableFundsKrw: result.totalAvailableFundsKrw,
     totalBaseNeedKrw: result.totalBaseNeedKrw,
+    totalBuyCapacityKrw: result.totalBuyCapacityKrw,
     minimumExecutionTargetKrw: result.minimumExecutionTargetKrw,
     minimumExecutionSatisfied: result.minimumExecutionSatisfied,
     calculationPolicy: result.policy,
     modifierEvidence:result.modifierEvidence,
     minimumExecutionEvidenceAvailable:result.minimumExecutionEvidenceAvailable,
+    effectiveMinimumRatioPct: result.effectiveMinimumRatioPct,
+    minimumTopupCapacityKrw: result.minimumTopupCapacityKrw,
     calculationParameters: result.parameters,
     ma120Evidence: Object.freeze({
       mode,
@@ -454,6 +462,7 @@ function mapPolicyResult<T extends Readonly<{
       action: row.action,
       allocationKrw: row.allocationKrw,
       rawAllocationKrw:row.rawAllocationKrw,
+      ruleSteps: row.ruleSteps,
       modifierBreakdown:row.modifierBreakdown,
       baseNeedKrw: row.baseNeedKrw,
       costBasisKrw: row.costBasisKrw,
@@ -463,7 +472,7 @@ function mapPolicyResult<T extends Readonly<{
       driftRatioPct: row.driftRatioPct,
       effectiveTargetWeightPct: row.effectiveTargetWeightBps / 100,
       ma120Evidence: row.metadata.ma120Evidence,
-      ma120ReductionKrw: Math.max(0, row.strategicAllocationKrw - row.allocationKrw),
+      ma120ReductionKrw: Math.max(0, row.strategicAllocationKrw - row.rawAllocationKrw),
       maAdjustmentReason: row.maAdjustmentReason,
       maEffectiveMultiplier: row.maEffectiveMultiplier,
       market: row.metadata.market,

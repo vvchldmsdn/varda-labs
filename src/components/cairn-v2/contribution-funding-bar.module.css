@@ -1,0 +1,29 @@
+.figure { margin:0; min-width:0; display:grid; gap:10px; color:var(--cairn-v2-ink); font-variant-numeric:tabular-nums; }
+.figure figcaption { display:flex; align-items:baseline; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:13px; }
+.figure figcaption strong { font-size:17px; letter-spacing:-.03em; }
+.bar { display:flex; align-items:stretch; height:26px; min-width:0; overflow:hidden; border-radius:8px; background:var(--cairn-v2-line); }
+.bar span { flex:none; height:100%; }
+.bar span + span { box-shadow:inset 1px 0 var(--cairn-v2-paper); }
+.figure [data-tone=fees] { --swatch:#B99771; }
+.figure [data-tone=buy] { --swatch:#F39579; }
+.figure [data-tone=remaining] { --swatch:#718895; }
+.figure [data-tone=reserve] { --swatch:repeating-linear-gradient(125deg,var(--cairn-v2-line) 0 4px,color-mix(in srgb,var(--cairn-v2-muted) 50%,var(--cairn-v2-line)) 4px 6px); }
+.bar span { background:var(--swatch); }
+.legend { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)); gap:8px 14px; margin:0; }
+.legend div { min-width:0; display:grid; }
+.legend dt { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--cairn-v2-muted); }
+.legend dt::before,.dot { content:""; display:block; flex:none; width:8px; height:8px; border-radius:2px; background:var(--swatch); }
+.legend dd { margin:2px 0 0 13px; font-size:14px; font-weight:650; overflow-wrap:anywhere; }
+.orderBudget { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 12px; margin:4px 0 -5px; padding-top:10px; border-top:1px solid var(--cairn-v2-line); font-size:13px; }
+.orderBudget strong { font-size:14px; }
+.orderBudget + .leading { border-top:0; }
+.leading { display:grid; margin:4px 0 0; padding:0; list-style:none; border-top:1px solid var(--cairn-v2-line); }
+.leading li { display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,auto); gap:8px; align-items:center; min-height:46px; }
+.leading li + li { border-top:1px solid var(--cairn-v2-line); }
+.leading strong { font-size:14px; font-weight:650; overflow-wrap:anywhere; }
+.leading small,.note { color:var(--cairn-v2-muted); }
+.leading small { display:block; font-size:12px; }
+.amount { text-align:end; }
+.note { margin:0; font-size:12px; line-height:1.5; }
+.dot { background:currentColor; }
+.dot[data-empty] { background:transparent; border:1px solid currentColor; }

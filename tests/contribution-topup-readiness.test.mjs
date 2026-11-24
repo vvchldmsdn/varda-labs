@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { importWithPorts } from './helpers/import-with-ports.mjs';
+import { contributionModifierOrder, roundedContributionPenalty } from '../src/lib/additional-contribution-modifiers.ts';
 
 // Fixed-coefficient unit check, deliberately NOT a provider/raw-factor test.
 // Only factor resolution is substituted; raw allocation, score, caps, rounding,
@@ -9,8 +10,9 @@ const known=value=>({status:'ready',value,source:'synthetic-fixed-coefficients',
 const row=(key,penalty,extra={})=>({allocationKey:key,assetType:'etf',buyable:true,costBasisKrw:null,currentValueKrw:500000,targetWeightBps:5000,maAssetClass:'broad_index',maRuleEnabled:false,fxExposureType:'DOMESTIC',riskContribution:known(penalty),...extra});
 const [engine]=await importWithPorts(['src/lib/additional-contribution-policy-engine.ts'],{
  './additional-contribution-modifiers.ts':{
-  contributionMinimumRatio:()=>.85, contributionFxPriority:()=>1,
-  resolveContributionMultipliers:({riskContribution})=>({fx:known(1),rc:known(1),regime:known(1),event:known(1),performance:known(1),penaltyMult:riskContribution.value}),
+  contributionModifierOrder, roundedContributionPenalty,
+  contributionMinimumPct:()=>85, contributionFxPriority:()=>1,
+  resolveContributionMultipliers:({riskContribution})=>({fx:known(1),rc:riskContribution,regime:known(1),event:known(1),performance:known(1),penaltyMult:riskContribution.value}),
  },
 });
 const calc=(rows,cash=100000)=>engine.calculateExplainableAdditionalContribution({rows,cashAmountKrw:cash,minimumExecutionRatioPct:85,trimDriftThresholdPct:12,modifiers:{fundingBasis:'KRW'}});

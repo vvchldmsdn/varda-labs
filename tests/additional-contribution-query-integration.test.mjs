@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { additionalContributionCostBasisKrw } from "../src/lib/additional-contribution-policy-input.ts";
 import { buildTargetPolicyHoldingUniverse } from "../src/lib/target-policy-holding-universe.ts";
 import { buildTargetPolicyReviewPacket } from "../src/lib/target-policy-review-packet.ts";
-import { adaptContribution, parseContributionInput } from "../src/lib/cairn-v2/planning-contract.ts";
+import { adaptContribution, parseContributionInput, parseMinimumBuyPct } from "../src/lib/cairn-v2/planning-contract.ts";
 
 const ownerUserId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const accountId = "11111111-1111-4111-8111-111111111111";
@@ -14,6 +14,27 @@ const now = new Date("2026-09-08T01:00:00Z");
 let moduleSequence = 0;
 
 describe("additional contribution query to policy integration", () => {
+  it("honors a scenario minimum without changing the saved percentage or reusing a stale calculation", async () => {
+    const fixture = makeFixture();
+    fixture.settings = [{ minExecutionRatioPct:"80", trimDriftThreshold:null, useTrendFilter:false }];
+    const query = await loadQuery(fixture);
+    for (const raw of ["0", "47.25", "100"]) {
+      const parsed = parseMinimumBuyPct(raw);
+      assert.equal(parsed.ok,true);
+      const preview = await query.getReadOnlyTenantAdditionalContributionPreviewForScope({
+        cashAmountKrw:100000, scope, tenantContext, now, minimumBuyPct:parsed.value,
+      });
+      assert.equal(preview.calculationParameters.minimumExecutionRatioPct,Number(raw));
+      const args = betaAdmission(fixture, preview);
+      const result = adaptContribution({...args,context:{...args.context,minBuyPct:raw}});
+      assert.equal(result.state,"ready");
+      assert.deepEqual(result.result.rows[0].ruleSteps,preview.rows[0].ruleSteps);
+      assert.deepEqual(adaptContribution({...args,context:{...args.context,minBuyPct:"42"}}).blockers,["planning_minimum_ratio_mismatch"]);
+    }
+    assert.equal((await run(query)).calculationParameters.minimumExecutionRatioPct,80);
+    for (const invalid of ["", "-1", "101", "0.123", ["85","40"]]) assert.equal(parseMinimumBuyPct(invalid).ok,false);
+    assert.deepEqual(parseMinimumBuyPct(undefined),{ok:true,value:undefined});
+  });
   it("preserves tickerless identity from the shared query through beta admission and serialization", async () => {
     // Same names with different asset types must remain distinct; no account-specific exception.
     for (const assetType of ["commodity", "pension", "stock"]) {

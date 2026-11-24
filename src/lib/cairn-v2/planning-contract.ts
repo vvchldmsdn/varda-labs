@@ -42,6 +42,11 @@ export type BetaContributionRead = {
 };
 export type BetaPlanningRead = { targets: BetaTargetRead; contribution: BetaContributionRead };
 export type ContributionInput = { state: "idle" | "invalid" | "ready"; amount: number | null; raw: string | string[] | undefined };
+export function parseMinimumBuyPct(raw: string | string[] | undefined): {ok:true; value:number | undefined} | {ok:false} {
+  if (raw === undefined) return {ok:true, value:undefined};
+  if (typeof raw !== "string" || !/^(?:0|[1-9]\d{0,2})(?:\.\d{1,2})?$/.test(raw) || Number(raw) > 100) return {ok:false};
+  return {ok:true, value:Number(raw)};
+}
 // The existing additional-contribution page caps user input at 100 billion KRW; this is a UI limit, not a new engine policy.
 export function parseContributionInput(raw: string | string[] | undefined): ContributionInput {
   if (raw === undefined) return { state: "idle", amount: null, raw };
@@ -53,7 +58,7 @@ export function unavailableTargets(message = "승인 목표 조회 실패"): Bet
   return { state: "unavailable", message, provenance: null, projection: null, rows: [], maxDrift: null };
 }
 export function initialContribution(context: BetaContext, input: ContributionInput): BetaContributionRead {
-  const requestKey = JSON.stringify([context.scope, context.currency, input.raw ?? null,...(context.excludeSell!==undefined?[context.excludeSell]:[])]);
+  const requestKey = JSON.stringify([context.scope, context.currency, input.raw ?? null,...(context.excludeSell!==undefined?[context.excludeSell]:[]),...(context.minBuyPct !== undefined ? [{minBuyPct:context.minBuyPct}] : [])]);
   const state = input.state === "invalid" ? "invalid" : context.currency !== "KRW" ? "unsupported" : input.state === "idle" ? "idle" : "unavailable";
   const message = state === "invalid" ? "양의 정수 KRW를 한 번만 입력해 주세요" : state === "unsupported" ? "추가 투자 계산은 KRW만 지원합니다" : state === "idle" ? "투자금을 입력한 뒤 계산해 주세요" : "추가 투자 조회 실패";
   return { state, message, inputKrw: input.amount, requestKey, approvalRevision: null, result: null, provenance: null, blockers: state === "invalid" ? ["invalid_cash_amount"] : [] };
@@ -106,10 +111,12 @@ function safeReadyPreview(preview: ReadyContribution): ReadyContribution {
   // Explicit boundary: no tenant owner IDs, query internals, auth or transport objects cross to the browser.
   return { status: preview.status, source: preview.source, scopeKey: preview.scopeKey, serviceDate: preview.serviceDate, policyVersion: preview.policyVersion,
     policyLabel: preview.policyLabel, effectiveServiceDate: preview.effectiveServiceDate,
-    calculationPolicy: preview.calculationPolicy, modifierEvidence: preview.modifierEvidence, minimumExecutionEvidenceAvailable: preview.minimumExecutionEvidenceAvailable, calculationParameters: preview.calculationParameters, cashAmountKrw: preview.cashAmountKrw,
+    calculationPolicy: preview.calculationPolicy, modifierEvidence: preview.modifierEvidence, minimumExecutionEvidenceAvailable: preview.minimumExecutionEvidenceAvailable, effectiveMinimumRatioPct: preview.effectiveMinimumRatioPct, calculationParameters: preview.calculationParameters, cashAmountKrw: preview.cashAmountKrw,
     currentPortfolioTotalKrw: preview.currentPortfolioTotalKrw, postTopupTotalKrw: preview.postTopupTotalKrw, totalTrimProceedsKrw: preview.totalTrimProceedsKrw,
     totalAvailableFundsKrw: preview.totalAvailableFundsKrw, totalBaseNeedKrw: preview.totalBaseNeedKrw, minimumExecutionTargetKrw: preview.minimumExecutionTargetKrw,
     minimumExecutionSatisfied: preview.minimumExecutionSatisfied, totalAllocatedKrw: preview.totalAllocatedKrw, residualCashKrw: preview.residualCashKrw,
+    minimumTopupCapacityKrw: preview.minimumTopupCapacityKrw,
+    totalBuyCapacityKrw: preview.totalBuyCapacityKrw,
     ma120Evidence: preview.ma120Evidence, blockers: [...preview.blockers], rows: preview.rows.map(row => ({
       accountCode: row.accountCode, accountName: row.accountName, name: row.name, assetType: row.assetType, market: row.market, currency: row.currency, ticker: row.ticker,
       action: row.action, currentValueKrw: row.currentValueKrw, costBasisKrw: row.costBasisKrw, unrealizedReturnPct: row.unrealizedReturnPct,
@@ -117,7 +124,7 @@ function safeReadyPreview(preview: ReadyContribution): ReadyContribution {
       trimReason: row.trimReason, trimAmountKrw: row.trimAmountKrw, postTrimValueKrw: row.postTrimValueKrw,
       maEffectiveMultiplier: row.maEffectiveMultiplier, maAdjustmentReason: row.maAdjustmentReason,
       effectiveTargetWeightPct: row.effectiveTargetWeightPct, baseNeedKrw: row.baseNeedKrw,
-      rawAllocationKrw: row.rawAllocationKrw, allocationKrw: row.allocationKrw,
+      rawAllocationKrw: row.rawAllocationKrw, allocationKrw: row.allocationKrw, ruleSteps: row.ruleSteps,
       postTopupValueKrw: row.postTopupValueKrw, postTopupWeightPct: row.postTopupWeightPct, ma120Evidence: row.ma120Evidence, modifierBreakdown: row.modifierBreakdown, ma120ReductionKrw: row.ma120ReductionKrw,
     })) };
 }
@@ -131,6 +138,8 @@ export function adaptContribution({ preview, before, after, legacyBefore, legacy
   if (targetFingerprint(before) !== targetFingerprint(after) || legacyFingerprint(legacyBefore) !== legacyFingerprint(legacyAfter)) return blocked("조회 중 정책·평가 근거가 변경되었습니다 · 다시 계산해 주세요", ["planning_basis_changed"]);
   if (unsupportedTargetPolicyVersion(before)) return { ...base, state: "unsupported", message: "이 목표 정책 버전은 현재 베타 계산에 연결되지 않았습니다", blockers: ["unsupported_target_policy_version"] };
   if (preview.status !== "ready") return blocked("추가 투자 계산 보류 · " + preview.blockers.join(" · "), preview.blockers);
+  const minimum = parseMinimumBuyPct(context.minBuyPct);
+  if (!minimum.ok || (minimum.value !== undefined && preview.calculationParameters.minimumExecutionRatioPct !== minimum.value)) return blocked("최소 매수비율과 계산 결과가 일치하지 않습니다", ["planning_minimum_ratio_mismatch"]);
   if (preview.scopeKey !== context.scope || preview.serviceDate !== serviceDate || preview.cashAmountKrw !== input.amount) return blocked("계산 범위·기준일·입력 불일치", ["planning_request_mismatch"]);
   if (before.structure.exclusions.length || JSON.stringify(valuationVector(before.structure)) !== JSON.stringify(valuationVector(after.structure))) return blocked("평가 근거 일부 미확인", ["planning_valuation_incomplete"]);
   const holdingValues: [string, number, number][] = before.structure.holdingRows.map(row => [portfolioStructureHoldingIdentityKey(row), row.currentValueKrw, row.currentWeightPct] as [string, number, number]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));

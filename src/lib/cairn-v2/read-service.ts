@@ -22,6 +22,7 @@ import {
   adaptContribution,
   initialContribution,
   parseContributionInput,
+  parseMinimumBuyPct,
   unavailableTargets,
   type TargetModel,
   type ContributionPreview,
@@ -47,7 +48,7 @@ export type BetaReadPorts = {
   history: (args: ReadArgs & {currency:BetaCurrency}) => Promise<BetaHistoryRead>;
   targets?: (args: ReadArgs) => Promise<TargetModel>;
   contribution?: (
-    args: ReadArgs & { cashAmountKrw: number; now: Date; excludedSellKeys?: readonly string[] },
+    args: ReadArgs & { cashAmountKrw: number; now: Date; excludedSellKeys?: readonly string[]; minimumBuyPct?: number },
   ) => Promise<ContributionPreview>;
   legacyPolicy?: (args: ReadArgs) => Promise<TenantApprovedTargetPolicyReadResult>;
   now?: () => Date;
@@ -59,6 +60,7 @@ export function domainContext(params: Params): BetaContext {
     currency: params.currency === "USD" ? "USD" : "KRW",
     fixture: "standard",
     cashAmountKrw: params.cashAmountKrw,
+    ...(params.minBuyPct !== undefined ? { minBuyPct: params.minBuyPct } : {}),
     ...(params.excludeSell !== undefined ? { excludeSell: params.excludeSell } : {}),
     ...(params.analysis !== undefined ? { analysis: params.analysis } : {}),
     ...(params.window !== undefined ? { window: params.window } : {}),
@@ -77,6 +79,7 @@ export function domainQueryContext(query: string) {
     "account",
     "fixture",
     "cashAmountKrw",
+    "minBuyPct",
     "excludeSell",
     "analysis",
     "window",
@@ -195,6 +198,7 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
       : unavailableTargets();
     let contribution = initialContribution(acceptedContext, input);
     const saleSelection = parseSaleExclusionKeys(params.excludeSell);
+    const minimum = parseMinimumBuyPct(params.minBuyPct);
     const selectionRows =
       before?.status === "ready"
         ? before.rows
@@ -220,7 +224,11 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
           "매도 제외 선택이 현재 범위와 일치하지 않습니다. 선택을 확인해 다시 계산해 주세요.",
         blockers: ["invalid_sale_exclusions"],
       };
+    if (!minimum.ok) contribution = {
+      ...contribution, state:"invalid", message:"최소 매수비율은 0~100%에서 소수 둘째 자리까지 입력해 주세요.", blockers:["invalid_minimum_buy_pct"],
+    };
     if (
+      minimum.ok &&
       validSaleSelection &&
       saleSelection.ok &&
       input.state === "ready" &&
@@ -238,6 +246,7 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
         const preview = await ports.contribution({
           ...args,
           cashAmountKrw: input.amount,
+          ...(minimum.value !== undefined ? { minimumBuyPct:minimum.value } : {}),
           now,
           ...(saleSelection.ok && saleSelection.keys.length
             ? { excludedSellKeys: saleSelection.keys }
