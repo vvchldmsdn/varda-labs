@@ -43,7 +43,7 @@ export async function runNativeDailySnapshotJob({ dryRun = true, now = new Date(
         const tenant: TenantContext = { ownerUserId: row.ownerUserId, role: row.role as TenantContext["role"] };
         const evidence = await readNativeCutoffEvidence(tenant, row.accountId, snapshotDate, asOf.toISOString());
         if (!evidence) return { status: "blocked", created: 0 };
-        const ready = (["KRW", "USD"] as const).some(reporting => buildTrackedCurrencyPortfolio({ ...evidence, reporting }).current?.complete);
+        const ready = buildTrackedCurrencyPortfolio({ ...evidence, reporting: "KRW" }).current?.complete;
         if (!ready) return { status: "blocked", created: 0 };
         return dryRun ? { status: "ready", created: 0 } : await saveNativeCutoffSnapshots(tenant, evidence, snapshotDate, asOf.toISOString());
       } catch {

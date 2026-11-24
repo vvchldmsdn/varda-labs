@@ -17,6 +17,7 @@ import {
 } from "@/lib/cron-market-cycle-run-repository";
 import { runCoreMarketFactorRefreshJob } from "@/lib/market-data/core-market-factor-refresh-job";
 import { runUsdKrwFxRefreshJob } from "@/lib/market-data/fx-refresh-job";
+import { collectClosingValuationFx } from "@/db/queries/daily-valuation-fx";
 import { KisRefreshLeaseBusyError, withKisCollectionLeaseWait } from "@/lib/market-data/kis-refresh-lease";
 import { runMarketPriceSync } from "@/lib/market-data/price-sync";
 import {
@@ -85,6 +86,7 @@ export type CronMarketCycleRunResult = {
   runId: string | null;
   snapshotDate: string;
   phase?: "pre_cutoff";
+  valuationFx?: Awaited<ReturnType<typeof collectClosingValuationFx>>;
   fx: {
     status: "written" | "skipped" | "not_attempted" | "failed";
     rateDate: string | null;
@@ -139,7 +141,8 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
   }
 
   const runId=claim.runId;
-  // Freeze native cutoff valuation before shared FX upserts. Its policy is unchanged.
+  // This shared reference is independent of tenants, KIS and the live spot refresh.
+  const valuationFx = await collectClosingValuationFx(snapshotDate);
   const nativeSnapshot = await runNativeDailySnapshotJob({ dryRun: false, durable:true, snapshotDate }).catch(() => ({ status: "failed" as const }));
   let result: CronMarketCycleRunResult;
   try {
@@ -168,6 +171,9 @@ async function runCronMarketCycleWithinDeadline(options: CronMarketCycleOptions)
   const nativeBlocked="blockedCount" in nativeSnapshot && nativeSnapshot.blockedCount>0;
   result={...result,nativeSnapshot,...(nativeFailed ? {ok:false,status:"failed" as const,blockers:[...result.blockers,"native_snapshot_failed"]} : nativeBlocked ? {ok:false,status:result.status==="failed" ? "failed" as const : "blocked" as const,blockers:[...result.blockers,"native_snapshot_incomplete"]} : {})};
   if(result.ok && result.status==="no_action" && "targetCount" in nativeSnapshot && nativeSnapshot.targetCount>0) result={...result,status:"completed"};
+  result={...result,valuationFx};
+  if(valuationFx.missingDates.length) result={...result,ok:false,status:"failed",blockers:[...result.blockers,"closing_valuation_fx_missing"]};
+  if(valuationFx.gapScanFailed) result={...result,ok:false,status:"failed",blockers:[...result.blockers,"closing_valuation_fx_gap_scan_failed"]};
   if(ownsRun) {
     try { await finishRun(result,result.status==="failed" ? "failed" : result.ok ? "completed" : "blocked"); }
     catch { return {...result,ok:false,status:"failed",blockers:[...result.blockers,"run_finalization_failed"]}; }
@@ -632,6 +638,7 @@ async function finishRun(
       phase: result.phase ?? status,
       outcome: result.status,
       fx: result.fx,
+      valuationFx: result.valuationFx,
       factorSync: result.factorSync,
       closeSync: result.closeSync,
       liveSync: result.liveSync,

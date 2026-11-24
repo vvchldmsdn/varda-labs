@@ -9,7 +9,7 @@ type SnapshotCostInput = Readonly<{
 }>;
 
 /** Acquisition cost is separate evidence from today's valuation. */
-export function snapshotPositionCostBasisKrw(asset: SnapshotCostInput, usdKrw: number): number | null {
+export function snapshotPositionCostBasisKrw(asset: SnapshotCostInput, acquisitionUsdKrw: number | null = null): number | null {
   const quantity = toNumber(asset.quantity);
   const averageCost = toNumber(asset.averageCost);
   const fractionalValue = asset.fractionalKrwValue === null ? 0 : toNumber(asset.fractionalKrwValue);
@@ -19,7 +19,8 @@ export function snapshotPositionCostBasisKrw(asset: SnapshotCostInput, usdKrw: n
   if (quantity === null || quantity < 0 || fractionalValue === null || fractionalValue < 0 ||
       fractionalCost === null || fractionalCost < 0 || (fractionalValue > 0 && fractionalCost === 0) ||
       (quantity > 0 && (averageCost === null || averageCost <= 0))) return null;
-  const wholeCost = quantity === 0 ? 0 : convertToKrw(quantity * (averageCost as number), asset.currency, usdKrw);
+  if (quantity > 0 && asset.currency.trim().toUpperCase() !== "KRW" && acquisitionUsdKrw === null) return null;
+  const wholeCost = quantity === 0 ? 0 : convertToKrw(quantity * (averageCost as number), asset.currency, acquisitionUsdKrw ?? 0);
   if (wholeCost === null) return null;
   const total = wholeCost + fractionalCost;
   return Number.isFinite(total) ? total : null;

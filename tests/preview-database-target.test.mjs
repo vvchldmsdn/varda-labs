@@ -129,19 +129,19 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0066_account_history_reviews",
-        createdAt: 1795478400000,
+        tag: "0067_daily_valuation_fx",
+        createdAt: 1795564800000,
         sha256:
-          "2e55bed836057d4374aa09865fed396e3021e19ad0cd4766c608a800b409f347",
+          "86ef397f7dafdaf0f2568903f74b0231d22e0d9d82bee6604fa3060f6a4ad180",
       },
     );
     assert.deepEqual(PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations, []);
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 67,
+        entryCount: 68,
         sha256:
-          "sha256:26699bbdbca19d1e5d228c9f5e896f553369238773cd88a29c2a3dd1d408e41c",
+          "sha256:453aa9face60673c279aebd35a1f55aee1f3258d16fac1f88ba38f0bf652f609",
       },
     );
   });
@@ -210,7 +210,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0066_present",
+      "reviewed_0067_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -275,7 +275,7 @@ describe("Preview database target operational guard", () => {
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0066_not_present",
+        migrationLedgerStatus: "reviewed_0067_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
@@ -343,13 +343,13 @@ describe("Preview database target operational guard", () => {
     state.appliedMigrations[47].sha256 = '9cc1fd0c45f7a9e41c7679876042460c89575bf808583b9630e09e8c97868391';
     const before = structuredClone(state);
     assertReviewedPreviewDatabaseState(state);
-    assert.equal(publicPreviewDatabaseEvidence(state).migrationLedgerStatus, 'reviewed_0066_present');
+    assert.equal(publicPreviewDatabaseEvidence(state).migrationLedgerStatus, 'reviewed_0067_present');
     assert.deepEqual(state, before);
     state.appliedMigrations[47].createdAt++;
     assert.throws(() => assertReviewedPreviewDatabaseState(state), /migration ledger/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0066 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0067 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -374,8 +374,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0066_account_history_reviews",
-        migrationLedgerStatus: "reviewed_0066_not_present",
+        latestReviewedMigration: "0067_daily_valuation_fx",
+        migrationLedgerStatus: "reviewed_0067_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );

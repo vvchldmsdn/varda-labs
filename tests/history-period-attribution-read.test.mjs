@@ -319,7 +319,7 @@ test("selling the last dollar holding can use the saved account FX on its own cl
     const source = "varda_manual_daily_snapshot";
     for (const [saved,n,fx] of [["2025-06-02",2,1000],["2025-06-03",1,1150]]) {
       await pg.query(`insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,source,snapshot_date,num_assets,description,usdkrw)
-        values($1,$2,'acct',$3,$4,$5,'snapshot_status=complete; fx_source=fx_rates:test',$6)`,[owner,account,source,saved,n,fx]);
+        values($1,$2,'acct',$3,$4,$5,'snapshot_status=complete; fx_source=daily_valuation_fx:synthetic',$6)`,[owner,account,source,saved,n,fx]);
       await pg.query(`insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,source,snapshot_date,asset_id,currency,quantity,fx_rate,market_value_krw)
         values($1,$2,'acct',$3,$4,$5,'KRW',1,1,50000)`,[owner,account,source,saved,held]);
     }
@@ -360,6 +360,15 @@ test("native return includes cash, treats only verified external legs as capital
     assert.equal(result.basis,"portfolio_including_cash"); assert.deepEqual(result.gaps,[]);
     // Opening NAV 200, closing NAV 290 after a midpoint deposit of 100. Buying is an internal exchange.
     assert.ok(Math.abs(result.points[1].dailyReturnPct + 4)<1e-9);
+    const cutoff = "2025-06-02T22:00:00Z", fetched = "2025-06-02T22:09:00Z";
+    const fixing = {base:"USD",quote:"KRW",rate:"1250",kind:"daily_reference",source:"ecb_eur_cross",fetchedAt:fetched,observedAt:fetched,
+      fixing:{id:"fx",serviceDate:"2025-06-03",referenceDate:"2025-06-02",policy:"test",evidenceKind:"closing_reference",cutoffAt:cutoff}};
+    await pg.query("update daily_portfolio_snapshots set native_evidence=jsonb_set(native_evidence,'{fx}',$1::jsonb) where snapshot_date='2025-06-03'",[JSON.stringify([fixing])]);
+    await pg.query("update event_ledger_entries set native_data=$1::jsonb where native_data->'event'->>'type'='deposit'",[JSON.stringify({
+      event:{type:"deposit",currency:"USD",amount:"0.08",at:"2025-06-02T10:00:00Z"},effect:{cashLegs:[{currency:"USD",delta:"0.08",kind:"external"}]}})]);
+    const foreign=await read(owner,native,r);
+    assert.deepEqual(foreign.gaps,[]);
+    assert.ok(Math.abs(foreign.points[1].dailyReturnPct + 4)<1e-9);
     await pg.query("update event_ledger_entries set native_data=native_data-'effect' where native_data->'event'->>'type'='deposit'");
     assert.deepEqual((await read(owner,native,r)).gaps,[{start:r.end,end:r.end,reason:"cash_flow"}]);
     await pg.query("update daily_portfolio_snapshots set native_evidence=native_evidence #- '{frame,positions,2}' where snapshot_date='2025-06-03'");

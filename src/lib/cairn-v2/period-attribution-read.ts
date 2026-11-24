@@ -148,9 +148,15 @@ function performanceFlows(rows: readonly Row[], ends: readonly Row[], accounts: 
       continue;
     }
     const previous = new Date(Date.parse(date + "T00:00:00Z") - 86_400_000).toISOString().slice(0,10);
-    const evidence = [...(fx.get(accountId + "/" + previous) ?? []), ...(fx.get(accountId + "/" + date) ?? [])];
-    const rate = fxFactor(row.currency, "KRW", at, row.date_only ? evidence.filter(item => item.kind === "daily_reference") : evidence,
-      SNAPSHOT_FX_REFERENCE_MAX_AGE_MS);
+    const closeFx = fx.get(accountId + "/" + date) ?? [];
+    const cutoff = date + "T22:00:00Z";
+    const fixing = closeFx.filter(item => item.fixing && Date.parse(item.fixing.cutoffAt) === Date.parse(cutoff));
+    const evidence = [...(fx.get(accountId + "/" + previous) ?? []), ...closeFx].filter(item => !item.fixing);
+    // The event time still weights the cash flow. Translate its native amount at
+    // this day's shared reporting rate without treating it as a currency trade.
+    const rate = fixing.length ? fxFactor(row.currency, "KRW", cutoff, fixing, SNAPSHOT_FX_REFERENCE_MAX_AGE_MS)
+      : fxFactor(row.currency, "KRW", at, row.date_only ? evidence.filter(item => item.kind === "daily_reference") : evidence,
+        SNAPSHOT_FX_REFERENCE_MAX_AGE_MS);
     flows.push({ date, accountId, at, amountKrw: rate.ok ? sign * amount * rate.value.toNumber() : null });
   }
   return flows;

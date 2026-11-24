@@ -1,4 +1,5 @@
 import "server-only";
+import { loadDailyValuationFx } from "./daily-valuation-fx";
 import { sqlClient } from "@/db/client";
 import { getTenantSqlClient } from "@/db/tenant-client";
 import { readNativeLedger,readNativeSnapshotObservations } from "./native-portfolio-ledger";
@@ -26,17 +27,14 @@ export async function readNativeCutoffEvidence(tenant: TenantContext, accountId:
   const [ledger,observations]=await Promise.all([readNativeLedger(tenant,accountId),readNativeSnapshotObservations(tenant,accountId)]);
   if (!ledger.accounts.length || ledger.accounts.length !== 1 || ledger.accounts[0].id !== accountId) return null;
   const at = buildCycleForSnapshotDate(snapshotDate, new Date(capturedAt)).cycleEndAt.toISOString();
-  const [[, assetRows], rates, retained] = await Promise.all([
+  const [[, assetRows], fixing, retained] = await Promise.all([
     getTenantSqlClient().transaction(tx => [
       tx.query("select set_config('app.current_user_id',$1,true)", [tenant.ownerUserId]),
       tx.query(`select id,name,ticker,market,currency,quantity::text,current_price::text as price,price_source as source,
         price_as_of::text as "observedAt",price_fetched_at::text as "fetchedAt",price_status as status,price_quote_type as "quoteType"
         from assets where canonical_owner_user_id=$1::uuid and account_id=$2::uuid and asset_type in ('stock','etf') limit 201`, [tenant.ownerUserId, accountId]),
     ], { isolationLevel: "RepeatableRead", readOnly: true }),
-    // Shared market tables are not tenant tables. Do not broaden tenant grants.
-    sqlClient.query(`select usdkrw::text as rate,observed_at::text as "observedAt",fetched_at::text as "fetchedAt",source,rate_kind as kind
-      from fx_rates where not is_sample and status='ok' and source is not null and observed_at<=$1::timestamptz and fetched_at<=$1::timestamptz and observed_at<=fetched_at and rate_kind in ('spot','daily_reference')
-      order by observed_at desc limit 30`, [at]),
+    loadDailyValuationFx(snapshotDate),
     readSnapshotCutoffObservations(snapshotDate),
   ]);
   const assets = assetRows as CutoffAssetRow[];
@@ -70,11 +68,14 @@ export async function readNativeCutoffEvidence(tenant: TenantContext, accountId:
       observation: live ?? (close ? {quantity:asset.quantity,price:String(close.price),currency:asset.currency,at,priceFetchedAt:new Date(close.fetchedAt).toISOString(),priceKind:'close' as const,priceReferenceDate:close.referenceDate,timestampBasis:'daily_close' as const,source:close.source,basis:'raw' as const} : null)};
   });
   const base: TrackedPortfolioEvidence = { ownerId: tenant.ownerUserId, reporting: "USD", asOf: capturedAt, current: { at, source: "stored_kis_evidence", scopeComplete: false, positions }, history: [], trades: null,
-    fx: [...rates,...retained.fxRows.map(row=>({...row,rate:String(row.usdKrw),kind:row.rateKind}))].map(row => ({ ...row, observedAt: new Date(row.observedAt).toISOString(), fetchedAt: new Date(row.fetchedAt).toISOString(), base: "USD", quote: "KRW" })) as FxEvidence[], maxFxAgeMs: 3 * 86400000, maxPriceAgeMs: 10 * 86400000 };
+    fx: fixing ? [{
+      base: "USD", quote: "KRW", rate: fixing.rate, kind: "daily_reference", source: fixing.source,
+      observedAt: fixing.fetchedAt.toISOString(), fetchedAt: fixing.fetchedAt.toISOString(),
+      fixing: { id: fixing.id, serviceDate: fixing.serviceDate, referenceDate: fixing.referenceDate,
+        cutoffAt: fixing.cutoffAt.toISOString(), evidenceKind: fixing.evidenceKind, policy: fixing.policy },
+    } satisfies FxEvidence] : [], maxFxAgeMs: 3 * 86400000, maxPriceAgeMs: 10 * 86400000 };
   const config = getTwelveDataServerConfig();
   if (config?.provider.audience === "member_display") {
-    const cachedFx = await readTwelveDataEvidence({ kind: "fx", asOf: at, knownAt: at, freshnessBasis: "cutoff" }, config).catch(() => null);
-    if (cachedFx?.status === "admitted") base.fx = [...base.fx, ...cachedFx.fx.map(rate => ({ base: rate.baseCurrency, quote: rate.quoteCurrency, rate: rate.rate, observedAt: rate.observedAt, fetchedAt: rate.fetchedAt, source: rate.source, kind: rate.kind }))];
     await mapWithConcurrency(positions, 2, async position => {
       const asset = ledger.accounts[0].assets.find(asset => asset.id === position.id);
       if (!asset) return;

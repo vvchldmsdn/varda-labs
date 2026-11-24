@@ -193,7 +193,7 @@ function logEvidence(phase, state, plan, protectedContent) {
       ...publicPreviewDatabaseEvidence(state),
       migrationPlan: plan,
       compatibleHistoricalHashes: state.appliedMigrations.filter(row => canonicalizePreviewMigrationEvidence(row).sha256 !== row.sha256).length,
-      releaseCatalog: '0047_0064_0065_0066_exact',
+      releaseCatalog: '0047_0064_0065_0066_0067_exact',
       protectedContent: { tables: protectedContent.length, sha256: previewContentDigest(protectedContent) },
     })}`,
   );

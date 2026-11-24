@@ -1,3 +1,4 @@
+import {seedFixtureClosingFx} from '../tests/helpers/closing-valuation-fx.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {drizzle} from 'drizzle-orm/node-postgres';
@@ -22,10 +23,7 @@ export async function runReliabilityRetryCases({admin,worker,tenant,report}) {
   assert.equal(created.status,'created');
   // The account holds USD. Each cutoff needs its own admissible FX observation
   // for the consecutive KRW closing returns to be measurable.
-  await queueWrite(`insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind)
-    select at::date,1400,'synthetic','ok',at,at,'spot'
-    from generate_series(timestamptz '1999-12-31 21:59:00+00',
-      timestamptz '2000-01-04 21:59:00+00',interval '1 day') as marks(at)`);
+  for (const day of ['01','02','03','04','05']) await seedFixtureClosingFx(admin,'2000-01-'+day,'1400');
   async function check(name,fn){const result={name,status:'FAIL'};report.cases.push(result);await fn();result.status='PASS';}
   await check('retry-operator-verifies-loopback-host-not-inet-cidr-rendering',async()=>{
     const {rows:[identity]}=await admin.query("select inet_server_addr()::text as literal,host(inet_server_addr()) as host,session_user as role,current_database() as database");

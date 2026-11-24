@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 
 // These release boundaries supplement the existing 0000-0026 catalog gate.
 // Never infer schema equivalence from a migration hash exception alone.
-const TABLES = "'member_activity_daily','member_activity_profiles','contribution_effects','account_history_reviews'";
+const TABLES = "'member_activity_daily','member_activity_profiles','contribution_effects','account_history_reviews','daily_valuation_fx'";
 export async function readPreviewReleaseCatalog(query) {
   const statements = {
     closingPerformance: `select data_type,udt_schema,udt_name,is_nullable,column_default,is_generated from information_schema.columns where table_schema='public' and table_name='daily_portfolio_snapshots' and column_name='closing_performance'`,
@@ -15,7 +15,7 @@ export async function readPreviewReleaseCatalog(query) {
     indexes: `select tablename as table_name,indexname as name,indexdef as definition from pg_indexes where schemaname='public' and tablename in (${TABLES}) order by tablename,indexname`,
     policies: `select tablename as table_name,policyname as name,permissive,roles::text,cmd,qual,with_check from pg_policies where schemaname='public' and tablename in (${TABLES}) order by tablename,policyname`,
     triggers: `select c.relname as table_name,t.tgname as name,t.tgenabled as enabled,pg_get_triggerdef(t.oid) as definition from pg_trigger t join pg_class c on c.oid=t.tgrelid where not t.tgisinternal and c.relnamespace='public'::regnamespace and c.relname in (${TABLES}) order by c.relname,t.tgname`,
-    functions: `select p.proname as name,p.prosecdef as security_definer,p.proconfig as config,pg_get_functiondef(p.oid) as definition from pg_proc p where p.pronamespace='public'::regnamespace and p.proname in ('contribution_effects_preserve_basis','preserve_account_history_review') order by p.proname`,
+    functions: `select p.proname as name,p.prosecdef as security_definer,p.proconfig as config,pg_get_functiondef(p.oid) as definition from pg_proc p where p.pronamespace='public'::regnamespace and p.proname in ('contribution_effects_preserve_basis','preserve_account_history_review','preserve_daily_valuation_fx') order by p.proname`,
     grants: `select c.relname as table_name,case when a.grantee=0 then 'PUBLIC' else r.rolname end as grantee,a.privilege_type,a.is_grantable from pg_class c cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a left join pg_roles r on r.oid=a.grantee where c.relnamespace='public'::regnamespace and c.relname in (${TABLES}) and (a.grantee=0 or r.rolname='varda_tenant_app') order by c.relname,grantee,a.privilege_type`,
     columnGrants: `select c.relname as table_name,p.attname as column_name,
         case when a.grantee=0 then 'PUBLIC' else r.rolname end as grantee,a.privilege_type,a.is_grantable
@@ -32,7 +32,7 @@ export function assertPreviewReleaseCatalog(actual, expected) {
   for (const key of Object.keys(expected)) {
     // Avoid assertion diffs containing database definitions in deployment logs.
     if (JSON.stringify(actual[key]) !== JSON.stringify(expected[key])) {
-      throw new Error(`Preview 0047/0064/0065/0066 schema evidence differs: ${key}.`);
+      throw new Error(`Preview 0047/0064/0065/0066/0067 schema evidence differs: ${key}.`);
     }
   }
   assert.equal(Object.keys(actual).length, Object.keys(expected).length, 'Unexpected Preview schema evidence');
@@ -45,7 +45,7 @@ export const PREVIEW_PROTECTED_TABLES = Object.freeze([
   'holding_state_corrections', 'holding_lifecycle_events', 'daily_portfolio_snapshots',
   'daily_position_snapshots', 'native_contribution_plans', 'contribution_effects',
   'broker_recovery_batches', 'portfolio_target_plan_rows', 'account_history_reviews',
-  'member_activity_daily', 'member_activity_profiles',
+  'member_activity_daily', 'member_activity_profiles', 'daily_valuation_fx',
 ]);
 export async function readPreviewProtectedContent(query) {
   const rows = await query(PREVIEW_PROTECTED_TABLES.map(name =>

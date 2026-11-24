@@ -5,7 +5,7 @@ import type { FxEvidence } from "./currency-valuation.ts";
 import type { NativeStoredAccount, NativeStoredEntry } from "../db/queries/native-portfolio-ledger.ts";
 import type { NativeGroupSelection } from "./native-group-scope.ts";
 
-export type NativeSnapshotEvidence = { version: 1; frame: TrackedValuationFrame; fx: readonly FxEvidence[]; sequence: number; availableCurrencies?: readonly string[] };
+export type NativeSnapshotEvidence = { version: 1; capturedAt?: string; frame: TrackedValuationFrame; fx: readonly FxEvidence[]; sequence: number; availableCurrencies?: readonly string[] };
 /** Adapts the actual owner ledger into the existing valuation engine, never fabricates a price. */
 export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledger: { accounts: NativeStoredAccount[]; entries: NativeStoredEntry[]; snapshots: { accountId: string; evidence: unknown }[]; accountsComplete?: boolean; historyComplete?: boolean }, scopeKind: string, selection?: NativeGroupSelection): TrackedPortfolioEvidence {
   const historyComplete = ledger.historyComplete !== false;
@@ -63,7 +63,7 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
     const group = grouped.get(data.frame.at) ?? { frames: [], accounts: new Set<string>() };
     if (group.accounts.has(snapshot.accountId)) throw new Error("native_snapshot_duplicate");
     group.frames.push({ ...data.frame, positions: data.frame.positions.filter(row => row.kind === "cash" ? includesCash(snapshot.accountId) : includesAsset(snapshot.accountId, row.id)) }); group.accounts.add(snapshot.accountId); grouped.set(data.frame.at, group);
-    fx.push(...data.fx.map(rate => ({ ...rate, capturedAt: data.frame.at })));
+    fx.push(...data.fx.map(rate => ({ ...rate, capturedAt: data.capturedAt ?? data.frame.at })));
   }
   const history: TrackedValuationFrame[] = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([at, group]) => {
     // An explicitly closed, empty account stays part of historical ownership.

@@ -39,7 +39,7 @@ describe("cutoff observation reuse respects current provider admission", () => {
     f.base.fx.push(fx("twelve_data"));
     const result = f.run();
     assert.equal(result.current.positions.find(row => row.id === "asset").observation.price, "105");
-    assert.equal(result.fx[0].source, "twelve_data");
+    assert.deepEqual(result.fx, []);
   });
   it("retains a valid saved KIS quote without deriving current shares", () => {
     const f = fixture();
@@ -52,9 +52,12 @@ describe("cutoff observation reuse respects current provider admission", () => {
     f.ledger.observations.push(f.saved([], [fx("twelve_data"), fx("other_licensed_provider")]));
     assert.deepEqual(f.run().fx, []);
   });
-  it("retains existing KIS and public-reference FX receipts", () => {
+  it("admits only the shared fixing for this service date, independently of archived FX receipts", () => {
     const f = fixture();
     f.ledger.observations.push(f.saved([], [fx("kis"), { ...fx("er-api_open_access"), kind: "daily_reference" }]));
-    assert.deepEqual(f.run().fx.map(row => row.source), ["kis", "er-api_open_access"]);
+    const fixing = { ...fx("ecb_eur_cross"), kind: "daily_reference", rate: "1400", fetchedAt: capturedAt, observedAt: capturedAt,
+      fixing: { id: "fixing", serviceDate: snapshotDate, referenceDate: "2026-09-21", cutoffAt: "2026-09-21T22:00:00.000Z", policy: "fixture", evidenceKind: "closing_reference" } };
+    f.base.fx.push(fixing, { ...fixing, fixing: { ...fixing.fixing, serviceDate: "2026-09-23" } });
+    assert.deepEqual(f.run().fx, [fixing]);
   });
 });

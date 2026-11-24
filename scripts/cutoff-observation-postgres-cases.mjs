@@ -1,3 +1,4 @@
+import {seedFixtureClosingFx} from '../tests/helpers/closing-valuation-fx.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -29,6 +30,7 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
   const receiptDate=new Date(Date.parse(`${snapshotDate}T00:00:00Z`)-86400000).toISOString().slice(0,10);
   const receipt=time=>`${receiptDate}T${time}Z`;
   const openingDate=new Date(Date.parse(`${snapshotDate}T00:00:00Z`)-10*86400000).toISOString().replace(".000Z", ".123456Z");
+  const fixing=await seedFixtureClosingFx(admin,snapshotDate,'1400');
   const bootstrap=await admin.connect();
   try {
     await bootstrap.query('BEGIN');await bootstrap.query("select set_config('app.trade_reliability_version','0059',true)");
@@ -72,11 +74,11 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     assert.equal(evidence.fxRows[0].providerObservedAt,null);assert.equal(evidence.fxRows[0].timestampBasis,'collection');
     assert.equal(Number((await worker.query("select price from live_price_quotes where ticker='CUTUNIT'")).rows[0].price),110);
   });
-  await check('historical-dry-run-retains-strict-cutoff-10-times-105-times-1300-equals-1365000',async()=>{
+  await check('historical-dry-run-retains-strict-cutoff-10-times-105-times-1400-equals-1470000',async()=>{
     const options={tenantContext:{ownerUserId:owner},snapshotDate,now:new Date(Date.parse(receipt('22:20:00'))+86400000),account:'brokerage'};
     const historical=await daily.runDailySnapshot({...options,dryRun:true});
-    assert.equal(historical.results.brokerage.totalMarketValue,1365000);
-    assert.equal(historical.fx.usdKrw,1300);
+    assert.equal(historical.results.brokerage.totalMarketValue,1470000);
+    assert.equal(historical.fx.usdKrw,1400);
     assert.equal(historical.cutoffValuation.policy,'pre_cutoff_kis_quote_else_exact_official_close');
     assert.equal(historical.cycle.cycleEndAt,new Date(receipt('22:00:00')).toISOString());
     await assert.rejects(daily.runDailySnapshot({...options,dryRun:false}),error=>error.code==='historical_write_not_enabled');
@@ -93,29 +95,29 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
       await modify(openingDate);
     });
   }
-  await check('execution-real-daily-writer-concurrency-10-times-110-times-1310-equals-1441000',async()=>{
+  await check('execution-real-daily-writer-concurrency-10-times-110-times-1400-equals-1540000',async()=>{
     gate=true;const results=await Promise.allSettled([snapshot(),snapshot()]);gate=false;
     assert.equal(arrivals,2,'both plans reached real concurrent transactions');
     assert.equal(results.filter(row=>row.status==='fulfilled').length,1);
     assert.equal(results.filter(row=>row.status==='rejected').length,1);
     const completed=results.find(row=>row.status==='fulfilled').value;
     assert.equal(completed.cutoffValuation.policy,'execution_quote_else_exact_official_close');
-    assert.equal(completed.fx.usdKrw,1310);
-    assert.equal(completed.fx.fetchedAt,new Date(receipt('22:20:00')).toISOString());
+    assert.equal(completed.fx.usdKrw,1400);
+    assert.equal(completed.fx.fetchedAt,fixing.fetchedAt);
     const rows=(await worker.query('select total_market_value,num_assets,description,cycle_end_at,captured_at from daily_portfolio_snapshots where account_id=$1 and snapshot_date=$2',[account,snapshotDate])).rows;
-    assert.equal(rows.length,1);assert.equal(Number(rows[0].total_market_value),1441000);assert.equal(rows[0].num_assets,1);
+    assert.equal(rows.length,1);assert.equal(Number(rows[0].total_market_value),1540000);assert.equal(rows[0].num_assets,1);
     const positions=(await worker.query('select quantity,current_price,market_value_krw,fx_rate,description,cycle_end_at,captured_at from daily_position_snapshots where account_id=$1 and snapshot_date=$2',[account,snapshotDate])).rows;
     assert.equal(positions.length,1);assert.equal(Number(positions[0].quantity),10);assert.equal(Number(positions[0].current_price),110);
-    assert.equal(Number(positions[0].market_value_krw),1441000);assert.equal(Number(positions[0].fx_rate),1310);
+    assert.equal(Number(positions[0].market_value_krw),1540000);assert.equal(Number(positions[0].fx_rate),1400);
     for(const row of [rows[0],positions[0]]) {
       assert.match(row.description,/(?:^|; )valuation_policy=execution_collection_v1(?:;|$)/);
-      assert.match(row.description,/(?:^|; )fx_valuation_policy=execution_collection_v1(?:;|$)/);
+      assert.ok(row.description.includes(`fx_source=daily_valuation_fx:${fixing.fixing.id}@${fixing.fixing.referenceDate}`));
       assert.equal(row.cycle_end_at.toISOString(),new Date(receipt('22:20:00')).toISOString());
       assert.equal(row.captured_at.toISOString(),new Date(receipt('22:20:00')).toISOString());
     }
-    assert.ok(positions[0].description.includes(`fx_fetched_at=${new Date(receipt('22:20:00')).toISOString()}`));
+    assert.ok(positions[0].description.includes(`fx_fetched_at=${fixing.fetchedAt}`));
     assert.match(positions[0].description,/(?:^|; )fx_observed_at=unknown(?:;|$)/);
-    assert.match(positions[0].description,/(?:^|; )fx_timestamp_basis=collection(?:;|$)/);
+    assert.match(positions[0].description,/(?:^|; )fx_timestamp_basis=daily_fixing(?:;|$)/);
   });
   await check('execution-completed-record-survives-refresh-retry-and-shared-evidence-prune',async()=>{
     const before=(await worker.query('select to_jsonb(s) data from daily_portfolio_snapshots s where account_id=$1 order by id',[account])).rows;
@@ -124,10 +126,10 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     assert.equal((await writePrice()).status,'completed');assert.equal((await writeFx('1320')).status,'written');
     await worker.query("delete from snapshot_cutoff_price_observations where ticker='CUTUNIT'");
     await worker.query('delete from snapshot_cutoff_fx_observations where snapshot_date=$1',[snapshotDate]);
-    const retry=await snapshot(at);assert.equal(retry.results.brokerage.totalMarketValue,1441000);
+    const retry=await snapshot(at);assert.equal(retry.results.brokerage.totalMarketValue,1540000);
     assert.equal(retry.results.brokerage.reason,'completed_cutoff_preserved');
     assert.equal(retry.cutoffValuation.policy,'execution_quote_else_exact_official_close');
-    assert.equal(retry.fx.usdKrw,1310);
+    assert.equal(retry.fx.usdKrw,1400);
     assert.equal(retry.cycle.capturedAt,new Date(receipt('22:20:00')).toISOString());
     assert.deepEqual((await worker.query('select to_jsonb(s) data from daily_portfolio_snapshots s where account_id=$1 order by id',[account])).rows,before);
     assert.deepEqual((await worker.query('select to_jsonb(s) data from daily_position_snapshots s where account_id=$1 order by id',[account])).rows,positionsBefore);

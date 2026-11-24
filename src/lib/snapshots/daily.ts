@@ -38,7 +38,6 @@ import {
   dailyPortfolioSnapshots,
   dailyPositionSnapshots,
   eventLedgerEntries,
-  fxRates,
   livePriceQuotes,
   marketRegimeDaily,
   type Asset,
@@ -76,7 +75,7 @@ import {
   uniqueStrings,
 } from "@/lib/portfolio-math";
 import { snapshotPositionCostBasisKrw, summarizeSnapshotCostEvidence } from "@/lib/snapshots/cost-evidence";
-import { selectSnapshotCutoffFx, selectSnapshotExecutionFx } from "@/lib/snapshots/cutoff-fx";
+import { loadDailyValuationFx } from "@/db/queries/daily-valuation-fx";
 import { eventsChangedAfterCutoff, holdingsChangedAfterCutoff } from "@/lib/snapshots/cutoff-holdings";
 import {
   buildCycleForSnapshotDate,
@@ -166,7 +165,7 @@ type ResolvedFxRate = {
   fetchedAt: string | null;
   rateKind: string | null;
   referenceAt?: string | null;
-  timestampBasis?: "collection" | "provider";
+  timestampBasis?: "collection" | "provider" | "daily_fixing";
 };
 
 type RealizedReturnRunSummary = {
@@ -513,7 +512,7 @@ export async function runDailySnapshot(
   const provenance = buildSnapshotProvenance({
     snapshotDate,
     historicalBackfill: historicalValidation?.ok === true,
-    executionFx: executionValuation,
+    executionValuation,
   });
 
   const scheduledCycle = buildCycleForSnapshotDate(snapshotDate, executionAt);
@@ -588,10 +587,7 @@ export async function runDailySnapshot(
     targetAccounts.includes(asset.account),
   );
   const retainedObservations = provenance.insertOnly ? null : await readSnapshotCutoffObservations(snapshotDate);
-  const fx = await resolveSnapshotFx(snapshotDate, provenance.fxAsOfDate,
-    provenance.insertOnly ? null : cycle.cycleEndAt, retainedObservations?.fxRows ?? [],
-    selectedAssets.some(asset => normalizeCurrencyCode(asset.currency) !== "KRW"),
-    !provenance.insertOnly && snapshotDate === resolvedCycle.snapshotDate ? cycle.capturedAt : null);
+  const fx = await resolveSnapshotFx(snapshotDate, selectedAssets.some(asset => normalizeCurrencyCode(asset.currency) !== "KRW"));
   const unsupportedCurrencyAssets = selectedAssets.filter(
     (asset) => !resolveKrwFxRate(asset.currency, fx.usdKrw).ok,
   );
@@ -870,11 +866,11 @@ function descriptionNumber(description: string | null, key: string) { return toN
 function buildSnapshotProvenance({
   snapshotDate,
   historicalBackfill,
-  executionFx,
+  executionValuation,
 }: {
   snapshotDate: string;
   historicalBackfill: boolean;
-  executionFx: boolean;
+  executionValuation: boolean;
 }): SnapshotProvenance {
   if (!historicalBackfill) {
     return Object.freeze({
@@ -882,9 +878,9 @@ function buildSnapshotProvenance({
       source: SNAPSHOT_SOURCE,
       ruleVersion: SNAPSHOT_RULE_VERSION,
       insertOnly: false,
-      fxAsOfDate: snapshotDate,
+      fxAsOfDate: previousCalendarDate(snapshotDate),
       manualValuation: "asset_current" as const,
-      descriptionTags: Object.freeze(executionFx ? ["fx_valuation_policy=execution_collection_v1", "valuation_policy=execution_collection_v1"] : []),
+      descriptionTags: Object.freeze(executionValuation ? ["valuation_policy=execution_collection_v1"] : []),
     });
   }
 
@@ -1325,7 +1321,7 @@ function computeAccountSnapshot({
         ? movement?.fxChangeKrw ?? null
         : unchangedHolding ? 0 : null;
     const assetReturnMetrics = getAssetReturnMetrics(returnMetrics, asset, fx.usdKrw ?? 0);
-    const costKrw = assetReturnMetrics.nativeCostBasis ? assetReturnMetrics.costBasisKrw : snapshotPositionCostBasisKrw(asset, fx.usdKrw ?? 0);
+    const costKrw = assetReturnMetrics.nativeCostBasis ? assetReturnMetrics.costBasisKrw : snapshotPositionCostBasisKrw(asset);
     const pnlKrw = costKrw === null ? null : marketValueKrw - costKrw;
     const exposureType = getSnapshotFxExposureType(asset);
 
@@ -1368,6 +1364,7 @@ function computeAccountSnapshot({
         `price_source=${selectedPrice.source}${selectedPrice.referenceDate ? `@${selectedPrice.referenceDate}` : ""}`,
         `close_source=${selectedClose.source}${selectedClose.referenceDate ? `@${selectedClose.referenceDate}` : ""}`,
         `fx_source=${fx.source}`,
+        `fx_evidence=${fx.status}`,
         `price_observed_at=${selectedPrice.observedAt ?? "unknown"}`,
         `price_reference_at=${selectedPrice.referenceAt ?? selectedPrice.observedAt ?? "unknown"}`,
         `price_timestamp_basis=${selectedPrice.timestampBasis ?? "unknown"}`,
@@ -1828,51 +1825,23 @@ function buildRealizedReturnRunSummary(
   };
 }
 
-async function resolveSnapshotFx(
-  snapshotDate: string,
-  fxAsOfDate = snapshotDate,
-  cutoffAt: Date | null = null,
-  retainedRows: Awaited<ReturnType<typeof readSnapshotCutoffObservations>>["fxRows"] = [],
-  required = true,
-  executionAt: Date | null = null,
-): Promise<ResolvedFxRate> {
-  const rows = await db
-    .select()
-    .from(fxRates)
-    .where(and(
-      lte(fxRates.rateDate, fxAsOfDate),
-      eq(fxRates.isSample, false),
-      eq(sql<string>`lower(trim(${fxRates.status}))`, "ok"),
-      sql`${fxRates.usdKrw} > 0 and ${fxRates.usdKrw} < 'Infinity'::numeric`,
-      executionAt ? lte(fxRates.fetchedAt, executionAt) : cutoffAt ? lte(fxRates.fetchedAt, cutoffAt) : undefined,
-    ))
-    .orderBy(desc(fxRates.rateDate), desc(fxRates.fetchedAt), desc(fxRates.createdAt))
-    .limit(32);
-  const row = executionAt
-    ? selectSnapshotExecutionFx(rows, fxAsOfDate, executionAt)
-    : selectSnapshotCutoffFx([...rows, ...retainedRows], fxAsOfDate, cutoffAt);
-
-  const usdKrw = toNumber(row?.usdKrw);
-  if (!row || usdKrw === null || usdKrw <= 0) {
+async function resolveSnapshotFx(snapshotDate: string, required: boolean): Promise<ResolvedFxRate> {
+  const fixing = await loadDailyValuationFx(snapshotDate);
+  if (!fixing) {
     if (!required) return { usdKrw: null, referenceDate: null, source: "not_required_for_krw_valuation", status: "not_required", observedAt: null, fetchedAt: null, rateKind: null };
-    throw new DailySnapshotRequestError(
-      "missing_fx_rate",
-      "A USD/KRW FX rate is required before writing a daily snapshot",
-      { snapshotDate, fxAsOfDate, cutoffAt: cutoffAt?.toISOString() ?? null },
-      409,
-    );
+    throw new DailySnapshotRequestError("missing_fx_rate",
+      "The shared USD/KRW closing rate is required for this service date", { snapshotDate }, 409);
   }
-
   return {
-    usdKrw,
-    referenceDate: row.rateDate,
-    source: row.source ? `fx_rates:${row.source}@${row.rateDate}` : `fx_rates@${row.rateDate}`,
-    status: row.status,
-    observedAt: "providerObservedAt" in row ? isoTimestamp(row.providerObservedAt) : isoTimestamp(row.observedAt),
-    fetchedAt: isoTimestamp(row.fetchedAt),
-    rateKind: row.rateKind,
-    referenceAt: executionAt ? isoTimestamp(row.fetchedAt) : isoTimestamp(row.observedAt),
-    timestampBasis: executionAt ? "collection" : "timestampBasis" in row && row.timestampBasis === "collection" ? "collection" : "provider",
+    usdKrw: Number(fixing.rate),
+    referenceDate: fixing.referenceDate,
+    source: `daily_valuation_fx:${fixing.id}@${fixing.referenceDate}`,
+    status: fixing.evidenceKind,
+    observedAt: null,
+    fetchedAt: fixing.fetchedAt.toISOString(),
+    rateKind: "daily_reference",
+    referenceAt: fixing.cutoffAt.toISOString(),
+    timestampBasis: "daily_fixing",
   };
 }
 

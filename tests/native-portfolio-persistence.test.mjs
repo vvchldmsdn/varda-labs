@@ -34,13 +34,15 @@ async function fixture(withApi=false) {
   await pg.exec("drop schema public cascade; create schema public; do $$ begin if not exists(select 1 from pg_roles where rolname='varda_tenant_app') then create role varda_tenant_app; end if; end $$;"+ddl);
   await addNativeReliabilityFixtureTables(pg);
   await pg.exec(readFileSync(new URL('../drizzle/0050_native_portfolio_ledger.sql',import.meta.url),'utf8'));
-  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability','0060_snapshot_cutoff_observations']) {
+  for (const migration of ['0045_investment_plans','0052_native_legacy_lifecycle_guard','0056_native_tenant_mutation','0057_native_settlement_cutoff','0059_trade_daily_reliability','0060_snapshot_cutoff_observations','0067_daily_valuation_fx']) {
     const sql = readFileSync(new URL(`../drizzle/${migration}.sql`,import.meta.url),'utf8');
     // Freeze the database clock alongside this September fixture. Preserve the
     // real 35-day retention guard instead of depending on the developer's date.
     await pg.exec(migration === '0060_snapshot_cutoff_observations'
       ? sql.replaceAll('statement_timestamp()', "TIMESTAMPTZ '2026-09-02T00:00:00Z'") : sql);
   }
+  await pg.query(`insert into daily_valuation_fx(service_date,base_currency,quote_currency,reference_date,rate,krw_per_eur,usd_per_eur,source,policy,evidence_kind,fetched_at)
+    values ('2026-09-02','USD','KRW','2026-09-01',1400,1400,1,'ecb_eur_cross','ecb-eur-cross-2dp-prev-market-day-v1','closing_reference','2026-09-01T22:00:00Z')`);
   await pg.exec('grant usage on schema public to varda_tenant_app; grant select on live_price_quotes,fx_rates to varda_tenant_app');
   for(const table of ['accounts','assets','event_ledger_entries','daily_portfolio_snapshots']) await pg.exec(`alter table ${table} enable row level security; alter table ${table} force row level security; create policy tenant_select on ${table} for select to varda_tenant_app using(canonical_owner_user_id = nullif(current_setting('app.current_user_id',true),'')::uuid); grant select on ${table} to varda_tenant_app;`);
   await pg.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);
@@ -82,12 +84,17 @@ async function fixture(withApi=false) {
   return {pg,queries,projection,valuation,snapshots,cutoff,route,evidence,open,mutate,batches,legacy,setBeforeWrite(fn){beforeWrite=fn;},setIdentity(nextSubject,active=true){subject=nextSubject;authenticated=active;}};
 }
 
-async function regularBaseline(f,t,kind='daily_reference') {
+async function regularBaseline(f,t,legacySpot=false) {
   const boundary='2026-09-01T22:00:00.000Z';
   setNow(t,boundary);
   const initial=await f.evidence(boundary);
-  initial.current.boundary='before';initial.current.source='native_ledger_cutoff_v2';initial.fx[0].kind=kind;
+  initial.current.boundary='before';initial.current.source='native_ledger_cutoff_v2';
+  initial.fx[0].fixing = { id:'fixture', serviceDate:'2026-09-02', referenceDate:'2026-09-01', cutoffAt:boundary, policy:'test', evidenceKind:'closing_reference' };
   assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},initial,'2026-09-02',boundary)).created,1);
+  if (legacySpot) {
+    const {fixing,...rate} = initial.fx[0];
+    await f.pg.query("update daily_portfolio_snapshots set native_evidence=jsonb_set(native_evidence,'{fx}',$1::jsonb)",[JSON.stringify([{...rate,kind:'spot'}])]);
+  }
 }
 
 it('executes the actual SQL writer, tenant reads, engine and projection against fixed ledger amounts',async()=>{
@@ -332,10 +339,13 @@ it('captures cash-only owners on the existing daily job without provider calls a
     '@/db/queries/native-cutoff-evidence':f.cutoff,
     '@/db/queries/native-portfolio-snapshots':f.snapshots,
   });
-  let result=await job.runNativeDailySnapshotJob(); assert.equal(result.dryRun,true); assert.equal(result.targetCount,1); assert.equal(result.created,0);
+  const run = (options = {}) => job.runNativeDailySnapshotJob({now:new Date('2026-09-02T00:00:00Z'),snapshotDate:'2026-09-02',...options});
+  const missingFixing=await run({snapshotDate:'2026-09-03',now:new Date('2026-09-03T00:00:00Z'),dryRun:false});
+  assert.equal(missingFixing.created,0);
+  let result=await run(); assert.equal(result.dryRun,true); assert.equal(result.targetCount,1); assert.equal(result.created,0);
   assert.equal((await f.pg.query('select count(*)::int as n from daily_portfolio_snapshots')).rows[0].n,0);
-  result=await job.runNativeDailySnapshotJob({dryRun:false}); assert.equal(result.created,1); assert.equal(result.failedCount,0);
-  assert.equal((await job.runNativeDailySnapshotJob({dryRun:false})).created,0);
+  result=await run({dryRun:false}); assert.equal(result.created,1); assert.equal(result.failedCount,0);
+  assert.equal((await run({dryRun:false})).created,0);
   await f.pg.query("update app_users set status='disabled' where id=$1",[owner]);
   assert.equal((await job.runNativeDailySnapshotJob()).targetCount,0);
 });
@@ -357,7 +367,7 @@ it('keeps closed empty account history and rejects further account writes',async
 
 it('retains the observed spot FX from an immutable capture without replacing it with today FX',async(t)=>{
   setNow(t,at); const f=await fixture(); await f.open(account,{KRW:'1400000',USD:'1000'});
-  await regularBaseline(f,t,'spot');
+  await regularBaseline(f,t,true);
   setNow(t,later);
   const result=f.valuation.buildTrackedCurrencyPortfolio(await f.evidence(later,'100','USD','1260'));
   assert.equal(result.history[0].total,'2000');
@@ -604,7 +614,7 @@ it('does not resurrect a rejected corporate-action price from an old frozen capt
   assert.equal(f.valuation.buildTrackedCurrencyPortfolio(cutoff).current.complete,false);
 });
 
-it('keeps 10 × 105 × 1300 at the cutoff after cache replacement, even with an official close of 100',async()=>{
+it('keeps 10 × 105 × the shared fixing of 1400 at the cutoff after cache replacement, even with an official close of 100',async()=>{
   const f=await fixture();await f.open(account,{KRW:'0',USD:'1000'});
   await f.mutate({type:'buy',assetId:asset,quantity:'10',price:'100',currency:'USD',at:'2026-09-01T21:00:00Z'},account,{newAsset:{id:asset,name:'Test',ticker:'TEST',market:'us',currency:'USD',assetType:'stock'}});
   await f.pg.query("insert into live_price_quotes values('TEST','us','USD','kis','kis_overseas_price:NAS','live','ok',105,'2026-09-01T21:59:00Z','2026-09-01T21:59:00Z')");
@@ -615,7 +625,7 @@ it('keeps 10 × 105 × 1300 at the cutoff after cache replacement, even with an 
   await f.pg.query("update fx_rates set usdkrw=1310,fetched_at='2026-09-01T22:20:00Z'");
   const capturedAt='2026-09-01T22:20:01Z';
   const evidence=await f.cutoff.readNativeCutoffEvidence({ownerUserId:owner},account,'2026-09-02',capturedAt);
-  assert.equal(f.valuation.buildTrackedCurrencyPortfolio({...evidence,reporting:'KRW'}).current.total,'1365000');
+  assert.equal(f.valuation.buildTrackedCurrencyPortfolio({...evidence,reporting:'KRW'}).current.total,'1470000');
   assert.equal(f.valuation.buildTrackedCurrencyPortfolio({...evidence,reporting:'USD'}).current.total,'1050');
   assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},evidence,'2026-09-02',capturedAt)).created,1);
   const original=(await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows[0].native_evidence;
@@ -623,7 +633,9 @@ it('keeps 10 × 105 × 1300 at the cutoff after cache replacement, even with an 
   assert.equal((await f.snapshots.saveNativeCutoffSnapshots({ownerUserId:owner},retry,'2026-09-02','2026-09-01T23:00:00Z')).created,0);
   assert.deepEqual((await f.pg.query('select native_evidence from daily_portfolio_snapshots')).rows[0].native_evidence,original);
   assert.equal(original.frame.positions.find(row=>row.id===asset).observation.price,'105.000000000000');
-  assert.equal(original.fx[0].timestampBasis,'collection');
+  assert.equal(original.fx[0].fixing.serviceDate,'2026-09-02');
+  assert.equal(original.fx[0].fixing.referenceDate,'2026-09-01');
+  assert.equal(original.fx[0].fetchedAt,'2026-09-01T22:00:00.000Z');
 });
 
 it('rebuilds a missing market cutoff from a late verified close without a new trade or quote request', async t => {

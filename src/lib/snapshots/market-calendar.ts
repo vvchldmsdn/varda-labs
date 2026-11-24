@@ -195,7 +195,7 @@ function lastWeekdayOfMonth(year: number, month: number, weekday: number) {
   return current;
 }
 
-function easterSunday(year: number) {
+export function easterSunday(year: number) {
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;
@@ -213,7 +213,7 @@ function easterSunday(year: number) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function shiftDate(date: string, deltaDays: number) {
+export function shiftDate(date: string, deltaDays: number) {
   const [year, month, day] = date.split("-").map(Number);
   const value = new Date(Date.UTC(year, month - 1, day));
   value.setUTCDate(value.getUTCDate() + deltaDays);

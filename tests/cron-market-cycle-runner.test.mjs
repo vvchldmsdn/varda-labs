@@ -3,6 +3,21 @@ import { describe, it } from "node:test";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
 
 describe("Daily market cycle cutoff recovery", () => {
+  it("collects the shared closing reference before native work even with no snapshot targets", async () => {
+    const f = await fixture({ noLegacyTargets: true });
+    const result = await f.run();
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.valuationFx, { serviceDate: "2026-09-10", referenceDate: "2026-09-09", missingDates: [] });
+    assert.deepEqual(f.finished[0].metadata.valuationFx, result.valuationFx);
+  });
+  it("persists missing reference dates and marks a close retryable", async () => {
+    const f = await fixture({ noLegacyTargets: true, missingValuationDates: ["2026-09-10"] });
+    const result = await f.run();
+    assert.equal(result.ok, false);
+    assert.ok(result.blockers.includes("closing_valuation_fx_missing"));
+    assert.equal(f.finished[0].status, "failed");
+    assert.deepEqual(f.finished[0].metadata.valuationFx.missingDates, ["2026-09-10"]);
+  });
   it("a request arriving after 07:00 is daily recovery, never reported as pre-cutoff preparation", async () => {
     const f = await fixture();
     const result = await f.run({ now: new Date("2026-09-09T22:01:00Z"), cronScheduleUtc: "55 21 * * *" });
@@ -297,7 +312,7 @@ function deferred(code, retryAfterSeconds) {
   return Object.assign(new Error("fixture provider deferred"), { code, retryAfterSeconds });
 }
 
-async function fixture({ noLegacyTargets=false, nativeResult={ status: "completed", targetCount: 0, created: 0, failedCount:0, blockedCount:0 }, missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false, closeErrors = [], multipleCloseGroups = false, leaseDelayMs = 0, planningDelayMs = 0, sleepOvershootMs = 0 } = {}) {
+async function fixture({ missingValuationDates = [], noLegacyTargets=false, nativeResult={ status: "completed", targetCount: 0, created: 0, failedCount:0, blockedCount:0 }, missingClose = false, closeSucceeds = true, liveResult = {}, liveError = false, fxError = false, fxStatus = "written", configured = true, snapshotWriteFails = false, alreadyCompleted = false, blockedTenant = false, snapshotsExist = false, closeErrors = [], multipleCloseGroups = false, leaseDelayMs = 0, planningDelayMs = 0, sleepOvershootMs = 0 } = {}) {
   const events = [], finished = [], claims = [];
   const closeMarkets = [], failures = [...closeErrors];
   let elapsedMs = 0, completedCloseGroups = 0;
@@ -308,6 +323,10 @@ async function fixture({ noLegacyTargets=false, nativeResult={ status: "complete
   const now = new Date("2026-09-09T22:58:55.000Z");
   const completeSync = { requestedCount: 1, successCount: 1, failedCount: 0, skippedCount: 0, insertedCount: 1, updatedCount: 0, conflictCount: 0, targetFilterSummary: { filteredPriceTargetCount: 1 } };
   const [runner] = await importWithPorts(["src/lib/cron-market-cycle-runner.ts"], {
+    "@/db/queries/daily-valuation-fx": { async collectClosingValuationFx(serviceDate) {
+      assert.deepEqual(events, ["claim"]);
+      return { serviceDate, referenceDate: missingValuationDates.includes(serviceDate) ? null : "2026-09-09", missingDates: missingValuationDates };
+    } },
     "@/lib/market-data/close-gap-collection": { scheduleRecentCloseCollection: () => {} },
     "@/lib/snapshots/native-daily-job": { async runNativeDailySnapshotJob() { events.push("native-snapshot"); assert.ok(!events.includes("fx"),"native cutoff must precede FX replacement"); assert.ok(!events.includes("live"),"native cutoff must precede live quote replacement"); return nativeResult; } },
     "node:perf_hooks": { performance: { now: () => elapsedMs } },

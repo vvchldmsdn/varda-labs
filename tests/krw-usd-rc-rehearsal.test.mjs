@@ -33,9 +33,10 @@ it('rehearsal containment rejects parent/sibling paths and the output root itsel
 
 it('validate-only reports NOT RUN and ordered migrations without SQL or environment loading', async () => {
   const report = await main(['--validate-only']);
-  assert.equal(report.status, 'NOT RUN'); assert.equal(report.validation, 'PASS'); assert.equal(report.migrationCount, 67);
+  assert.equal(report.status, 'NOT RUN'); assert.equal(report.validation, 'PASS'); assert.equal(report.migrationCount, 68);
   assert.deepEqual(report.migrationTail, RC_TAGS);
   const manifest = await migrationManifest();
+  assert.equal(manifest.at(-1).tag, '0067_daily_valuation_fx');
   assert.ok(manifest.every(row => /^[a-f0-9]{64}$/.test(row.sha256)));
 });
 

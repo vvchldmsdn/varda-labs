@@ -98,7 +98,7 @@ select c.account_id::text as account_id,c.valued_on::text as date,c.source,
   c.native_evidence->'frame'->>'at' as frame_at,c.native_evidence->'frame'->'scopeComplete' as frame_complete,
   c.native_evidence->'fx' as native_fx,
   ${performance ? `c.native_evidence->'availableCurrencies' as available_currencies,
-    case when c.source='varda_manual_daily_snapshot' and c.description ~ '(^|; )fx_source=fx_rates[:@]'
+    case when c.source='varda_manual_daily_snapshot' and c.description ~ '(^|; )fx_source=(fx_rates|daily_valuation_fx)[:@]'
       then c.usdkrw end as portfolio_usd_krw,` : ""}
   case when c.native_evidence is not null then (
     select jsonb_agg(jsonb_build_object('id',p->>'id','accountId',p->>'accountId','ownerId',p->>'ownerId',

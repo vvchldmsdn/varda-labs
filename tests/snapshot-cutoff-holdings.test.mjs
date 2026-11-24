@@ -98,6 +98,7 @@ async function snapshotFixture(t, { changed, archived = false, events = [], samp
     isSample: sampleClose, source: "kis", fetchedAt: now }));
   const rowsByTable = {
     accounts, assets: holdings,
+    daily_valuation_fx: [{ id: "fixture-fixing", serviceDate: "2026-09-10", referenceDate: "2026-09-09", rate: "1337.5", source: "ecb_eur_cross", evidenceKind: "closing_reference", fetchedAt: new Date("2026-09-10T07:01:00+09:00") }],
     fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1337.5", source: "test", status: "ok", isSample: false, fetchedAt: "2026-09-09T13:24:00Z", observedAt: "2026-09-09T13:24:00Z", rateKind: "daily_reference" }],
     asset_price_snapshots: priceRows,
     event_ledger_entries: events.map((event, index) => ({ ...holding(), id: `event-${index}`, account: "acct0",

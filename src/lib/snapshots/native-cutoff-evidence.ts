@@ -5,7 +5,6 @@ import type { NativeStoredAccount, NativeStoredEntry } from "../../db/queries/na
 import type { TrackedNativePosition, TrackedPortfolioEvidence } from "../currency-tracked-portfolio.ts";
 import type { NativeSnapshotEvidence } from "../native-portfolio-projection.ts";
 import { isNativeCutoffObservation, hasConflictingLatestSnapshotPrices } from "./cutoff-valuation.ts";
-import { selectSnapshotCutoffFx } from "./cutoff-fx.ts";
 
 /** A boundary is the state BEFORE 07:00. Events exactly at 07:00 belong to the
  * next service day. Neither a delayed worker nor today's quantities can move it. */
@@ -32,11 +31,6 @@ export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger
     const saved=row.evidence as NativeSnapshotEvidence;
     if(saved?.version!==1||!saved.frame||Date.parse(saved.frame.at)>Date.parse(cutoff))return [];
     return [{...saved.frame,positions:saved.frame.positions.filter(p=>p.accountId===row.accountId && p.observation?.source.startsWith("kis") && p.observation.basis==="raw")}];
-  });
-  const originalFx=(ledger.observations??[]).flatMap(row=>{
-    const saved=row.evidence as NativeSnapshotEvidence;
-    return saved?.version===1 && saved.frame && Date.parse(saved.frame.at)<=Date.parse(cutoff)
-      ? (saved.fx??[]).filter(rate=>reusableSnapshotFxSource(rate.source)) : [];
   });
   for (const account of ledger.accounts) {
     const events = ledger.entries.filter(row => row.accountId === account.id).sort((a, b) => a.data.state.sequence - b.data.state.sequence);
@@ -70,17 +64,10 @@ export function buildNativeCutoffEvidence(base: TrackedPortfolioEvidence, ledger
     for (const currency of ["KRW", "USD"] as const) positions.push({ id: `cash:${account.id}:${currency}`, ownerId: base.ownerId, accountId: account.id, kind: "cash", name: `${account.name} · ${currency}`, cost: null,
       observation: { quantity: state.cash[currency], price: "1", currency, at: cutoff, priceObservedAt: cutoff, priceFetchedAt: cutoff, basis: "raw", source: "native_ledger_cash" } });
   }
-  const fx = [...base.fx,...originalFx].filter(rate => selectSnapshotCutoffFx([{
-    ...rate,usdKrw:rate.rate,rateDate:rate.observedAt.slice(0,10),rateKind:rate.kind,status:"ok",isSample:false,
-  }],snapshotDate,new Date(cutoff)) !== null);
+  const fx = base.fx.filter(rate => rate.fixing?.cutoffAt === cutoff && rate.fixing.serviceDate === snapshotDate
+    && Date.parse(rate.fetchedAt) <= Date.parse(capturedAt));
   return { ...base, asOf: capturedAt, current: { at: cutoff, boundary: "before", source: "native_ledger_cutoff_v2", scopeComplete: true, positions },
     history: [], trades: null, cashFlows: undefined, realizedTrades: undefined, realizedTradesComplete: false,
     fx,
     ledgerComplete: true, nativeSequences: sequences, nativeRevisions:Object.fromEntries(ledger.accounts.map(a=>[a.id,a.revision??0])) };
-}
-
-function reusableSnapshotFxSource(source: string) {
-  // Explicitly retain the existing KIS/public-reference sources. An unknown or
-  // licensed provider must enter through the current storage/admission reader.
-  return source.startsWith("kis") || source === "er-api_open_access" || source === "frankfurter";
 }

@@ -11,7 +11,7 @@ const observed = new Date("2026-09-09T21:59:00Z");
 
 describe("daily cutoff readiness through the legacy writer and Cron plan", () => {
   it("price-only and FX-only evidence cannot complete a foreign holding snapshot", async () => {
-    const priceOnly=await fixture({close:false});priceOnly.rows.fx_rates.length=0;
+    const priceOnly=await fixture({close:false});priceOnly.rows.daily_valuation_fx.length=0;
     await assert.rejects(priceOnly.run({dryRun:true}),e=>e.code==='missing_fx_rate');
     await assert.rejects(priceOnly.run(),e=>e.code==='missing_fx_rate');assert.equal(priceOnly.writes.length,0);
     const fxOnly=await fixture({live:false,close:false});
@@ -71,22 +71,22 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     assert.equal(saved.cutoffValuation.policy, "execution_quote_else_exact_official_close");
   });
 
-  it("uses execution prices and FX instead of retained 07:00 observations", async () => {
+  it("uses the execution price and the shared daily FX even when the spot cache changes", async () => {
     const f = await fixture({ close: false });
     f.retained.quotes.push({ ...f.rows.live_price_quotes[0], priceAsOf: observed, fetchedAt: observed, observedAt: null, timestampBasis: "collection" });
     f.retained.fxRows.push({ ...f.rows.fx_rates[0], providerObservedAt: null, timestampBasis: "collection" });
     Object.assign(f.rows.live_price_quotes[0], { price: "110", priceAsOf: new Date("2026-09-09T22:20:00Z"), fetchedAt: new Date("2026-09-09T22:20:00Z") });
     Object.assign(f.rows.fx_rates[0], { usdKrw: "1310", observedAt: new Date("2026-09-09T22:20:00Z"), fetchedAt: new Date("2026-09-09T22:20:00Z") });
     const result = await f.run();
-    assert.equal(result.results.brokerage.totalMarketValue, 1441000);
+    assert.equal(result.results.brokerage.totalMarketValue, 1430000);
     assert.equal(planFor(result).closeTargetCount, 0);
     const position = f.writes.find(row => row.table === "daily_position_snapshots").rows[0];
     assert.match(position.description, /price_reference_at=2026-09-09T22:20:00.000Z/);
-    assert.match(position.description, /fx_reference_at=2026-09-09T22:20:00.000Z/);
+    assert.match(position.description, /fx_reference_at=2026-09-09T22:00:00.000Z/);
     assert.match(position.description, /price_observed_at=unknown/);
-    assert.match(position.description, /fx_observed_at=2026-09-09T22:20:00.000Z/);
+    assert.match(position.description, /fx_observed_at=unknown/);
     assert.match(position.description, /price_timestamp_basis=collection/);
-    assert.match(position.description, /fx_timestamp_basis=collection/);
+    assert.match(position.description, /fx_timestamp_basis=daily_fixing/);
     assert.match(position.description, /(?:^|; )valuation_policy=execution_collection_v1(?:;|$)/);
   });
 
@@ -150,7 +150,7 @@ describe("daily cutoff readiness through the legacy writer and Cron plan", () =>
     const f = await fixture({ close: false });
     Object.assign(f.rows.assets[0], { currency: "KRW", market: "korea" });
     Object.assign(f.rows.live_price_quotes[0], { currency: "KRW", market: "korea", price: "10000" });
-    f.rows.fx_rates.length = 0;
+    f.rows.daily_valuation_fx.length = 0;
     const result = await f.run();
     assert.equal(result.results.brokerage.totalMarketValue, 100000);
     assert.equal(result.fx.usdKrw, null);
@@ -231,6 +231,7 @@ async function fixture({ live = true, close = true } = {}) {
     fractionalKrwValue: null, fractionalAvgCost: null, groupId: null, targetWeight: null, maAssetClass: null,
     createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z" };
   const rows = { accounts: [{ id: "account-a", canonicalOwnerUserId: owner, code: "brokerage", name: "Synthetic", accountType: "investment", currency: "USD", isActive: true }], assets: [asset],
+    daily_valuation_fx: [{ id: "fixture-fixing", serviceDate: "2026-09-10", referenceDate: "2026-09-09", rate: "1300", source: "ecb_eur_cross", evidenceKind: "closing_reference", fetchedAt: new Date("2026-09-10T07:01:00+09:00") }],
     fx_rates: [{ rateDate: "2026-09-09", usdKrw: "1300", source: "synthetic", status: "ok", isSample: false, observedAt: new Date(cutoff.getTime()+19*60_000), fetchedAt: new Date(cutoff.getTime()+19*60_000), rateKind: "spot" }],
     asset_price_snapshots: close ? [{ ticker: asset.ticker, market: asset.market, currency: "USD", priceDate: "2026-09-09", closePrice: "100", source: "kis", isSample: false, fetchedAt: observed }] : [],
     live_price_quotes: live ? [{ ticker: asset.ticker, market: asset.market, currency: "USD", provider: "kis", source: "kis_overseas_price:NAS", quoteType: "live", status: "ok", price: "105", priceAsOf: new Date(cutoff.getTime()+19*60_000), fetchedAt: new Date(cutoff.getTime()+19*60_000) }] : [] };

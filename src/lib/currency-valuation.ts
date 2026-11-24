@@ -5,6 +5,10 @@ export type FxEvidence = Readonly<{
   observedAt: string; fetchedAt: string; source: string;
   kind: "spot" | "historical_spot" | "daily_reference" | "user_input" | "synthetic";
   requestedAt?: string;
+  /** Shared valuation effective at one service cutoff. Collection timestamps
+   * remain factual even when this rate was reconstructed after that cutoff. */
+  fixing?: { id: string; serviceDate: string; referenceDate: string; cutoffAt: string;
+    evidenceKind: "historical_reconstruction" | "closing_reference"; policy: string };
   /** Present only when restored from an immutable, owned valuation capture. */
   capturedAt?: string;
 }>;
@@ -12,6 +16,9 @@ export type CurrencyResult<T> = { ok: true; value: T } | { ok: false; reason: "f
 /** Dated captures keep their original pair evidence. Later backfills may fill
  * another pair, but cannot rewrite a previously captured portfolio valuation. */
 export function selectValuationFxAt(at: string, asOf: string, evidence: readonly FxEvidence[], historical: boolean): readonly FxEvidence[] {
+  const fixing = evidence.filter(row => row.fixing && Date.parse(row.fixing.cutoffAt) === Date.parse(at) && Date.parse(row.fetchedAt) <= Date.parse(asOf));
+  if (fixing.length) return fixing;
+  evidence = evidence.filter(row => !row.fixing);
   const validCapture = (row: FxEvidence) => Number.isFinite(Date.parse(row.capturedAt ?? "")) && Date.parse(row.observedAt) <= Date.parse(row.fetchedAt) && Date.parse(row.fetchedAt) <= Date.parse(row.capturedAt!) && Date.parse(row.capturedAt!) <= Date.parse(asOf);
   if (!historical) return evidence.filter(row => row.kind === "spot" || row.kind === "daily_reference" || row.kind === "historical_spot");
   const admitted = evidence.filter(row => row.kind === "daily_reference" || row.kind === "historical_spot" || (row.kind === "spot" && validCapture(row)));
@@ -24,7 +31,9 @@ export function fxFactor(from: Currency, to: Currency, at: string, evidence: rea
   const knownAt = Date.now();
   if (time > knownAt) return { ok: false, reason: "future_evidence" };
   if (from === to) return { ok: true, value: Decimal.from(1) };
-  const matching = evidence.filter(row => (row.base === from && row.quote === to) || (row.base === to && row.quote === from));
+  const exactFixings = evidence.filter(row => row.fixing && Date.parse(row.fixing.cutoffAt) === time && Date.parse(row.fetchedAt) <= knownAt);
+  const candidates = exactFixings.length ? exactFixings : evidence.filter(row => !row.fixing);
+  const matching = candidates.filter(row => (row.base === from && row.quote === to) || (row.base === to && row.quote === from));
   if (!matching.length) return { ok: false, reason: "fx_missing" };
   const valid = matching.filter(row => {
     try { return row.base !== row.quote && row.source.trim() && Number.isFinite(Date.parse(row.observedAt)) && Number.isFinite(Date.parse(row.fetchedAt)) && Date.parse(row.observedAt) <= Date.parse(row.fetchedAt) &&
@@ -32,12 +41,12 @@ export function fxFactor(from: Currency, to: Currency, at: string, evidence: rea
   });
   if (!valid.length) return { ok: false, reason: "fx_invalid" };
   // Historic reconstruction may use a subsequently collected observation, but never a future observation.
-  const past = valid.filter(row => Date.parse(row.observedAt) <= time && Date.parse(row.fetchedAt) <= knownAt).sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt));
+  const past = valid.filter(row => (row.fixing || Date.parse(row.observedAt) <= time) && Date.parse(row.fetchedAt) <= knownAt).sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt));
   if (!past.length) return { ok: false, reason: "future_evidence" };
   const row = past[0];
-  if (time - Date.parse(row.observedAt) > maxAgeMs) return { ok: false, reason: "fx_stale" };
+  if (!row.fixing && time - Date.parse(row.observedAt) > maxAgeMs) return { ok: false, reason: "fx_stale" };
   const factor = row.base === from ? Decimal.from(row.rate) : Decimal.from(1).div(row.rate);
-  if (past.some(item => Date.parse(item.observedAt) === Date.parse(row.observedAt) && (item.base === from ? Decimal.from(item.rate) : Decimal.from(1).div(item.rate)).compare(factor) !== 0)) return { ok: false, reason: "fx_invalid" };
+  if (past.some(item => (row.fixing || Date.parse(item.observedAt) === Date.parse(row.observedAt)) && (item.base === from ? Decimal.from(item.rate) : Decimal.from(1).div(item.rate)).compare(factor) !== 0)) return { ok: false, reason: "fx_invalid" };
   return { ok: true, value: factor };
 }
 export function convertMoney(amount: string | number | Decimal, from: Currency, to: Currency, at: string, evidence: readonly FxEvidence[], maxAgeMs: number): CurrencyResult<Decimal> {
