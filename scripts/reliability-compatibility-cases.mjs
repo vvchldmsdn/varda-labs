@@ -1,4 +1,4 @@
-import {fixtureClosingFx} from './fixtures/closing-valuation-fx.mjs';
+import {fixtureClosingFx} from '../tests/helpers/closing-valuation-fx.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';

@@ -13,7 +13,7 @@ import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 import { childEnvironment } from './reliability-ci.mjs';
 import { runContributionUiCases, runLegacyContributionUiCase } from './reliability-contribution-ui-cases.mjs';
 import { fillSettledTrade } from './reliability-trade-ui-helpers.mjs';
-import { seedFixtureClosingFx } from './fixtures/closing-valuation-fx.mjs';
+import { seedFixtureClosingFx } from '../tests/helpers/closing-valuation-fx.mjs';
 import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
 import { runAutoRefreshUiCases } from './reliability-auto-refresh-ui-cases.mjs';
 import { runOnboardingQaCases } from './reliability-onboarding-qa-cases.mjs';

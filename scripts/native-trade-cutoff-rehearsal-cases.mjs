@@ -1,4 +1,4 @@
-import {seedFixtureClosingFx} from './fixtures/closing-valuation-fx.mjs';
+import {seedFixtureClosingFx} from '../tests/helpers/closing-valuation-fx.mjs';
 import {drizzle} from 'drizzle-orm/node-postgres';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
