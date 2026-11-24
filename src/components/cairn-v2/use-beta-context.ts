@@ -19,13 +19,15 @@ export function useBetaContext(initialContext: BetaContext) {
   useEffect(() => {
     if (context.mode !== "domain" && query !== undefined && `${pathname}?${query}` !== href) router.replace(href, { scroll: false });
   }, [context.mode, href, pathname, query, router]);
-  const setContext = useCallback((requested: BetaContext) => {
+  const setContext = useCallback((requested: BetaContext, options?: { replace?: boolean }) => {
     const next=requested.scope!==context.scope?{...requested,excludeSell:undefined}:requested;
     startTransition(() => {
       if (next.mode === "domain") selectPendingContext(next);
       const destination = betaHref(pathname, next.mode === "domain" ? next : normalizeBetaContext(next));
       const pendingEpoch = next.mode === "domain" ? freshness?.store.pendingEpoch() : null;
-      router.push(betaReadHref(destination, pendingEpoch), { scroll: false });
+      const href = betaReadHref(destination, pendingEpoch);
+      if (options?.replace) router.replace(href, { scroll: false });
+      else router.push(href, { scroll: false });
     });
   }, [pathname, router, selectPendingContext, freshness, context.scope]);
   return [optimisticContext, setContext] as const;

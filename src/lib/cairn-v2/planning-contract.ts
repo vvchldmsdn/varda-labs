@@ -7,6 +7,7 @@ import type { PortfolioStructureResult } from "../portfolio-structure";
 import type { BetaContext } from "./navigation";
 import type { PORTFOLIO_TARGET_POLICY } from "../portfolio-target-policy.ts";
 import { portfolioStructureHoldingIdentityKey } from "../portfolio-structure-target-policy.ts";
+import { buildContributionOrderBasis, type ContributionOrderBasis } from "./contribution-order-plan.ts";
 
 export type TargetModel = Omit<Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>, "policyValidation"> & {
  policyValidation: Readonly<{ status: string }>; targetPlanRead?: "v2_held_identity_v1";
@@ -30,6 +31,7 @@ export type BetaTargetRead = {
   rows: BetaTargetRow[]; maxDrift: BetaTargetRow | null;
 };
 export type BetaContributionRead = {
+  orderBasis?: ContributionOrderBasis;
   selectionRows?: {key:string;label:string;detail:string}[];
   state: "idle" | "invalid" | "unsupported" | "blocked" | "unavailable" | "ready";
   message: string; inputKrw: number | null; requestKey: string; approvalRevision: number | null;
@@ -64,7 +66,8 @@ export function targetFingerprint(model: TargetModel) {
   // This is an observation-coherence check, not a database snapshot/transaction guarantee.
   return JSON.stringify([model.scope.key, model.serviceDate, model.status, model.policyValidation.status, model.startingWeightSource,
     model.approvedPolicy.status !== "available" && model.approvedPolicy.explicitlyRevoked === true, model.targetPlanRead ?? null, model.exactPolicyUniverse, model.currentUniverseHash, policy && [policy.approvalRevision, policy.policyVersion, policy.effectiveServiceDate, policy.universeHash, policy.vectorHash],
-    model.rows.map(row => [row.accountId, row.assetId, row.market, row.currency, row.ticker, row.targetWeightBps, row.currentValueKrw, row.costBasisKrw, row.maAssetClass, row.maRuleEnabled, row.assetType, row.accountCode]), model.plannedTargetRows ?? [], model.plannedMaRows ?? [], valuationVector(model.structure), model.structure.exclusions]);
+    model.rows.map(row => [row.accountId, row.assetId, row.market, row.currency, row.ticker, row.targetWeightBps, row.currentValueKrw, row.costBasisKrw, row.maAssetClass, row.maRuleEnabled, row.assetType, row.accountCode]), model.plannedTargetRows ?? [], model.plannedMaRows ?? [], valuationVector(model.structure), model.structure.exclusions,
+    model.structure.usdKrwRate, model.structure.holdingRows.map(row => [portfolioStructureHoldingIdentityKey(row), row.quantity, row.currentPrice, row.priceEvidenceSource, row.priceFetchedAt])]);
 }
 export function legacyFingerprint(read: TenantApprovedTargetPolicyReadResult | null) {
   if (!read) return null;
@@ -174,6 +177,7 @@ export function adaptContribution({ preview, before, after, legacyBefore, legacy
   const approvalRevision = preview.source === "portfolio_target_policy" ? approved!.approvalRevision : null;
   const policyBasis = preview.source === "portfolio_target_policy" ? approved! : legacy!;
   return { ...base, state: "ready", message: "계산 결과 · 주문·저장 없음", approvalRevision, result: safeReadyPreview(preview), blockers: [],
+    orderBasis: buildContributionOrderBasis(preview, before),
     provenance: { source: preview.source, scopeKey: preview.scopeKey, serviceDate: preview.serviceDate,
       policyVersion: preview.policyVersion, effectiveServiceDate: preview.effectiveServiceDate, approvalRevision,
       universeHash: policyBasis.universeHash, vectorHash: policyBasis.vectorHash, consistency: "before_after_read_match" } };

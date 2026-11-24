@@ -7,7 +7,15 @@ export type ContributionEvidence<T> =
 export type ContributionFxExposure = 'US_LISTED' | 'KR_UNHEDGED_GLOBAL' | 'DOMESTIC' | 'HEDGED' | 'UNKNOWN';
 export type ContributionModifiers = Readonly<{
   fundingBasis: 'KRW' | 'unsupported';
-  fx: ContributionEvidence<{ multiplier: number; hot: boolean; observationCount: number; percentileLookback?: number; ma120Available?: boolean }>;
+  fx: ContributionEvidence<{
+    multiplier: number;
+    hot: boolean;
+    observationCount: number;
+    percentileLookback?: number;
+    ma120Available?: boolean;
+    percentile?: number;
+    trendMult?: number;
+  }>;
   regime: ContributionEvidence<'안정' | '주의' | '경계'>;
   eventScore: ContributionEvidence<number>;
   performance: ContributionEvidence<{ alpha90Pct: number; alpha252Pct: number; mddPct: number }>;

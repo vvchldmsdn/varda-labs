@@ -35,7 +35,7 @@ test('date form rejects missing, invalid, out-of-range and reversed dates in pla
   }
 });
 
-test('home contribution uses the entered amount and original focus target from all card entry points', async () => {
+test('home contribution keeps detail entry to expand and allocation controls and validates their current input', async () => {
   const runtime = hooks();
   const [{ ContributionEntry }] = await importUiWithPorts(['src/components/cairn-v2/home-contribution-entry.tsx'], {
     react: runtime.react,
@@ -46,6 +46,7 @@ test('home contribution uses the entered amount and original focus target from a
     runtime.begin();
     const card = ContributionEntry({
       view: {}, context: { currency: 'KRW', cashAmountKrw }, dirty: false, colors: [],
+      onCalculate: () => assert.fail('render should not calculate'),
       onView: (trigger, amount) => opens.push([trigger, amount]),
     });
     return card.type(card.props);
@@ -53,19 +54,19 @@ test('home contribution uses the entered amount and original focus target from a
   const button = (tree, label) => walk(tree).find(node => node.type === 'button' &&
     (node.props['aria-label'] === label || text(node).trim() === label));
   const input = tree => walk(tree).find(node => node.type === 'input');
-  const opening = { kind: 'open' }, title = { kind: 'title' }, submit = { kind: 'submit' };
+  const opening = { kind: 'open' }, submit = { kind: 'submit' };
   const empty = render(undefined);
-  button(empty, '추가 투자').props.onClick({ currentTarget: title });
-  assert.deepEqual(opens.pop(), [title, undefined], 'an untouched card can open an empty form or recovery link');
+  assert.equal(button(empty, '추가 투자'), undefined);
+  assert.equal(empty.props.onClick, undefined);
+  button(empty, '추가 투자 확대').props.onClick({ currentTarget: opening });
+  assert.deepEqual(opens.pop(), [opening, undefined], 'the untouched expand control can open an empty form or recovery link');
 
   input(render('1000000')).props.onChange({ target: { value: '300.0001' } });
   const edited = render('1000000');
   button(edited, '추가 투자 확대').props.onClick({ currentTarget: opening });
-  button(edited, '추가 투자').props.onClick({ currentTarget: title });
-  edited.props.onClick({ target: { closest: () => null }, currentTarget: { querySelector: () => opening } });
   walk(edited).find(node => node.props.type === 'submit').props.ref.current = submit;
   walk(edited).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
-  assert.deepEqual(opens, [opening, title, opening, submit].map(trigger => [trigger, '3000001']));
+  assert.deepEqual(opens, [opening, submit].map(trigger => [trigger, '3000001']));
 
   input(edited).props.onChange({ target: { value: '' } });
   const invalid = render('1000000');
@@ -74,7 +75,42 @@ test('home contribution uses the entered amount and original focus target from a
   button(invalid, '추가 투자 확대').props.onClick({ currentTarget: opening });
   assert.equal(focused, true);
   assert.equal(input(render('1000000')).props['aria-invalid'], true);
-  assert.equal(opens.length, 4, 'clearing a submitted amount cannot open its old result');
+  assert.equal(opens.length, 2, 'clearing a submitted amount cannot open its old result');
+});
+
+test('home contribution debounces recalculation while keeping its last read and waits for explicit dialog opening', async (t) => {
+  const runtime = hooks();
+  let effect;
+  const [ui] = await importUiWithPorts(['src/components/cairn-v2/home-contribution-entry.tsx'], {
+    react: { ...runtime.react, useEffect: callback => { effect = callback; } },
+    '@/components/cairn-v2/home-contribution': { ContributionHome: () => null },
+  });
+  const calls = [];
+  const view = { domain: { planning: { contribution: { state: 'ready', inputKrw: 1000000 } } } };
+  const render = (amount = '1000000') => {
+    runtime.begin();
+    return ui.ContributionEntry({ view, context: { currency:'KRW', cashAmountKrw:amount }, dirty:false, colors:[],
+      onCalculate: value => calls.push(value), onView: () => assert.fail('automatic calculation opened the dialog') });
+  };
+  const input = tree => walk(tree).find(node => node.props.inputMode === 'decimal');
+  const summary = tree => walk(tree).find(node => node.props.view === view && 'pendingAmount' in node.props);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  input(render()).props.onChange({ target:{ value:'200' } });
+  const first = render();
+  assert.equal(summary(first).props.pendingAmount, 2000000);
+  assert.equal(summary(first).props.dirty, false);
+  const cancel = effect();
+  t.mock.timers.tick(250);
+  input(first).props.onChange({ target:{ value:'300' } });
+  render();
+  cancel();
+  effect();
+  t.mock.timers.tick(449);
+  assert.deepEqual(calls, []);
+  t.mock.timers.tick(1);
+  assert.deepEqual(calls, ['3000000']);
+  assert.equal(input(render('3000000')).props.value, '300');
+  assert.equal(summary(render('3000000')).props.pendingAmount, 3000000);
 });
 
 test('selecting an instrument returns keyboard focus before the result button is removed',async()=>{

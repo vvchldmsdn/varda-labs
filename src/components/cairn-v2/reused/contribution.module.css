@@ -65,6 +65,24 @@
 .resultActions :is(a, summary):focus-visible, .evidence summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .surface .evidence { border-top: 1px solid var(--line); }
 .surface .evidence > summary { font-size: 13px; color: var(--muted); }
+.evidenceRows { display:grid; gap:8px; margin-block-end:12px; }
+.evidenceRows .holdingEvidence { min-width:0; padding:0 12px; border:1px solid var(--line); border-radius:12px; }
+.holdingEvidence > summary { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; min-height:44px; padding-block:8px; list-style:none; font-size:13px; }
+.holdingEvidence > summary::-webkit-details-marker { display:none; }
+.holdingEvidence > summary span { padding-inline-start:18px; position:relative; overflow-wrap:anywhere; }
+.holdingEvidence > summary span::before { content:""; position:absolute; inset-inline-start:1px; top:6px; width:6px; height:6px; border-inline-end:1px solid; border-block-end:1px solid; transform:rotate(-45deg); }
+.holdingEvidence[open] > summary span::before { transform:rotate(45deg); }
+.holdingEvidence > summary strong { font-size:13px; font-weight:650; text-align:end; }
+.evidenceFactors { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); gap:8px; }
+.evidenceFactors > div { min-width:0; min-height:94px; padding:10px; border-radius:9px; background:var(--wash); }
+.evidenceFactors dt,.evidenceAmounts dt,.holdingEvidence small { color:var(--muted); }
+.evidenceFactors dd { display:grid; gap:4px; }
+.evidenceFactors dd strong { font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.025em; }
+.holdingEvidence small { display:block; font-size:11px; line-height:1.5; }
+.evidenceAmounts { display:grid; gap:4px; margin-block:10px; }
+.evidenceAmounts > div { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 8px; }
+.evidenceAmounts dd { font-variant-numeric:tabular-nums; }
+.holdingEvidence > p { margin-block-end:10px; }
 
 .form {
   width: min(100%, 36rem);
