@@ -11,7 +11,9 @@ describe("snapshot purchase cost evidence", () => {
     assert.equal(snapshotPositionCostBasisKrw({ ...base, averageCost: null, currentPrice: "999" }, 1500), null);
     assert.equal(snapshotPositionCostBasisKrw({ ...base, fractionalKrwValue: "50" }, 1500), null);
     assert.equal(snapshotPositionCostBasisKrw({ ...base, averageCost: "0" }, 1500), null);
-    assert.equal(snapshotPositionCostBasisKrw({ ...base, currency: "USD", fractionalKrwValue: "500", fractionalAvgCost: "400" }, 1500), 300400);
+    const usd = { ...base, currency: "USD", fractionalKrwValue: "500", fractionalAvgCost: "400" };
+    assert.equal(snapshotPositionCostBasisKrw(usd), null);
+    assert.equal(snapshotPositionCostBasisKrw(usd, 1500), 300400);
     assert.equal(snapshotPositionCostBasisKrw({ ...base, quantity: "0", averageCost: null, fractionalKrwValue: "500", fractionalAvgCost: "400" }, 1500), 400);
   });
 
@@ -43,6 +45,7 @@ describe("snapshot purchase cost evidence", () => {
     const rowsByTable = {
       accounts: holdings.map((row) => ({ id: row.accountId, canonicalOwnerUserId: owner, code: row.account, name: row.account, accountType: "investment", currency: "KRW", isActive: true })),
       assets: holdings,
+      daily_valuation_fx: [{ id: "fixture-fixing", serviceDate: "2026-09-09", referenceDate: "2026-09-08", rate: "1500", source: "ecb_eur_cross", evidenceKind: "closing_reference", fetchedAt: new Date("2026-09-09T07:01:00+09:00") }],
       fx_rates: [{ rateDate: "2026-09-08", usdKrw: "1500", source: "test", status: "ok", isSample: false, fetchedAt: cutoffObservation, observedAt: cutoffObservation, rateKind: "spot" }],
       asset_price_snapshots: holdings.map((row) => ({ ...row, priceDate: "2026-09-08", closePrice: "105", isSample: false, source: "kis", fetchedAt: now })),
       live_price_quotes: holdings.map((row) => ({ ticker: row.ticker, market: row.market, currency: row.currency, price: "110", source: "kis", provider: "kis", quoteType: "live", status: "ok", fetchedAt: now, priceAsOf: now })),

@@ -10,7 +10,7 @@ test('Preview current catalog attests actual activity, contribution, performance
   try {
     await db.exec(`create role varda_tenant_app; create table app_users(id uuid primary key); create table accounts(id uuid primary key,canonical_owner_user_id uuid,is_active boolean); create function investment_plan_tenant_active() returns boolean language sql as 'select false';`);
     await db.exec('create table daily_portfolio_snapshots(id uuid primary key); alter table accounts add unique(id,canonical_owner_user_id)');
-    for (const tag of ['0047_member_activity','0064_contribution_effects','0065_snapshot_closing_performance','0066_account_history_reviews']) await db.exec(readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint',''));
+    for (const tag of ['0047_member_activity','0064_contribution_effects','0065_snapshot_closing_performance','0066_account_history_reviews','0067_daily_valuation_fx']) await db.exec(readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint',''));
     const read = () => readPreviewReleaseCatalog(async q => (await db.query(q)).rows);
     assertPreviewReleaseCatalog(await read(), expected);
     for (const sql of [
@@ -34,6 +34,8 @@ test('Preview current catalog attests actual activity, contribution, performance
       'grant update on account_history_reviews to varda_tenant_app',
       'alter table account_history_reviews disable trigger account_history_reviews_immutable',
       'drop index account_history_reviews_latest',
+      'alter table daily_valuation_fx disable trigger daily_valuation_fx_immutable',
+      'grant insert on daily_valuation_fx to varda_tenant_app',
     ]) {
       await db.exec('begin');
       try {

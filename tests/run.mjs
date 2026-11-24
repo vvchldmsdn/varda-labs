@@ -67,6 +67,7 @@ import "./financial-correctness-regression.test.mjs";
 import "./portfolio-mutation-integration.test.mjs";
 import "./kis-refresh-lease-integration.test.mjs";
 import "./cron-market-cycle-runner.test.mjs";
+import "./daily-valuation-fx.test.mjs";
 import "./presentation-system.test.mjs";
 import "./auth-experience.test.mjs";
 import "./multi-provider-auth.test.mjs";

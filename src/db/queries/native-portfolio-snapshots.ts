@@ -12,12 +12,14 @@ export async function saveNativeCutoffSnapshots(tenant: TenantContext, evidence:
   if (tenant.ownerUserId !== evidence.ownerId || evidence.groupEvidence || evidence.current.boundary !== "before" || evidence.current.at !== cutoff || !evidence.ledgerComplete || !evidence.current.scopeComplete || !evidence.nativeSequences
     || !Number.isFinite(Date.parse(capturedAt)) || Date.parse(capturedAt) < Date.parse(cutoff) || Date.parse(capturedAt) > Date.now()
     || evidence.current.positions.some(row => row.ownerId !== tenant.ownerUserId || !row.accountId || !row.observation || row.unsupportedReason || row.evidenceReason)) return { status: "incomplete" as const, created: 0 };
-  const availableCurrencies = (["KRW", "USD"] as const).filter(reporting => buildTrackedCurrencyPortfolio({ ...evidence, reporting }).current?.complete);
-  if (!availableCurrencies.length) return { status: "incomplete" as const, created: 0 };
+  const closingFx = evidence.fx.filter(rate => rate.fixing?.serviceDate === snapshotDate && rate.fixing.cutoffAt === cutoff
+    && Date.parse(rate.fetchedAt) <= Date.parse(capturedAt));
+  const availableCurrencies = (["KRW", "USD"] as const).filter(reporting => buildTrackedCurrencyPortfolio({ ...evidence, reporting, fx: closingFx }).current?.complete);
+  if (!availableCurrencies.includes("KRW")) return { status: "incomplete" as const, created: 0 };
   const payload = Object.entries(evidence.nativeSequences).map(([accountId, sequence]) => ({ accountId, sequence, evidence: { version: 1, sequence, revision:evidence.nativeRevisions?.[accountId]??0, availableCurrencies, capturedAt, snapshotDate,
     valuationPolicy: "cutoff_latest_then_verified_close_v3", cycleEnd: cutoff,
     cycleStart: new Date(Date.parse(cutoff)-86400000).toISOString(),
-    frame: { ...evidence.current, positions: evidence.current.positions.filter(row => row.accountId === accountId) }, fx: evidence.fx.filter(rate => Date.parse(rate.observedAt) <= Date.parse(cutoff) && Date.parse(rate.fetchedAt) <= Date.parse(cutoff)) } }));
+    frame: { ...evidence.current, positions: evidence.current.positions.filter(row => row.accountId === accountId) }, fx: closingFx } }));
   if (!payload.length) return { status: "incomplete" as const, created: 0 };
   const rows = await runPortfolioMutation(tenant.ownerUserId, `
     with selected as materialized (

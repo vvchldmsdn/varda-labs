@@ -21,6 +21,11 @@
       "forced": true
     },
     {
+      "name": "daily_valuation_fx",
+      "rls": true,
+      "forced": false
+    },
+    {
       "name": "member_activity_daily",
       "rls": true,
       "forced": true
@@ -235,6 +240,150 @@
       "datetime_precision": null,
       "is_nullable": "NO",
       "column_default": "'[]'::jsonb"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": "gen_random_uuid()"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "service_date",
+      "data_type": "date",
+      "udt_name": "date",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": 0,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "base_currency",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "character_maximum_length": 3,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "quote_currency",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "character_maximum_length": 3,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "reference_date",
+      "data_type": "date",
+      "udt_name": "date",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": 0,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "rate",
+      "data_type": "numeric",
+      "udt_name": "numeric",
+      "character_maximum_length": null,
+      "numeric_precision": 20,
+      "numeric_scale": 6,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "krw_per_eur",
+      "data_type": "numeric",
+      "udt_name": "numeric",
+      "character_maximum_length": null,
+      "numeric_precision": 20,
+      "numeric_scale": 8,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "usd_per_eur",
+      "data_type": "numeric",
+      "udt_name": "numeric",
+      "character_maximum_length": null,
+      "numeric_precision": 20,
+      "numeric_scale": 8,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "source",
+      "data_type": "text",
+      "udt_name": "text",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "policy",
+      "data_type": "text",
+      "udt_name": "text",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "evidence_kind",
+      "data_type": "text",
+      "udt_name": "text",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "column_name": "fetched_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": 6,
+      "is_nullable": "NO",
+      "column_default": null
     },
     {
       "table_name": "member_activity_daily",
@@ -469,6 +618,62 @@
       "definition": "CHECK (((jsonb_typeof(trade_ids) = 'array'::text) AND (jsonb_array_length(trade_ids) <= 100)))"
     },
     {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_cross",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((krw_per_eur > (0)::numeric) AND (krw_per_eur < 'Infinity'::numeric) AND (usd_per_eur > (0)::numeric) AND (usd_per_eur < 'Infinity'::numeric) AND (rate > (0)::numeric) AND (rate = round((krw_per_eur / NULLIF(usd_per_eur, (0)::numeric)), 2))))"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_day_pair",
+      "type": "u",
+      "validated": true,
+      "definition": "UNIQUE (service_date, base_currency, quote_currency)"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_kind",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK ((evidence_kind = ANY (ARRAY['closing_reference'::text, 'historical_reconstruction'::text])))"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_pair",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK ((((base_currency)::text = 'USD'::text) AND ((quote_currency)::text = 'KRW'::text)))"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_pkey",
+      "type": "p",
+      "validated": true,
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_reference",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((reference_date >= (service_date - 7)) AND (reference_date <= (service_date - 1))))"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_source",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((source = 'ecb_eur_cross'::text) AND (policy = 'ecb-eur-cross-2dp-prev-market-day-v1'::text)))"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_time",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK ((fetched_at >= ((service_date + '07:00:00'::time without time zone) AT TIME ZONE 'Asia/Seoul'::text)))"
+    },
+    {
       "table_name": "member_activity_daily",
       "name": "member_activity_daily_counts",
       "type": "c",
@@ -533,6 +738,16 @@
       "definition": "CREATE UNIQUE INDEX contribution_effects_pkey ON public.contribution_effects USING btree (owner_user_id, id)"
     },
     {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_day_pair",
+      "definition": "CREATE UNIQUE INDEX daily_valuation_fx_day_pair ON public.daily_valuation_fx USING btree (service_date, base_currency, quote_currency)"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_pkey",
+      "definition": "CREATE UNIQUE INDEX daily_valuation_fx_pkey ON public.daily_valuation_fx USING btree (id)"
+    },
+    {
       "table_name": "member_activity_daily",
       "name": "member_activity_daily_date_idx",
       "definition": "CREATE INDEX member_activity_daily_date_idx ON public.member_activity_daily USING btree (activity_date)"
@@ -580,6 +795,12 @@
       "name": "contribution_effects_preserve_basis",
       "enabled": "O",
       "definition": "CREATE TRIGGER contribution_effects_preserve_basis BEFORE UPDATE ON public.contribution_effects FOR EACH ROW EXECUTE FUNCTION contribution_effects_preserve_basis()"
+    },
+    {
+      "table_name": "daily_valuation_fx",
+      "name": "daily_valuation_fx_immutable",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER daily_valuation_fx_immutable BEFORE DELETE OR UPDATE ON public.daily_valuation_fx FOR EACH ROW EXECUTE FUNCTION preserve_daily_valuation_fx()"
     }
   ],
   "functions": [
@@ -594,6 +815,12 @@
       "security_definer": false,
       "config": null,
       "definition": "CREATE OR REPLACE FUNCTION public.preserve_account_history_review()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM accounts\n    WHERE id=OLD.account_id AND canonical_owner_user_id=OLD.canonical_owner_user_id) THEN\n    RETURN OLD;\n  END IF;\n  RAISE EXCEPTION 'account_history_review_is_immutable';\nEND $function$\n"
+    },
+    {
+      "name": "preserve_daily_valuation_fx",
+      "security_definer": false,
+      "config": null,
+      "definition": "CREATE OR REPLACE FUNCTION public.preserve_daily_valuation_fx()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  RAISE EXCEPTION 'published daily valuation FX is immutable';\nEND;\n$function$\n"
     }
   ],
   "grants": [

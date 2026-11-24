@@ -15,6 +15,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -1795,6 +1796,29 @@ export const assetGroupMembers = pgTable(
     }),
   }),
 ).enableRLS();
+
+export const dailyValuationFx = pgTable("daily_valuation_fx", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  serviceDate: date("service_date").notNull(),
+  baseCurrency: varchar("base_currency", { length: 3 }).notNull(),
+  quoteCurrency: varchar("quote_currency", { length: 3 }).notNull(),
+  referenceDate: date("reference_date").notNull(),
+  rate: decimal("rate", { precision: 20, scale: 6 }).notNull(),
+  krwPerEur: decimal("krw_per_eur", { precision: 20, scale: 8 }).notNull(),
+  usdPerEur: decimal("usd_per_eur", { precision: 20, scale: 8 }).notNull(),
+  source: text("source").notNull(),
+  policy: text("policy").notNull(),
+  evidenceKind: text("evidence_kind").$type<"closing_reference" | "historical_reconstruction">().notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+}, t => [
+  unique("daily_valuation_fx_day_pair").on(t.serviceDate, t.baseCurrency, t.quoteCurrency),
+  check("daily_valuation_fx_pair", sql`${t.baseCurrency}='USD' and ${t.quoteCurrency}='KRW'`),
+  check("daily_valuation_fx_reference", sql`${t.referenceDate} between ${t.serviceDate}-7 and ${t.serviceDate}-1`),
+  check("daily_valuation_fx_cross", sql`${t.krwPerEur}>0 and ${t.krwPerEur}<'Infinity'::numeric and ${t.usdPerEur}>0 and ${t.usdPerEur}<'Infinity'::numeric and ${t.rate}>0 and ${t.rate}=round(${t.krwPerEur}/nullif(${t.usdPerEur},0),2)`),
+  check("daily_valuation_fx_source", sql`${t.source}='ecb_eur_cross' and ${t.policy}='ecb-eur-cross-2dp-prev-market-day-v1'`),
+  check("daily_valuation_fx_kind", sql`${t.evidenceKind} in ('closing_reference','historical_reconstruction')`),
+  check("daily_valuation_fx_time", sql`${t.fetchedAt} >= (${t.serviceDate} + time '07:00') at time zone 'Asia/Seoul'`),
+]).enableRLS();
 
 export const fxRates = pgTable(
   "fx_rates",
