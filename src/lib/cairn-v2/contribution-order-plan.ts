@@ -5,14 +5,28 @@ import { isKrxGoldManualAssetCandidate } from "../market-data/manual-asset-price
 import type { ReadyContribution, TargetModel } from "./planning-contract";
 
 export type ContributionOrderKind = "whole" | "fractional-shares" | "fractional-amount";
+export const fractionalShareStep = "0.000001";
 export type ContributionOrderRule = Readonly<{
   kind: ContributionOrderKind;
+  fractionalSell?: boolean;
   step: string;
   minimum: string;
   fee: string;
   feePct: string;
   minimumFee: string;
   capKrw: string;
+}>;
+export type ContributionOrderOption = Readonly<{
+  key: string;
+  label: string;
+  accountName: string;
+  walletKey: string;
+  ticker: string | null;
+  market: string | null;
+  currency: Currency | null;
+  unit: "share" | "gram" | null;
+  canBuy: boolean;
+  canSell: boolean;
 }>;
 type BasisRow = Readonly<{
   key: string;
@@ -50,6 +64,28 @@ export const defaultContributionOrderSettings: ContributionOrderSettings = {
   useCashLimits: false, cashByWallet: {}, rules: {},
 };
 
+export function withFractionalBuy(rule: ContributionOrderRule, enabled: boolean): ContributionOrderRule {
+  if (enabled === (rule.kind !== "whole")) return rule;
+  return enabled
+    ? {...rule, kind: "fractional-shares", step: fractionalShareStep, minimum: "0"}
+    : {...rule, kind: "whole", step: "", minimum: ""};
+}
+
+function orderUnit(row: Parameters<typeof isKrxGoldManualAssetCandidate>[0]): "share" | "gram" | null {
+  if (isKrxGoldManualAssetCandidate(row)) return "gram";
+  return row.assetType === "stock" || row.assetType === "etf" ? "share" : null;
+}
+
+export function buildContributionOrderOptions(model: TargetModel): ContributionOrderOption[] {
+  return model.rows.map(row => ({
+    key: row.accountId + ":" + row.assetId, label: row.assetName, accountName: row.accountName,
+    ticker: row.ticker, market: row.market, currency: isCurrency(row.currency) ? row.currency : null,
+    walletKey: row.accountCode + ":" + row.currency,
+    unit: orderUnit({...row, name: row.assetName}), canBuy: row.buyability === "buyable",
+    canSell: (row.currentValueKrw ?? 0) > 0,
+  }));
+}
+
 /** Only the before/after-checked allocation and its admitted price observations enter sizing. */
 export function buildContributionOrderBasis(preview: ReadyContribution, model: TargetModel): ContributionOrderBasis {
   const usdKrw = positive(model.structure.usdKrwRate) ? model.structure.usdKrwRate : null;
@@ -60,16 +96,18 @@ export function buildContributionOrderBasis(preview: ReadyContribution, model: T
     if (!(row.allocationKrw > 0) && !(row.trimAmountKrw > 0)) continue;
     const identity = portfolioStructureHoldingIdentityKey({ ...row, market: row.market ?? "", currency: row.currency ?? "" });
     const holding = held.get(identity);
-    const prices = model.plannedMaRows?.filter(mark => row.ticker !== null && mark.ticker === row.ticker && mark.market === row.market && mark.currency === row.currency);
+    const prices = model.plannedMaRows?.filter(mark => row.ticker !== null && mark.ticker === row.ticker &&
+      mark.market === row.market && mark.currency === row.currency &&
+      (!mark.accountId || row.allocationKey === mark.accountId + ":" + mark.assetId));
     const price = holding?.currentPrice ?? (prices?.length === 1 ? prices[0].currentPrice : null);
-    const gold = isKrxGoldManualAssetCandidate(row);
+    const unit = orderUnit(row);
     if (!positive(price) || !isCurrency(row.currency) || (row.currency === "USD" && usdKrw === null) ||
-      (!gold && !["stock", "etf"].includes(row.assetType ?? "")) || !row.allocationKey) {
+      !unit || !row.allocationKey) {
       unavailable.push(row.name);
       continue;
     }
     rows.push({ key: row.allocationKey, walletKey: row.accountCode + ":" + row.currency, accountName: row.accountName,
-      name: row.name, ticker: row.ticker, market: row.market, currency: row.currency, unit: gold ? "gram" : "share",
+      name: row.name, ticker: row.ticker, market: row.market, currency: row.currency, unit,
       targetKrw: Math.floor(row.allocationKrw), maxBuyKrw: Math.floor(row.baseNeedKrw),
       trimKrw: row.trimAmountKrw, quantity: holding?.quantity ?? null, price });
   }
@@ -82,20 +120,58 @@ export function getContributionWallets(basis: ContributionOrderBasis) {
   return [...new Map(basis.rows.filter(row => row.targetKrw > 0).map(row => [row.walletKey, row])).values()];
 }
 
-const projectedSale = (row: BasisRow, usdKrw: number | null) => {
+const projectedSale = (row: BasisRow, usdKrw: number | null, rule: ContributionOrderRule) => {
   if (!(row.trimKrw > 0) || !positive(row.quantity)) return [];
+  if (row.unit === "gram" && rule.fractionalSell) throw Error("invalid_gold_order_unit");
   const priceKrw = Decimal.from(row.price).mul(row.currency === "USD" ? usdKrw! : 1);
-  const quantity = Math.min(Math.floor(row.quantity), Number(Decimal.from(row.trimKrw).div(priceKrw).minor("KRW", "floor")));
-  return quantity > 0 ? [{key: row.key, quantity, principalKrw: priceKrw.mul(quantity).toNumber()}] : [];
+  const step = Decimal.from(rule.fractionalSell ? fractionalShareStep : 1);
+  const heldLots = Decimal.from(row.quantity).div(step).minor("KRW", "floor");
+  const plannedLots = Decimal.from(row.trimKrw).div(priceKrw.mul(step)).minor("KRW", "floor");
+  const lots = heldLots < plannedLots ? heldLots : plannedLots;
+  const quantity = step.mul(new Decimal(lots));
+  return lots > BigInt(0) ? [{key: row.key, quantity: quantity.toNumber(), principalKrw: priceKrw.mul(quantity).toNumber()}] : [];
 };
 
+function parseOrderTerms(rule: ContributionOrderRule, currency: Currency, unit: BasisRow["unit"]) {
+  if (unit === "gram" && (rule.kind !== "whole" || rule.fractionalSell)) throw Error("invalid_gold_order_unit");
+  const minPrincipalMinor = nativeMinor(rule.minimum, currency);
+  const fee = {fixedMinor: nativeMinor(rule.fee, currency), rateBps: nativeMinor(rule.feePct, "USD"),
+    minimumMinor: nativeMinor(rule.minimumFee, currency)};
+  if (fee.rateBps > 10000) throw Error("invalid_rate");
+  const capKrw = rule.capKrw.trim() ? nativeMinor(rule.capKrw, "KRW") : null;
+  const terms = {minPrincipalMinor, fee, capKrw};
+  if (rule.kind === "whole") return {...terms, kind: rule.kind};
+  if (!rule.minimum.trim()) throw Error("invalid_fractional_rule");
+  const step = rule.step.trim().replace(/^\./, "0.");
+  if (rule.kind === "fractional-shares") {
+    if (!/^\d+(?:\.\d{1,8})?$/.test(step) || Decimal.from(step).compare(0) <= 0 || Decimal.from(step).compare(1) >= 0) {
+      throw Error("invalid_fractional_rule");
+    }
+    return {...terms, kind: rule.kind, quantityStep: step};
+  }
+  if (rule.kind !== "fractional-amount") throw Error("invalid_order_kind");
+  const amountStepMinor = nativeMinor(step, currency);
+  if (amountStepMinor <= 0) throw Error("invalid_fractional_rule");
+  return {...terms, kind: rule.kind, amountStepMinor};
+}
+
+export function validContributionOrderRule(rule: ContributionOrderRule, currency: Currency | null, unit: BasisRow["unit"] | null) {
+  if (!currency || !unit) return rule.kind === "whole" && !rule.fractionalSell &&
+    ![rule.step, rule.minimum, rule.fee, rule.feePct, rule.minimumFee, rule.capKrw].some(Boolean);
+  try {
+    parseOrderTerms(rule, currency, unit);
+    return true;
+  } catch { return false; }
+}
+
 export function projectContributionOrderPlan(basis: ContributionOrderBasis, settings: ContributionOrderSettings) {
-  const sales = basis.rows.flatMap(row => projectedSale(row, basis.usdKrw));
+  let sales: ReturnType<typeof projectedSale> = [];
   const buyRows = basis.rows.filter(row => row.targetKrw > 0);
   const wallets: Record<string, number> = {};
   const assets: OrderSizingAsset[] = [];
 
   try {
+    sales = basis.rows.flatMap(row => projectedSale(row, basis.usdKrw, settings.rules[row.key] ?? defaultContributionOrderRule));
     for (const row of getContributionWallets(basis)) {
       wallets[row.walletKey] = settings.useCashLimits
         ? nativeMinor(settings.cashByWallet[row.walletKey], row.currency)
@@ -103,32 +179,22 @@ export function projectContributionOrderPlan(basis: ContributionOrderBasis, sett
     }
     for (const row of buyRows) {
       const rule = settings.rules[row.key] ?? defaultContributionOrderRule;
-      if (row.unit === "gram" && rule.kind !== "whole") throw Error("invalid_gold_order_unit");
-      const minPrincipalMinor = nativeMinor(rule.minimum, row.currency);
-      const fee = {fixedMinor: nativeMinor(rule.fee, row.currency), rateBps: nativeMinor(rule.feePct, "USD"), minimumMinor: nativeMinor(rule.minimumFee, row.currency)};
-      if (fee.rateBps > 10000) throw Error("invalid_rate");
-      const pricing = {unitPrice: row.price};
-      const step = rule.step.trim().replace(/^\./, "0.");
+      const terms = parseOrderTerms(rule, row.currency, row.unit);
       let order: OrderSizingAsset["order"];
-      switch (rule.kind) {
+      switch (terms.kind) {
         case "whole":
-          order = {kind: rule.kind, ...pricing};
+          order = {kind: terms.kind, unitPrice: row.price};
           break;
         case "fractional-shares":
-          if (!/^\d+(?:\.\d{1,8})?$/.test(step) || Decimal.from(step).compare(0) <= 0 || Decimal.from(step).compare(1) >= 0 || !rule.minimum.trim()) throw Error("invalid_fractional_rule");
-          order = {kind: rule.kind, ...pricing, quantityStep: step};
+          order = {kind: terms.kind, unitPrice: row.price, quantityStep: terms.quantityStep};
           break;
-        case "fractional-amount": {
-          const amountStepMinor = nativeMinor(step, row.currency);
-          if (amountStepMinor <= 0 || !rule.minimum.trim()) throw Error("invalid_fractional_rule");
-          order = {kind: rule.kind, amountStepMinor};
+        case "fractional-amount":
+          order = {kind: terms.kind, amountStepMinor: terms.amountStepMinor};
           break;
-        }
       }
-      const customMax = rule.capKrw.trim() ? nativeMinor(rule.capKrw, "KRW") : basis.budgetKrw;
       assets.push({key: row.key, currency: row.currency, walletKey: row.walletKey, targetKrw: row.targetKrw,
-        krwPerCurrency: row.currency === "USD" ? basis.usdKrw! : 1, maxPrincipalKrw: Math.min(row.maxBuyKrw, customMax, basis.budgetKrw),
-        fee, minPrincipalMinor, order});
+        krwPerCurrency: row.currency === "USD" ? basis.usdKrw! : 1, maxPrincipalKrw: Math.min(row.maxBuyKrw, terms.capKrw ?? basis.budgetKrw, basis.budgetKrw),
+        fee: terms.fee, minPrincipalMinor: terms.minPrincipalMinor, order});
     }
 
     const result = sizeAdditionalContributionOrders({budgetKrw:basis.budgetKrw, wallets, assets});
@@ -142,6 +208,13 @@ export function projectContributionOrderPlan(basis: ContributionOrderBasis, sett
 
 export function displayOrderNativeAmount(minor: number, currency: Currency) {
   return (minor / 10 ** MINOR_DIGITS[currency]).toLocaleString(currency === "KRW" ? "ko-KR" : "en-US", {minimumFractionDigits: MINOR_DIGITS[currency]});
+}
+
+export function validContributionWalletAmount(raw: string | undefined, currency: Currency) {
+  try {
+    nativeMinor(raw, currency);
+    return true;
+  } catch { return false; }
 }
 
 function nativeMinor(raw: string | undefined, currency: Currency) {

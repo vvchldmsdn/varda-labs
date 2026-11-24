@@ -59,7 +59,7 @@ async function captureWidths(page, output, name, focus) {
 }
 
 async function openExclusions(surface) {
-  const picker = surface.locator('summary').filter({ hasText: /^매도 제외 종목/ }).locator('..');
+  const picker = surface.locator('summary').filter({ hasText: /^(매도 제외 종목|종목별 거래 설정)/ }).locator('..');
   if (await picker.getAttribute('open') === null) await picker.locator(':scope > summary').click();
   return picker;
 }

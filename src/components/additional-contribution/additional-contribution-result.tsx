@@ -82,7 +82,7 @@ export function AdditionalContributionFlowScene({
           <SummaryMetric
             label="현금 보류"
             value={formatKrw(preview.residualCashKrw)}
-            detail="유효 목표 부족분과 원 단위 배분 후 잔액"
+            detail="기본 배분·감액·보충 후 남은 재원"
           />
           <SummaryMetric
             label="배분 종목"

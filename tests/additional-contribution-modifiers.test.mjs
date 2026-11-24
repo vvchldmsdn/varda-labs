@@ -16,14 +16,15 @@ it('applies the verified danger-regime reduction before conditional topup',()=>{
   assert.deepEqual(result.rows.map(r=>r.allocationKrw),[35000,35000]);
   assert.equal(result.totalAllocatedKrw,70000);
   assert.equal(result.residualCashKrw,30000);
-  assert.equal(result.minimumExecutionTargetKrw,40000);
+  assert.equal(result.minimumExecutionTargetKrw,85000);
+  assert.equal(result.minimumExecutionSatisfied,false);
 });
 
 it('retains the basic allocation exactly when all five observed multipliers are neutral',()=>{
   const a=calculate(undefined,{modifiers:evidence('안정')}),b=calculate(undefined,{modifiers:undefined});
   assert.equal(a.totalAllocatedKrw,100000);assert.equal(a.residualCashKrw,0);
   assert.deepEqual(a.rows.map(row=>row.allocationKrw),b.rows.map(row=>row.allocationKrw));
-  assert.equal(a.policy.version,'gyeol_fin_explainable_rebalance_v2');assert.equal(b.policy.version,'gyeol_fin_explainable_rebalance_v1');
+  assert.equal(a.policy.version,'gyeol_fin_explainable_rebalance_v3');assert.equal(b.policy.version,'gyeol_fin_explainable_rebalance_base_v3');
 });
 it('reconciles each rule to the approved baseline and final allocation, including redistribution and rounding', () => {
   const modifiers = {...evidence('안정'), fx: known({multiplier:.744, hot:false, observationCount:252}),
@@ -49,16 +50,29 @@ it('reconciles each rule to the approved baseline and final allocation, includin
   assert.ok(result.rows[0].ruleSteps.find(step=>step.rule==='fx').deltaKrw<0);
   assert.equal(result.rows[1].ruleSteps.find(step=>step.rule==='fx').deltaKrw,0);
 });
-it('distinguishes an observed neutral value from unavailable evidence and never tops up unknown candidates',()=>{
-  const m={...evidence('안정'),eventScore:{status:'unavailable',reason:'missing'},regime:{status:'unavailable',reason:'missing'}};
-  const result=calculate(undefined,{modifiers:m});
-  assert.equal(result.rows[0].modifierBreakdown.multipliers.event.status,'unavailable');
-  assert.equal(result.rows[0].modifierBreakdown.multipliers.event.value,1);
-  assert.equal(result.minimumExecutionEvidenceAvailable,false);
-  assert.equal(result.effectiveMinimumRatioPct,null);
-  assert.equal(result.minimumTopupCapacityKrw,0);
-  assert.ok(result.rows.every(row=>row.modifierBreakdown.topupBlockers.includes('event_unavailable')));
-  assert.ok(result.rows.every(row=>!row.modifierBreakdown.topupEligible));
+it('tops up an eligible holding with missing evidence and preserves a known MA reduction',()=>{
+  const missing = {status:'unavailable',reason:'missing'};
+  const modifiers = {fundingBasis:'KRW',eventScore:missing,regime:missing,fx:missing,performance:missing};
+  const common = {currentValueKrw:100000, targetWeightBps:4000, costBasisKrw:null, riskContribution:missing, fxExposureType:'US_LISTED'};
+  const result = calculate([
+    row('a',{...common,maAssetClass:'thematic',ma120Evidence:{status:'below_ma',distanceFromMaPct:-4}}),
+    row('b',common),
+    row('over',{currentValueKrw:800000,targetWeightBps:2000,costBasisKrw:null}),
+  ],{modifiers});
+  const [reduced, eligible] = result.rows;
+  assert.equal(reduced.effectiveTargetWeightBps,4000);
+  assert.deepEqual(reduced.ruleSteps[0],{rule:'ma120',beforeKrw:50000,afterKrw:25000,deltaKrw:-25000});
+  assert.deepEqual(reduced.modifierBreakdown.topupBlockers,['ma_not_eligible']);
+  for (const rule of ['fx','rc','regime','event','performance']) {
+    assert.equal(eligible.modifierBreakdown.multipliers[rule].status,'unavailable');
+    assert.equal(eligible.modifierBreakdown.multipliers[rule].value,1);
+  }
+  assert.equal(eligible.modifierBreakdown.topupEligible,true);
+  assert.equal(eligible.modifierBreakdown.topupAllocationKrw,10000);
+  assert.equal(result.minimumExecutionEvidenceAvailable,true);
+  assert.equal(result.effectiveMinimumRatioPct,85);
+  assert.equal(result.totalAllocatedKrw,85000);
+  assert.equal(result.minimumExecutionSatisfied,true);
 });
 it('uses the raw 60-to-251 observation count, skips unavailable MA120 and clamps FX at 0.55',()=>{
   assert.equal(calculateContributionFxOverlay(Array(59).fill(1000),35),null);
@@ -67,11 +81,11 @@ it('uses the raw 60-to-251 observation count, skips unavailable MA120 and clamps
   const full=calculateContributionFxOverlay([...Array(251).fill(1000),1500],35);assert.equal(full.percentileLookback,252);assert.equal(full.ma120Available,true);
   const stretch=calculateContributionFxOverlay([...Array(251).fill(1000),1010],0);assert.equal(stretch.stretchMult,.98);
 });
-it('applies signed MDD, fraction RC and 10 percentage-point FX_HOT cuts',()=>{
+it('applies known FX, MDD and RC reductions while retaining the configured minimum',()=>{
   const m={...evidence('안정'),fx:known({multiplier:.55,hot:true,observationCount:252}),eventScore:known(39),performance:known({alpha90Pct:-1,alpha252Pct:-1,mddPct:-10})};
   const resolved=resolveContributionMultipliers({modifiers:m,exposure:'US_LISTED',riskContribution:known(.75),targetFraction:.5});
   assert.equal(resolved.fx.value,.55);assert.equal(resolved.rc.value,.85);assert.equal(resolved.event.value,.9);assert.equal(resolved.performance.value,.9);assert.equal(resolved.penaltyMult,.3787);
-  const result=calculate(undefined,{modifiers:m});assert.equal(result.minimumExecutionTargetKrw,75000);
+  const result=calculate(undefined,{modifiers:m});assert.equal(result.minimumExecutionTargetKrw,85000);
 });
 it('caps topup at each remaining gap and redistributes only to eligible candidates',()=>{
   const m={...evidence('안정'),fx:known({multiplier:.55,hot:false,observationCount:252})};
@@ -100,14 +114,15 @@ it('tops up one eligible holding and leaves cash when its capacity is exhausted'
   assert.equal(capped.minimumTopupCapacityKrw,13333);
   assert.equal(capped.rows.find(r=>r.allocationKey==='safe').modifierBreakdown.topupCapacityKrw,13333);
 });
-it('caps the minimum at the sum of whole-won eligible gaps, before estimating order units', () => {
+it('reports an unmet configured minimum when none of the target gaps covers a whole won', () => {
   const rows = ['a','b'].map(key => row(key, {currentValueKrw:10000.25,
     ma120Evidence:{status:'below_ma',distanceFromMaPct:-4}}));
-  const result = calculate(rows, {cashAmountKrw:5002, modifiers:evidence('안정')});
+  const result = calculate(rows, {cashAmountKrw:1, modifiers:evidence('안정')});
   assert.equal(result.status,'ready');
-  assert.ok(result.totalBaseNeedKrw > 1 && result.totalBaseNeedKrw < 2);
+  assert.equal(result.totalBaseNeedKrw,1);
   assert.equal(result.totalBuyCapacityKrw,0);
-  assert.equal(result.minimumExecutionTargetKrw,0);
+  assert.equal(result.minimumExecutionTargetKrw,1);
+  assert.equal(result.minimumExecutionSatisfied,false);
   assert.equal(result.totalAllocatedKrw,0);
 });
 it('uses exact whole-won minimum targets for decimal policy percentages', () => {

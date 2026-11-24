@@ -77,77 +77,15 @@ export const contributionMethod = {
       },
     },
     {
-      id: "ma120-effective-target",
-      title: { ko: "2. MA120 아래에서는 목표액을 완만하게 낮춥니다", en: "2. Below MA120, reduce the effective target gradually" },
-      lead: {
-        ko: "추세 필터와 해당 종목 규칙이 켜진 경우에만 적용합니다. MA120은 확인된 최근 120개 가격 관측일의 종가 평균입니다. 가격이 평균 아래로 내려간 정도에 따라 목표액을 줄인 뒤 부족액을 다시 계산합니다. 최종 매수액에 일정 비율을 곱하는 방식이 아닙니다.",
-        en: "This applies only when both the trend filter and the position's rule are enabled. MA120 is the average close across the latest 120 observed price dates. Reduce the target value according to how far price is below that average, then recalculate the shortfall. It is not a fixed percentage haircut on the final buy amount.",
-      },
-      equations: [
-        {
-          expression: "MA₁₂₀ = (P₁ + … + P₁₂₀) / 120",
-          reading: {
-            ko: "비교일 이후의 가격은 제외하고 최근 120개 관측값을 평균냅니다. 120일 달력에 빈 날짜를 채우는 방식은 아닙니다. 비교 가격과 과거 가격의 가격 기준도 확인합니다.",
-            en: "Exclude observations after the comparison date and average the latest 120 observations. This is not a 120-calendar-day series filled across missing dates. The comparison price and history must also have an accepted price basis.",
-          },
-        },
-        {
-          expression: "gᵢ = max(0, 100 × (1 − Pᵢ / MA₁₂₀))",
-          reading: {
-            ko: "평균보다 아래인 비율을 양수 g로 표현합니다. 평균이 10,000원, 비교 가격이 9,850원이면 g는 1.5입니다. 평균 이상이거나 근거가 유효하지 않으면 감액하지 않습니다.",
-            en: "Express the percentage below the average as a positive g. With an average of KRW 10,000 and a comparison price of KRW 9,850, g is 1.5. Prices at or above the average, or unavailable evidence, do not trigger a reduction.",
-          },
-        },
-        {
-          expression: "mᵢ = 1 − min(1, gᵢ / 3) × (1 − bᵢ)",
-          reading: {
-            ko: "평균 바로 아래에서는 1배에서 시작해 3% 아래까지 선형으로 낮춥니다. 3% 이상 아래에서는 분류별 하한 b를 유지합니다. 광범위 지수·배당 우량·기타 0.8배, 대형 성장 0.7배, 테마 0.5배입니다. 금·채권은 1배로 감액에서 제외합니다.",
-            en: "Start at 1× just below the average and decrease linearly until price is 3% below it. At or below that point, retain the class floor b: 0.8× for broad indices, dividend quality and other assets; 0.7× for large growth; 0.5× for thematic assets. Gold and bonds remain at 1× and are exempt.",
-          },
-        },
-        {
-          expression: "Eᵢ = tᵢ × mᵢ × T,  Dᵢ = max(0, Eᵢ − pᵢ)",
-          reading: {
-            ko: "조정한 유효 목표액 E에서 이미 보유한 p를 빼면 부족액 D가 됩니다. 감액한 목표비중들을 다시 100%로 확대하지 않으므로, 필요에 따라 일부 재원이 현금으로 남습니다.",
-            en: "Subtract the existing post-trim holding p from the effective target E to obtain shortfall D. Reduced target weights are not scaled back up to 100%, so part of the budget may remain as cash.",
-          },
-        },
-      ],
-      symbols: [
-        { symbol: "P₁ … P₁₂₀, Pᵢ", meaning: { ko: "과거 120개 종가와 현재 비교 가격. 동일한 가격 단위 사용", en: "The 120 historical closes and current comparison price, in compatible price units" } },
-        { symbol: "gᵢ", meaning: { ko: "MA120 아래 거리, % 단위 숫자. 1.5% 아래면 1.5", en: "Distance below MA120 in percent units; use 1.5 for 1.5% below" } },
-        { symbol: "bᵢ, mᵢ", meaning: { ko: "자산 분류별 하한 배수와 실제 적용 배수, 단위 없음", en: "The class floor multiplier and the applied multiplier, dimensionless" } },
-        { symbol: "Eᵢ, Dᵢ", meaning: { ko: "유효 목표액과 매수 부족액, 원화. 아직 원 미만을 버리지 않음", en: "Effective target value and buying shortfall, in KRW; fractional KRW are retained here" } },
-      ],
-      figure: {
-        kind: "bars",
-        caption: { ko: "대형 성장 자산의 목표액 배수 · 아래 거리에 따라 1배에서 0.7배로", en: "Large-growth target multiplier · from 1× to 0.7× with distance below MA120" },
-        unit: { ko: "배", en: "×" },
-        rows: [
-          { label: { ko: "MA120 이상", en: "At or above MA120" }, value: 1 },
-          { label: { ko: "1.5% 아래", en: "1.5% below" }, value: 0.85 },
-          { label: { ko: "3% 이상 아래", en: "3% or more below" }, value: 0.7 },
-        ],
-      },
-      example: {
-        ko: "대형 성장 자산이 MA120보다 1.5% 아래라면 m = 1 − (1.5 ÷ 3) × (1 − 0.7) = 0.85입니다. 원래 목표액 200만원은 170만원으로 줄어듭니다. 매도 후 이미 160만원을 보유했다면 부족액은 10만원이며, 실제 매수액은 다음 단계에서 전체 재원과 다른 종목의 부족액에 따라 정해집니다.",
-        en: "For large growth at 1.5% below MA120, m = 1 − (1.5 ÷ 3) × (1 − 0.7) = 0.85. An original KRW 2m target becomes KRW 1.7m. With KRW 1.6m already held after trimming, the shortfall is KRW 100,000. The next stage determines the actual buy using the total budget and other positions' shortfalls.",
-      },
-      caveat: {
-        ko: "규칙이 꺼져 있거나 금·채권·적금·연금·주택청약·정기예금이면 배수는 1입니다. 관측이 120개보다 적거나 중복·잘못된 가격·허용되지 않은 가격 기준·오래되거나 미래인 비교 시세가 있으면 감액 근거로 쓰지 않습니다. 비교 시세 168시간 초과 또는 최신 과거 관측일 7일 초과도 제외합니다. 이 배수는 현재 구현된 정책값이며 미래 수익을 보장하거나 최적임을 입증한 값은 아닙니다.",
-        en: "A disabled rule, gold, bonds, savings, pensions, housing subscriptions or fixed deposits use 1×. Fewer than 120 observations, duplicate or invalid history, unsupported price bases, and stale or future comparison quotes cannot justify a reduction. A comparison quote over 168 hours old or latest history over 7 calendar days old is also rejected. These are implemented policy parameters, not proven optimal values or guarantees of future returns.",
-      },
-    },
-    {
       id: "whole-krw-allocation",
-      title: { ko: "3. 부족액에 비례해 원 단위로 나눕니다", en: "3. Allocate whole KRW in proportion to shortfalls" },
+      title: { ko: "2. 목표까지 부족한 금액에 비례해 배분합니다", en: "2. Allocate the budget in proportion to target shortfalls" },
       lead: {
-        ko: "매도액이 0원이고 매수 가능한 종목만 후보가 됩니다. 후보별 유효 목표 부족액은 소수 원까지 비례 계산에 사용하되, 실제 배정액은 그 부족액을 내림한 금액을 넘을 수 없습니다. 작은 반올림 차이도 재원 합계가 맞도록 처리합니다.",
-        en: "Only buyable positions with zero sale amounts are candidates. Keep fractional KRW in each effective-target shortfall for proportional weighting, but never allocate more than the shortfall rounded down. Whole-KRW rounding must preserve the budget totals.",
+        ko: "각 종목의 목표액은 투입 후 총액에 승인된 목표비중을 곱해 구합니다. 매도 후 보유액을 빼서 양수인 만큼이 부족액입니다. 이번에 매도한 종목은 매수 후보에서 제외합니다.",
+        en: "Multiply the post-contribution total by each approved target weight. Subtract post-trim holdings and keep a positive difference as the shortfall. Omit positions sold in this plan from its buy candidates.",
       },
       equations: [
         {
-          expression: "D = ΣDᵢ,  Q = min(F, D)",
+          expression: "Dᵢ = max(0, T × tᵢ − pᵢ),  D = ΣDᵢ,  Q = min(F, D)",
           reading: {
             ko: "매수 후보의 부족액 합 D와 재원 F 중 작은 쪽 Q까지만 배분합니다. 부족액 합이 0이면 매수도 0원입니다.",
             en: "Allocate at most Q, the smaller of candidate shortfalls D and available funds F. If total shortfall is zero, all buy amounts are zero.",
@@ -168,17 +106,17 @@ export const contributionMethod = {
           },
         },
         {
-          expression: "L = F − Σaᵢ,  Σ(pᵢ + aᵢ) + L = V + C",
+          expression: "L₀ = F − Σaᵢ",
           reading: {
-            ko: "배분 후 남은 금액 L은 현금입니다. 거래 후 보유액과 현금을 합하면 원래 보유액과 새 돈의 합이 됩니다. 재원이 충분해도 종목별 상한 때문에 남은 돈을 모두 투자하지 않을 수 있습니다.",
-            en: "L is cash left after allocation. Post-trade holdings plus cash equal original holdings plus new cash. Position caps can leave money uninvested even when funds remain available.",
+            ko: "기본 배분액을 합해 재원에서 빼면 이 단계의 잔액 L₀입니다. 이후 종목별 감액과 최소매수비율 보충을 반영해 최종 현금을 계산합니다.",
+            en: "Subtract the base buys from available funds to get the balance at this stage. Final cash also reflects each reduction and eligible top-up.",
           },
         },
       ],
       symbols: [
         { symbol: "Dᵢ, D, Q", meaning: { ko: "종목별 부족액·부족액 합·배분 한도, 원화", en: "Position shortfall, total shortfall and deployment limit, in KRW" } },
         { symbol: "qᵢ, capᵢ, aᵢ", meaning: { ko: "이상적 배분액·원 단위 상한·실제 배정액. q만 소수 가능", en: "Ideal allocation, whole-KRW cap and assigned amount; only q may be fractional" } },
-        { symbol: "R, L", meaning: { ko: "1원 추가 배정을 위한 잔여액과 최종 잔여 현금, 원 단위 정수", en: "Remainder for one-KRW awards and final cash left, in whole KRW" } },
+        { symbol: "R, L₀", meaning: { ko: "원 단위 배정 전 나머지와 기본 배분 후 잔액", en: "Remainder before one-KRW awards and cash after base allocation" } },
       ],
       figure: {
         kind: "bars",
@@ -195,20 +133,82 @@ export const contributionMethod = {
         en: "With a total shortfall of KRW 300, ideal amounts are approximately 33.6667, 33.3333 and 33 KRW. Allocate 33 each, then give the remaining KRW 1 to A: 34 + 33 + 33 = 100. For a cap example, a KRW 10 budget with only 0.8 and 2.2 KRW shortfalls has caps of 0 and 2. Final buys are 0 and 2 KRW, leaving KRW 8 in cash.",
       },
       caveat: {
-        ko: "매도하지 않은 매수 불가 종목에 유효 부족액이 있으면 그 몫을 다른 종목에 몰아주지 않고 계산을 중단합니다. 최소 집행 기준은 ceil(F × 설정 비율 ÷ 100)이며 기본 비율은 85%입니다. ceil은 원 미만 올림입니다. 이 기준은 안내용이므로 충족시키려고 부족액 상한을 넘겨 강제로 매수하지 않습니다.",
-        en: "If an untrimmed, non-buyable position has an effective shortfall, the calculation stops instead of sending its share elsewhere. The minimum-execution reference is ceil(F × configured percent ÷ 100), with an 85% default. Ceil rounds up to whole KRW. This is informational: it never forces buys above shortfall caps to meet that reference.",
+        ko: "종목별 상한은 승인 목표까지의 부족액을 원 단위로 내림한 값입니다. 매수할 수 없는 종목에 부족액이 있으면 계산을 중단합니다.",
+        en: "The cap is the whole-KRW shortfall to the approved target. An unbuyable position with a positive shortfall after trimming blocks the plan.",
+      },
+    },
+    {
+      id: "ma120-buy-amount",
+      title: { ko: "3. 120일선 아래면 이번 매수금액을 줄입니다", en: "3. Reduce this purchase when price is below MA120" },
+      lead: {
+        ko: "추세 필터와 종목 규칙이 켜져 있으면 최근 120개 관측일의 평균 종가와 현재 가격을 비교합니다. 평균보다 낮으면 방금 계산한 기본 배분액에 종목별 배수를 곱합니다.",
+        en: "When both trend rules are enabled, compare the current price with the average of the latest 120 observed closes. Below that average, multiply the holding’s base allocation by its trend multiplier.",
+      },
+      equations: [
+        {
+          expression: "MA₁₂₀ = (P₁ + … + P₁₂₀) / 120",
+          reading: {
+            ko: "비교일 이후의 가격은 제외하고 최근 120개 관측값을 평균냅니다. 120일 달력에 빈 날짜를 채우는 방식은 아닙니다. 비교 가격과 과거 가격의 가격 기준도 확인합니다.",
+            en: "Exclude observations after the comparison date and average the latest 120 observations. This is not a 120-calendar-day series filled across missing dates. The comparison price and history must also have an accepted price basis.",
+          },
+        },
+        {
+          expression: "gᵢ = max(0, 100 × (1 − Pᵢ / MA₁₂₀))",
+          reading: {
+            ko: "평균이 10,000원이고 비교 가격이 9,850원이면 평균보다 1.5% 낮습니다. 비교 시세가 168시간보다 오래됐거나 최신 이력 날짜가 7일 넘게 지났으면 감액을 건너뜁니다.",
+            en: "A price of KRW 9,850 is 1.5% below a KRW 10,000 average. Skip the reduction if the quote is over 168 hours old or the latest historical date is more than seven days old.",
+          },
+        },
+        {
+          expression: "mᵢ = 1 − min(1, gᵢ / 3) × (1 − bᵢ)",
+          reading: {
+            ko: "평균 바로 아래에서는 1배에서 시작해 3% 아래까지 선형으로 낮춥니다. 3% 이상 아래에서는 분류별 하한 b를 유지합니다. 광범위 지수·배당 우량·기타 0.8배, 대형 성장 0.7배, 테마 0.5배입니다. 금·채권은 1배로 감액에서 제외합니다.",
+            en: "Start at 1× just below the average and decrease linearly until price is 3% below it. At or below that point, retain the class floor b: 0.8× for broad indices, dividend quality and other assets; 0.7× for large growth; 0.5× for thematic assets. Gold and bonds remain at 1× and are exempt.",
+          },
+        },
+        {
+          expression: "Aᵢ = round(aᵢ × mᵢ)",
+          reading: {
+            ko: "기본 배분액 a에 추세 배수 m을 곱해 원 단위로 반올림합니다. 이어서 확인된 환율·위험기여·시장·뉴스·성과 배수를 적용합니다.",
+            en: "Multiply the base allocation a by the trend multiplier m and round to whole KRW. Then apply each available FX, risk, regime, news and performance factor.",
+          },
+        },
+      ],
+      symbols: [
+        { symbol: "P₁ … P₁₂₀, Pᵢ", meaning: { ko: "과거 120개 종가와 현재 비교 가격. 동일한 가격 단위 사용", en: "The 120 historical closes and current comparison price, in compatible price units" } },
+        { symbol: "gᵢ", meaning: { ko: "MA120 아래 거리, % 단위 숫자. 1.5% 아래면 1.5", en: "Distance below MA120 in percent units; use 1.5 for 1.5% below" } },
+        { symbol: "bᵢ, mᵢ", meaning: { ko: "자산 분류별 하한 배수와 실제 적용 배수, 단위 없음", en: "The class floor multiplier and the applied multiplier, dimensionless" } },
+        { symbol: "aᵢ, Aᵢ", meaning: { ko: "종목의 기본 배분액과 추세 배수를 반영한 금액, 원 단위", en: "Base allocation and amount after the trend multiplier, in whole KRW" } },
+      ],
+      figure: {
+        kind: "bars",
+        caption: { ko: "대형 성장 자산의 매수 배수", en: "Buy multiplier for a large-growth holding" },
+        unit: { ko: "배", en: "×" },
+        rows: [
+          { label: { ko: "MA120 이상", en: "At or above MA120" }, value: 1 },
+          { label: { ko: "1.5% 아래", en: "1.5% below" }, value: 0.85 },
+          { label: { ko: "3% 이상 아래", en: "3% or more below" }, value: 0.7 },
+        ],
+      },
+      example: {
+        ko: "대형 성장 종목의 가격이 120일선보다 1.5% 낮으면 배수는 0.85입니다. 기본 배분액이 20만원이면 이번 매수금액은 17만원으로 3만원 줄어듭니다.",
+        en: "For a large-growth holding 1.5% below MA120, the multiplier is 0.85. A base allocation of KRW 200,000 becomes KRW 170,000, a KRW 30,000 reduction.",
+      },
+      caveat: {
+        ko: "예를 들어 원화 재원 100만원에 최소매수비율 80%면 80만원까지 보충합니다. 뉴스 등 자료가 없으면 그 배수는 1입니다. 보충은 120일선 이상이거나 추세 규칙이 면제·해제된 종목 중 다른 감액 배수의 곱이 0.85 이상인 매수 후보에만 적용합니다. 승인 목표까지 남은 자리가 부족하면 채우지 못한 금액은 현금으로 남습니다.",
+        en: "With a KRW 1m budget and an 80% minimum buy ratio, top up toward KRW 800,000. Missing factors such as news use 1×. A buy candidate qualifies if its price is at or above MA120 or its trend rule is exempt or disabled, and the other factors multiply to at least 0.85. Cash remains when eligible target gaps have been filled.",
       },
     },
     {
       id: "assumptions-and-baseline",
       title: { ko: "4. 내 가정은 기본 계산과 분리해 비교합니다", en: "4. Compare your assumptions separately from the baseline" },
       lead: {
-        ko: "기본 결과를 보존한 채 신규 투입금의 일부를 현금으로 남기는 실험을 할 수 있습니다. 별도로 환율 변화 가정에 따른 현재 보유액 차이를 볼 수 있습니다. 현재 뉴스·금리·산업 전망을 자동 점수화해 매수액을 바꾸는 기능은 연결되어 있지 않습니다.",
-        en: "Keep the baseline intact while testing a minimum cash reserve from your new contribution. Separately, inspect how an assumed exchange-rate change affects current holdings. News, interest rates and industry outlooks are not currently scored into automatic buy-amount adjustments.",
+        ko: "기본 계획을 두고 신규 투입금 일부를 현금으로 유보하거나 환율이 바뀌었을 때 현재 보유액이 얼마나 변하는지 확인할 수 있습니다.",
+        en: "Starting from the base plan, explore a higher cash reserve from the new contribution or a hypothetical exchange-rate change for current holdings.",
       },
       equations: [
         {
-          expression: "nᵢ ≈ C × aᵢ / F,  nL ≈ C × L / F",
+          expression: "nᵢ ≈ C × Bᵢ / F,  nL ≈ C × L / F",
           reading: {
             ko: "섞인 재원의 각 매수액과 잔여 현금에 신규 투입금이 얼마나 포함되었는지 비례로 나눠 봅니다. 실제로는 원 단위 최대잔여 방식으로 나누므로 n들의 합은 C와 정확히 같습니다. 실제 돈의 출처를 추적한 기록이 아닌 비교용 귀속 규칙입니다.",
             en: "Attribute new cash proportionally to every baseline buy and to residual cash in the pooled budget. Actual attribution uses whole-KRW largest remainders, so the n amounts sum to C exactly. This is a comparison convention, not a record of where each unit of cash came from.",
@@ -222,7 +222,7 @@ export const contributionMethod = {
           },
         },
         {
-          expression: "Σeᵢ = E,  a′ᵢ = aᵢ − eᵢ,  L′ = L + E",
+          expression: "Σeᵢ = E,  a′ᵢ = Bᵢ − eᵢ,  L′ = L + E",
           reading: {
             ko: "추가 유보액은 각 매수의 신규 투입금 귀속분 n에 비례해 원 단위 최대잔여 방식으로 줄입니다. 각 감액 e는 n을 넘지 않습니다. 매도대금으로 귀속된 매수분과 원래 매도액은 유지하며 다른 종목에 재배분하지 않습니다.",
             en: "Reduce buys by E in proportion to their new-cash-attributed portions n, using whole-KRW largest remainders. Each reduction e is capped at n. Sale-funded buying and original sale amounts stay unchanged, with no redistribution to other positions.",
@@ -238,6 +238,7 @@ export const contributionMethod = {
       ],
       symbols: [
         { symbol: "nᵢ, nL", meaning: { ko: "기본 매수와 기본 잔여 현금에 귀속된 신규 투입금, 원화", en: "New cash attributed to baseline buys and baseline residual cash, in KRW" } },
+        { symbol: "Bᵢ, L", meaning: { ko: "감액과 보충까지 마친 매수금액과 남은 현금, 원화", en: "Buy amount and cash balance after reductions and eligible top-ups, in KRW" } },
         { symbol: "r, H, E", meaning: { ko: "유보 비율(%), 신규 투입금 최소 현금 목표(원), 추가 유보액(원)", en: "Reserve percent, minimum new-cash reserve in KRW, and extra reserve in KRW" } },
         { symbol: "eᵢ, a′ᵢ, L′", meaning: { ko: "종목별 감액·가정 적용 후 매수액·가정 적용 후 현금, 원화", en: "Position reduction, scenario buy amount and scenario cash, in KRW" } },
         { symbol: "VUSD, h, ΔFX", meaning: { ko: "USD 표시 자산의 현재 원화 평가액, 환율 변화 가정(bp), 원화 평가액 차이. 100bp = 1%", en: "Current KRW value of USD-denominated assets, assumed FX move in basis points, and KRW value difference; 100 bp = 1%" } },

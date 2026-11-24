@@ -193,3 +193,13 @@ test("enforces spending constraints in the deterministic bounded-search fallback
   assert.equal(result.spentKrw, 1_000_000);
   assert.ok(result.orders[0].principalKrw <= 600_000 && result.orders[1].principalKrw <= 400_000);
 });
+
+test("multiple millionth-share grids fill a million won without moving money away from achievable policy amounts", () => {
+  const result = run(1_000_000, [
+    shares("a",200_000,180_000,"0.000001"), shares("b",300_000,250_000,"0.000001"),
+    shares("c",500_000,600_000,"0.000001"),
+  ]);
+  assert.deepEqual(principal(result),[200_000,300_000,500_000]);
+  assert.equal(result.allocationErrorKrw,0);
+  assert.equal(result.remainingKrw,0);
+});

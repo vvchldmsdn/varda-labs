@@ -172,13 +172,13 @@ function better(a: State, b: State) {
     (a.error < b.error || a.error === b.error && a.spent < b.spent);
 }
 
-function highestAffordable(state: State, asset: PreparedAsset, budgetKrw: number, limits: number[]): Quote {
+function highestAffordable(state: State, asset: PreparedAsset, budgetKrw: number, limits: number[], principalLimit = Infinity): Quote {
   let lower = asset.minLots, upper = asset.maxLots;
   let best = asset.quote(ZERO);
   while (lower <= upper) {
     const middle = (lower + upper) / BigInt(2);
     const guess = asset.quote(middle);
-    if (admissible(state, asset, guess, budgetKrw, limits)) {
+    if (guess.principalKrw <= principalLimit && admissible(state, asset, guess, budgetKrw, limits)) {
       best = guess;
       lower = middle + ONE;
     } else {
@@ -224,23 +224,37 @@ function fallback(assets: PreparedAsset[], start: State, budgetKrw: number, limi
   }
   const ranked = assets.map((asset, index) => ({ asset, index }))
     .sort((a, b) => b.asset.asset.targetKrw - a.asset.asset.targetKrw);
-  for (const { asset, index } of ranked) {
-    const old = selected[index];
-    const spent = totals.spent - old.spentKrw;
-    const used = [...totals.used];
-    used[asset.wallet] -= old.spentMinor;
-    const without = {
-      spent, used, selected: null, principal: totals.principal - old.principalKrw,
-      error: totals.error - Math.abs(old.principalKrw - asset.asset.targetKrw),
-    };
-    const quote = asset.wholeOptions
-      ? asset.wholeOptions.findLast(candidate => admissible(without, asset, candidate, budgetKrw, limits))
-      : highestAffordable(without, asset, budgetKrw, limits);
-    if (!quote) continue;
-    selected[index] = quote;
-    totals = add(without, asset, quote, index);
+  function fill(targetFirst: boolean) {
+    const choices = [...selected];
+    let state = totals;
+    function advance(upToTarget: boolean) {
+      for (const { asset, index } of ranked) {
+        const old = choices[index];
+        const used = [...state.used];
+        used[asset.wallet] -= old.spentMinor;
+        const without = {
+          spent: state.spent - old.spentKrw, used, selected: null, principal: state.principal - old.principalKrw,
+          error: state.error - Math.abs(old.principalKrw - asset.asset.targetKrw),
+        };
+        const ceiling = upToTarget ? asset.asset.targetKrw : Infinity;
+        const quote = asset.wholeOptions
+          ? asset.wholeOptions.findLast(q => q.principalKrw <= ceiling && admissible(without, asset, q, budgetKrw, limits))
+          : highestAffordable(without, asset, budgetKrw, limits, ceiling);
+        if (!quote || quote.principalKrw < old.principalKrw) continue;
+        choices[index] = quote;
+        state = add(without, asset, quote, index);
+      }
+    }
+    if (targetFirst) advance(true);
+    advance(false);
+    return choices.reduce((total, quote, index) => add(total, assets[index], quote, index), start);
   }
-  return selected.reduce((state, quote, index) => add(state, assets[index], quote, index), start);
+  // Two fine share increments can generate millions of combinations. Keep a
+  // target-aligned candidate as well as the cash-first one, under the exact
+  // same principal, allocation error, and fee ordering as exhaustive search.
+  const targetAligned = fill(true);
+  const cashFirst = fill(false);
+  return better(cashFirst, targetAligned) ? cashFirst : targetAligned;
 }
 
 function uniformAmountGroup(assets: PreparedAsset[], fractional: number[]) {
@@ -306,6 +320,10 @@ function optimize(assets: PreparedAsset[], start: State, budgetKrw: number, limi
   let frontier = [start];
   for (const index of sequence.filter(index => !direct.has(index))) {
     const asset = assets[index];
+    if (!asset.wholeOptions && asset.maxLots >= asset.minLots) {
+      const candidatesCount = asset.maxLots - asset.minLots + BigInt(2);
+      if (candidatesCount * BigInt(frontier.length) > BigInt(MAX_TRANSITIONS - transitions)) return { limited: true, state: null };
+    }
     const merged = new Map<string, State>();
     for (const quote of candidates(asset)) {
       for (const state of frontier) {

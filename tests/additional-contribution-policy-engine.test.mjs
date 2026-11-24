@@ -117,7 +117,11 @@ describe("explainable additional contribution policy", () => {
 
     assert.equal(result.status, "ready");
     const adjusted = result.rows.find((item) => item.allocationKey === "a");
-    assert.ok(adjusted.strategicAllocationKrw > adjusted.allocationKrw);
+    assert.equal(adjusted.effectiveTargetWeightBps, 5_000);
+    assert.equal(adjusted.effectiveTargetValueKrw, 600_000);
+    assert.equal(adjusted.baseNeedKrw, 200_000);
+    assert.equal(adjusted.strategicAllocationKrw, 200_000);
+    assert.equal(adjusted.allocationKrw, 100_000);
     assert.equal(result.totalAllocatedKrw + result.residualCashKrw, result.totalAvailableFundsKrw);
   });
 
@@ -255,6 +259,13 @@ describe("explainable additional contribution policy", () => {
     }
   });
 
+  it("rounds a half-won MA adjustment using the decimal class multiplier", () => {
+    const result = calculate([row("a", 100, 100, 10_000, {
+      maAssetClass: "large_growth", ma120Evidence: { status: "below_ma", distanceFromMaPct: -5 },
+    })], { cashAmountKrw: 45 });
+    assert.equal(result.rows[0].rawAllocationKrw, 32);
+  });
+
   it("exempts gold and bonds and respects the holding rule switch", () => {
     for (const overrides of [{ maAssetClass: "defensive_gold" }, { maAssetClass: "bond" }, { assetType: "pension" }, { maRuleEnabled: false }]) {
       const result = calculate([row("a", 100, 100, 10_000, { maAssetClass: "thematic", ma120Evidence: { status: "below_ma", distanceFromMaPct: -8 }, ...overrides })], { cashAmountKrw: 100 });
@@ -294,8 +305,8 @@ describe("explainable additional contribution policy", () => {
     assert.equal(result.status, "ready");
     assert.equal(result.minimumExecutionTargetKrw, 85);
     assert.equal(result.minimumExecutionSatisfied, false);
-    assert.equal(result.totalAllocatedKrw, 0);
-    assert.equal(result.residualCashKrw, 100);
+    assert.equal(result.totalAllocatedKrw, 50);
+    assert.equal(result.residualCashKrw, 50);
     assert.equal(result.rows[0].strategicAllocationKrw, 100);
     const noMinimum = calculate(rows, { cashAmountKrw: 100, minimumExecutionRatioPct: 0 });
     assert.equal(noMinimum.minimumExecutionTargetKrw, 0);

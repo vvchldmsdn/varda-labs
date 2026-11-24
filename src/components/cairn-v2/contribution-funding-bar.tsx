@@ -10,14 +10,15 @@ import styles from "./contribution-funding-bar.module.css";
 
 const formatAmount = (value: number) => value.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
 
-export function ContributionFundingBar({ result, basis, showLeadingBuys = false }: {
+export function ContributionFundingBar({ result, basis, showLeadingBuys = false, presentation = "orders" }: {
   result: ReadyContribution;
   basis?: ContributionOrderBasis;
   showLeadingBuys?: boolean;
+  presentation?: "orders" | "strategy";
 }) {
   const { t } = useI18n();
   const { projection } = useContributionOrderPlan(basis);
-  const sized = projection?.result && projection.result.status !== "unavailable" ? projection.result : null;
+  const sized = presentation === "orders" && projection?.result && projection.result.status !== "unavailable" ? projection.result : null;
   const orderBudget = basis && sized ? basis.budgetKrw : null;
   const total = sized ? result.cashAmountKrw : result.totalAvailableFundsKrw;
   const won = (value: number) => t(`${formatAmount(value)}원`, `₩${formatAmount(value)}`);
@@ -57,7 +58,7 @@ export function ContributionFundingBar({ result, basis, showLeadingBuys = false 
         <dt>{row.label}</dt><dd>{won(row.amount)}</dd>
       </div>)}
     </dl>
-    {basis && !sized && <p className={styles.note}>{t("예상 수량을 계산할 수 없어 목표 배분을 표시해요.", "Showing target allocations while estimated orders are unavailable.")}</p>}
+    {presentation === "orders" && basis && !sized && <p className={styles.note}>{t("예상 수량을 계산할 수 없어 목표 배분을 표시해요.", "Showing target allocations while estimated orders are unavailable.")}</p>}
     {showLeadingBuys && orderBudget !== null && <p className={styles.orderBudget}><span>{t("주문 예산", "Order budget")}</span><strong>{won(orderBudget)}</strong></p>}
     {leading.length > 0 && <ul className={styles.leading} aria-label={t("주요 추가 매수", "Leading buy allocations")}>
       {leading.map(row => <li key={row.key}>

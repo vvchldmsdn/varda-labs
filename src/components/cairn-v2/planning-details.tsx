@@ -7,7 +7,9 @@ import { contributionJourneyHref, type ContributionJourney } from '@/lib/contrib
 import { betaHref } from '@/lib/cairn-v2/navigation';
 import { Button as CairnButton, Field as CairnField, Form as CairnForm, FormActions as CairnFormActions, Input, Status as CairnStatus, InfoDisclosure } from "@/components/cairn-ui";
 
-import {SaleExclusionPicker} from "../sale-exclusion-picker";
+import { ContributionOrderOptions } from "./contribution-order-options";
+import { useContributionOrderPlan } from "./contribution-order-context";
+import { validContributionOrderRule, validContributionWalletAmount, type ContributionOrderSettings } from "@/lib/cairn-v2/contribution-order-plan";
 import {parseSaleExclusionKeys} from "@/lib/additional-contribution-sale-exclusions";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useI18n } from "@/components/i18n/locale-provider";
@@ -19,7 +21,7 @@ import { useBetaContext } from "./use-beta-context";
 import { useBetaExistingCrudAvailable } from './beta-provider';
 import { ContributionOrderPreview } from "./contribution-order-preview";
 import { ContributionFundingBar } from "./contribution-funding-bar";
-import { ContributionBudgetSteps, ContributionRuleReceipt } from "./contribution-rule-receipt";
+import { ContributionRuleReceipt } from "./contribution-rule-receipt";
 import styles from "./beta.module.css";
 
 import {AdditionalContributionAllocationTable} from "./reused/allocation-list";
@@ -60,8 +62,14 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
   const amount = draft.key === queryKey ? draft.amount : submitted;
   const excludedSales = draft.key === queryKey ? draft.keys : committedKeys;
   const floor = draft.key === queryKey ? draft.floor : submittedFloor;
-  const dirty = amount !== submitted || floor !== submittedFloor || JSON.stringify(excludedSales) !== JSON.stringify(committedKeys);
   const read = view.domain?.planning?.contribution;
+  const {settings, setSettings} = useContributionOrderPlan(read?.orderBasis);
+  const [orderDraft, setOrderDraft] = useState<{key: string; settings: ContributionOrderSettings} | null>(null);
+  const orders = orderDraft?.key === queryKey ? orderDraft.settings : settings;
+  const ordersChanged = orders !== settings;
+  const [orderError, setOrderError] = useState("");
+  const changedInputs = amount !== submitted || floor !== submittedFloor || JSON.stringify(excludedSales) !== JSON.stringify(committedKeys);
+  const dirty = changedInputs || ordersChanged;
   const input = parseContributionInput(submitted);
   const pending = context.currency === "KRW" && input.state === "ready" &&
     (view.domain?.state === "loading" || (read != null && read.inputKrw !== input.amount));
@@ -83,7 +91,7 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
 
   function edit(nextAmount: string, keys: string[], nextFloor = floor) {
     setDraft({ key: queryKey, amount: nextAmount, keys, floor: nextFloor });
-    onEdit?.(nextAmount !== submitted || nextFloor !== submittedFloor || JSON.stringify(keys) !== JSON.stringify(committedKeys));
+    onEdit?.(ordersChanged || nextAmount !== submitted || nextFloor !== submittedFloor || JSON.stringify(keys) !== JSON.stringify(committedKeys));
   }
 
   function calculate(event: FormEvent) {
@@ -99,6 +107,23 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
       document.getElementById(inputId + "-floor")?.focus();
       return;
     }
+    const invalidOption = read?.orderOptions?.find(option => {
+      const rule = orders.rules[option.key];
+      return rule && !validContributionOrderRule(rule, option.currency, option.unit);
+    });
+    if (invalidOption) {
+      setOrderError(t(`${invalidOption.label}의 주문 단위, 최소 매수액과 수수료를 확인해 주세요.`, `Check order increments, minimum purchase and fees for ${invalidOption.label}.`));
+      return;
+    }
+    const invalidWallet = orders.useCashLimits && read?.orderOptions?.find(option =>
+      option.canBuy && option.currency && option.unit && !validContributionWalletAmount(orders.cashByWallet[option.walletKey], option.currency));
+    if (invalidWallet) {
+      setOrderError(t(`${invalidWallet.accountName}의 ${invalidWallet.currency} 가용 현금을 확인해 주세요.`, `Check available cash in ${invalidWallet.currency} for ${invalidWallet.accountName}.`));
+      return;
+    }
+    if (ordersChanged) setSettings(orders);
+    setOrderDraft(null);
+    setOrderError("");
     const minBuyPct = parsedFloor.value?.toString();
     const nextContext = { ...context, cashAmountKrw: amount, excludeSell: excludedSales.length ? excludedSales : undefined, minBuyPct };
     const nextKey = requestKey(nextContext);
@@ -146,11 +171,21 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
           ? t("0~100 사이의 비율을 소수 둘째 자리까지 입력해 주세요.", "Enter 0–100 with up to two decimal places.")
           : t("비워 두면 저장된 설정을 사용해요. 적격 종목에 추가 배분할 때 쓰는 기준이에요.", "Leave blank to use your saved setting. This guides top-ups to eligible holdings.")}</p>
       </div>
-      <SaleExclusionPicker english={locale === "en"} options={read?.selectionRows ?? []} value={excludedSales} onChange={keys => edit(amount, keys)} />
+      <ContributionOrderOptions options={read?.orderOptions ?? []} settings={orders} excluded={excludedSales}
+        onSettings={next => {
+          setOrderDraft({key:queryKey, settings:next});
+          setOrderError("");
+          onEdit?.(true);
+        }}
+        onExclude={keys => edit(amount, keys)} />
+      {orderError && <CairnStatus role="alert">{orderError}</CairnStatus>}
       <CairnFormActions className={presentation.submitRow}>
         <CairnButton variant="primary" className={presentation.calculate} type="submit" disabled={context.currency !== "KRW"}>{t("배분 계산", "Calculate allocation")}</CairnButton>
         {read?.state === "ready" && <CairnButton variant="bare" type="button" onClick={() => {
           edit(submitted, committedKeys, submittedFloor);
+          setOrderDraft(null);
+          setOrderError("");
+          onEdit?.(false);
           setValidate(false);
           setEditorKey(null);
           focusAfterCalculate.current = queryKey;
@@ -166,31 +201,33 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
     {!showForm && result && trades && <>
       <div className={presentation.receiptHead}>
         <h3 ref={receiptRef} tabIndex={-1} className={styles.visuallyHidden}>{t("예상 배분", "Projected allocation")}</h3>
-        <span>{t("최소 매수비율", "Minimum buy ratio")} <strong>{result.calculationParameters.minimumExecutionRatioPct}%</strong>{excludedSales.length > 0 && ` · ${t(`매도 제외 ${excludedSales.length}건`, `${excludedSales.length} excluded from sales`)}`}</span>
+        <span>{t("새 투자금", "New investment")} <strong>{formatWon(result.cashAmountKrw)}</strong>{excludedSales.length > 0 && ` · ${t(`매도 제외 ${excludedSales.length}건`, `${excludedSales.length} excluded from sales`)}`}</span>
         <CairnButton type="button" variant="bare" onClick={() => {
           setEditorKey(queryKey);
           requestAnimationFrame(() => document.getElementById(inputId)?.focus());
         }}>{t("조건 변경", "Edit inputs")}</CairnButton>
       </div>
-      <ContributionFundingBar result={result} basis={read?.orderBasis} />
-      <ContributionBudgetSteps result={result} formatWon={formatWon} />
-      {read?.orderBasis && <ContributionOrderPreview basis={read.orderBasis} preview={result} formatWon={formatWon}
-        onIncludeCash={updated => {
-          onEdit?.(false);
-          if (onCalculate) onCalculate(updated, committedKeys, submittedFloor || undefined);
-          else setContext({...context,cashAmountKrw:updated});
-        }} />}
+      <ContributionFundingBar result={result} basis={read?.orderBasis} presentation="strategy" />
+
       <ContributionRuleReceipt result={result} basis={read?.orderBasis} showAccount={context.scope === "all"} formatWon={formatWon}
         onEditRatio={() => {
           setEditorKey(queryKey);
           requestAnimationFrame(() => document.getElementById(inputId + "-floor")?.focus());
         }} />
-      {read?.orderBasis ? <details className={presentation.evidence}>
-        <summary>{t("목표 배분과 매도 계획", "Target allocation and sale plan")}</summary>
+      {read?.orderBasis && <details className={presentation.evidence}>
+        <summary>{t("주문 수량·예상 비용", "Order quantities and fees")}</summary>
+        <ContributionOrderPreview basis={read.orderBasis} preview={result} formatWon={formatWon}
+          onIncludeCash={updated => {
+            onEdit?.(false);
+            if (onCalculate) onCalculate(updated, committedKeys, submittedFloor || undefined);
+            else setContext({...context,cashAmountKrw:updated});
+          }} />
+      </details>}
+      {result.totalTrimProceedsKrw > 0 && <details className={presentation.evidence}>
+        <summary>{t("매도 계획과 재투자 배분", "Planned sales and reinvestment")}</summary>
         <PlannedTrades rows={trades} totalSell={result.totalTrimProceedsKrw} totalBuy={result.totalAllocatedKrw}
           available={result.totalAvailableFundsKrw} remainingCash={result.residualCashKrw} formatAmount={formatWon} english={locale === "en"} />
-      </details> : <PlannedTrades rows={trades} totalSell={result.totalTrimProceedsKrw} totalBuy={result.totalAllocatedKrw}
-        available={result.totalAvailableFundsKrw} remainingCash={result.residualCashKrw} formatAmount={formatWon} english={locale === "en"} />}
+      </details>}
       {available && <nav className={presentation.resultActions} aria-label={t("투자 계획 이어가기", "Continue your plan")}>
         <RecoveryJourneyLink className={presentation.primaryLink} prefetch={false} href={contributionJourneyHref("plan", journey)}>
           {t("계획 편집기 열기", "Open plan editor")} <span aria-hidden="true">→</span>

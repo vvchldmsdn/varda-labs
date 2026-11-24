@@ -1,12 +1,11 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { Button, Checkbox, Field, Form, Input, Select, Status } from "@/components/cairn-ui";
+import { Button, Field, Form, Input, Status } from "@/components/cairn-ui";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { instrumentLabel } from "@/lib/instrument-display";
 import {
-  defaultContributionOrderRule, displayOrderNativeAmount, getContributionWallets, projectContributionOrderPlan,
-  type ContributionOrderBasis, type ContributionOrderKind, type ContributionOrderRule,
+  displayOrderNativeAmount, type ContributionOrderBasis,
 } from "@/lib/cairn-v2/contribution-order-plan";
 import { parseContributionInput, type ReadyContribution } from "@/lib/cairn-v2/planning-contract";
 import { useContributionOrderPlan } from "./contribution-order-context";
@@ -19,31 +18,15 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
   onIncludeCash: (updatedTotal: string) => void;
 }) {
   const {t} = useI18n();
-  const {projection, settings, setSettings} = useContributionOrderPlan(basis);
-  const [draft, setDraft] = useState(settings);
+  const {projection, settings} = useContributionOrderPlan(basis);
   const [message, setMessage] = useState("");
   const [additionalCash, setAdditionalCash] = useState("");
   const id = useId();
   const result = projection?.result;
   const orders = result && result.status !== "unavailable" ? result.orders.filter(row => row.principalMinor > 0) : [];
   const cappedOrders = result && result.status !== "unavailable" ? result.orders.filter(row => row.nextWholeOverCap) : [];
-  const buyRows = basis.rows.filter(row => row.targetKrw > 0);
   const saleRows = projection?.sales ?? [];
   const rowsByKey = new Map(basis.rows.map(row => [row.key, row]));
-
-  function updateRule(key: string, values: Partial<ContributionOrderRule>) {
-    setDraft(prev => ({...prev, rules: {...prev.rules, [key]: {...(prev.rules[key] ?? defaultContributionOrderRule), ...values}}}));
-    setMessage("");
-  }
-  function updateSettings(event: FormEvent) {
-    event.preventDefault();
-    if (projectContributionOrderPlan(basis, draft).status === "invalid") {
-      setMessage(t("소수점 주문 단위·최소 금액과 수수료 입력을 확인해 주세요.", "Check the fractional increment, minimum order and fee inputs."));
-      return;
-    }
-    setSettings(draft);
-    setMessage(t("주문 조건을 적용했어요.", "Order terms updated."));
-  }
 
   function quantityText(quantity: string | number, unit: "share" | "gram") {
     if (unit === "gram") return `${quantity}g`;
@@ -70,7 +53,9 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
     {result && result.status !== "unavailable" ? <>
       <dl className={styles.totals}>
         <div><dt>{t("규칙 적용 후 주문 예산", "Order budget after rules")}</dt><dd>{formatWon(basis.budgetKrw)}</dd></div>
-        <div><dt>{t("주문 가능한 매수 원금", "Estimated buy principal")}</dt><dd>{formatWon(result.principalKrw)}</dd></div>
+        <div><dt>{t("예상 매수 원금", "Estimated buy principal")}</dt><dd>{formatWon(result.principalKrw)}</dd></div>
+        <div><dt>{t("예상 비용", "Estimated fees")}</dt><dd>{formatWon(result.feesKrw)}</dd></div>
+        <div><dt>{t("주문 후 잔액", "Unspent order budget")}</dt><dd>{formatWon(result.remainingKrw)}</dd></div>
       </dl>
       {preview.totalTrimProceedsKrw > 0 && <p>{t(
         `전략 배분은 예상 매도대금 ${formatWon(preview.totalTrimProceedsKrw)}을 포함해요. 주문 예산은 새 투자금 한도에서 계산해요.`,
@@ -104,47 +89,12 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
         const row = rowsByKey.get(sale.key)!;
         return <li key={sale.key}><span>{instrumentLabel(row)}<small>{row.accountName}</small></span>
           <span>{quantityText(sale.quantity,row.unit)}<small>{formatWon(sale.principalKrw)}</small></span></li>;
-      })}</ul><p>{t("보유량 내 정수 수량만 표시해요. 결제된 매도대금은 아래 기존 현금 합산으로 반영할 수 있어요.", "Whole units are capped by holdings. Add settled sale proceeds through the existing cash control below.")}</p>
+      })}</ul><p>{t("설정한 매도 단위와 보유 수량을 적용했어요. 결제된 매도대금은 기존 현금에 더할 수 있어요.", "Estimated sales follow your sell increments and available holdings. You can add settled sale proceeds as available cash.")}</p>
     </details>}
     {basis.unavailable.length > 0 && <p>{t("주문 단가·단위 확인 필요", "Order prices or increments needed")} · {basis.unavailable.join(", ")}</p>}
     <p className={styles.basis}>{t("평가 단가와 환율 기준 · 기본 정수 주문 · 미입력 수수료 0 가정", "Uses valuation prices and FX · whole units by default · blank fees assumed zero")}</p>
     <details className={styles.settings}>
-      <summary>{t("소수점·수수료·현금 조건", "Fractional orders, fees and cash")}</summary>
-      <Form onSubmit={updateSettings} className={styles.settingsForm}>
-        <Field className={styles.cashToggle}><Checkbox checked={draft.useCashLimits} onChange={event => {
-          setDraft({...draft, useCashLimits: event.target.checked}); setMessage("");
-        }} />{t("실제 주문 가능액으로 제한", "Limit to available broker cash")}</Field>
-        {draft.useCashLimits && <div className={styles.inputs}>
-          {getContributionWallets(basis).map(wallet => <NumericField key={wallet.walletKey}
-            label={`${wallet.accountName} · ${wallet.currency}`} value={draft.cashByWallet[wallet.walletKey] ?? ""}
-            onChange={amount => {setDraft(prev => ({...prev, cashByWallet: {...prev.cashByWallet,[wallet.walletKey]:amount}})); setMessage("");}} />)}
-          <p>{t("계좌·통화별 증권사 주문 가능액을 입력해 주세요. 빈 칸의 잔액은 사용하지 않아요.", "Enter broker buying power per account and currency. Blank balances are left unused.")}</p>
-        </div>}
-        {buyRows.map(row => {
-          const rule = draft.rules[row.key] ?? defaultContributionOrderRule;
-          const fractional = rule.kind !== "whole";
-          const label = `${instrumentLabel(row)} · ${row.accountName}`;
-          return <details key={row.key} className={styles.assetRule}><summary>{label} · {row.unit === "gram" ? "g" : fractional ? t("소수점", "Fractional") : t("정수", "Whole shares")}</summary>
-            <div className={styles.inputs}>
-              {row.unit === "share" && <Field>{t("주문 방식", "Order type")}<Select value={rule.kind} onChange={event => updateRule(row.key, {kind: event.target.value as ContributionOrderKind, step: "", minimum:""})}>
-                <option value="whole">{t("정수 수량", "Whole shares")}</option>
-                <option value="fractional-shares">{t("소수점 수량", "Fractional shares")}</option>
-                <option value="fractional-amount">{t("소수점 금액", "Fractional amount")}</option>
-              </Select></Field>}
-              {fractional && <>
-                <NumericField label={rule.kind === "fractional-shares" ? t("수량 단위", "Share increment") : t(`금액 단위 (${row.currency})`, `Amount increment (${row.currency})`)} value={rule.step} onChange={step => updateRule(row.key,{step})} />
-                <NumericField label={t(`최소 주문액 (${row.currency})`, `Minimum order (${row.currency})`)} value={rule.minimum} onChange={minimum => updateRule(row.key,{minimum})} />
-              </>}
-              <NumericField label={t(`고정 수수료 (${row.currency})`, `Fixed fee (${row.currency})`)} value={rule.fee} onChange={fee => updateRule(row.key,{fee})} />
-              <NumericField label={t("수수료율 (%)", "Fee rate (%)")} value={rule.feePct} onChange={feePct => updateRule(row.key,{feePct})} />
-              <NumericField label={t(`최소 수수료 (${row.currency})`, `Minimum fee (${row.currency})`)} value={rule.minimumFee} onChange={minimumFee => updateRule(row.key,{minimumFee})} />
-              <NumericField label={t("매수 상한 (원)", "Buy cap (KRW)")} value={rule.capKrw} onChange={capKrw => updateRule(row.key,{capKrw})} />
-            </div>
-            <p>{t("기존 배분 규칙의 매수 상한", "Existing allocation cap")} {formatWon(row.maxBuyKrw)}</p>
-          </details>;
-        })}
-        <div><Button type="submit" variant="secondary">{t("주문 조건 적용", "Apply order terms")}</Button></div>
-      </Form>
+      <summary>{t("기존 현금 더하기", "Add available cash")}</summary>
       <Form className={styles.addCash} onSubmit={includeCash}>
         <NumericField label={t("예산에 더 쓸 기존 현금 (원)", "Existing cash to add (KRW)")} value={additionalCash} onChange={setAdditionalCash} />
         <Button type="submit" variant="secondary">{t("합산 후 다시 배분", "Add and reallocate")}</Button>

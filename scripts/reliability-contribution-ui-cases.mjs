@@ -65,7 +65,7 @@ export async function runContributionUiCases({page,check,admin,owner,account,ass
     await expect(result.getByRole('heading',{name:'저장된 계획 · KRW',exact:true})).toBeVisible();
     await expect(planner.getByRole('alert')).toContainText('최신 기준으로 저장했어요');
     const stored=(await admin.query('select document_json from native_contribution_plans where owner_user_id=$1 and id=$2',[owner,savedId])).rows[0].document_json;
-    assert.equal(stored.result.context.policyVersion,'gyeol_fin_explainable_rebalance_v2');assert.equal(stored.result.buys,10000);
+    assert.equal(stored.result.context.policyVersion,'gyeol_fin_explainable_rebalance_v3');assert.equal(stored.result.buys,10000);
     assert.equal(stored.result.rows[0].modifierBreakdown.multipliers.regime.value,1);
     assert.equal(stored.result.rows[0].modifierBreakdown.multipliers.event.status,'unavailable');
     // Saving is not a purchase: the known position and cash stay exactly as before.
