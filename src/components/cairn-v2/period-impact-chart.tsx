@@ -41,11 +41,13 @@ export function PeriodImpactChart({ days }: { days: PeriodAttribution["days"] })
   const tick = <i aria-hidden="true" className={styles.cursor} style={{ left: x(index) + "%" }} />;
   const selectedDate = day.date.replaceAll("-", ".");
   const impactStatus = day.priceKrw === null || day.fxKrw === null ? missing : day.complete ? "" : t("일부 종목", "Partial holdings");
+  const provenance = day.reviewed ? day.estimated ? t("복구 평가 · 추정 포함", "Restored valuation · includes estimates") :
+    t("복구 평가", "Restored valuation") : t("당일 기록 · 원화", "Daily record · KRW");
   const spoken = [selectedDate, valuesTitle + " " + money(day.closingValueKrw, false), price + " " + money(day.priceKrw), fx + " " + money(day.fxKrw), impactStatus].filter(Boolean).join(" · ");
   return <figure className={styles.chart} data-period-selection data-selected-date={day.date}
     data-selected-period-start={bucket.start} data-selected-period-end={bucket.end}>
     <figcaption className={styles.selection}><time dateTime={day.date}>{selectedDate}</time>
-      <span>{t("당일 기록 · 원화", "Daily record · KRW")}</span></figcaption>
+      <span>{provenance}</span></figcaption>
     <div className={styles.plotHeading}><strong>{valuesTitle}</strong><span>{money(day.closingValueKrw, false)}</span></div>
     <div className={styles.plot}>
       <div className={styles.valueAxis} aria-hidden="true">{high === low

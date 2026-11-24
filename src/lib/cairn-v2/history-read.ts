@@ -30,6 +30,7 @@ type ReadArgs = {
   tenantContext: TenantContext;
   scope: PortfolioAnalysisScope;
   historyWindow?: "recent";
+  includeReviewedPositions?: boolean;
   currency?: string;
 };
 
@@ -45,7 +46,7 @@ export async function getBetaHistoryRead(args: ReadArgs): Promise<BetaHistoryRea
       args.scope.kind === "portfolio_group" ? loadGroupRows(args.tenantContext, args.scope, args.historyWindow)
         : loadAccountRows(args.tenantContext, args.scope, args.historyWindow),
       args.scope.kind === "account" && args.currency === "KRW"
-        ? readAccountHistoryReview(args.tenantContext, args.scope.accountId)
+        ? readAccountHistoryReview(args.tenantContext, args.scope.accountId, undefined, args.includeReviewedPositions ? "positions" : "values")
             .then(review => ({ review, unavailable: false }), () => ({ review: null, unavailable: true }))
         : null,
     ]);

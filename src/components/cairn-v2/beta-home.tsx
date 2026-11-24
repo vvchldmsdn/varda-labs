@@ -19,7 +19,8 @@ import { HomeImpactControls, HomeImpactProvider } from "./home-impact";
 import { HomePerformanceProvider, usePeriodPerformance } from "./home-performance";
 import { readStateText } from "@/lib/cairn-v2/read-presentation";
 import { displayReadMoney, type DomainRead } from "@/lib/cairn-v2/read-contract";
-import { originalCurrentComposition, originalCurrentValueSummary } from "@/lib/cairn-v2/current-value-presentation";
+import { originalCurrentComposition } from "@/lib/cairn-v2/current-value-presentation";
+import { currentHistoryValuation, todayChangeForHistory } from "@/lib/cairn-v2/history-current";
 import { useBetaView } from "./use-beta-view";
 import { useHomeHistoryRead } from "./use-home-history-read";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
@@ -60,7 +61,7 @@ export function BetaHome({
     metric === "return" && !context.scope.startsWith("portfolio:");
   const history = useHomeHistoryRead(useBetaView(context, read), read, context, needsFullHistory);
   const view = history.view;
-  const originalValue = view.domain?.currentValuePresentation ? originalCurrentValueSummary(view.domain.currentValuePresentation,context.currency) : null;
+  const originalValue = currentHistoryValuation(view, context.currency);
   const composition = view.domain?.currentValuePresentation ? originalCurrentComposition(view.domain.currentValuePresentation, context.currency) : null;
   const compositionRequested = !!view.domain?.currentValuePresentation;
   const allocationEntries = compositionRequested ? composition?.positions.flatMap((row, index) => row.displayWeightPct === null || row.displayWeightPct <= 0 ? [] : [{
@@ -105,18 +106,23 @@ export function BetaHome({
     ? originalValue.amount === null ? "—" : Number(originalValue.amount).toLocaleString("ko-KR", {maximumFractionDigits: context.currency === "USD" ? 2 : 0})
     : displayMoney(view.rows.length ? view.totalKrw : null, context.currency);
   const movement = view.domain?.currentHoldingMovement;
+  const change = todayChangeForHistory(view);
+  const todayReturn = change ? change.returnPct : !movement?.excludedCount ? movement?.returnPct : null;
   const homeSummary = {
     count: originalValue?.coverage?.positions ?? (view.domain ? null : view.rows.length),
     balance: formattedValue === "—" ? null : `${originalValue && !originalValue.complete ? "확인 소계 " : ""}${formattedValue} ${unit}`,
-    change: context.currency === "KRW" && movement?.returnPct != null && !movement.excludedCount
-      ? `오늘 ${movement.returnPct > 0 ? "+" : ""}${movement.returnPct.toFixed(2)}%` : null,
+    change: context.currency === "KRW" && todayReturn != null
+      ? `오늘 ${todayReturn > 0 ? "+" : ""}${todayReturn.toFixed(2)}%` : null,
   };
   return (
     <BetaShell context={context} setContext={setContext} readView={view} homeSummary={homeSummary}>
-      <HomeImpactProvider read={view.domain?.heatmap} review={view.domain?.accountHistoryReview}>
+      <HomeImpactProvider read={view.domain?.heatmap} review={view.domain?.accountHistoryReview} reviewed={view.domain?.reviewedDailyImpact}>
       <HomePerformanceProvider view={view} context={context} read={read}>
       <div className={home.dashboard}>
         <div className={home.hero}>
+          <svg className={home.refreshOutline} aria-hidden="true" focusable="false">
+            <rect width="100%" height="100%" pathLength="100" />
+          </svg>
           <div className={home.summary}>
 
           <Card onOpen={open} kind="value" controls={<span className={home.syncHint} aria-hidden>동기화 중</span>}>

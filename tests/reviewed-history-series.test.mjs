@@ -5,9 +5,10 @@ import { importUiWithPorts } from './helpers/import-ui-with-ports.mjs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const [series, contract, display, current] = await importWithPorts([
+const [series, contract, display, current, heatmap, value] = await importWithPorts([
   'src/lib/cairn-v2/reviewed-history-series.ts', 'src/lib/cairn-v2/read-contract.ts',
   'src/lib/cairn-v2/read-display.ts', 'src/lib/cairn-v2/history-current.ts',
+  'src/lib/cairn-v2/heatmap-contract.ts', 'src/lib/cairn-v2/current-value-presentation.ts',
 ], {});
 const dates = ['2026-05-01','2026-05-02','2026-05-03','2026-05-04','2026-05-05'];
 const review = { source: series.reviewedSource, basis:'reviewed_holdings_excluding_cash', currency:'KRW',
@@ -79,10 +80,51 @@ test('the existing valuation and return charts show the new basis and break at t
   for (const metric of ['value','return']) {
     prefs.metric=metric;
     const html=renderToStaticMarkup(createElement(ui.HistoryChart,{view,compact:true,interactive:true}));
-    assert.match(html,/사용자 확인 복원/);
-    assert.match(html,/Synthetic exclusion 제외/);
+    assert.doesNotMatch(html,/사용자 확인 복원|Synthetic exclusion 제외/);
+    const detail = renderToStaticMarkup(createElement(ui.HistoryChart,{view}));
+    assert.match(detail,/Synthetic exclusion 제외/);
     assert.match(html,/2026-05-02/);
     assert.doesNotMatch(html,/stroke-dasharray="3 4"/);
     assert.match(html,/data-history-line="true"/);
   }
+});
+
+test('the same admitted amount feeds Home and the live chart while its change uses the preserved same-day close', () => {
+  const last = '2026-11-24';
+  const accountReview = {...review,startDate:last,endDate:last,excludedTickers:['000010'],
+    points:[{...review.points[0],date:last,segment:last,valueKrw:17_355_456}]};
+  const active = {name:'Active',ticker:'000020',currency:'KRW',market:'korea',account:'brokerage',currentPrice:1000,valueKrw:17_419_955};
+  const excluded = {...active,name:'Renamed exclusion',ticker:'000010',valueKrw:100};
+  const currentValuePresentation = value.alignCurrentValueWithReview({kind:'legacy',data:{holdings:[active,excluded],
+    generatedAt:last+'T11:42:00.000Z',usdKrwRate:1350,totalValueKrw:17_420_055}},accountReview);
+  const {view} = contract.applyBetaHistory(base,{...history,portfolioRows:[],accountHistoryReview:accountReview},'KRW');
+  view.totalKrw = 5;
+  view.domain.currentValuePresentation = currentValuePresentation;
+  const projected = current.historyWithCurrentValue(view);
+  assert.equal(projected.history.length,2);
+  assert.equal(projected.history[0].valueKrw,17_355_456);
+  assert.equal(projected.history[1].valueKrw,current.currentHistoryValuation(view,'KRW').amount);
+  assert.equal(projected.history[1].liveAsOf,'2026-11-24T11:42:00.000Z');
+  const change = current.todayChangeForHistory(view);
+  assert.equal(change.baselineDate,last);
+  assert.equal(change.changeKrw,64_499);
+  assert.equal(change.returnPct.toFixed(2),'0.37');
+});
+
+test('reviewed heatmap fills missing Nov 19 and 21 from adjacent marks, retaining true zero and common FX effects', () => {
+  const marks = ['2026-11-18','2026-11-19','2026-11-20','2026-11-21'];
+  const points = marks.map((date,index) => {
+    const rate = index < 2 ? 1320 : 1330;
+    const price = index === 0 ? 10 : 11;
+    const position = {key:'USD:VOO',name:'VOO',ticker:'VOO',market:'us',currency:'USD',quantity:1,price,fxRate:rate,valueKrw:price*rate};
+    return {...review.points[0],date,valueKrw:position.valueKrw,positions:[position],trades:[]};
+  });
+  const read = heatmap.adaptHeatmap({dates:marks,rows:[{holdingId:'fixture',name:'VOO',ticker:'VOO',market:'us',account:'brokerage',currentWeight:100,cells:[]}],
+    observedCellCount:0,expectedCellCount:4,coveragePct:0},scope.key);
+  const model = heatmap.projectReviewedHeatmap(read,{...review,startDate:marks[0],endDate:marks[3],points});
+  const cells = model.heatmap.history.rows[0].cells;
+  assert.equal(cells.find(cell=>cell.date===marks[1]).changePct,10);
+  assert.equal(cells.find(cell=>cell.date===marks[3]).changePct,0);
+  assert.equal(model.impacts.find(day=>day.date===marks[2]).fx,110);
+  assert.equal(model.impacts.find(day=>day.date===marks[3]).price,0);
 });

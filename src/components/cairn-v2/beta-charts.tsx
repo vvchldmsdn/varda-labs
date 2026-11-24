@@ -50,8 +50,7 @@ export function HistoryChart({
   const performanceRead = usePeriodPerformance();
   const performance = metric === "return" && !savedOnly ? performanceRead : null;
   const review = inputView.domain?.historyViewSource === "observed" ? inputView.domain.accountHistoryReview : null;
-  const impact = performance || !homeImpact ? null : review
-    ? { ...homeImpact, days: homeImpact.days.filter(day => !withinReview(review, day.date)) } : homeImpact;
+  const impact = performance || !homeImpact ? null : homeImpact;
   const data = performance?.data;
   const [measured, setPlotElement] = useMeasuredPlot();
   const [inspecting, setInspecting] = useState(false);
@@ -162,9 +161,9 @@ export function HistoryChart({
     ? selectedRow.exampleReturnPct == null ? "—" : (data?.points[selectedIndex].estimatedFx ? "≈ " : "") + selectedRow.exampleReturnPct.toFixed(2) + "%"
     : selectedMoney === "—" ? "—" : selectedMoney + (currency === "KRW" ? "원" : " USD");
   const first = values[0], last = values[latestIndex] ?? null;
-  const selectedLiveAsOf = data?.points[selectedIndex].liveAsOf;
+  const selectedLiveAsOf = selectedRow.liveAsOf ?? data?.points[selectedIndex].liveAsOf;
   const selectedDateLabel = selectedLiveAsOf
-    ? `${selectedRow.date} · ${i18n.t("잠정 수익률", "Provisional return")} ${selectedValue} · ${formatLiveValuationTime(selectedLiveAsOf)}`
+    ? `${metric === "value" ? i18n.t("현재 평가액", "Current valuation") : i18n.t("잠정 수익률", "Provisional return")} ${selectedValue} · ${formatLiveValuationTime(selectedLiveAsOf)}`
     : selectedRow.date;
   const periodRate = metric === "value"
     ? percentOrNull(historyComparison(rows, !!view.domain).value, first)
@@ -221,7 +220,7 @@ export function HistoryChart({
       className={compact ? styles.compactChart : styles.historyChart}
       aria-label={data ? "누적 수익률 추이 · 원화" : `${metric === "value" ? "평가액" : view.domain ? "기존 저장 수익률" : "예시 수익률"} 추이 · ${view.domain ? "도메인 읽기" : "가상 데이터"}`}
     >
-      {review && rows.some(row => withinReview(review, row.date)) && <p className={styles.muted}>{i18n.t(
+      {!compact && review && rows.some(row => withinReview(review, row.date)) && <p className={styles.muted}>{i18n.t(
         `${review.startDate} – ${review.endDate} 사용자 확인 복원 · 현금·${review.excludedLabels.join("·")} 제외${review.usesEstimates ? " · 추정 포함" : ""}`,
         `${review.startDate} – ${review.endDate} reconstructed · excludes cash and ${review.excludedLabels.join(", ")}${review.usesEstimates ? " · includes estimates" : ""}`)}</p>}
       {inputView.domain?.reviewUnavailable && <p className={styles.muted}>{i18n.t("복원 이력을 읽지 못해 기존 기록을 표시해요.", "Showing saved records because reconstructed history is unavailable.")}</p>}
@@ -246,7 +245,7 @@ export function HistoryChart({
       )}
       <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
       {showTooltip && <HomeHistoryTooltip id={tooltipId}
-        date={selectedRow.date} returns={metric === "return"} value={selectedValue} reviewed={selectedRow.source === reviewedSource || data?.points[selectedIndex]?.accountReview}
+        date={selectedRow.liveAsOf ? formatLiveValuationTime(selectedRow.liveAsOf) : selectedRow.date} returns={metric === "return"} value={selectedValue} reviewed={selectedRow.source === reviewedSource || data?.points[selectedIndex]?.accountReview}
         impact={inspectedImpact} performance={data?.points[selectedIndex]} plot={plot} points={tooltipPoints}
         anchor={{x: selectedX, y: selectedPoint?.y ?? height / 2}} />}
       <svg

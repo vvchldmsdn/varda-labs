@@ -8,6 +8,7 @@ import type { BetaView, BetaMovementRow } from "@/lib/cairn-v2/read-contract";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
 import { movementDisplay } from "@/lib/cairn-v2/read-display";
+import { todayChangeForHistory } from "@/lib/cairn-v2/history-current";
 import { betaHref, betaReadHref, type BetaContext } from "@/lib/cairn-v2/navigation";
 import { useBetaReadFreshness } from "./beta-provider";
 import styles from "./today-detail.module.css";
@@ -35,6 +36,9 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  const readKey=JSON.stringify([context.mode,context.scope,context.currency]);
  if(!d || ["loading","unauthorized"].includes(d.state)) return <p role="status" className={styles.status}>{movement.message ?? "조회 근거 확인 중"}</p>;
  const market=d.currentHoldingMovement;
+ const reviewChange=todayChangeForHistory(view);
+ const changeKrw=reviewChange ? reviewChange.changeKrw ?? null : market?.changeKrw ?? null;
+ const returnPct=reviewChange ? reviewChange.returnPct ?? null : market?.returnPct ?? null;
  const rows=[...(market?.rows ?? [])].sort((a,b)=>Math.abs(b.changeKrw)-Math.abs(a.changeKrw));
  const sources=[...new Set(rows.map(row=>sourceLabel(row.source)))].join(" · ");
  const active=rows.find(row=>selection?.read===readKey&&row.key===selection.key) ?? rows[0] ?? null;
@@ -45,11 +49,25 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  const execution=active?.execution;
  const money=(n:number|null,signed=false)=>displayReadMoney(view,n,context.currency,signed,"dashboard");
  const select=(row:BetaMovementRow)=>setSelection({read:readKey,key:row.key});
+ const historyHref=betaReadHref(betaHref("/beta/history",context),freshness?.store.pendingEpoch());
+ if (reviewChange) return <section className={styles.detail} aria-label="오늘 변동 상세">
+  <header className={styles.heading}>
+   <dl className={styles.primaryMetrics}>
+    <Metric label="평가액 변동률" value={formatPercent(returnPct,2,true)} size="hero" tone={tone(returnPct)} note="오전 7시 마감 평가액 대비" />
+    <Metric label="평가액 변동" value={money(changeKrw,true)} unit={context.currency} tone={tone(changeKrw)} />
+   </dl>
+  </header>
+  <dl className={styles.primaryMetrics}>
+   <Metric label={reviewChange.baselineDate + " 오전 7시 마감"} value={money(reviewChange.previousValueKrw)} unit={context.currency} />
+   <Metric label="현재 평가액" value={money(reviewChange.valueKrw)} unit={context.currency} />
+  </dl>
+  <ActionGroup label="오늘 변동 더 살펴보기"><Link prefetch={false} href={historyHref}><ActionContent icon={<History size={22}/>} title="히스토리에서 이어보기" description="평가액·기간 수익률·가격과 환율 영향" /></Link></ActionGroup>
+ </section>;
  return <section className={styles.detail} aria-label="오늘 변동 상세">
   <header className={styles.heading}>
    <dl className={styles.primaryMetrics}>
-    <Metric label="총변동률" value={formatPercent(market?.returnPct ?? null,2,true)} size="hero" tone={tone(market?.returnPct ?? null)} note={adjusted ? "시작 평가액 대비 · KRW" : "KRW 기준"} />
-    <Metric label="총변동액" value={money(market?.changeKrw ?? null,true)} unit={context.currency} tone={tone(market?.changeKrw ?? null)} note={market?.partial ? "비교 가능한 종목의 소계" : undefined} />
+    <Metric label="총변동률" value={formatPercent(returnPct,2,true)} size="hero" tone={tone(returnPct)} note={adjusted ? "시작 평가액 대비 · KRW" : "KRW 기준"} />
+    <Metric label="총변동액" value={money(changeKrw,true)} unit={context.currency} tone={tone(changeKrw)} note={market?.partial ? "비교 가능한 종목의 소계" : undefined} />
    </dl>
    <div className={styles.basis}><span>비교 기준</span><strong>{d.comparisonDate ?? "기준일 미제공"}</strong><p>{sources || sourceLabel(d.movementSource)}</p></div>
   </header>
@@ -113,7 +131,7 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
    {adjusted&&<p>현재 보유 종목을 비교합니다. 기존 보유분은 시작 가격부터, 오늘 산 수량은 체결가부터 계산합니다. 일부 매도한 수량은 매도 체결가까지 반영합니다.</p>}
    <p>원본 상태: {d.movementSource??"none"}{d.movementReason?" · "+d.movementReason:""}{d.movementRead?.reasons.length?" · "+d.movementRead.reasons.join(", "):""}</p>
   </details>
-  <ActionGroup label="오늘 변동 더 살펴보기"><Link prefetch={false} href={betaReadHref(betaHref("/beta/history",context),freshness?.store.pendingEpoch())}><ActionContent icon={<History size={22}/>} title="지난 변동과 이어서 보기" description="날짜별 평가액과 수익률"/></Link></ActionGroup>
+  <ActionGroup label="오늘 변동 더 살펴보기"><Link prefetch={false} href={historyHref}><ActionContent icon={<History size={22}/>} title="지난 변동과 이어서 보기" description="날짜별 평가액과 수익률"/></Link></ActionGroup>
  </section>;
 }
 
