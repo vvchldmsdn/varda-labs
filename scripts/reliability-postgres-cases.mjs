@@ -1,3 +1,4 @@
+import {fixtureClosingFx} from './fixtures/closing-valuation-fx.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {importWithPorts} from '../tests/helpers/import-with-ports.mjs';
@@ -82,7 +83,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
  await check('invalidated-valuation-retains-private-price-evidence-and-rebuild-queue',async()=>{
   const state=await read(), observations=await ledger.readNativeSnapshotObservations(context,account);
   assert.equal(state.snapshots.length,0);assert.equal(observations.length,1);
-  const missingPrice={ownerId:owner,reporting:'USD',asOf:'2026-08-04T01:00:00Z',current:{at:'2026-08-04T01:00:00Z',scopeComplete:false,source:'synthetic',positions:[]},history:[],trades:null,fx:[],maxPriceAgeMs:86400000,maxFxAgeMs:86400000};
+  const missingPrice={ownerId:owner,reporting:'USD',asOf:'2026-08-04T01:00:00Z',current:{at:'2026-08-04T01:00:00Z',scopeComplete:false,source:'synthetic',positions:[]},history:[],trades:null,fx:[fixtureClosingFx('2026-08-04')],maxPriceAgeMs:86400000,maxFxAgeMs:86400000};
   const rebuilt=cutoff.buildNativeCutoffEvidence(missingPrice,{...state,observations},'2026-08-04','2026-08-04T01:00:00Z');
   assert.equal(rebuilt.current.positions.find(p=>p.id===asset).observation.quantity,'9');
   assert.equal(rebuilt.current.positions.find(p=>p.id===asset).observation.price,'100');
@@ -110,7 +111,7 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
  });
  // These writer/replay tests use explicit, synthetic pre-cutoff receipts. A
  // permissive max-age no longer admits a two-hour-old live observation.
- const base=(at,snapshotDate='2026-08-03')=>{const receipt=new Date(`${snapshotDate}T06:59:00+09:00`).toISOString();return {ownerId:owner,reporting:'USD',asOf:at,current:{at,source:'synthetic_observation',scopeComplete:true,positions:[{id:asset,ownerId:owner,accountId:account,kind:'holding',name:'Synthetic unit',ticker:'UNIT',market:'us',observation:{quantity:'999',price:'100',currency:'USD',at:receipt,priceObservedAt:receipt,priceFetchedAt:receipt,timestampBasis:'collection',priceKind:'live',basis:'raw',source:'synthetic'}}]},history:[],trades:null,fx:[],maxFxAgeMs:86400000,maxPriceAgeMs:86400000};};
+ const base=(at,snapshotDate='2026-08-03')=>{const receipt=new Date(`${snapshotDate}T06:59:00+09:00`).toISOString();return {ownerId:owner,reporting:'USD',asOf:at,current:{at,source:'synthetic_observation',scopeComplete:true,positions:[{id:asset,ownerId:owner,accountId:account,kind:'holding',name:'Synthetic unit',ticker:'UNIT',market:'us',observation:{quantity:'999',price:'100',currency:'USD',at:receipt,priceObservedAt:receipt,priceFetchedAt:receipt,timestampBasis:'collection',priceKind:'live',basis:'raw',source:'synthetic'}}]},history:[],trades:null,fx:[fixtureClosingFx(snapshotDate,snapshotDate==='2026-08-03'?'1000':'1100')],maxFxAgeMs:86400000,maxPriceAgeMs:86400000};};
  await check('cutoff-delay-independent-and-no-current-quantity-backdate',async()=>{
   const state=await read();
   const early=cutoff.buildNativeCutoffEvidence(base('2026-08-02T22:00:00.000Z'),state,'2026-08-03','2026-08-02T22:00:00.000Z');
@@ -165,10 +166,6 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
    }
    const data=await ledger.readNativeLedger(context,item.accountId);
    const marks=base('2026-08-05T01:00:00Z',item.snapshotDate);
-   if(item.accountId===boundaryAccount) {
-    const at=new Date(`${item.snapshotDate}T06:59:00+09:00`).toISOString();
-    marks.fx=[{base:'USD',quote:'KRW',rate:item.snapshotDate==='2026-08-03'?'1000':'1100',source:'synthetic',kind:'spot',observedAt:at,fetchedAt:at}];
-   }
    const evidence=cutoff.buildNativeCutoffEvidence(marks,data,item.snapshotDate,'2026-08-05T01:00:00Z');
    const saved=await snapshots.saveNativeCutoffSnapshots(context,evidence,item.snapshotDate,'2026-08-05T01:00:00Z');
    assert.equal(saved.status,'ready');return {status:'completed'};
@@ -189,8 +186,11 @@ export async function runReliabilityCases({admin,worker,tenant,report,connection
   const [opening,relinked,last]=linkedCloses;
   assert.equal(relinked.id,unlinked.id);assert.deepEqual(relinked.native_evidence,unlinked.native_evidence);
   assert.equal(relinked.closing_performance.previousSnapshotId,opening.id);
-  // USD 1,001 at the opening plus a USD 2 deposit, all valued at 1,000 then 1,100 KRW/USD.
-  assert.ok(Math.abs(relinked.closing_performance.dailyReturnPct-10)<1e-8,'Only the 10% FX change is performance');
+  // The USD 2 deposit lands at the opening boundary. Translate this external flow
+  // at the closing 1,100 KRW rate with full day weight. Only the opening USD
+  // 1,001 earns the 100 KRW increase.
+  const expectedReturn=100*(1001*100)/(1001*1000+2*1100);
+  assert.ok(Math.abs(relinked.closing_performance.dailyReturnPct-expectedReturn)<1e-8);
   assert.equal(relinked.closing_performance.reason,null);
   assert.deepEqual(last,beforeRetry[1],'The later daily return already used the correct opening');
   const count=(await admin.query('select count(*)::int n from daily_portfolio_snapshots')).rows[0].n;

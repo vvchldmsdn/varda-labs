@@ -13,6 +13,7 @@ import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 import { childEnvironment } from './reliability-ci.mjs';
 import { runContributionUiCases, runLegacyContributionUiCase } from './reliability-contribution-ui-cases.mjs';
 import { fillSettledTrade } from './reliability-trade-ui-helpers.mjs';
+import { seedFixtureClosingFx } from './fixtures/closing-valuation-fx.mjs';
 import { runUiContextCases } from './ui-convergence-fullapp-cases.mjs';
 import { runAutoRefreshUiCases } from './reliability-auto-refresh-ui-cases.mjs';
 import { runOnboardingQaCases } from './reliability-onboarding-qa-cases.mjs';
@@ -67,9 +68,16 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
   const sessionTokens = Object.keys(identities);
   const context = { ownerUserId: owner, role: 'user' };
   const sql = sqlTransport(worker, new Set()), tenantSql = sqlTransport(tenant, new Set());
-  const [ledger, snapshots, cutoff, legacySnapshots] = await importWithPorts(['src/db/queries/native-portfolio-ledger.ts', 'src/db/queries/native-portfolio-snapshots.ts', 'src/lib/snapshots/native-cutoff-evidence.ts', 'src/lib/snapshots/daily.ts'], {
+  const [ledger, snapshots, cutoff, legacySnapshots, closingRates] = await importWithPorts(['src/db/queries/native-portfolio-ledger.ts', 'src/db/queries/native-portfolio-snapshots.ts', 'src/lib/snapshots/native-cutoff-evidence.ts', 'src/lib/snapshots/daily.ts', 'src/db/queries/daily-valuation-fx.ts'], {
     '@/db/client': { sqlClient: sql, db: drizzle(worker) }, '@/db/tenant-client': { getTenantSqlClient: () => tenantSql },
   });
+  async function seedClosingRate(serviceDate) {
+    const fx = await seedFixtureClosingFx(admin, serviceDate, '1400');
+    const stored = await closingRates.loadDailyValuationFx(serviceDate);
+    assert.equal(stored?.id, fx.fixing.id);
+    assert.equal(Number(stored.rate), Number(fx.rate));
+    return fx;
+  }
   const now = new Date(), quoteAt = new Date(now.getTime() - 3600000).toISOString();
   await admin.query("insert into app_users(id,status,role) values($1,'active','user'),($2,'active','user')", [owner, other]);
   await admin.query("insert into auth_identities(app_user_id,provider,provider_subject) values($1::uuid,'neon_auth',$1::text),($2::uuid,'neon_auth',$2::text)", [owner, other]);
@@ -89,6 +97,7 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
     await admin.query("insert into asset_price_snapshots(ticker,market,currency,date,close_price,source,fetched_at) values('999998','korea','KRW',$1,$2,'kis',$3)", [row.date, row.price, `${row.date}T21:00:00Z`]);
     await admin.query("insert into live_price_quotes(ticker,market,currency,price,source,provider,quote_type,status,price_as_of,fetched_at) values('999998','korea','KRW',$1,'kis','kis','live','ok',$2,$2) on conflict(market,ticker,provider) do update set price=excluded.price,price_as_of=excluded.price_as_of,fetched_at=excluded.fetched_at", [row.price, `${row.date}T21:59:59Z`]);
     await admin.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind) values($1,1400,'synthetic','ok',$2,$2,'spot') on conflict do nothing", [row.date, `${row.date}T21:00:00Z`]);
+    await seedClosingRate(row.snapshotDate);
     const result = await legacySnapshots.runDailySnapshot({ tenantContext: { ownerUserId: legacyOwner, role: 'user' }, dryRun: false, snapshotDate: row.snapshotDate, now: new Date(`${row.snapshotDate}T01:00:00Z`), account: 'brokerage' });
     assert.equal(result.writeReady, true);
   }
@@ -202,9 +211,10 @@ export async function runFullAppCases({ admin, worker, tenant, report, output, s
       const serviceDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() - 86400000));
       const cutoffAt = new Date(`${serviceDate}T07:00:00+09:00`).toISOString();
       const observedAt = new Date(Date.parse(cutoffAt) - 60000).toISOString();
+      const fixing = await seedClosingRate(serviceDate);
       const evidence = { ownerId: owner, reporting: 'USD', asOf: now.toISOString(),
         current: { at: now.toISOString(), source: 'synthetic_test_observation', scopeComplete: true, positions: [{ id: asset, ownerId: owner, accountId: account, kind: 'holding', name: 'Synthetic USD holding', ticker: 'TESTUSD', market: 'us',
-          observation: { quantity: '12', price: '100', currency: 'USD', at: observedAt, priceObservedAt: observedAt, priceFetchedAt: observedAt, basis: 'raw', source: 'kis' } }] }, history: [], trades: null, fx: [], maxPriceAgeMs: 86400000, maxFxAgeMs: 86400000 };
+          observation: { quantity: '12', price: '100', currency: 'USD', at: observedAt, priceObservedAt: observedAt, priceFetchedAt: observedAt, basis: 'raw', source: 'kis' } }] }, history: [], trades: null, fx: [fixing], maxPriceAgeMs: 86400000, maxFxAgeMs: 86400000 };
       const initial = cutoff.buildNativeCutoffEvidence(evidence, await ledger.readNativeLedger(context, account), serviceDate, now.toISOString());
       assert.equal(initial.current.positions.find(row => row.id === asset).observation.quantity, '10');
       assert.equal((await snapshots.saveNativeCutoffSnapshots(context, initial, serviceDate, now.toISOString())).created, 1);

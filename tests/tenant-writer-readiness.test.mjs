@@ -24,6 +24,7 @@ const ROOT = process.cwd();
 const RELEASE_WRITER_TABLE_POLICIES = [
   { table: "contribution_effects", classification: "user_owned", canonicalOwnerRolloutScope: "not_applicable" },
   { table: "instrument_catalog", classification: "shared_reference", canonicalOwnerRolloutScope: "not_applicable" },
+  { table: "daily_valuation_fx", classification: "shared_reference", canonicalOwnerRolloutScope: "not_applicable" },
   { table: "drizzle.__drizzle_migrations", classification: "admin_system", canonicalOwnerRolloutScope: "not_applicable" },
 ];
 const OWNER_A = "11111111-1111-4111-8111-111111111111";
@@ -272,7 +273,7 @@ describe("tenant writer Phase 1D-A readiness", () => {
 
     assert.deepEqual(registeredPaths, discoveredPaths);
     assert.equal(TENANT_WRITER_REGISTRY.length, 51);
-    assert.equal(registeredPaths.length, 63);
+    assert.equal(registeredPaths.length, 64);
     assert.equal(
       new Set(TENANT_WRITER_REGISTRY.map(({ id }) => id)).size,
       TENANT_WRITER_REGISTRY.length,

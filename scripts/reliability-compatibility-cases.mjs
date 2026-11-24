@@ -1,3 +1,4 @@
+import {fixtureClosingFx} from './fixtures/closing-valuation-fx.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
@@ -153,7 +154,7 @@ export async function runCompatibilityCases({ admin: clusterAdmin, report, conne
     await check('new-app-rebuilds-and-old-projection-cannot-read-revision-snapshot', async () => {
       const data = await ledger.readNativeLedger(context, account);
       const observations = await ledger.readNativeSnapshotObservations(context, account);
-      const rebuilt = cutoff.buildNativeCutoffEvidence(oldEvidence, { ...data, observations }, '2026-08-04', '2026-08-04T01:00:00Z');
+      const rebuilt = cutoff.buildNativeCutoffEvidence({ ...oldEvidence, fx: [fixtureClosingFx('2026-08-04')] }, { ...data, observations }, '2026-08-04', '2026-08-04T01:00:00Z');
       rebuiltEvidence = rebuilt;
       assert.equal(rebuilt.current.positions.find(row => row.id === asset).observation.quantity, '9');
       assert.equal(rebuilt.current.positions.find(row => row.id === `cash:${account}:USD`).observation.quantity, '1130');

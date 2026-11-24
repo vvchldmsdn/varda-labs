@@ -1,10 +1,12 @@
+import {seedFixtureClosingFx} from './fixtures/closing-valuation-fx.mjs';
+import {drizzle} from 'drizzle-orm/node-postgres';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {sqlTransport} from '../scripts/krw-usd-rc-rehearsal.mjs';
 import {importWithPorts} from '../tests/helpers/import-with-ports.mjs';
 export async function runNativeTradeCutoffCases({admin,worker,tenant,report}) {
  const owner=randomUUID(),other=randomUUID(),account=randomUUID(),asset=randomUUID();
- const ports={'next/server':{after:()=>{throw Error('No provider calls permitted')}},'@/db/tenant-client':{getTenantSqlClient:()=>sqlTransport(tenant,new Set())},'@/db/client':{sqlClient:sqlTransport(worker,new Set())}};
+ const ports={'next/server':{after:()=>{throw Error('No provider calls permitted')}},'@/db/tenant-client':{getTenantSqlClient:()=>sqlTransport(tenant,new Set())},'@/db/client':{db:drizzle(worker),sqlClient:sqlTransport(worker,new Set())}};
  const [q,cutoff,snapshots,projection,valuation]=await importWithPorts(['src/db/queries/native-portfolio-ledger.ts','src/db/queries/native-cutoff-evidence.ts','src/db/queries/native-portfolio-snapshots.ts','src/lib/native-portfolio-projection.ts','src/lib/currency-tracked-portfolio.ts'],ports);
  await admin.query("insert into app_users(id,status) values($1,'active'),($2,'active')",[owner,other]);
  await admin.query("insert into accounts(id,canonical_owner_user_id,code,name,account_type,currency) values($1,$2,'trade-rehearsal','Trade Rehearsal','brokerage','USD')",[account,owner]);
@@ -29,12 +31,10 @@ export async function runNativeTradeCutoffCases({admin,worker,tenant,report}) {
    await write({type:'sell',at:'2026-09-01T03:00:00Z',assetId:asset,quantity:'0.411494',currency:'USD',settlement:{amount:'420000',currency:'KRW'}});
    for(const [at,amount] of [['2026-09-01T21:59:59.999Z','100'],['2026-09-01T22:00:00.000Z','50'],['2026-09-01T22:00:00.001Z','25'],['2026-09-01T22:05:00Z','20']]) assert.equal((await write({type:'deposit',at,amount,currency:'USD'})).status,'created');
    await admin.query("insert into fx_rates(date,usdkrw,source,status,observed_at,fetched_at,rate_kind,is_sample) values('2026-09-01','1000','synthetic_fx','ok','2026-09-01T21:00:00Z','2026-09-01T21:01:00Z','spot',false)");
-   // The legacy rehearsal used an hour-old spot rate. The current cutoff
-   // contract correctly rejects it; retain that negative check, then supply
-   // a separately timed synthetic observation within the unchanged 15m bound.
+   // A stored spot rate alone cannot establish a common close.
    const stale=await cutoff.readNativeCutoffEvidence(ctx,account,'2026-09-02','2026-09-01T22:00:00.000Z');
    assert.equal(valuation.buildTrackedCurrencyPortfolio(stale).current.total,null);
-   await admin.query("update fx_rates set observed_at='2026-09-01T21:50:00Z',fetched_at='2026-09-01T21:51:00Z' where date='2026-09-01' and source='synthetic_fx'");
+   await seedFixtureClosingFx(admin,'2026-09-02','1000');
    for(const actual of ['2026-09-01T22:00:00.000Z','2026-09-01T22:05:00Z','2026-09-01T22:30:00Z','2026-09-01T23:00:00Z']) {
      const e=await cutoff.readNativeCutoffEvidence(ctx,account,'2026-09-02',actual);
      assert.equal(valuation.buildTrackedCurrencyPortfolio(e).current.total,'2100');
