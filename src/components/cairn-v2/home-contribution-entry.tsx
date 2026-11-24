@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button, Field, Form, Input } from "@/components/cairn-ui";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
@@ -17,24 +17,42 @@ function wonFromManwon(value: string) {
   return parseContributionInput(won).state === "ready" ? won : null;
 }
 
-export function ContributionEntry({ view, context, dirty, colors, className, onView }: {
+export function ContributionEntry({ view, context, dirty, colors, className, onCalculate, onView }: {
   view: BetaView; context: BetaContext; dirty: boolean; colors: readonly string[];
   className?: string;
+  onCalculate: (amount: string) => void;
   onView: (trigger: HTMLElement, amount?: string) => void;
 }) {
   const amountId = useId();
   const amountRef = useRef<HTMLInputElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
-  const [draft, setDraft] = useState<{ base: BetaContext["cashAmountKrw"]; text: string } | null>(null);
+  const [draft, setDraft] = useState<{ base: BetaContext["cashAmountKrw"]; text: string; submitted?: string } | null>(null);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [validate, setValidate] = useState(false);
   const saved = parseContributionInput(context.cashAmountKrw).amount;
   const initial = saved === null ? "" : String(saved / 10000);
-  const currentDraft = draft?.base === context.cashAmountKrw ? draft : null;
+  const currentDraft = draft && (draft.base === context.cashAmountKrw || draft.submitted === context.cashAmountKrw) ? draft : null;
   const text = currentDraft?.text ?? initial;
   const won = wonFromManwon(text);
   const invalid = validate && !won;
   const canCalculate = context.currency === "KRW";
+  const read = view.domain?.planning?.contribution;
+  const settled = won !== null && read?.inputKrw === Number(won);
+  const changed = canCalculate && currentDraft !== null && won !== String(saved);
+  const pending = canCalculate && won !== null && (changed || view.domain?.state === "loading" || !!read) && !settled;
+
+  useEffect(() => {
+    if (!changed || !won || currentDraft.submitted === won) return;
+    const timer = setTimeout(() => {
+      setDraft({ ...currentDraft, base: context.cashAmountKrw, submitted: won });
+      onCalculate(won);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [changed, context.cashAmountKrw, currentDraft, onCalculate, won]);
+
+  function changeAmount(text: string) {
+    setDraft({ base: context.cashAmountKrw, text, submitted: currentDraft?.submitted });
+  }
 
   function openAllocation(trigger: HTMLElement, submitting = false) {
     const requestedAmount = canCalculate && (submitting || currentDraft !== null) ? won : undefined;
@@ -45,6 +63,7 @@ export function ContributionEntry({ view, context, dirty, colors, className, onV
     }
     setValidate(false);
     setPresetsOpen(false);
+    if (currentDraft && requestedAmount) setDraft({ ...currentDraft, submitted: requestedAmount });
     onView(trigger, requestedAmount);
   }
 
@@ -59,7 +78,7 @@ export function ContributionEntry({ view, context, dirty, colors, className, onV
           <Input ref={amountRef} presentation="amount" id={amountId} aria-label="추가 투자 금액 (만원)" inputMode="decimal" autoComplete="off" placeholder="0"
             aria-invalid={invalid || undefined} aria-describedby={invalid ? amountId + "-error" : undefined}
             value={text} onFocus={() => setPresetsOpen(true)}
-            onChange={event => setDraft({ base: context.cashAmountKrw, text: event.target.value })} />
+            onChange={event => changeAmount(event.target.value)} />
           <span>만원</span>
         </div>
         <Button ref={submitRef} variant="primary" type="submit" className={styles.submit}>배분 보기 <ArrowRight size={14} aria-hidden /></Button>
@@ -67,10 +86,11 @@ export function ContributionEntry({ view, context, dirty, colors, className, onV
       {invalid && <p id={amountId + "-error"} role="alert">1원부터 1,000억 원까지, 원 단위로 입력해 주세요.</p>}
       {presetsOpen && <div className={styles.presets} role="group" aria-label="투자금 바로가기">
         {[50, 100, 200, 500].map(value => <Button key={value} type="button" variant="bare" aria-pressed={value * 10000 === Number(won)}
-          onClick={() => { setDraft({ base: context.cashAmountKrw, text: String(value) }); setPresetsOpen(false); setValidate(false); submitRef.current?.focus(); }}>{value}만원</Button>)}
+          onClick={() => { changeAmount(String(value)); setPresetsOpen(false); setValidate(false); submitRef.current?.focus(); }}>{value}만원</Button>)}
         <Button type="button" variant="bare" onClick={() => { setPresetsOpen(false); submitRef.current?.focus(); }}>닫기</Button>
       </div>}
     </Form> : <Button variant="secondary" type="button" onClick={e => openAllocation(e.currentTarget)}>배분 보기</Button>}
-    <ContributionHome view={view} dirty={dirty || (canCalculate && text !== initial && won !== String(saved))} colors={colors} />
+    <ContributionHome view={view} dirty={dirty} colors={colors}
+      pendingAmount={pending ? Number(won) : null} />
   </HomeCard>;
 }

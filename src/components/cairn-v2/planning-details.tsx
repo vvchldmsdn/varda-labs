@@ -17,6 +17,7 @@ import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { requestKey, type BetaView } from "@/lib/cairn-v2/read-contract";
 import { useBetaContext } from "./use-beta-context";
 import { useBetaExistingCrudAvailable } from './beta-provider';
+import { ContributionOrderPreview } from "./contribution-order-preview";
 import styles from "./beta.module.css";
 
 import {AdditionalContributionAllocationTable} from "./reused/allocation-list";
@@ -59,7 +60,10 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
   const excludedSales = draft.key === queryKey ? draft.keys : committedKeys;
   const dirty = amount !== submitted || JSON.stringify(excludedSales) !== JSON.stringify(committedKeys);
   const read = view.domain?.planning?.contribution;
-  const result = !dirty && read?.state === "ready" ? read.result : null;
+  const input = parseContributionInput(submitted);
+  const pending = context.currency === "KRW" && input.state === "ready" &&
+    (view.domain?.state === "loading" || (read != null && read.inputKrw !== input.amount));
+  const result = !dirty && !pending && read?.state === "ready" ? read.result : null;
   const [editorKey, setEditorKey] = useState<string | null>(null);
   const [validate, setValidate] = useState(false);
   const showForm = !result || editorKey === queryKey;
@@ -103,8 +107,8 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
     sell: row.trimAmountKrw, buy: row.allocationKrw,
   }));
 
-  return <div className={`${styles.planningDetail} ${presentation.surface}`} data-contribution-state={dirty ? "edited" : read?.state ?? view.domain?.state}>
-    {showForm && <CairnForm className={presentation.form} noValidate onSubmit={calculate}>
+  return <div className={`${styles.planningDetail} ${presentation.surface}`} data-contribution-state={pending ? "loading" : dirty ? "edited" : read?.state ?? view.domain?.state}>
+    {showForm && !pending && <CairnForm className={presentation.form} noValidate onSubmit={calculate}>
       <CairnField htmlFor={inputId}>{t("얼마를 더 투자할까요?", "How much will you add?")}</CairnField>
       <div className={presentation.amountInput}>
         <MoneyInput presentation="amount" data-long={amount.length > 9} id={inputId} name="cashAmountKrw"
@@ -134,6 +138,7 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
     </CairnForm>}
 
     {context.currency !== "KRW" ? <CairnStatus as="p" role="status" className={styles.muted}>{t("이 화면에서 계산하려면 표시 통화를 원화로 바꿔 주세요.", "Switch the display currency to KRW to calculate here.")}</CairnStatus>
+      : pending ? <CairnStatus as="p" role="status" className={styles.muted}>{t(`${formatWon(input.amount!)} 배분을 계산 중이에요.`, `Calculating the allocation for ${formatWon(input.amount!)}.`)}</CairnStatus>
       : (read?.state === "blocked" || read?.state === "unavailable") ? <RecoveryNotice beta allowResolve={available && context.mode === "domain"} scope={context.scope} reasons={read.blockers} kind={read.state === "unavailable" ? "retry" : undefined} returnHref={betaHref("/beta", { ...context, cashAmountKrw: amount, excludeSell: excludedSales }) + "#beta-contribution"} />
       : !dirty && !result && read?.state !== "idle" && <CairnStatus as="p" role="status" className={styles.muted}>{read?.message ?? t("계산 조건 확인 중", "Checking inputs")}</CairnStatus>}
 
@@ -146,12 +151,21 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
           requestAnimationFrame(() => document.getElementById(inputId)?.focus());
         }}>{t("조건 변경", "Edit inputs")}</CairnButton>
       </div>
-      <PlannedTrades rows={trades} totalSell={result.totalTrimProceedsKrw} totalBuy={result.totalAllocatedKrw}
-        available={result.totalAvailableFundsKrw} remainingCash={result.residualCashKrw}
-        formatAmount={formatWon} english={locale === "en"} />
+      {read?.orderBasis && <ContributionOrderPreview basis={read.orderBasis} totalBudgetKrw={result.cashAmountKrw} formatWon={formatWon}
+        onIncludeCash={updated => {
+          onEdit?.(false);
+          if (onCalculate) onCalculate(updated, committedKeys);
+          else setContext({...context,cashAmountKrw:updated});
+        }} />}
+      {read?.orderBasis ? <details className={presentation.evidence}>
+        <summary>{t("목표 배분과 매도 계획", "Target allocation and sale plan")}</summary>
+        <PlannedTrades rows={trades} totalSell={result.totalTrimProceedsKrw} totalBuy={result.totalAllocatedKrw}
+          available={result.totalAvailableFundsKrw} remainingCash={result.residualCashKrw} formatAmount={formatWon} english={locale === "en"} />
+      </details> : <PlannedTrades rows={trades} totalSell={result.totalTrimProceedsKrw} totalBuy={result.totalAllocatedKrw}
+        available={result.totalAvailableFundsKrw} remainingCash={result.residualCashKrw} formatAmount={formatWon} english={locale === "en"} />}
       {available && <nav className={presentation.resultActions} aria-label={t("투자 계획 이어가기", "Continue your plan")}>
         <RecoveryJourneyLink className={presentation.primaryLink} prefetch={false} href={contributionJourneyHref("plan", journey)}>
-          {t("이 조건으로 계획 만들기", "Create a plan with these inputs")} <span aria-hidden="true">→</span>
+          {t("목표 배분으로 계획 만들기", "Create a plan from the target allocation")} <span aria-hidden="true">→</span>
         </RecoveryJourneyLink>
         <details>
           <summary>{t("다른 작업", "More actions")}</summary>
@@ -166,38 +180,85 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
       }}>
         <summary>{t("종목별 비중과 계산 근거", "Weights and calculation details")}</summary>
         {evidenceOpen && <>
-          <AdditionalContributionAllocationTable preview={result} />
-          <p>{result.policyLabel} · {result.policyVersion}
-            {read?.approvalRevision != null && ` · ${t("승인", "Revision")} ${read.approvalRevision}`}
-            {result.source === "legacy_account_policy" && ` · ${t("기존 계좌 정책", "Legacy account policy")}`}
-          </p>
-          <p>{t("적용일", "Effective date")} {result.effectiveServiceDate ?? "—"} · {t("평가 기준일", "Valuation date")} {result.serviceDate}</p>
-          <p>{t("투입 후 비중은 남는 현금을 포함한 총액을 기준으로 계산해요.", "Weights use the projected total including remaining cash.")} {formatWon(result.postTopupTotalKrw)}</p>
-          <p>{t("가상 계산이며 수수료·세금·체결 단위는 반영하지 않았습니다.", "This projection excludes fees, taxes and lot sizes.")}</p>
-          {view.domain?.planning?.targets.rows.some(row => row.plannedOnly) && <p>{t("미보유 계획 종목은 현재 보유액 0으로 계산합니다.", "Planned holdings start with zero current value.")}</p>}
-          {result.rows.map((row, index) => <details key={trades[index].key}>
-            <summary>{instrumentLabel(row)}{context.scope === "all" && ` · ${row.accountName}`}</summary>
-            <dl className={styles.holdingNumbers}>
-              <div><dt>{t("현재 평가액", "Current value")}</dt><dd>{formatWon(row.currentValueKrw)}</dd></div>
-              <div><dt>{t("매입원가", "Cost basis")}</dt><dd>{row.costBasisKrw == null ? "—" : formatWon(row.costBasisKrw)}</dd></div>
-              <div><dt>{t("미실현 수익률", "Unrealized return")}</dt><dd>{row.unrealizedReturnPct == null ? "—" : `${row.unrealizedReturnPct.toFixed(2)}%`}</dd></div>
-              <div><dt>{t("승인 목표 → 계산 목표", "Approved → adjusted target")}</dt><dd>{row.targetWeightPct.toFixed(2)}% → {row.effectiveTargetWeightPct.toFixed(2)}%</dd></div>
-              <div><dt>{t("예상 매도", "Planned sale")}</dt><dd>{formatWon(row.trimAmountKrw)}</dd></div>
-              <div><dt>{t("예상 매수", "Planned buy")}</dt><dd>{formatWon(row.allocationKrw)}</dd></div>
-              <div><dt>{t("투입 후 비중", "Projected weight")}</dt><dd>{row.postTopupWeightPct.toFixed(2)}%</dd></div>
-            </dl>
-            <p>{t(...saleReasons[row.trimReason])} · {t(...movingAverageReasons[row.maAdjustmentReason])}</p>
-            <p>{t("120일 이동평균", "120-day moving average")} {row.ma120Evidence.ma120 ?? "—"} · {t(...averageObservation[row.ma120Evidence.status])}
-              {" · "}{t("관측 수", "Observations")} {row.ma120Evidence.availableObservationCount}
-              {" · "}{t("최근 관측일", "Last observation")} {row.ma120Evidence.latestWindowPriceDate ?? "—"}</p>
-            <p>{t("가격 기준", "Price basis")} {row.ma120Evidence.priceBasis === "private_kis_raw_close" ? t("종가", "Close") : row.ma120Evidence.priceBasis === "provider_adjusted_close" ? t("수정 종가", "Adjusted close") : "—"}
-              {" · "}{t("이격률", "Distance")} {row.ma120Evidence.distanceFromMaPct == null ? "—" : `${row.ma120Evidence.distanceFromMaPct.toFixed(2)}%`}
-              {" · "}{t("적용 배수", "Multiplier")} {Number(row.maEffectiveMultiplier.toFixed(4))}</p>
-          </details>)}
+          <div className={presentation.evidenceRows}>
+            {result.rows.map((row, index) => <HoldingAllocationEvidence key={trades[index].key}
+              row={row} fx={result.modifierEvidence?.fx} showAccount={context.scope === "all"} formatWon={formatWon} />)}
+          </div>
+          <details>
+            <summary>{t("전체 비중 비교와 계산 기준", "All weights and calculation basis")}</summary>
+            <AdditionalContributionAllocationTable preview={result} />
+            <p>{result.policyLabel} · {result.policyVersion}
+              {read?.approvalRevision != null && ` · ${t("승인", "Revision")} ${read.approvalRevision}`}
+              {result.source === "legacy_account_policy" && ` · ${t("기존 계좌 정책", "Legacy account policy")}`}
+            </p>
+            <p>{t("적용일", "Effective date")} {result.effectiveServiceDate ?? "—"} · {t("평가 기준일", "Valuation date")} {result.serviceDate}</p>
+            <p>{t("투입 후 비중은 남는 현금을 포함한 총액을 기준으로 계산해요.", "Weights use the projected total including remaining cash.")} {formatWon(result.postTopupTotalKrw)}</p>
+            <p>{t("이 표의 목표 배분은 수량 조정 전 기준이에요.", "This table shows target amounts before order sizing.")}</p>
+            {view.domain?.planning?.targets.rows.some(row => row.plannedOnly) && <p>{t("미보유 계획 종목은 현재 보유액 0으로 계산합니다.", "Planned holdings start with zero current value.")}</p>}
+          </details>
         </>}
       </details>
     </>}
   </div>;
+}
+
+function HoldingAllocationEvidence({ row, fx, showAccount, formatWon }: {
+  row: ReadyContributionRow;
+  fx?: NonNullable<ReadyContribution["modifierEvidence"]>["fx"];
+  showAccount: boolean;
+  formatWon: (amount: number) => string;
+}) {
+  const { t } = useI18n();
+  const ma = row.ma120Evidence;
+  const breakdown = row.modifierBreakdown;
+  const fxFactor = breakdown?.multipliers.fx;
+  const formatMultiplier = (value: number) => "×" + value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  const formatPercent = (value: number) => (value > 0 ? "+" : "") + value.toFixed(2) + "%";
+  const currencyPrice = ma.ma120 != null ? `${ma.ma120.toLocaleString("ko-KR", { maximumFractionDigits: 4 })} ${row.currency ?? ""}` : null;
+  const factorText = fxFactor?.status === "ready" ? formatMultiplier(fxFactor.value) :
+    fxFactor?.status === "not_applicable" ? t("적용 제외", "Exempt") : t("미적용", "Not applied");
+  return <details className={presentation.holdingEvidence}>
+    <summary>
+      <span>{instrumentLabel(row)}{showAccount && <small>{row.accountName}</small>}</span>
+      <strong>{row.trimAmountKrw > 0 ? t("매도", "Sell") + " " + formatWon(row.trimAmountKrw) :
+        row.allocationKrw > 0 ? t("매수", "Buy") + " " + formatWon(row.allocationKrw) : t("유지", "Hold")}</strong>
+    </summary>
+    <dl className={presentation.evidenceFactors}>
+      <div>
+        <dt>{t("120일 이동평균 · 목표 비중", "120-day MA · Target weight")}</dt>
+        <dd><strong>{formatMultiplier(row.maEffectiveMultiplier)}</strong>
+          <span>{t(...movingAverageReasons[row.maAdjustmentReason])}
+            {ma.distanceFromMaPct != null && ` · ${formatPercent(ma.distanceFromMaPct)}`}</span>
+          {currencyPrice && <small>{t("이동평균", "Moving average")} {currencyPrice}
+            {ma.latestWindowPriceDate ? ` · ${ma.latestWindowPriceDate}` : ""}</small>}
+          <small>{row.targetWeightPct.toFixed(2)}% → {row.effectiveTargetWeightPct.toFixed(2)}%</small>
+        </dd>
+      </div>
+      <div>
+        <dt>{t("원·달러 환율 · 매수 배수", "USD/KRW · Buy multiplier")}</dt>
+        <dd><strong>{factorText}</strong>
+          {fxFactor?.status === "ready" && fx?.status === "ready" ? <>
+            <span>{fx.value.percentile != null && fx.value.percentileLookback != null
+              ? t(`최근 ${fx.value.percentileLookback}개 환율 중 ${fx.value.percentile.toFixed(0)}백분위`,
+                `${fx.value.percentile.toFixed(0)}th percentile across the last ${fx.value.percentileLookback} observations`)
+              : t(`환율 관측 ${fx.value.observationCount}개`, `${fx.value.observationCount} FX observations`)}</span>
+            <small>{fx.value.trendMult != null && `${t("환율 추세", "FX trend")} ${formatMultiplier(fx.value.trendMult)} · `}
+              {t("환율 기준 배수", "Base FX multiplier")} {formatMultiplier(fx.value.multiplier)}</small>
+          </> : <span>{fxFactor?.status === "not_applicable"
+            ? t("국내 자산·환헤지 정책 적용", "Domestic or currency-hedged exposure")
+            : t("이 종목에 적용된 환율 조정 없음", "No FX adjustment applied to this holding")}</span>}
+        </dd>
+      </div>
+    </dl>
+    <dl className={presentation.evidenceAmounts}>
+      <div><dt>{t("현재 평가액", "Current value")}</dt><dd>{formatWon(row.currentValueKrw)}</dd></div>
+      <div><dt>{t("기본 매수 배분", "Base buy allocation")}</dt><dd>{formatWon(row.rawAllocationKrw ?? row.strategicAllocationKrw)}</dd></div>
+      {breakdown && <div><dt>{t("감액 후 / 추가 배분", "After reductions / Top-up")}</dt><dd>{formatWon(breakdown.penalizedAllocationKrw)} / {formatWon(breakdown.topupAllocationKrw)}</dd></div>}
+      <div><dt>{t("투입 후 비중", "Projected weight")}</dt><dd>{row.postTopupWeightPct.toFixed(2)}%</dd></div>
+    </dl>
+    <p>{t(...saleReasons[row.trimReason])}
+      {row.unrealizedReturnPct != null && ` · ${t("미실현 수익률", "Unrealized return")} ${formatPercent(row.unrealizedReturnPct)}`}</p>
+  </details>;
 }
 
 const saleReasons: Record<ReadyContributionRow["trimReason"], [string, string]> = {
@@ -217,12 +278,4 @@ const movingAverageReasons: Record<ReadyContributionRow["maAdjustmentReason"], [
   asset_class_exempt: ["이동평균 조정 제외 자산", "Asset exempt from moving-average adjustments"],
   asset_rule_disabled: ["이동평균 조정 꺼짐", "Moving-average adjustment off"],
   evidence_unavailable: ["이동평균 자료 부족", "Insufficient moving-average data"],
-};
-const averageObservation: Record<ReadyContributionRow["ma120Evidence"]["status"], [string, string]> = {
-  above_ma: ["평균보다 높음", "Above average"],
-  at_ma: ["평균과 같음", "At the average"],
-  below_ma: ["평균보다 낮음", "Below average"],
-  insufficient_history: ["가격 이력 부족", "Insufficient price history"],
-  invalid_history: ["가격 이력 확인 필요", "Invalid price history"],
-  unavailable: ["자료 없음", "Unavailable"],
 };

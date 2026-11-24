@@ -24,6 +24,7 @@ export function HomeCard({
   onOpen: (kind: CardKind, trigger: HTMLElement) => void;
   minimal?: boolean;
 }) {
+  const expandOnly = kind === "contribution";
   const activate = (event: MouseEvent<HTMLElement>) => {
     if ((event.target as Element).closest("button,a,input,select,label,form,details,[role=button],[popover]")) return;
     const trigger = event.currentTarget.querySelector<HTMLButtonElement>("[data-expand]");
@@ -34,16 +35,15 @@ export function HomeCard({
       className={`${styles.card} ${styles[kind]} ${className ?? ""}`}
       data-beta-card={kind}
       data-minimal={minimal || undefined}
-      onClick={activate}
+      onClick={expandOnly ? undefined : activate}
     >
       <CardHeader
         className={styles.cardHeader}
         title={
           minimal ? (
             <span className={styles.visuallyHidden}>{cardTitles[kind]}</span>
-          ) : (
+          ) : expandOnly ? <span>{cardTitles[kind]}</span> : (
             <button
-              id={kind === "contribution" ? "beta-contribution" : undefined}
               type="button"
               onClick={(event) => onOpen(kind, event.currentTarget)}
             >
@@ -53,6 +53,7 @@ export function HomeCard({
         }
         actions={
           <IconButton
+            id={expandOnly ? "beta-contribution" : undefined}
             label={expandText ? `${cardTitles[kind]} ${expandText}` : `${cardTitles[kind]} 확대`}
             data-expand
             onClick={(event) => onOpen(kind, event.currentTarget)}

@@ -184,6 +184,8 @@ import "./svg-monotone-curve.test.mjs";
 import "./holding-connection-graph.test.mjs";
 import "./fx-trend.test.mjs";
 import "./additional-contribution-allocator.test.mjs";
+import "./additional-contribution-order-sizing.test.mjs";
+import "./contribution-order-integration.test.mjs";
 import "./target-deficit-allocation.test.mjs";
 import "./portfolio-target-policy.test.mjs";
 import "./portfolio-target-policy-schema.test.mjs";

@@ -7,8 +7,9 @@ import { HoldingHeatmap } from './holding-heatmap';
 
 import { HomeSimulationPending } from "./home-simulation";
 import { ContributionEntry } from "./home-contribution-entry";
+import { ContributionOrderProvider } from "./contribution-order-context";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 const LazyHomeSimulation = dynamic(() => import("./home-simulation-lazy").then(module => module.LazyHomeSimulation), { loading: () => <HomeSimulationPending detail /> });
 import { HomeCard as Card } from "./home-card";
@@ -59,7 +60,7 @@ export function BetaHome({
   const [expanded, setExpanded] = useState<{ kind: CardKind; origin: ExpansionOrigin } | null>(null);
   const needsFullHistory = period === "ALL" || expanded?.kind === "history" ||
     metric === "return" && !context.scope.startsWith("portfolio:");
-  const history = useHomeHistoryRead(useBetaView(context, read), read, context, needsFullHistory);
+  const history = useHomeHistoryRead(useBetaView(context, read, true), read, context, needsFullHistory);
   const view = history.view;
   const originalValue = currentHistoryValuation(view, context.currency);
   const composition = view.domain?.currentValuePresentation ? originalCurrentComposition(view.domain.currentValuePresentation, context.currency) : null;
@@ -76,6 +77,9 @@ export function BetaHome({
     setExpanded({ kind, origin: { rect: card.getBoundingClientRect(), trigger } });
   }
   const [contributionDirty, setContributionDirty] = useState(false);
+  const calculateContribution = useCallback((amount: string) => {
+    if (amount !== context.cashAmountKrw) setContext({ ...context, cashAmountKrw: amount }, { replace: true });
+  }, [context, setContext]);
   useEffect(() => {
     const resume = () => {
       if (location.hash === '#beta-target-drift') {
@@ -116,6 +120,7 @@ export function BetaHome({
   };
   return (
     <BetaShell context={context} setContext={setContext} readView={view} homeSummary={homeSummary}>
+      <ContributionOrderProvider key={JSON.stringify([context.scope, context.currency, read?.displayBinding])} basis={view.domain?.planning?.contribution?.orderBasis}>
       <HomeImpactProvider read={view.domain?.heatmap} review={view.domain?.accountHistoryReview} reviewed={view.domain?.reviewedDailyImpact}>
       <HomePerformanceProvider view={view} context={context} read={read}>
       <div className={home.dashboard}>
@@ -207,10 +212,11 @@ export function BetaHome({
 
           <div className={home.planning}>
             {view.domain ? (
-              <ContributionEntry key={context.scope} view={view} context={context} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}
+              <ContributionEntry key={context.scope + ":" + context.currency} view={view} context={context} dirty={contributionDirty} colors={HOME_ALLOCATION_COLORS}
                 className={!contributionReady ? home.contributionStatus : undefined}
+                onCalculate={calculateContribution}
                 onView={(trigger, amount) => {
-                  if (amount !== undefined && amount !== context.cashAmountKrw) setContext({ ...context, cashAmountKrw: amount });
+                  if (amount !== undefined) calculateContribution(amount);
                   open("contribution", trigger);
                 }} />
             ) : (
@@ -321,6 +327,7 @@ export function BetaHome({
       )}
       </HomePerformanceProvider>
       </HomeImpactProvider>
+      </ContributionOrderProvider>
     </BetaShell>
   );
 }
