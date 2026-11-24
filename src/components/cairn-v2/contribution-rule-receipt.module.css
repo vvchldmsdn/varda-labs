@@ -34,6 +34,8 @@
 .holding > summary > :not(.identity) small { display: none; }
 .final { font-weight: 650; }
 .final svg { display: inline-block; vertical-align: middle; color: var(--muted); }
+.order { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; text-align: start; font-size: .8rem; color: var(--muted); }
+.order strong { color: var(--ink); font-weight: 650; }
 .cut[data-changed="true"] { color: var(--negative); }
 .extra[data-changed="true"] { color: var(--accent); }
 .body { display: grid; gap: 8px; padding: 0 10px 14px; }
@@ -55,5 +57,7 @@
   .base { grid-area: base; }
   .cut { grid-area: cut; }
   .extra { grid-area: extra; }
+  .holding > summary:has(.order) { grid-template-areas: "name name final" "order order order" "base cut extra"; }
+  .order { grid-area: order; }
   .holding > summary > :is(.base,.cut,.extra) small { display: block; padding-bottom: 1px; font-size: .70rem; }
 }

@@ -6,6 +6,7 @@ import type { ContributionOrderBasis } from "@/lib/cairn-v2/contribution-order-p
 import type { ReadyContribution } from "@/lib/cairn-v2/planning-contract";
 import { instrumentLabel } from "@/lib/instrument-display";
 import { useContributionOrderPlan } from "./contribution-order-context";
+import { formatBuyQuantity, formatOrderUnitPrice } from "./contribution-order-display";
 import styles from "./contribution-funding-bar.module.css";
 
 const formatAmount = (value: number) => value.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
@@ -37,7 +38,7 @@ export function ContributionFundingBar({ result, basis, showLeadingBuys = false,
     const terms = basisByKey.get(row.allocationKey);
     return { key: row.allocationKey, name: instrumentLabel(row), account: row.accountName,
       target: row.allocationKrw, buy: sized ? order?.principalKrw ?? 0 : row.allocationKrw,
-      quantity: order?.quantity, unit: terms?.unit, quoted: !!terms };
+      order, terms };
   }).sort((left, right) => right.buy - left.buy || right.target - left.target)
     .map((row, index) => ({ ...row, color: HOME_ALLOCATION_COLORS[index % HOME_ALLOCATION_COLORS.length] }));
   const purchases = candidates.filter(row => row.buy > 0);
@@ -63,12 +64,12 @@ export function ContributionFundingBar({ result, basis, showLeadingBuys = false,
     {leading.length > 0 && <ul className={styles.leading} aria-label={t("주요 추가 매수", "Leading buy allocations")}>
       {leading.map(row => <li key={row.key}>
         <span className={styles.dot} data-empty={row.buy === 0 || undefined} style={{ color: row.color }} aria-hidden="true" />
-        <div><strong>{row.name}</strong><small>{row.account}</small></div>
+        <div><strong>{row.name}</strong><small>{row.account}{row.order && row.terms && " · " + formatOrderUnitPrice(row.terms, t)}</small></div>
         <div className={styles.amount}>
-          <strong>{sized && row.buy === 0 ? (row.quoted ? t("주문 없음", "No order") : t("단가 확인 필요", "Price needed")) : won(row.buy)}</strong>
-          <small>{row.quantity && row.buy > 0 ? row.unit === "gram" ? `${row.quantity} g` : t(`${row.quantity}주`, `${row.quantity} shares`) :
+          <strong>{sized && row.buy === 0 ? (row.terms ? t("주문 없음", "No order") : t("단가 확인 필요", "Price needed")) : won(row.buy)}</strong>
+          <small>{row.order && row.terms ? formatBuyQuantity(row.order, row.terms, t) :
             sized && row.target !== row.buy ? t(`목표 ${won(row.target)}`, `Target ${won(row.target)}`) :
-            sized ? t("금액 주문", "Amount order") : t("목표 배분", "Target allocation")}</small>
+            t("목표 배분", "Target allocation")}</small>
         </div>
       </li>)}
     </ul>}

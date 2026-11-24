@@ -10,21 +10,21 @@
 .summaryBody small,.hint { color:var(--muted); font-size:.78rem; line-height:1.5; }
 .content { display:grid; gap:10px; padding-bottom:12px; }
 .content p { margin:0; }
-.search { display:flex; align-items:center; gap:7px; padding:0 10px; border:1px solid var(--line); border-radius:9px; color:var(--muted); }
-.search input { min-width:0; flex:1; border:0; background:transparent; box-shadow:none; }
+.options .search[data-cairn-field] { display:flex; align-items:center; gap:7px; padding:0 10px; border:1px solid var(--line); border-radius:9px; color:var(--muted); }
+.options .search input[data-cairn-control] { min-width:0; flex:1; border:0; background:transparent; box-shadow:none; }
 .table { width:100%; border-spacing:0; table-layout:fixed; border-collapse:collapse; font-variant-numeric:tabular-nums; }
 .table th,.table td { border-bottom:1px solid var(--line); padding:2px 0; text-align:center; }
 .table tr:last-child td,.table tbody tr:last-child th { border-bottom:0; }
 .table thead th { height:42px; color:var(--muted); font-size:.74rem; font-weight:560; line-height:1.2; background:var(--wash); }
 .table thead th:first-child { padding-left:8px; }
 .table th:first-child { text-align:start; }
-.table thead th:not(:first-child) { width:clamp(48px,12cqw,62px); overflow-wrap:anywhere; }
+.table thead th:not(:first-child) { width:clamp(70px,18cqw,92px); padding-inline:3px; word-break:keep-all; }
 .table tbody th { padding-block:8px; }
 .table th b,.table th small { display:block; overflow-wrap:anywhere; }
 .table th b { color:var(--ink); font-size:.88rem; font-weight:600; line-height:1.35; }
 .table th small { color:var(--muted); font-size:.72rem; font-weight:400; line-height:1.3; }
 .table td { color:var(--muted); }
-.check { display:grid; place-items:center; position:relative; width:100%; min-height:44px; }
+.check { display:grid; place-items:center; justify-content:center; position:relative; width:100%; min-height:44px; }
 .check input[type=checkbox][data-cairn-control] { position:absolute; inset:0; width:100%; height:100%; opacity:0; margin:0; cursor:pointer; }
 .check input:disabled { cursor:default; }
 .check span { pointer-events:none; display:grid; place-items:center; width:20px; height:20px; border:1px solid var(--muted); border-radius:6px; color:transparent; background:var(--surface); }

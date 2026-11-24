@@ -9,6 +9,7 @@ import {
 } from "@/lib/cairn-v2/contribution-order-plan";
 import { parseContributionInput, type ReadyContribution } from "@/lib/cairn-v2/planning-contract";
 import { useContributionOrderPlan } from "./contribution-order-context";
+import { formatBuyQuantity, formatOrderUnitPrice } from "./contribution-order-display";
 import styles from "./contribution-order-preview.module.css";
 
 export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCash}: {
@@ -64,7 +65,7 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
       {orders.length ? <ul className={styles.orderList}>{orders.map(order => {
         const row = rowsByKey.get(order.key)!;
         return <li key={row.key}><span>{instrumentLabel(row)}<small>{row.accountName}</small></span>
-          <span>{order.quantity === null ? t("금액 주문", "Amount order") : quantityText(order.quantity, row.unit)}
+          <span>{formatBuyQuantity(order, row, t)}<small>{formatOrderUnitPrice(row, t)}</small>
             <small>{order.currency === "KRW" ? formatWon(order.principalKrw) : `USD ${displayOrderNativeAmount(order.principalMinor, "USD")} · ${formatWon(order.principalKrw)}`}</small></span></li>;
       })}</ul> : <p>{t("예산과 주문 조건에 맞는 매수 수량이 없어요.", "No buy size meets the budget and order terms.")}</p>}
       {result.remainingKrw > 0 && <p>{t(

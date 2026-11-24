@@ -35,6 +35,41 @@ describe("contribution assumption display", () => {
       assert.ok(html.includes(label), label);
     }
   });
+  it("shows sized shares, unit quotes and zero grams in collapsed holding rows", async () => {
+    const [{ ContributionRuleReceipt }] = await importUiWithPorts(["src/components/cairn-v2/contribution-rule-receipt.tsx"], {});
+    const row = { accountName: "Account", market: "korea", currency: "KRW", trimAmountKrw: 0, trimReason: "not_overweight", ruleSteps: [] };
+    const targets = [
+      { ...row, allocationKey: "fund", name: "Fund", ticker: "FUND", allocationKrw: 80 },
+      { ...row, allocationKey: "gold", name: "금현물", ticker: null, allocationKrw: 15 },
+      { ...row, allocationKey: "missing", name: "Pending", ticker: "PND", allocationKrw: 5 },
+    ].map(row => ({ ...row, strategicAllocationKrw: row.allocationKrw }));
+    const basis = { budgetKrw: 100, usdKrw: null, unavailable: ["Pending"], rows: targets.slice(0,2).map((row, i) => ({
+      ...row, key: row.allocationKey, walletKey: "account:KRW", unit: i === 0 ? "share" : "gram",
+      price: i === 0 ? 30 : 60, targetKrw: row.allocationKrw, maxBuyKrw: i === 0 ? 100 : 15, trimKrw: 0,
+    })) };
+    const result = { rows: targets, totalAllocatedKrw: 100, calculationParameters: { minimumExecutionRatioPct: 80 } };
+    function summaries(basis) {
+      const html = renderToStaticMarkup(createElement(ContributionRuleReceipt, { result, basis, formatWon: value => value + "원", onEditRatio() {} }));
+      return Array.from(html.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g), match => match[1].replace(/<[^>]*>/g, " "));
+    }
+    const [fund, gold, pending] = summaries(basis);
+    assert.match(fund, /80원.*예상 매수\s+3주.*1주당 30원/);
+    assert.match(gold, /예상 매수\s+0g.*1g당 60원/);
+    assert.match(pending, /단가·환율·단위 확인 필요/);
+    assert.doesNotMatch(pending, /0주/);
+    assert.match(summaries(undefined)[0], /주문 기준 미확인/);
+    assert.match(summaries({ ...basis, budgetKrw: -1 })[0], /주문 조건 확인 필요/);
+  });
+  it("preserves share increments and estimates amount orders using their native principal at the quote", async () => {
+    const [{ formatBuyQuantity, formatOrderUnitPrice }] = await importUiWithPorts(["src/components/cairn-v2/contribution-order-display.ts"], {});
+    const ko = (ko) => ko, en = (_ko, en) => en;
+    const quote = { unit: "share", price: 80.125, currency: "USD" };
+    const amount = { principalMinor: 1000, principalKrw: 13500, currency: "USD", quantity: null };
+    assert.equal(formatBuyQuantity(amount, quote, ko), "금액 주문 · 약 0.12480499주");
+    assert.equal(formatBuyQuantity({ ...amount, principalMinor: 0 }, quote, en), "0 shares");
+    assert.equal(formatBuyQuantity({ ...amount, quantity: "0.124804" }, quote, ko), "0.124804주");
+    assert.equal(formatOrderUnitPrice(quote, en), "$80.125/share");
+  });
   it("keeps an allocation visible in the detail bar when its budget cannot buy a whole share", async () => {
     const [{ ContributionFundingBar }] = await importUiWithPorts([
       "src/components/cairn-v2/contribution-funding-bar.tsx",

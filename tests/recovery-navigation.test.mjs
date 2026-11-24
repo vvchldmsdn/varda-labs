@@ -110,18 +110,19 @@ it('beta contribution card explains blocked reads without showing internal codes
   assert.match(ready, /목표 매수 배분<\/dt><dd>0/);
   assert.match(ready, /data-funding-amount="10000"/);
 });
-it('trading terms distinguish accounts, independent buy and sell permissions, gold and planned holdings', async () => {
-  const [{ ContributionOrderOptions }, { defaultContributionOrderRule, withFractionalBuy }] = await importUiWithPorts([
+it('shows one fractional setting per eligible account holding independently of sale exclusions', async () => {
+  const [{ ContributionOrderOptions }, { defaultContributionOrderRule, withFractionalOrders }] = await importUiWithPorts([
     'src/components/cairn-v2/contribution-order-options.tsx', 'src/lib/cairn-v2/contribution-order-plan.ts',
   ], {});
   const a = {key:'a:voo', label:'Vanguard', accountName:'A', walletKey:'a:USD', ticker:'VOO', market:'us', currency:'USD', unit:'share', canBuy:true, canSell:true};
   const b = {...a, key:'b:voo', accountName:'B', walletKey:'b:USD'};
   const planned = {...a, key:'a:plan', ticker:'PLAN', canSell:false};
+  const sellOnly = {...a, key:'a:sell', ticker:'SELL', canBuy:false};
   const gold = {...a, key:'a:gold', label:'금현물', market:'kr', currency:'KRW', walletKey:'a:KRW', unit:'gram'};
-  const rules = {[a.key]: {...defaultContributionOrderRule, fractionalSell:true}, [b.key]: withFractionalBuy(defaultContributionOrderRule, true)};
+  const rules = {[a.key]: withFractionalOrders(defaultContributionOrderRule, true)};
   function render(excluded) {
     return renderToStaticMarkup(createElement(ContributionOrderOptions, {
-      options:[a, b, planned, gold], settings:{rules, useCashLimits:false, cashByWallet:{}}, excluded,
+      options:[a, b, planned, sellOnly, gold], settings:{rules, useCashLimits:false, cashByWallet:{}}, excluded,
       onSettings:() => {}, onExclude:() => {},
     }));
   }
@@ -129,20 +130,20 @@ it('trading terms distinguish accounts, independent buy and sell permissions, go
     return [...html.matchAll(/<input\b[^>]*>/g)].map(match => match[0]).find(input => input.includes(`aria-label="${label}"`)) ?? '';
   }
   const html = render([]);
-  assert.doesNotMatch(checkbox(html, 'VOO · A 소수점 매수'), /checked/);
-  assert.match(checkbox(html, 'VOO · A 소수점 매도'), /checked/);
-  assert.match(checkbox(html, 'VOO · B 소수점 매수'), /checked/);
-  assert.doesNotMatch(checkbox(html, 'VOO · B 소수점 매도'), /checked/);
-  assert.ok(checkbox(html, 'PLAN · A 소수점 매수'));
-  assert.equal(checkbox(html, 'PLAN · A 소수점 매도'), '');
-  assert.equal(checkbox(html, '금현물 · A 소수점 매수'), '');
-  assert.equal(checkbox(html, '금현물 · A 소수점 매도'), '');
+  assert.equal([...html.matchAll(/aria-label="[^"]* 소수점 가능"/g)].length, 4);
+  assert.match(checkbox(html, 'VOO · A 소수점 가능'), /checked/);
+  assert.ok(checkbox(html, 'VOO · B 소수점 가능'));
+  assert.doesNotMatch(checkbox(html, 'VOO · B 소수점 가능'), /checked/);
+  assert.ok(checkbox(html, 'PLAN · A 소수점 가능'));
+  assert.equal(checkbox(html, 'PLAN · A 매도 제외'), '');
+  assert.ok(checkbox(html, 'SELL · A 소수점 가능'));
+  assert.equal(checkbox(html, '금현물 · A 소수점 가능'), '');
   assert.match(checkbox(html, '금현물 · A 매도 제외'), /name="excludeSell"/);
   const excluded = render([a.key]);
   assert.match(checkbox(excluded, 'VOO · A 매도 제외'), /checked/);
-  assert.match(checkbox(excluded, 'VOO · A 소수점 매도'), /disabled/);
-  assert.doesNotMatch(checkbox(excluded, 'VOO · A 소수점 매도'), /checked/);
-  assert.match(checkbox(excluded, 'VOO · B 소수점 매수'), /checked/);
+  assert.match(checkbox(excluded, 'VOO · A 소수점 가능'), /checked/);
+  assert.doesNotMatch(checkbox(excluded, 'VOO · A 소수점 가능'), /disabled/);
+  assert.match(excluded, /소수점 가능 1 · 매도 제외 1/);
   assert.match(render(['unknown:holding']), /매도 제외 모두 해제/);
 });
 
@@ -171,7 +172,7 @@ it('the home and detail allocation bars account for all new money across strateg
     if (showLeadingBuys) {
       assert.match(html, /주문 예산<\/span><strong>361,895원/);
       assert.match(html, /TMDX<\/strong>.*?123,820원<\/strong><small>1주/);
-      assert.match(html, /LARGE<\/strong>.*?주문 없음<\/strong><small>목표 238,075원/);
+      assert.match(html, /LARGE<\/strong>.*?주문 없음<\/strong><small>0주/);
     } else assert.doesNotMatch(html, /주요 추가 매수/);
   }
   const noBasis = renderToStaticMarkup(createElement(ContributionFundingBar, { result }));

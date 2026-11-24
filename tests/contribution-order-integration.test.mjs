@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildContributionOrderBasis, buildContributionOrderOptions, defaultContributionOrderSettings, defaultContributionOrderRule,
-  projectContributionOrderPlan, validContributionOrderRule, validContributionWalletAmount, withFractionalBuy,
+  projectContributionOrderPlan, validContributionOrderRule, validContributionWalletAmount, withFractionalOrders,
 } from "../src/lib/cairn-v2/contribution-order-plan.ts";
 import { decodeFractionalPreferences, encodeFractionalPreferences } from "../src/lib/cairn-v2/contribution-order-preferences.ts";
 
@@ -87,22 +87,26 @@ test("offers account-specific options for held and planned assets before a cash 
   ]);
 });
 
-test("opts into fractional sales independently, rounds down to six decimals and never spends expected proceeds", () => {
+test("uses the same capability for fractional buys and sells and never spends projected proceeds", () => {
   const sale = allocation("SALE",0,{trimAmountKrw:100_000, currency:"USD", market:"us"});
   const buy = allocation("NEW",80_000);
   const basis = scenario([sale,buy],[holding(sale,200,.8),holding(buy,80_000,0)],{cashAmountKrw:0});
-  const buyOnly = withFractionalBuy(defaultContributionOrderRule, true);
-  const sellOnly = {...defaultContributionOrderRule, fractionalSell:true};
+  const fractional = withFractionalOrders(defaultContributionOrderRule, true);
+  const whole = withFractionalOrders(fractional, false);
   const project = rule => projectContributionOrderPlan(basis,{...defaultContributionOrderSettings,rules:{SALE:rule}});
-  assert.deepEqual(project(buyOnly).sales,[]);
-  assert.deepEqual(project(sellOnly).sales,[{key:"SALE", quantity:.333333, principalKrw:99_999.9}]);
-  assert.equal(project(sellOnly).result.principalKrw,0);
+  assert.deepEqual(project(whole).sales,[]);
+  const expectedSale = [{key:"SALE", quantity:.333333, principalKrw:99_999.9}];
+  assert.deepEqual(project(fractional).sales,expectedSale);
+  assert.deepEqual(project({...fractional, step:".05"}).sales,expectedSale);
+  const amountBuy = {...fractional, kind:"fractional-amount", step:"0.50"};
+  assert.equal(withFractionalOrders(amountBuy,true), amountBuy);
+  assert.deepEqual(project(amountBuy).sales, expectedSale);
+  assert.equal(project(fractional).result.principalKrw,0);
   const limitedByHolding = scenario([sale],[holding(sale,200,.1234569)]);
-  assert.deepEqual(projectContributionOrderPlan(limitedByHolding, {...defaultContributionOrderSettings,rules:{SALE:sellOnly}}).sales,
+  assert.deepEqual(projectContributionOrderPlan(limitedByHolding, {...defaultContributionOrderSettings,rules:{SALE:fractional}}).sales,
     [{key:"SALE", quantity:.123456, principalKrw:37_036.8}]);
-  assert.equal(withFractionalBuy(sellOnly,true).fractionalSell,true);
-  assert.equal(withFractionalBuy(buyOnly,false).kind,"whole");
-  assert.equal(validContributionOrderRule(sellOnly, "KRW", "gram"),false);
+  assert.equal(whole.kind,"whole");
+  assert.equal(validContributionOrderRule(fractional, "KRW", "gram"),false);
   assert.equal(validContributionWalletAmount("10.12","USD"),true);
   assert.equal(validContributionWalletAmount("10.12","KRW"),false);
 });
@@ -120,7 +124,7 @@ test("matches unheld planned quotes to their own option and allocation even for 
   assert.deepEqual(basis.rows.map(row => [row.key,row.price]),[["east:e",10],["west:w",11]]);
   assert.deepEqual(basis.unavailable,[]);
   const {result} = projectContributionOrderPlan(basis,{...defaultContributionOrderSettings,
-    rules:{[options[0].key]:withFractionalBuy(defaultContributionOrderRule,true)}});
+    rules:{[options[0].key]:withFractionalOrders(defaultContributionOrderRule,true)}});
   assert.match(result.orders[0].quantity,/\./);
   assert.match(result.orders[1].quantity,/^\d+$/);
 });
@@ -128,13 +132,30 @@ test("matches unheld planned quotes to their own option and allocation even for 
 test("stores only fractional capabilities for eligible share identities and revalidates them when restored", () => {
   const share = {key:"east:a",unit:"share",currency:"USD",canBuy:true,canSell:true};
   const gold = {...share,key:"east:g",unit:"gram"};
-  const rule = {...withFractionalBuy(defaultContributionOrderRule,true), fractionalSell:true, fee:"21", capKrw:"750000"};
+  const rule = {...withFractionalOrders(defaultContributionOrderRule,true), fee:"21", capKrw:"750000"};
   const raw = encodeFractionalPreferences({"east:a":rule,"east:g":rule,"unrelated":rule},[share,gold]);
-  assert.deepEqual(JSON.parse(raw),{"east:a":{kind:"fractional-shares",step:"0.000001",minimum:"0",fractionalSell:true}});
+  assert.deepEqual(JSON.parse(raw),{"east:a":{kind:"fractional-shares",step:"0.000001",minimum:"0"}});
   assert.deepEqual(decodeFractionalPreferences(raw,[share]),{"east:a":{...rule,fee:"",capKrw:""}});
   assert.deepEqual(decodeFractionalPreferences(raw,[{...share,key:"west:a"}]),{});
-  assert.deepEqual(decodeFractionalPreferences(raw,[{...share,canBuy:false}]),{"east:a":{...defaultContributionOrderRule,fractionalSell:true}});
+  assert.deepEqual(decodeFractionalPreferences(raw,[{...share,canBuy:false}]),{"east:a":{...rule,fee:"",capKrw:""}});
+  assert.deepEqual(decodeFractionalPreferences(raw,[{...share,canBuy:false,canSell:false}]),{});
   assert.deepEqual(decodeFractionalPreferences(raw,[{...share,unit:"gram"}]),{});
   assert.deepEqual(decodeFractionalPreferences(raw.replace("0.000001","0"),[share]),{});
   assert.deepEqual(decodeFractionalPreferences("invalid",[share]),{});
+});
+
+test("migrates sell-only, buy-only and dual device preferences into one capability", () => {
+  const share = {key:"east:a",unit:"share",currency:"USD",canBuy:true,canSell:true};
+  const restore = (entry, option = share) => decodeFractionalPreferences(JSON.stringify({[option.key]:entry}),[option]);
+  const defaultFractional = withFractionalOrders(defaultContributionOrderRule,true);
+  assert.deepEqual(restore({kind:"whole",fractionalSell:true,step:"",minimum:""}),{[share.key]:defaultFractional});
+  assert.deepEqual(restore({kind:"whole",fractionalSell:false}),{});
+  const amount = {kind:"fractional-amount",step:"0.01",minimum:"5.00"};
+  for (const fractionalSell of [false,true]) {
+    assert.deepEqual(restore({...amount,fractionalSell}),{[share.key]:{...defaultContributionOrderRule,...amount}});
+  }
+  const planned = {...share,canSell:false};
+  assert.deepEqual(restore({...amount,fractionalSell:false},planned),{[share.key]:{...defaultContributionOrderRule,...amount}});
+  assert.deepEqual(restore({kind:"whole",fractionalSell:true},{...share,currency:null}),{});
+  assert.deepEqual(restore({kind:"whole",fractionalSell:true},{...share,unit:"gram"}),{});
 });
