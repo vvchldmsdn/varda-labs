@@ -88,6 +88,6 @@ function calculateCurrencyContributionChecked(input: CurrencyContributionInput) 
       beforePct: row.currentWeightPct, afterPct: row.postTradeWeightPct, targetPct: row.targetWeightBps / 100,
       trimReason: row.trimReason, maMultiplier: row.maEffectiveMultiplier, maReason: row.maAdjustmentReason, profitPct: row.unrealizedReturnPct,
       rawAllocation:amount(row.rawAllocationKrw), baseNeed:row.baseNeedKrw/scale,
-      modifierBreakdown:row.modifierBreakdown?{...row.modifierBreakdown,rawAmount:amount(row.modifierBreakdown.rawAmount),penalizedAllocationKrw:amount(row.modifierBreakdown.penalizedAllocationKrw),topupAllocationKrw:amount(row.modifierBreakdown.topupAllocationKrw)}:null })),
+      modifierBreakdown:row.modifierBreakdown?{...row.modifierBreakdown,rawAmount:amount(row.modifierBreakdown.rawAmount),penalizedAllocationKrw:amount(row.modifierBreakdown.penalizedAllocationKrw),topupCapacityKrw:amount(row.modifierBreakdown.topupCapacityKrw),topupAllocationKrw:amount(row.modifierBreakdown.topupAllocationKrw)}:null })),
   };
 }

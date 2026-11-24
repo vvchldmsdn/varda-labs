@@ -28,6 +28,7 @@ export type SizedContributionOrder = {
   principalKrw: number;
   feeKrw: number;
   spentKrw: number;
+  nextWholeOverCap?: { quantity: string; principalKrw: number; maxPrincipalKrw: number };
 };
 
 type SizingInput = {
@@ -366,6 +367,12 @@ export function sizeAdditionalContributionOrders(input: SizingInput): OrderSizin
     const { lots, ...cost } = quote;
     orders[index] = { ...cost, key: asset.key, currency: asset.currency, walletKey: asset.walletKey,
       quantity: quantityStep ? quantityStep.mul(new Decimal(lots)).toExactString() : null };
+    if (asset.order.kind === "whole") {
+      const next = assets[index].quote(lots + ONE);
+      if (Number.isSafeInteger(next.principalKrw) && next.principalKrw > asset.maxPrincipalKrw) {
+        orders[index].nextWholeOverCap = {quantity: next.lots.toString(), principalKrw: next.principalKrw, maxPrincipalKrw: asset.maxPrincipalKrw};
+      }
+    }
   }
   const summary = { orders, principalKrw: state.principal, feesKrw: state.spent - state.principal,
     spentKrw: state.spent, remainingKrw: input.budgetKrw - state.spent, allocationErrorKrw: state.error };

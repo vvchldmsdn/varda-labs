@@ -1,9 +1,9 @@
-.orderPanel { display:grid; gap:.9rem; margin-block:1.15rem; padding:1rem; border:1px solid var(--cairn-v2-line,#e1dfd7); border-radius:1rem; background:var(--cairn-v2-paper,#faf8f2); }
+.orderPanel { display:grid; gap:.75rem; padding:1rem; border:1px solid var(--cairn-v2-line,#e1dfd7); border-radius:1rem; background:var(--cairn-v2-paper,#faf8f2); }
 .orderPanel p { margin:0; color:var(--cairn-v2-muted,#68645c); font-size:.86rem; line-height:1.45; }
 .head { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:.3rem 1rem; }
 .head h3 { margin:0; font-size:1.1rem; }
 .head span,.orderList small,.totals dt { color:var(--cairn-v2-muted,#68645c); font-size:.8rem; }
-.totals { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.7rem; margin:0; padding:0; }
+.totals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; margin:0; padding:0; }
 .totals div { display:grid; gap:.25rem; padding-top:.55rem; border-top:1px solid var(--cairn-v2-line,#e1dfd7); }
 .totals dd { margin:0; font-weight:650; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .orderList { list-style:none; display:grid; gap:.3rem; margin:0; padding:0; }

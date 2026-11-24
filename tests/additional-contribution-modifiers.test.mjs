@@ -25,12 +25,39 @@ it('retains the basic allocation exactly when all five observed multipliers are 
   assert.deepEqual(a.rows.map(row=>row.allocationKrw),b.rows.map(row=>row.allocationKrw));
   assert.equal(a.policy.version,'gyeol_fin_explainable_rebalance_v2');assert.equal(b.policy.version,'gyeol_fin_explainable_rebalance_v1');
 });
+it('reconciles each rule to the approved baseline and final allocation, including redistribution and rounding', () => {
+  const modifiers = {...evidence('안정'), fx: known({multiplier:.744, hot:false, observationCount:252}),
+    eventScore:known(43), performance:known({alpha90Pct:-1,alpha252Pct:-2,mddPct:-13})};
+  const rows = [row('a',{currentValueKrw:210000,costBasisKrw:null,fxExposureType:'US_LISTED',riskContribution:known(.9),
+    ma120Evidence:{status:'below_ma',distanceFromMaPct:-1.5}}), row('b',{currentValueKrw:790000,costBasisKrw:null})];
+  const result = calculate(rows,{cashAmountKrw:1000003, modifiers, minimumExecutionRatioPct:53});
+  assert.equal(result.status,'ready');
+  assert.equal(result.effectiveMinimumRatioPct,53);
+  for (const row of result.rows) {
+    const steps = row.ruleSteps;
+    assert.deepEqual(steps.map(step=>step.rule),['ma120','fx','rc','regime','event','performance','minimum']);
+    assert.equal(steps[0].beforeKrw,row.strategicAllocationKrw);
+    assert.equal(steps[0].afterKrw,row.rawAllocationKrw);
+    assert.equal(steps.at(-2).afterKrw,row.modifierBreakdown.penalizedAllocationKrw);
+    assert.equal(steps.at(-1).deltaKrw,row.modifierBreakdown.topupAllocationKrw);
+    assert.equal(steps.at(-1).afterKrw,row.allocationKrw);
+    for (const [i, step] of steps.entries()) {
+      if (i) assert.equal(step.beforeKrw,steps[i-1].afterKrw);
+      assert.equal(step.deltaKrw,step.afterKrw-step.beforeKrw);
+    }
+  }
+  assert.ok(result.rows[0].ruleSteps.find(step=>step.rule==='fx').deltaKrw<0);
+  assert.equal(result.rows[1].ruleSteps.find(step=>step.rule==='fx').deltaKrw,0);
+});
 it('distinguishes an observed neutral value from unavailable evidence and never tops up unknown candidates',()=>{
   const m={...evidence('안정'),eventScore:{status:'unavailable',reason:'missing'},regime:{status:'unavailable',reason:'missing'}};
   const result=calculate(undefined,{modifiers:m});
   assert.equal(result.rows[0].modifierBreakdown.multipliers.event.status,'unavailable');
   assert.equal(result.rows[0].modifierBreakdown.multipliers.event.value,1);
   assert.equal(result.minimumExecutionEvidenceAvailable,false);
+  assert.equal(result.effectiveMinimumRatioPct,null);
+  assert.equal(result.minimumTopupCapacityKrw,0);
+  assert.ok(result.rows.every(row=>row.modifierBreakdown.topupBlockers.includes('event_unavailable')));
   assert.ok(result.rows.every(row=>!row.modifierBreakdown.topupEligible));
 });
 it('uses the raw 60-to-251 observation count, skips unavailable MA120 and clamps FX at 0.55',()=>{
@@ -70,6 +97,22 @@ it('tops up one eligible holding and leaves cash when its capacity is exhausted'
   assert.equal(capped.totalAllocatedKrw,75833);assert.equal(capped.residualCashKrw,24167);
   assert.equal(capped.rows.find(r=>r.allocationKey==='safe').allocationKrw,30000);
   assert.equal(capped.minimumExecutionSatisfied,false);
+  assert.equal(capped.minimumTopupCapacityKrw,13333);
+  assert.equal(capped.rows.find(r=>r.allocationKey==='safe').modifierBreakdown.topupCapacityKrw,13333);
+});
+it('caps the minimum at the sum of whole-won eligible gaps, before estimating order units', () => {
+  const rows = ['a','b'].map(key => row(key, {currentValueKrw:10000.25,
+    ma120Evidence:{status:'below_ma',distanceFromMaPct:-4}}));
+  const result = calculate(rows, {cashAmountKrw:5002, modifiers:evidence('안정')});
+  assert.equal(result.status,'ready');
+  assert.ok(result.totalBaseNeedKrw > 1 && result.totalBaseNeedKrw < 2);
+  assert.equal(result.totalBuyCapacityKrw,0);
+  assert.equal(result.minimumExecutionTargetKrw,0);
+  assert.equal(result.totalAllocatedKrw,0);
+});
+it('uses exact whole-won minimum targets for decimal policy percentages', () => {
+  const result = calculate(undefined,{cashAmountKrw:10000,modifiers:evidence('안정'),minimumExecutionRatioPct:57});
+  assert.equal(result.minimumExecutionTargetKrw,5700);
 });
 it('uses actual funding currency for FX rather than applying it again after a display switch',()=>{
   const at='2026-09-27T00:00:00Z';

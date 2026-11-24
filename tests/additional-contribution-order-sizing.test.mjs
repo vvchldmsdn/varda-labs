@@ -13,6 +13,16 @@ const run = (budgetKrw, assets, wallets = { won: budgetKrw }) => size({ budgetKr
 const quantities = result => result.orders.map(order => order.quantity);
 const principal = result => result.orders.map(order => order.principalKrw);
 
+test("explains the next whole-share cost with the same currency rounding and buy cap used by sizing", () => {
+  const result = run(361_895, [
+    whole("TMDX", 242_518, "92.10", {currency:"USD", walletKey:"usd", krwPerCurrency:"1344.41", maxPrincipalKrw:242_518}),
+    whole("069500", 77_079, 78_660, {maxPrincipalKrw:77_079}),
+  ], {usd:100_000, won:361_895});
+  assert.deepEqual(quantities(result), ["1", "0"]);
+  assert.deepEqual(result.orders[0].nextWholeOverCap, {quantity:"2", principalKrw:247_641, maxPrincipalKrw:242_518});
+  assert.deepEqual(result.orders[1].nextWholeOverCap, {quantity:"1", principalKrw:78_660, maxPrincipalKrw:77_079});
+});
+
 test("reaches the 1M investment target with the smallest allocation error", () => {
   const result = run(1_000_000, [whole("a", 200_000, 180_000), whole("b", 300_000, 250_000),
     shares("c", 500_000, 600_000, "0.01")]);

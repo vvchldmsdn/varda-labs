@@ -17,8 +17,8 @@ function wonFromManwon(value: string) {
   return parseContributionInput(won).state === "ready" ? won : null;
 }
 
-export function ContributionEntry({ view, context, dirty, colors, className, onCalculate, onView }: {
-  view: BetaView; context: BetaContext; dirty: boolean; colors: readonly string[];
+export function ContributionEntry({ view, context, dirty, className, onCalculate, onView }: {
+  view: BetaView; context: BetaContext; dirty: boolean;
   className?: string;
   onCalculate: (amount: string) => void;
   onView: (trigger: HTMLElement, amount?: string) => void;
@@ -90,7 +90,7 @@ export function ContributionEntry({ view, context, dirty, colors, className, onC
         <Button type="button" variant="bare" onClick={() => { setPresetsOpen(false); submitRef.current?.focus(); }}>닫기</Button>
       </div>}
     </Form> : <Button variant="secondary" type="button" onClick={e => openAllocation(e.currentTarget)}>배분 보기</Button>}
-    <ContributionHome view={view} dirty={dirty} colors={colors}
+    <ContributionHome view={view} dirty={dirty}
       pendingAmount={pending ? Number(won) : null} />
   </HomeCard>;
 }

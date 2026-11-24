@@ -6,13 +6,14 @@ import { importUiWithPorts } from './helpers/import-ui-with-ports.mjs';
 import { safeRecoveryUrl, recoveryHref, recoveryReturnHref, recoveryDestination, recoveryKind, carryRecoveryFragment } from '../src/lib/recovery-navigation.ts';
 
 it('recovery preserves contribution drafts but never returns cached read receipts or unknown credentials', () => {
-  const source = '/beta?mode=domain&scope=account%3Aabc&currency=KRW&cashAmountKrw=4321000&excludeSell=one&excludeSell=two&_betaRead=old&token=secret#beta-contribution';
+  const source = '/beta?mode=domain&scope=account%3Aabc&currency=KRW&cashAmountKrw=4321000&minBuyPct=42.75&excludeSell=one&excludeSell=two&_betaRead=old&token=secret#beta-contribution';
   const href = recoveryHref(recoveryDestination('targets', 'account:abc', true), source);
   const destination = new URL(href, 'https://local.test');
   assert.equal(destination.pathname, '/beta/portfolio/targets');
   assert.equal(destination.searchParams.get('scope'), 'account:abc');
   const restored = new URL(recoveryReturnHref(destination.hash), 'https://local.test');
   assert.equal(restored.searchParams.get('cashAmountKrw'), '4321000');
+  assert.equal(restored.searchParams.get('minBuyPct'), '42.75');
   assert.deepEqual(restored.searchParams.getAll('excludeSell'), ['one', 'two']);
   assert.equal(restored.searchParams.has('_betaRead'), false);
   assert.equal(restored.searchParams.has('token'), false);
@@ -43,7 +44,7 @@ it('recovery rejects external, malformed, oversized and unsupported return route
   assert.equal(recoveryHref('//other.test', '/history'), null);
 });
 it('successful target refresh carries a validated continuation without nesting fragments', () => {
-  const original = '/beta?mode=domain&scope=all&cashAmountKrw=3200000#beta-contribution';
+  const original = '/beta?mode=domain&scope=all&cashAmountKrw=3200000&minBuyPct=0#beta-contribution';
   const href = recoveryHref('/beta/portfolio/targets', original);
   const fragment = new URL(href, 'https://local.test').hash;
   const refreshed = carryRecoveryFragment('/beta/portfolio/targets?_betaRead=new#target-editor', fragment);
@@ -108,4 +109,36 @@ it('beta contribution card explains blocked reads without showing internal codes
   } });
   assert.match(ready, /목표 매수 배분<\/dt><dd>0/);
   assert.match(ready, /data-funding-amount="10000"/);
+});
+it('the home and detail allocation bars account for all new money across strategy, order sizes, fees and purchases', async () => {
+  const [{ ContributionFundingBar }] = await importUiWithPorts(['src/components/cairn-v2/contribution-funding-bar.tsx'], {});
+  const rows = [
+    { allocationKey: 'large', name: 'Large cap', ticker: 'LARGE', market: 'us', accountName: 'Brokerage', allocationKrw: 238075 },
+    { allocationKey: 'tmdx', name: 'TransMedics', ticker: 'TMDX', market: 'us', accountName: 'Brokerage', allocationKrw: 123820 },
+  ];
+  const result = { cashAmountKrw: 1000000, totalAvailableFundsKrw: 1000000, totalTrimProceedsKrw: 0,
+    totalAllocatedKrw: 361895, residualCashKrw: 638105, rows };
+  const basis = { budgetKrw: 361895, usdKrw: 1000, unavailable: [], rows: rows.map((row, index) => ({
+    key: row.allocationKey, accountName: row.accountName, walletKey: 'brokerage:USD', currency: 'USD',
+    price: index === 0 ? 800 : 123.82, targetKrw: row.allocationKrw, maxBuyKrw: row.allocationKrw,
+    unit: 'share', quantity: 1, trimKrw: 0, name: row.name, ticker: row.ticker, market: row.market,
+  })) };
+  for (const showLeadingBuys of [true, false]) {
+    const html = renderToStaticMarkup(createElement(ContributionFundingBar, { result, basis, showLeadingBuys }));
+    const segments = [...html.matchAll(/data-funding-amount="(\d+)" style="width:([^%;]+)%/g)]
+      .map(([, amount, width]) => [Number(amount), Number(width)]);
+    assert.deepEqual(segments.map(([amount]) => amount), [123820, 238075, 638105]);
+    for (const [amount, width] of segments) assert.ok(Math.abs(width - amount / 1000000 * 100) < 1e-10);
+    assert.match(html, /예상 매수 원금<\/dt><dd>123,820원/);
+    assert.match(html, /전략 유보금<\/dt><dd>638,105원/);
+    assert.match(html, /주문 후 잔액<\/dt><dd>238,075원/);
+    if (showLeadingBuys) {
+      assert.match(html, /주문 예산<\/span><strong>361,895원/);
+      assert.match(html, /TMDX<\/strong>.*?123,820원<\/strong><small>1주/);
+      assert.match(html, /LARGE<\/strong>.*?주문 없음<\/strong><small>목표 238,075원/);
+    } else assert.doesNotMatch(html, /주요 추가 매수/);
+  }
+  const noBasis = renderToStaticMarkup(createElement(ContributionFundingBar, { result }));
+  assert.match(noBasis, /목표 매수 배분<\/dt><dd>361,895원/);
+  assert.doesNotMatch(noBasis, /예상 매수 원금|주문 후 잔액/);
 });

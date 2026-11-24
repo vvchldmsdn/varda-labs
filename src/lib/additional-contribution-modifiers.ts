@@ -28,6 +28,10 @@ export function knownContributionEvidence<T>(value: T, source: string, asOf: str
   return { status: 'ready', value, source, asOf };
 }
 type Multiplier = { value: number; status: 'ready' | 'unavailable' | 'not_applicable'; reason?: string };
+export const contributionModifierOrder = ['fx', 'rc', 'regime', 'event', 'performance'] as const;
+export function roundedContributionPenalty(product: number) {
+  return Math.round(product * 10_000) / 10_000;
+}
 const clamp = (v: number, lo=0, hi=1) => Math.max(lo, Math.min(hi, v));
 const round = (v: number, n: number) => Math.round(v * 10 ** n) / 10 ** n;
 function validEvidence<T>(v: ContributionEvidence<T> | undefined): v is Extract<ContributionEvidence<T>, {status:'ready'}> { return !!v && v.status === 'ready' && !!v.source?.trim() && Number.isFinite(Date.parse(v.asOf)); }
@@ -56,14 +60,16 @@ export function resolveContributionMultipliers(input: { modifiers: ContributionM
   const regime = multiplier(m.regime, value => ({ 안정:1, 주의:.85, 경계:.7 })[value] ?? null);
   const event = multiplier(m.eventScore, score => Number.isFinite(score) && score >= 0 && score <= 100 ? score < 40 ? .9 : score < 55 ? .95 : 1 : null);
   const performance = multiplier(m.performance, v => [v.alpha90Pct,v.alpha252Pct,v.mddPct].every(Number.isFinite) && v.mddPct >= -100 && v.mddPct <= 0 ? v.alpha90Pct < 0 && v.alpha252Pct < 0 && v.mddPct <= -10 ? .9 : 1 : null);
-  return { fx, rc, regime, event, performance, penaltyMult:round(fx.value*rc.value*regime.value*event.value*performance.value,4) };
+  return { fx, rc, regime, event, performance, penaltyMult:roundedContributionPenalty(fx.value*rc.value*regime.value*event.value*performance.value) };
 }
-export function contributionMinimumRatio(modifiers: ContributionModifiers, configuredPct: number): number | null {
+export function contributionMinimumPct(modifiers: ContributionModifiers, configuredPct: number): number | null {
   if (!validEvidence(modifiers.regime) || modifiers.fundingBasis !== 'KRW' || !validEvidence(modifiers.fx)) return null;
   const byRegime = ({ 안정:85, 주의:65, 경계:40 })[modifiers.regime.value];
   if (byRegime === undefined) return null;
   const hot = modifiers.fundingBasis === 'KRW' && validEvidence(modifiers.fx) && modifiers.fx.value.hot;
-  return clamp((Math.min(configuredPct,byRegime) - (hot ? 10 : 0))/100);
+  const cappedPct = Math.min(configuredPct, byRegime);
+  if (!hot) return cappedPct;
+  return cappedPct <= 10 ? 0 : Decimal.from(cappedPct).sub(10).toNumber();
 }
 export function contributionFxPriority(exposure?: ContributionFxExposure) {
   return exposure === 'DOMESTIC' || exposure === 'HEDGED' ? 1 : exposure === 'KR_UNHEDGED_GLOBAL' ? .5 : 0;

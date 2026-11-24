@@ -300,7 +300,7 @@ export function BetaDetail({
   historyRead?: Pick<DomainRead, "displayBinding" | "readReceipt">;
   onAllHistoryAccounts?: () => void;
   onContributionEdit?: (dirty: boolean) => void;
-  onContributionCalculate?: (amount: string, keys?: string[]) => void;
+  onContributionCalculate?: (amount: string, keys?: string[], minBuyPct?: string) => void;
   onTargetDrift?: () => void;
 }) {
   const freshness = useBetaReadFreshness();
