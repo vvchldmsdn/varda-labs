@@ -13,7 +13,8 @@ import type { TenantContext } from "../session-resolver-contract";
 import { SNAPSHOT_FX_REFERENCE_MAX_AGE_MS } from "../snapshots/cutoff-fx";
 import { resolveSnapshotCycle } from "../snapshots/market-calendar";
 import { reviewedAttributionPosition, reviewedAttributionTrade } from "./reviewed-history-positions";
-import { withinReview } from "./reviewed-history-series";
+import { withinReviewedValuationDates } from "./reviewed-history-series";
+import { cutoffDateForValuation, valuationDateForCutoff } from "./history-date";
 import {
   buildPeriodAttribution, type AttributionAccountObservation, type AttributionPosition, type AttributionTrade,
   type PeriodAttributionRange,
@@ -91,20 +92,21 @@ export async function readPeriodAttribution({ tenantContext, scope, range }: {
   if (scope.kind === "portfolio_group") throw new Error("period_attribution_group_unsupported");
   const account = scope.kind === "account" ? scope.accountId : null;
   const period = [account, range.start, range.end];
-  const previous = new Date(Date.parse(range.start) - 86_400_000).toISOString().slice(0, 10);
+  // A previous valuation day is needed to calculate the first day's impact.
+  // Its next-morning cutoff is the valuation range's start date.
   const [accounts, ends, events, reviews] = await runTenantReadTransaction(tenantContext.ownerUserId, tx => [
     tx.query(ATTRIBUTION_ACCOUNTS_SQL, [account]),
     tx.query(ATTRIBUTION_ENDS_SQL, period),
     tx.query(ATTRIBUTION_TRADES_SQL, period),
-    ...(account ? [tx.query(ACCOUNT_HISTORY_ATTRIBUTION_SQL, [tenantContext.ownerUserId, account, previous, range.end])] : []),
+    ...(account ? [tx.query(ACCOUNT_HISTORY_ATTRIBUTION_SQL, [tenantContext.ownerUserId, account, range.start, cutoffDateForValuation(range.end)])] : []),
   ]);
   const review = account && projectAccountHistoryReview(reviews?.[0], "attribution");
   const observations = ends.map(row => observation(row, tenantContext.ownerUserId));
   const trades = events.map(trade);
   if (review && accounts.some(row => row.id === account)) {
-    const matches = (row: {accountId: string; date: string}) => row.accountId === account && withinReview(review, row.date);
+    const matches = (row: {accountId: string; date: string}) => row.accountId === account && withinReviewedValuationDates(review, row.date);
     const reviewedObservations = review.points.map(point => ({
-      date: point.date, accountId: account, expectedPositions: point.positions?.length ?? null,
+      date: valuationDateForCutoff(point.date), accountId: account, expectedPositions: point.positions?.length ?? null,
       positions: point.positions?.map(reviewedAttributionPosition) ?? [],
       reviewed: { valueKrw: point.valueKrw, estimated: point.estimated, tradesKnown: !!point.trades },
     } satisfies AttributionAccountObservation));
@@ -112,7 +114,7 @@ export async function readPeriodAttribution({ tenantContext, scope, range }: {
       accounts: accounts.map(a => ({ id: String(a.id), name: String(a.name) })),
       observations: [...observations.filter(row => !matches(row)), ...reviewedObservations],
       trades: [...trades.filter(row => !matches(row)),
-        ...review.points.flatMap(point => (point.trades ?? []).map(row => reviewedAttributionTrade(row, point.date, account)))],
+        ...review.points.flatMap(point => (point.trades ?? []).map(row => reviewedAttributionTrade(row, valuationDateForCutoff(point.date), account)))],
     });
   }
   return buildPeriodAttribution(range, {

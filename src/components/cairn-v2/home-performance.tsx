@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Button, Status } from "@/components/cairn-ui";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { startBoundedRead } from "@/lib/cairn-v2/bounded-read";
-import { formatLiveValuationTime, historyObservationDate } from "@/lib/cairn-v2/history-date";
+import { formatLiveValuationTime, historyObservationDate, liveHistoryDate, valuationDateForCutoff } from "@/lib/cairn-v2/history-date";
 import { HISTORY_BINDING_HEADER, homeHistoryGeneration } from "@/lib/cairn-v2/home-history-read";
 import type { BetaContext } from "@/lib/cairn-v2/navigation";
 import { MAX_PERFORMANCE_DAYS, type PeriodPerformance } from "@/lib/cairn-v2/period-performance";
@@ -36,16 +36,18 @@ export function visiblePerformance(data: PeriodPerformance, period: HistoryPerio
 export function nextPerformanceReadAt(now: Date, missingClose: boolean) {
   const today = currentKstDate(now);
   const midnight = Date.parse(today + "T00:00:00+09:00") + 86_400_000;
-  if (!missingClose) return midnight;
   // The 07:00 KST closing job can run for five minutes or start late.
   const close = buildCycleForSnapshotDate(today, now).cycleEndAt.getTime();
+  if (now.getTime() < close) return close + 5 * 60_000;
+  if (!missingClose) return midnight;
   return [close + 5 * 60_000, close + 65 * 60_000].find(time => time > now.getTime()) ?? midnight;
 }
 
 function earliestPerformanceDate(view: BetaView, end: string) {
   const domain = view.domain;
   if (!domain) return;
-  const dates = [domain.accountHistoryReview?.startDate, domain.recoveredReturn?.baseDate, ...view.history.map(row => row.date)];
+  const reviewStart = domain.accountHistoryReview && valuationDateForCutoff(domain.accountHistoryReview.startDate);
+  const dates = [reviewStart, domain.recoveredReturn?.baseDate, ...view.history.map(row => row.date)];
   for (const row of domain.historyRecords) {
     const date = historyObservationDate(row);
     // Native 07:00 cutoffs can use the next calendar day's storage key.
@@ -69,7 +71,7 @@ export function HomePerformanceProvider({ view, context, read, children }: {
   const authorized = active && read.context.scope === scope && read.context.currency === context.currency &&
     domain.state !== "loading" && domain.state !== "unauthorized";
   const now = new Date();
-  const end = currentKstDate(now);
+  const end = liveHistoryDate(now);
   const oldest = active ? earliestPerformanceDate(view, end) : undefined;
   const group = scope.startsWith("portfolio:");
   const earliestAllowed = new Date(Date.parse(end) - (MAX_PERFORMANCE_DAYS - 1) * 86_400_000).toISOString().slice(0, 10);

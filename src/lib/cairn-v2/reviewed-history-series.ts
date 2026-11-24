@@ -1,5 +1,6 @@
 import type { BetaView } from "./read-contract";
 import type { PeriodPerformance } from "./period-performance";
+import { cutoffDateForValuation, valuationDateForCutoff } from "./history-date.ts";
 
 import type { AccountHistoryReview } from "../../db/queries/account-history-review";
 export type { AccountHistoryReview } from "../../db/queries/account-history-review";
@@ -9,36 +10,42 @@ const day = 86_400_000;
 const adjacent = (before: string, after: string) => Date.parse(after) - Date.parse(before) === day;
 export const withinReview = (review: AccountHistoryReview, date: string) =>
   date >= review.startDate && date <= review.endDate;
+export const withinReviewedValuationDates = (review: AccountHistoryReview, date: string) =>
+  date >= valuationDateForCutoff(review.startDate) && date <= valuationDateForCutoff(review.endDate);
 
 export function reviewedValues(original: BetaView["history"], review: AccountHistoryReview): BetaView["history"] {
   let segment = 0;
   const rows = review.points.filter(p => withinReview(review, p.date)).map((point, index, points) => {
     if (index && !adjacent(points[index - 1].date, point.date)) segment++;
-    return { date: point.date, source: reviewedSource, rowKind: "reviewed", valueKrw: point.valueKrw,
+    return { date: valuationDateForCutoff(point.date), storageSnapshotDate: point.date,
+      source: reviewedSource, rowKind: "reviewed", valueKrw: point.valueKrw,
       exampleReturnPct: point.returnPct, valueSegment: reviewedSource + ":" + segment,
-      segment: point.segment ? reviewedSource + ":" + point.segment : undefined };
+      segment: point.segment ? reviewedSource + ":" + valuationDateForCutoff(point.segment) : undefined };
   });
-  return [...original.filter(row => !withinReview(review, row.date)), ...rows].sort((a, b) => a.date.localeCompare(b.date));
+  return [...original.filter(row => !withinReviewedValuationDates(review, row.date)), ...rows].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** A reviewed close and native account performance can have different baskets.
  * The chart keeps independent segments on either side of the reviewed interval. */
 export function reviewedPerformance(original: PeriodPerformance, review: AccountHistoryReview): PeriodPerformance {
-  if (review.endDate < original.range.start || review.startDate > original.range.end) return original;
-  const rows = review.points.filter(row => withinReview(review, row.date) &&
-    row.date >= original.range.start && row.date <= original.range.end);
+  const start = valuationDateForCutoff(review.startDate);
+  const end = valuationDateForCutoff(review.endDate);
+  if (end < original.range.start || start > original.range.end) return original;
+  const rows = review.points.filter(row => withinReview(review, row.date)).map(row => ({
+    ...row,date:valuationDateForCutoff(row.date),segment:row.segment && valuationDateForCutoff(row.segment),
+  }));
   const reviewed = new Map(rows.map(row => [row.date, row]));
-  const points = original.points.filter(point => !withinReview(review, point.date));
+  const points = original.points.filter(point => !withinReviewedValuationDates(review, point.date));
   const remaining = original.gaps.flatMap(gap => {
-    if (gap.end < review.startDate || gap.start > review.endDate) return [gap];
+    if (gap.end < start || gap.start > end) return [gap];
     const parts: PeriodPerformance["gaps"] = [];
-    if (gap.start < review.startDate) parts.push({ ...gap, end: new Date(Date.parse(review.startDate) - day).toISOString().slice(0, 10) });
-    if (gap.end > review.endDate) parts.push({ ...gap, start: new Date(Date.parse(review.endDate) + day).toISOString().slice(0, 10) });
+    if (gap.start < start) parts.push({ ...gap, end: valuationDateForCutoff(start) });
+    if (gap.end > end) parts.push({ ...gap, start: cutoffDateForValuation(end) });
     return parts;
   });
   const gaps: PeriodPerformance["gaps"] = [];
-  const from = Date.parse(review.startDate > original.range.start ? review.startDate : original.range.start);
-  const to = Date.parse(review.endDate < original.range.end ? review.endDate : original.range.end);
+  const from = Date.parse(start > original.range.start ? start : original.range.start);
+  const to = Date.parse(end < original.range.end ? end : original.range.end);
   for (let at = from; at <= to; at += day) {
     const date = new Date(at).toISOString().slice(0, 10);
     const row = reviewed.get(date);

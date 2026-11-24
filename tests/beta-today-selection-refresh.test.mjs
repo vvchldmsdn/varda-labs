@@ -12,6 +12,61 @@ const movementView = (movement, fxRate = 1300, state = 'ready') => ({
 });
 const homeMarkup = (view, currency = 'KRW') => renderToStaticMarkup(createElement(HomeToday, { view, currency }));
 
+it('keeps the restored close, today totals and per-holding price, FX and quantity changes on one basis', async () => {
+  const [{ TodayDetail }, { projectReviewedCurrentMovement }] = await importUiWithPorts([
+    'src/components/cairn-v2/today-detail.tsx', 'src/lib/cairn-v2/reviewed-current-movement.ts',
+  ], {
+    'next/link': { default: () => null },
+    '@/components/cairn-v2/beta-provider': { useBetaReadFreshness: () => null },
+    '@/components/cairn-v2/home-impact': { impactTypes: ['price', 'fx'], impactNames: { price: '가격', fx: '환율' } },
+  });
+  const view = movementView({
+    changeKrw: 999, returnPct: 1, includedCount: 1, excludedCount: 0, priceChangeKrw: 999, fxChangeKrw: 0,
+    rows: [{ key: 'wrong', name: 'Legacy-only', changeKrw: 999 }],
+  }, 1400);
+  const voo = { name: 'VOO', ticker: 'VOO', account: 'qa', market: 'us', currency: 'USD' };
+  const local = { name: '국내 ETF', ticker: '123456', account: 'qa', market: 'korea', currency: 'KRW' };
+  view.domain.currentValuePresentation = { kind: 'legacy', data: {
+    generatedAt: '2026-11-24T01:44:00.000Z', usdKrwRate: 1400, totalValueKrw: 869500,
+    holdings: [{ ...voo, quantity: 5, currentPrice: 110, valueKrw: 770000 },
+      { ...local, quantity: 10, currentPrice: 9950, valueKrw: 99500 }],
+  } };
+  view.domain.accountHistoryReview = { points: [{ date: '2026-11-24', valueKrw: 620000, positions: [
+    { ...voo, key: 'USD:VOO', quantity: 4, price: 100, fxRate: 1300, valueKrw: 520000 },
+    { ...local, key: 'KRW:123456', quantity: 10, price: 10000, fxRate: 1, valueKrw: 100000 },
+  ] }] };
+  const movement = projectReviewedCurrentMovement(view);
+  assert.ok(movement);
+  assert.equal(movement.priceChangeKrw, 51500);
+  assert.equal(movement.fxChangeKrw, 44000);
+  assert.equal(movement.quantityChangeKrw, 154000);
+  assert.equal(movement.rows.reduce((sum, row) => sum + row.changeKrw, 0), 249500);
+  assert.equal(movement.priceChangeKrw + movement.fxChangeKrw + movement.quantityChangeKrw, 249500);
+  view.domain.reviewedCurrentMovement = movement;
+  view.domain.accountHistoryReview.points[0].positions = undefined; // Client receives only the projected rows.
+  const home = homeMarkup(view);
+  assert.match(home, /\+249,500/);
+  assert.match(home, /\+40\.24%/);
+  assert.match(home, /\+51,500원/);
+  assert.match(home, /\+44,000원/);
+  assert.match(home, /수량·기타/);
+  assert.doesNotMatch(home, /\+999원/);
+  const context = { mode: 'domain', scope: 'account:qa', currency: 'KRW' };
+  const detailMarkup = () => renderToStaticMarkup(createElement(TodayDetail, { view, context }));
+  const detail = detailMarkup();
+  assert.match(detail, /2026-11-23 평가액/);
+  assert.match(detail, /2026-11-24 오전 7시 저장/);
+  assert.match(detail, /620,000/);
+  assert.match(detail, /869,500/);
+  assert.match(detail, /VOO.+\+250,000/);
+  assert.match(detail, /국내 ETF.+-500/);
+  assert.doesNotMatch(detail, /Legacy-only/);
+
+  view.domain.currentValuePresentation.data.totalValueKrw++;
+  assert.doesNotMatch(homeMarkup(view), /\+51,500원/);
+  assert.match(detailMarkup(), /종목별 근거가 아직 없어요/);
+});
+
 it('shows the opening shares and today’s fills in their own currency even when KRW attribution is unavailable', async () => {
   const [{ TodayDetail }, { movementEvidenceRows }] = await importUiWithPorts([
     'src/components/cairn-v2/today-detail.tsx', 'src/lib/cairn-v2/read-contract.ts',

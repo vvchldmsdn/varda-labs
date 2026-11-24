@@ -1,7 +1,9 @@
 import type {PortfolioDashboardHoldingHistory} from './heatmap-model';
 import { percentOrNull } from "../portfolio-math.ts";
+import { valuationDateForCutoff } from "./history-date";
+import type { ReviewedCurrentMovement } from "./reviewed-current-movement";
 import { reviewedHoldingMovement, reviewedPositionKey, type ReviewedHistoryPosition } from "./reviewed-history-positions";
-import { withinReview, type AccountHistoryReview } from "./reviewed-history-series";
+import { withinReview, withinReviewedValuationDates, type AccountHistoryReview } from "./reviewed-history-series";
 // Type-only public price-evidence contract from the original UI. No new price-return engine.
 export type HoldingPriceReturn=Readonly<{changePct:number|null;currentPrice:number|null;previousClose:number|null;previousCloseDate:string|null;currency:string;observedAt:string|null;reason:'missing_current_quote'|'missing_previous_close'|'conflicting_previous_close'|null}>;
 export type BetaHeatmapRead={state:'ready'|'partial'|'empty'|'unavailable';history:PortfolioDashboardHoldingHistory|null;scopeKey:string;currencyBasis:'KRW';currentDate:string|null;message:string};
@@ -14,23 +16,35 @@ export function adaptHeatmap(history:PortfolioDashboardHoldingHistory,scopeKey:s
  return{state:empty?'empty':partial?'partial':'ready',history:safe,scopeKey,currencyBasis:'KRW',currentDate,message:empty?'조회 범위의 현재 보유 종목이 없습니다':partial?'비교 가능한 관측만 표시 · 회색 빗금은 비교 불가':'확인된 종목별 관측 · 저장 기록과 현재 평가를 구분'};
 }
 
-function applyReviewedHeatmap(read: BetaHeatmapRead, review: AccountHistoryReview | null | undefined, days: ReturnType<typeof reviewedDays>): BetaHeatmapRead {
+function applyReviewedHeatmap(read: BetaHeatmapRead, review: AccountHistoryReview | null | undefined,
+  days: ReturnType<typeof reviewedDays>, movement: ReviewedCurrentMovement | null | undefined): BetaHeatmapRead {
   const history = read.history;
   if (!review || !history?.rows.length) return read;
   const points = new Map(days.map(day => [day.date,day]));
-  const latestDate = [history.dates.at(-1) ?? "", review.points.at(-1)?.date ?? ""].sort().at(-1)!;
+  const lastReview = review.points.at(-1);
+  const reviewStart = valuationDateForCutoff(review.startDate);
+  const latestDate = [history.dates.at(-1) ?? "", lastReview ? valuationDateForCutoff(lastReview.date) : "", read.currentDate ?? ""].sort().at(-1)!;
   const firstDate = new Date(Date.parse(latestDate) - 30 * 86_400_000).toISOString().slice(0, 10);
   const dates = Array.from({length:31}, (_, index) => new Date(Date.parse(firstDate) + index * 86_400_000).toISOString().slice(0,10))
-    .filter(date => date >= (history.dates[0] && history.dates[0] < review.startDate ? history.dates[0] : review.startDate));
+    .filter(date => date >= (history.dates[0] && history.dates[0] < reviewStart ? history.dates[0] : reviewStart));
   const tickers = new Set(review.excludedTickers);
   const labels = new Set(review.excludedLabels.map(label => label.trim().normalize("NFC")));
-  const rows = history.rows.filter(row => !tickers.has(row.ticker ?? "") && !labels.has(row.name.trim().normalize("NFC"))).map(row => {
-    const key = row.ticker || row.name.trim() === "금현물"
+  const currentDate = read.currentDate && withinReviewedValuationDates(review, read.currentDate) ? null : read.currentDate;
+  const holdings = history.rows.filter(row => !tickers.has(row.ticker ?? "") && !labels.has(row.name.trim().normalize("NFC")))
+    .map(row => ({ row, key: row.ticker || row.name.trim() === "금현물"
       ? reviewedPositionKey(row.ticker?.trim().toUpperCase() ?? null, row.market ?? "", row.market === "us" ? "USD" : "KRW")
-      : null;
+      : null }));
+  const liveRows = movement?.cutoffDate === currentDate ? new Map(movement.rows.map(row => [row.key,row])) : undefined;
+  const rows = holdings.map(({row,key}) => {
     const cells = new Map(row.cells.map(cell => [cell.date, cell]));
+    const live = liveRows && key && holdings.filter(holding => holding.key === key).length === 1 ? liveRows.get(key) : undefined;
     return {...row,cells: dates.map(date => {
-      if (!withinReview(review,date)) return cells.get(date) ?? reviewedHeatmapCell(date);
+      if (date === currentDate && live && live.account === row.account) {
+        return {date, changePct:live.returnPct, marketValueKrw:live.currentValueKrw, changeKrw:live.changeKrw,
+          priceChangeKrw:live.priceChangeKrw, fxChangeKrw:live.fxChangeKrw,
+          basis:live.returnPct === null ? "missing" as const : "live_movement" as const};
+      }
+      if (!withinReviewedValuationDates(review,date)) return cells.get(date) ?? reviewedHeatmapCell(date);
       const point = points.get(date);
       return key && point
         ? reviewedHeatmapCell(date, point.current.get(key), point.previous?.get(key), point.impacts.get(key))
@@ -39,7 +53,6 @@ function applyReviewedHeatmap(read: BetaHeatmapRead, review: AccountHistoryRevie
   });
   const expectedCellCount = rows.length * dates.length;
   const observedCellCount = rows.reduce((sum, row) => sum + row.cells.filter(cell => cell.changePct !== null).length, 0);
-  const currentDate = read.currentDate && withinReview(review, read.currentDate) ? null : read.currentDate;
   return adaptHeatmap({dates,rows,expectedCellCount,observedCellCount,coveragePct:percentOrNull(observedCellCount,expectedCellCount)}, read.scopeKey, currentDate);
 }
 
@@ -57,14 +70,14 @@ function reviewedHeatmapCell(date: string, current?: ReviewedHistoryPosition, pr
   };
 }
 
-export function projectReviewedHeatmap(read: BetaHeatmapRead, review: AccountHistoryReview | null | undefined) {
+export function projectReviewedHeatmap(read: BetaHeatmapRead, review: AccountHistoryReview | null | undefined, movement?: ReviewedCurrentMovement | null) {
   const days = review ? reviewedDays(review) : [];
   const impacts: ReviewedDailyImpact[] = days.map(day => ({
     date:day.date, value:day.value,
     price:day.complete ? [...day.impacts.values()].reduce((sum, impact) => sum + impact.priceKrw, 0) : null,
     fx:day.complete ? [...day.impacts.values()].reduce((sum, impact) => sum + impact.fxKrw, 0) : null,
   }));
-  return {heatmap:applyReviewedHeatmap(read, review, days), impacts};
+  return {heatmap:applyReviewedHeatmap(read, review, days, movement), impacts};
 }
 
 function reviewedDays(review: AccountHistoryReview) {
@@ -84,6 +97,6 @@ function reviewedDays(review: AccountHistoryReview) {
         else impacts.set(key,impact);
       }
     }
-    return [{date:point.date,value:point.valueKrw,current,previous,impacts,complete}];
+    return [{date:valuationDateForCutoff(point.date),value:point.valueKrw,current,previous,impacts,complete}];
   });
 }

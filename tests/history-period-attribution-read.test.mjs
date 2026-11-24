@@ -62,16 +62,17 @@ test("attribution follows the same owned reviewed points, with a gap if detailed
   try {
     await setup(pg);
     const read = await reader(pg);
-    const from = "2025-06-01", end = "2025-06-03";
+    const end = "2025-06-03";
+    const cutoffs = ["2025-06-02", "2025-06-03", "2025-06-04"];
     const position = (price, fxRate) => ({key:"USD:IN", name:"Held ETF", ticker:"IN", market:"us", currency:"USD",
       quantity:2, price, fxRate, valueKrw: 2 * price * fxRate});
     const points = [position(100,1000), position(101,1200), position(100,1300)].map((mark, i) => ({
-      date:[from, day, end][i], valueKrw:mark.valueKrw, segment:from, estimated:i>0, returnPct:i,
+      date:cutoffs[i], valueKrw:mark.valueKrw, segment:cutoffs[0], estimated:i>0, returnPct:i,
       dailyReturnPct:i>0?i:null, ...(i<2 ? {positions:[mark],trades:[]} : {}),
     }));
     await pg.query(`insert into account_history_reviews(canonical_owner_user_id,account_id,evidence_hash,captured_revision,start_date,end_date,excluded_labels,points,evidence)
       values($1,$2,$3,0,$4,$5,array[]::text[],$6::jsonb,$7::jsonb)`, [
-      owner, account, "a".repeat(64), from, end, JSON.stringify(points),
+      owner, account, "a".repeat(64), cutoffs[0], cutoffs[2], JSON.stringify(points),
       JSON.stringify({version:1,basis:"reviewed_holdings_excluding_cash",currency:"KRW"}),
     ]);
     const result = await read(owner, account, {start:day,end});

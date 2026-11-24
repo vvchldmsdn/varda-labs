@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { Button, ChoiceGroup, Field, Form, InfoDisclosure, Input, ValidationMessage } from "@/components/cairn-ui";
 import { useI18n } from "@/components/i18n/locale-provider";
-import { currentKstDate } from "@/lib/current-kst-date";
+import { liveHistoryDate, valuationDateForCutoff } from "@/lib/cairn-v2/history-date";
 import {
   calendarAttributionRange, MAX_ATTRIBUTION_DAYS, validateAttributionRange,
   type PeriodAttribution, type PeriodAttributionRange, type PeriodGapReason,
@@ -16,17 +16,20 @@ type Preset = "thisMonth" | "lastMonth" | "custom";
 
 export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext) {
   const { t } = useI18n();
-  const today = currentKstDate(new Date());
+  const today = liveHistoryDate(new Date());
+  const lastClose = valuationDateForCutoff(today);
+  const currentMonth = calendarAttributionRange("thisMonth", today);
+  const thisMonth = currentMonth.start <= lastClose ? {start:currentMonth.start,end:lastClose} : null;
   const [preset, setPreset] = useState<Preset>("thisMonth");
-  const [draft, setDraft] = useState(() => calendarAttributionRange("thisMonth", today));
+  const [draft, setDraft] = useState(() => thisMonth ?? {start:lastClose,end:lastClose});
   const [custom, setCustom] = useState<PeriodAttributionRange | null>(null);
   const [attempted, setAttempted] = useState(false);
   const errorId = useId();
-  const range = preset === "custom" ? custom : calendarAttributionRange(preset, today);
-  const error = !attempted || validateAttributionRange(draft, today) ? "" :
+  const range = preset === "custom" ? custom : preset === "thisMonth" ? thisMonth : calendarAttributionRange("lastMonth", today);
+  const error = !attempted || validateAttributionRange(draft, lastClose) ? "" :
     !draft.start || !draft.end ? t("시작일과 종료일을 입력해 주세요.", "Enter both dates.") :
     draft.start > draft.end ? t("종료일은 시작일과 같거나 늦어야 해요.", "End date must be on or after start date.") :
-    draft.end > today ? t("오늘까지의 날짜를 선택해 주세요.", "Choose a date up to today.") :
+    draft.end > lastClose ? t("마감된 평가일까지 선택해 주세요.", "Choose a date up to the last completed valuation day.") :
     t(`한 번에 ${MAX_ATTRIBUTION_DAYS}일까지 조회할 수 있어요.`, `Choose up to ${MAX_ATTRIBUTION_DAYS} days at a time.`);
 
   return <section className={styles.panel} data-period-attribution aria-label={t("기간별 가격·환율 영향", "Price and FX impact by period")}>
@@ -39,10 +42,10 @@ export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext)
     {preset === "custom" && <Form noValidate className={styles.dates} onSubmit={event => {
       event.preventDefault();
       setAttempted(true);
-      if (validateAttributionRange(draft, today)) setCustom(draft);
+      if (validateAttributionRange(draft, lastClose)) setCustom(draft);
     }}>
       {(["start", "end"] as const).map(key => <Field key={key} label={key === "start" ? t("시작일", "Start date") : t("종료일", "End date")}>
-        <Input type="date" required max={today} value={draft[key]} aria-describedby={error ? errorId : undefined}
+        <Input type="date" required max={lastClose} value={draft[key]} aria-describedby={error ? errorId : undefined}
           aria-invalid={!!error || undefined} onChange={event => setDraft({ ...draft, [key]: event.target.value })} />
       </Field>)}
       <Button type="submit" variant="primary">{t("기간 적용", "Apply dates")}</Button>
@@ -50,6 +53,7 @@ export function PeriodAttributionPanel({ scope, binding, receipt }: ReadContext)
     </Form>}
     {range && <PeriodRead key={JSON.stringify([binding, receipt, scope, range.start, range.end])}
       range={range} scope={scope} binding={binding} />}
+    {preset === "thisMonth" && !range && <p role="status">{t("이번 달의 첫 마감 평가를 기다리고 있어요.", "Waiting for this month's first completed valuation.")}</p>}
   </section>;
 }
 

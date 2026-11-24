@@ -13,7 +13,8 @@ it('refreshes a visible return chart after the Korean close with a bounded late-
   assert.equal(next('2026-11-24T06:59:00+09:00', true), '2026-11-23T22:05:00.000Z');
   assert.equal(next('2026-11-24T07:05:00+09:00', true), '2026-11-23T23:05:00.000Z');
   assert.equal(next('2026-11-24T08:05:00+09:00', true), '2026-11-24T15:00:00.000Z');
-  assert.equal(next('2026-11-24T06:59:00+09:00', false), '2026-11-24T15:00:00.000Z');
+  assert.equal(next('2026-11-24T06:59:00+09:00', false), '2026-11-23T22:05:00.000Z');
+  assert.equal(next('2026-11-24T07:05:00+09:00', false), '2026-11-24T15:00:00.000Z');
 });
 
 it('zooms the cumulative return without rebasing or joining an unverified interval', async () => {

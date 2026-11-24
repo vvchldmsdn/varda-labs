@@ -39,8 +39,31 @@ test('reviewed history stays in one account, replays the latest review, stops at
     assert.equal((await get(owner)).points.length,3);
     await db.query("insert into native_ledger_revisions values($1,$2,null,'2026-09-14T13:00Z',5)",[second,other]);
     assert.equal((await get(owner)).points.length,3);
+    const operation='00000000-0000-4000-8000-000000000005';
+    const event='00000000-0000-4000-8000-000000000006';
+    const expectThroughCutoff=async(write,lastCutoff)=>{
+      await db.exec('begin');
+      try {
+        await write();
+        const review=await get(owner);
+        assert.equal(review.endDate,lastCutoff);
+        assert.deepEqual(review.points,points.filter(point=>point.date<=lastCutoff));
+      } finally {await db.exec('rollback');}
+    };
+    for (const [affectedAt,lastCutoff] of [
+      ['2026-09-14T06:59:59+09:00',days[0]],
+      ['2026-09-14T07:00:00+09:00',days[1]],
+    ]) {
+      await expectThroughCutoff(async()=>{
+        await db.query("insert into event_ledger_entries(id,account_id,canonical_owner_user_id,native_operation_id,native_sequence,native_data,is_sample) values($1,$2,$3,$4,6,'{}',false)",[event,account,owner,operation]);
+        await db.query('insert into native_ledger_revisions values($1,$2,$3,$4,6)',[account,owner,operation,affectedAt]);
+      },lastCutoff);
+    }
+    await expectThroughCutoff(()=>db.query("insert into event_ledger_entries(account_id,canonical_owner_user_id,is_sample,event_type,event_date,recorded_at) values($1,$2,false,'buy','2026-09-14',clock_timestamp()+interval '1 second')",[account,owner]),days[1]);
+    await expectThroughCutoff(()=>db.query("insert into broker_recovery_batches values($1,$2,clock_timestamp()+interval '1 second',$3::jsonb)",[account,owner,JSON.stringify({trades:[{tradeDate:days[1]}]})]),days[1]);
+    // An orphan revision still uses the conservative inferred time.
     await db.query("insert into native_ledger_revisions values($1,$2,null,'2026-09-14T13:00Z',6)",[account,owner]);
-    assert.deepEqual((await get(owner)).points,[points[0]]);
+    assert.deepEqual((await get(owner)).points,points.slice(0,2));
     await db.query("delete from accounts where id=$1",[account]);
     assert.equal((await db.query('select count(*)::int n from account_history_reviews')).rows[0].n,0);
   } finally {await db.close();}
