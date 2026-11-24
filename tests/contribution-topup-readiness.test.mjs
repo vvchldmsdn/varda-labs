@@ -43,9 +43,9 @@ it('capacity exhaustion caps both candidates and leaves an unmet minimum as cash
 it('score ties and odd minor units are key deterministic under row reordering',()=>{
  const rows=roomy(.9,.9),r=calc(rows,100001),back=calc([...rows].reverse(),100001);
  // raw A=25001 B/C/D=25000; rounded A=22501 B=22500 C/D=12500.
- // floor minimum=85000, shortfall14999; equal rounded scores57.50 give A7500/B7499.
- assert.deepEqual(amounts(r),{A:30001,B:29999,C:12500,D:12500,over:0});
- assert.deepEqual(amounts(r),amounts(back));assert.equal(r.residualCashKrw,15001);
+ // The first whole won attaining 85% is 85001; the equal scores split 15000 evenly.
+ assert.deepEqual(amounts(r),{A:30001,B:30000,C:12500,D:12500,over:0});
+ assert.deepEqual(amounts(r),amounts(back));assert.equal(r.residualCashKrw,15000);
 });
 it('redistributes after the small candidate caps instead of losing its unused share',()=>{
  const r=calc([row('A',.9,{currentValueKrw:218000,targetWeightBps:2000}),row('B',.85,{currentValueKrw:100000,targetWeightBps:2000}),row('C',.5,{currentValueKrw:100000,targetWeightBps:2000}),row('D',.5,{currentValueKrw:100000,targetWeightBps:2000}),row('over',1,{currentValueKrw:482000,targetWeightBps:2000})]);

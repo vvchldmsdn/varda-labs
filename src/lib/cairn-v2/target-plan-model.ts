@@ -49,7 +49,7 @@ export function applyTargetPlanRead(base: TargetModel, read: TenantPortfolioTarg
     const row=normalized.rows[0];
     if(row.buyability!==plan.buyability)return blocked("target_plan_buyability_unsupported");
     plannedRows.push({...row,assetType:evidence.assetType,costBasisKrw:null,maAssetClass:null,maRuleEnabled:true,targetWeightBps:plan.targetWeightBps,editorTargetWeightBps:plan.targetWeightBps});
-    plannedMaRows.push({market:row.market,currency:row.currency,ticker:row.ticker,currentPrice:evidence.currentPrice,priceSource:evidence.priceSource,priceAsOf:evidence.priceAsOf,priceFetchedAt:evidence.priceFetchedAt});
+    plannedMaRows.push({accountId:row.accountId,assetId:row.assetId,market:row.market,currency:row.currency,ticker:row.ticker,currentPrice:evidence.currentPrice,priceSource:evidence.priceSource,priceAsOf:evidence.priceAsOf,priceFetchedAt:evidence.priceFetchedAt});
   }
   const rows = policy.rows.map(row => {
     const held = base.rows.find(holding => key(holding) === key(row));

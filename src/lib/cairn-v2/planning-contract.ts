@@ -7,12 +7,12 @@ import type { PortfolioStructureResult } from "../portfolio-structure";
 import type { BetaContext } from "./navigation";
 import type { PORTFOLIO_TARGET_POLICY } from "../portfolio-target-policy.ts";
 import { portfolioStructureHoldingIdentityKey } from "../portfolio-structure-target-policy.ts";
-import { buildContributionOrderBasis, type ContributionOrderBasis } from "./contribution-order-plan.ts";
+import { buildContributionOrderBasis, type ContributionOrderBasis, type ContributionOrderOption } from "./contribution-order-plan.ts";
 
-export type TargetModel = Omit<Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>, "policyValidation"> & {
+export type TargetModel = Omit<Awaited<ReturnType<typeof getReadOnlyTenantPortfolioTargetPolicyModel>>, "policyValidation" | "plannedMaRows"> & {
  policyValidation: Readonly<{ status: string }>; targetPlanRead?: "v2_held_identity_v1";
  plannedTargetRows?: readonly BetaTargetRow[];
- plannedMaRows?: readonly {market:string;currency:string;ticker:string|null;currentPrice:number|null;priceSource:string|null;priceAsOf:string|null;priceFetchedAt:string|null}[];
+ plannedMaRows?: readonly {accountId?:string;assetId?:string;market:string;currency:string;ticker:string|null;currentPrice:number|null;priceSource:string|null;priceAsOf:string|null;priceFetchedAt:string|null}[];
 };
 export type ContributionPreview = Awaited<ReturnType<typeof getReadOnlyTenantAdditionalContributionPreviewForScope>>;
 export type ReadyContribution = Extract<ContributionPreview, { status: "ready" }>;
@@ -32,6 +32,7 @@ export type BetaTargetRead = {
 };
 export type BetaContributionRead = {
   orderBasis?: ContributionOrderBasis;
+  orderOptions?: ContributionOrderOption[];
   selectionRows?: {key:string;label:string;detail:string}[];
   state: "idle" | "invalid" | "unsupported" | "blocked" | "unavailable" | "ready";
   message: string; inputKrw: number | null; requestKey: string; approvalRevision: number | null;

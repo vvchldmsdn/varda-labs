@@ -85,7 +85,7 @@ test('USD cash and investments share FX; absent execution FX stays unverified', 
   f.market.fx=f.market.fx.map(row=>({...row,kind:'daily_reference'}));assert.equal(evaluateContributionEffect(f.saved,f.market,f.trades).actual.status,'ready');
 });
 test('preview uses the real evaluator and keeps the frozen snapshot unchanged', () => {
-  const p=contributionEffectPreview();assert.equal(p.result.status,'ready');assert.equal(p.result.actual.status,'ready');assert.equal(p.result.gap,56800);
+  const p=contributionEffectPreview();assert.equal(p.result.status,'ready');assert.equal(p.result.actual.status,'ready');assert.equal(p.result.gap,34545.6);
   const f=fixture(), before=JSON.stringify(f.saved);evaluateContributionEffect(f.saved,f.market,f.trades);assert.equal(JSON.stringify(f.saved),before);
 });
 test('tracking migration enforces tenant and account ownership with RLS', async () => {

@@ -63,13 +63,7 @@ export function resolveContributionMultipliers(input: { modifiers: ContributionM
   return { fx, rc, regime, event, performance, penaltyMult:roundedContributionPenalty(fx.value*rc.value*regime.value*event.value*performance.value) };
 }
 export function contributionMinimumPct(modifiers: ContributionModifiers, configuredPct: number): number | null {
-  if (!validEvidence(modifiers.regime) || modifiers.fundingBasis !== 'KRW' || !validEvidence(modifiers.fx)) return null;
-  const byRegime = ({ 안정:85, 주의:65, 경계:40 })[modifiers.regime.value];
-  if (byRegime === undefined) return null;
-  const hot = modifiers.fundingBasis === 'KRW' && validEvidence(modifiers.fx) && modifiers.fx.value.hot;
-  const cappedPct = Math.min(configuredPct, byRegime);
-  if (!hot) return cappedPct;
-  return cappedPct <= 10 ? 0 : Decimal.from(cappedPct).sub(10).toNumber();
+  return modifiers.fundingBasis === 'KRW' ? configuredPct : null;
 }
 export function contributionFxPriority(exposure?: ContributionFxExposure) {
   return exposure === 'DOMESTIC' || exposure === 'HEDGED' ? 1 : exposure === 'KR_UNHEDGED_GLOBAL' ? .5 : 0;

@@ -1,5 +1,6 @@
 import { projectReviewedHeatmap, unavailableHeatmap, type BetaHeatmapRead } from "./heatmap-contract";
 import { parseSaleExclusionKeys } from "../additional-contribution-sale-exclusions.ts";
+import { buildContributionOrderOptions } from "./contribution-order-plan.ts";
 import type { BetaContext, BetaCurrency } from "./navigation";
 import { alignCurrentValueWithReview, type OriginalCurrentValuePresentation } from "./current-value-presentation";
 import { projectReviewedCurrentMovement } from "./reviewed-current-movement.ts";
@@ -279,7 +280,9 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
     view.domain = {
       ...view.domain!,
       ...(currentValuePromise ? {currentValuePresentation:alignCurrentValueWithReview(await currentValuePromise, view.domain?.accountHistoryReview)} : {}),
-      planning: { targets, contribution: { ...contribution, selectionRows } },
+      planning: { targets, contribution: { ...contribution, selectionRows,
+        orderOptions: before?.status === "ready" ? buildContributionOrderOptions(before) : [],
+      } },
     };
     const review = view.domain.accountHistoryReview;
     const reviewedCurrentMovement = projectReviewedCurrentMovement(view);

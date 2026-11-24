@@ -1,16 +1,17 @@
 import { parseSaleExclusionKeys } from './additional-contribution-sale-exclusions.ts';
+import { Decimal } from './money.ts';
 import { contributionFxPriority, contributionMinimumPct, contributionModifierOrder, resolveContributionMultipliers, roundedContributionPenalty, type ContributionEvidence, type ContributionFxExposure, type ContributionModifiers } from './additional-contribution-modifiers.ts';
 
 export const ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY = Object.freeze({
-  version: "gyeol_fin_explainable_rebalance_v1",
+  version: "gyeol_fin_explainable_rebalance_base_v3",
   targetWeightTotalBps: 10_000,
   trimLandingTargetMultiplier: 1.05,
   trimRequiresNonnegativeUnrealizedReturn: true,
   trimRounding: "floor_krw_with_sub_krw_holding_remainder",
-  allocation: "post_trim_effective_target_deficit_proportional",
+  allocation: "post_trim_target_deficit_proportional_then_ma_buy_amount",
   rounding: "integer_krw_largest_remainder_then_allocation_key_with_deficit_cap",
   minimumExecution: "reference_only_without_forced_topup",
-  unavailableMaEvidence: "do_not_reduce_target",
+  unavailableMaEvidence: "do_not_reduce_buy_amount",
   ma120BufferPct: 3,
   ma120ClassMultipliers: Object.freeze({
     broad_index: 0.8,
@@ -32,8 +33,8 @@ export const ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY = Object.freeze({
 } as const);
 export const ADDITIONAL_CONTRIBUTION_MODIFIER_POLICY = Object.freeze({
   ...ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY,
-  version: 'gyeol_fin_explainable_rebalance_v2',
-  minimumExecution: 'eligible_capped_topup_after_five_modifiers',
+  version: 'gyeol_fin_explainable_rebalance_v3',
+  minimumExecution: 'configured_ratio_topup_to_eligible_target_gaps',
   unsupportedDynamicModifiers: Object.freeze([]),
   missingModifierEvidence: 'unapplied_with_explicit_status',
   groupExecution: 'unavailable_without_verified_member_execution_policy',
@@ -181,16 +182,17 @@ export function calculateExplainableAdditionalContribution<T>({
       (row.targetWeightBps / ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.targetWeightTotalBps) *
       postContributionTotalKrw;
     const postTrimValueKrw = row.currentValueKrw - trim.amountKrw;
+    const targetGapKrw = Math.max(0, strategicTargetValueKrw - postTrimValueKrw);
 
     return {
       ...row,
       action: "hold",
       allocationKrw: 0,
-      baseNeedKrw: 0,
+      baseNeedKrw: targetGapKrw,
       currentWeightPct,
       driftRatioPct,
-      effectiveTargetValueKrw: 0,
-      effectiveTargetWeightBps: row.targetWeightBps * ma.multiplier,
+      effectiveTargetValueKrw: strategicTargetValueKrw,
+      effectiveTargetWeightBps: row.targetWeightBps,
       maAdjustmentReason: ma.reason,
       maBaseMultiplier: ma.baseMultiplier,
       maEffectiveMultiplier: ma.multiplier,
@@ -198,7 +200,7 @@ export function calculateExplainableAdditionalContribution<T>({
       postTradeWeightPct: 0,
       postTrimValueKrw,
       strategicAllocationKrw: 0,
-      strategicNeedKrw: Math.max(0, strategicTargetValueKrw - postTrimValueKrw),
+      strategicNeedKrw: targetGapKrw,
       strategicTargetValueKrw,
       trimAmountKrw: trim.amountKrw,
       trimReason: trim.reason,
@@ -213,11 +215,6 @@ export function calculateExplainableAdditionalContribution<T>({
     return blocked(new Set(["allocation_invariant_failed"]));
   }
   for (const row of rows) {
-    row.effectiveTargetValueKrw =
-      (row.effectiveTargetWeightBps /
-        ADDITIONAL_CONTRIBUTION_REBALANCE_POLICY.targetWeightTotalBps) *
-      postContributionTotalKrw;
-    row.baseNeedKrw = Math.max(0, row.effectiveTargetValueKrw - row.postTrimValueKrw);
     if (!row.trimTriggered && row.baseNeedKrw > EPSILON_KRW && !row.buyable) {
       blockers.add("unallocatable_target_deficit");
     }
@@ -225,29 +222,26 @@ export function calculateExplainableAdditionalContribution<T>({
   if (blockers.size > 0) return blocked(blockers);
 
   const candidates = rows.filter(isBuyCandidate);
-  const strategic = allocateWithCaps(
+  const strategicAllocations = allocateWithCaps(
     totalAvailableFundsKrw,
     candidates.map((row) => ({
       needKrw: row.strategicNeedKrw,
       key: row.allocationKey,
     })),
   );
-  const final = allocateWithCaps(
-    totalAvailableFundsKrw,
-    candidates.map((row) => ({
-      needKrw: row.baseNeedKrw,
-      key: row.allocationKey,
-    })),
-  );
-  const strategicByKey = new Map(strategic.map((row) => [row.key, row.amountKrw]));
-  const finalByKey = new Map(final.map((row) => [row.key, row.amountKrw]));
-  const totalBaseNeedKrw = sum(candidates, row => row.baseNeedKrw);
-  const totalBuyCapacityKrw = sum(candidates, row => Math.floor(row.baseNeedKrw));
-  const modifierRows = modifiers ? applyModifiers(rows, finalByKey, totalAvailableFundsKrw, totalBuyCapacityKrw, minimumExecutionRatioPct, modifiers) : null;
-
+  const strategicByKey = new Map(strategicAllocations.map(row => [row.key, row.amountKrw]));
+  const afterMaByKey = new Map<string, number>();
   for (const row of rows) {
     row.strategicAllocationKrw = strategicByKey.get(row.allocationKey) ?? 0;
-    row.allocationKrw = modifierRows?.allocations.get(row.allocationKey) ?? finalByKey.get(row.allocationKey) ?? 0;
+    const afterMa = Decimal.from(row.strategicAllocationKrw).mul(row.maEffectiveMultiplier);
+    afterMaByKey.set(row.allocationKey, Number(afterMa.minor('KRW', 'nearest')));
+  }
+  const totalBaseNeedKrw = sum(candidates, row => row.baseNeedKrw);
+  const totalBuyCapacityKrw = sum(candidates, row => Math.floor(row.baseNeedKrw));
+  const modifierRows = modifiers ? applyModifiers(rows, afterMaByKey, totalAvailableFundsKrw, minimumExecutionRatioPct, modifiers) : null;
+
+  for (const row of rows) {
+    row.allocationKrw = modifierRows?.allocations.get(row.allocationKey) ?? afterMaByKey.get(row.allocationKey) ?? 0;
     row.action = row.trimAmountKrw > 0 ? "trim" : row.allocationKrw > 0 ? "buy" : "hold";
     row.postTradeValueKrw = row.postTrimValueKrw + row.allocationKrw;
     row.postTradeWeightPct = (row.postTradeValueKrw / postContributionTotalKrw) * 100;
@@ -258,7 +252,6 @@ export function calculateExplainableAdditionalContribution<T>({
   const minimumExecutionTargetKrw = modifierRows ? modifierRows.minimumTarget ?? 0 : minimumExecutionKrw(
     totalAvailableFundsKrw,
     minimumExecutionRatioPct,
-    'ceil',
   );
   if (!invariantsHold({
     currentPortfolioTotalKrw,
@@ -295,8 +288,8 @@ export function calculateExplainableAdditionalContribution<T>({
       action: row.action,
       allocationKey: row.allocationKey,
       allocationKrw: row.allocationKrw,
-      rawAllocationKrw: finalByKey.get(row.allocationKey) ?? 0,
-      ruleSteps: allocationRuleSteps(row.strategicAllocationKrw, finalByKey.get(row.allocationKey) ?? 0, modifierRows?.details.get(row.allocationKey)?.multipliers, row.allocationKrw),
+      rawAllocationKrw: afterMaByKey.get(row.allocationKey) ?? 0,
+      ruleSteps: allocationRuleSteps(row.strategicAllocationKrw, afterMaByKey.get(row.allocationKey) ?? 0, modifierRows?.details.get(row.allocationKey)?.multipliers, row.allocationKrw),
       modifierBreakdown: modifierRows?.details.get(row.allocationKey) ?? null,
       baseNeedKrw: row.baseNeedKrw,
       costBasisKrw: row.costBasisKrw,
@@ -427,7 +420,7 @@ function isBuyCandidate<T>(row: WorkingRow<T>) {
 
 type AllocationRule = 'ma120' | typeof contributionModifierOrder[number] | 'minimum';
 export type AllocationRuleStep = Readonly<{ rule: AllocationRule; beforeKrw: number; afterKrw: number; deltaKrw: number }>;
-type TopupBlocker = 'no_buy_allocation' | 'target_gap_filled' | 'penalty_below_threshold' | 'ma_not_eligible' | `${typeof contributionModifierOrder[number]}_unavailable`;
+type TopupBlocker = 'no_buy_allocation' | 'target_gap_filled' | 'penalty_below_threshold' | 'ma_not_eligible';
 
 // Attribute the combined penalty in a fixed order. Each prefix uses the same
 // precision as the final penalty. Rounding intermediates into the next input
@@ -451,7 +444,7 @@ function allocationRuleSteps(strategic: number, raw: number, multipliers: Return
   return steps;
 }
 
-function applyModifiers<T>(rows: WorkingRow<T>[], raw: Map<string, number>, available: number, buyCapacityKrw: number, configuredPct: number, modifiers: ContributionModifiers) {
+function applyModifiers<T>(rows: WorkingRow<T>[], raw: Map<string, number>, available: number, configuredPct: number, modifiers: ContributionModifiers) {
   const totalRaw = [...raw.values()].reduce((a,b)=>a+b,0);
   const postTrimTotal = sum(rows,row=>row.postTrimValueKrw);
   const working = rows.map(row=>{
@@ -465,9 +458,6 @@ function applyModifiers<T>(rows: WorkingRow<T>[], raw: Map<string, number>, avai
     if (room === 0) topupBlockers.push('target_gap_filled');
     if (multipliers.penaltyMult < .85) topupBlockers.push('penalty_below_threshold');
     if (!maKnown) topupBlockers.push('ma_not_eligible');
-    for (const rule of contributionModifierOrder) {
-      if (multipliers[rule].status === 'unavailable') topupBlockers.push(`${rule}_unavailable`);
-    }
     const eligible = topupBlockers.length === 0;
     const target=row.effectiveTargetWeightBps/10000;
     const postTrimWeight=postTrimTotal>0?row.postTrimValueKrw/postTrimTotal:0;
@@ -479,7 +469,7 @@ function applyModifiers<T>(rows: WorkingRow<T>[], raw: Map<string, number>, avai
     return { key:row.allocationKey, rawAmount, multipliers, penalizedAllocationKrw:penalized, topupEligible:eligible, topupScore:score, topupBlockers, topupCapacityKrw:eligible ? room : 0, topupFactors:{rawAllocationRatio,penaltyPriority,deficitPct,maPriority,fxPriority}, topupAllocationKrw:0, room };
   });
   const effectiveMinimumRatioPct = contributionMinimumPct(modifiers, configuredPct);
-  const minimumTarget = effectiveMinimumRatioPct === null ? null : Math.min(minimumExecutionKrw(available, effectiveMinimumRatioPct, 'floor'), buyCapacityKrw);
+  const minimumTarget = effectiveMinimumRatioPct === null ? null : minimumExecutionKrw(available, effectiveMinimumRatioPct);
   const penalizedTotal = sum(working, row => row.penalizedAllocationKrw);
   const minimumTopupCapacityKrw = Math.min(available - penalizedTotal, sum(working, row => row.topupCapacityKrw));
   let remaining=Math.max(0,(minimumTarget??0)-penalizedTotal);
@@ -570,7 +560,7 @@ function validMoney(value: number) {
   return Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
 }
 
-function minimumExecutionKrw(availableKrw: number, ratioPct: number, rounding: 'floor' | 'ceil') {
+function minimumExecutionKrw(availableKrw: number, ratioPct: number) {
   // Compute decimal percentages exactly before rounding to an executable won.
   const [mantissa, exponent = "0"] = ratioPct.toString().split("e");
   const [whole, fractional = ""] = mantissa.split(".");
@@ -579,7 +569,7 @@ function minimumExecutionKrw(availableKrw: number, ratioPct: number, rounding: '
   const numerator = BigInt(`${whole}${fractional}`) * (scale > 0 ? power : BigInt(1));
   const denominator = BigInt(100) * (scale < 0 ? power : BigInt(1));
   const amount = BigInt(availableKrw) * numerator;
-  return Number(rounding === 'ceil' ? (amount + denominator - BigInt(1)) / denominator : amount / denominator);
+  return Number((amount + denominator - BigInt(1)) / denominator);
 }
 
 function belowThreshold(value: number, threshold: number) {

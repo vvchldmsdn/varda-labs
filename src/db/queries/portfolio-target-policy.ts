@@ -190,7 +190,9 @@ async function loadPortfolioTargetPolicyModel({
     .orderBy(desc(livePriceQuotes.fetchedAt),desc(livePriceQuotes.priceAsOf)).limit(candidateTickers.length*4) : [];
   const candidateMaRows = universeInput.filter(row=>row.heldAssetId===null).map(row=>{
     const quote=candidateQuotes.find(q=>q.ticker===row.ticker && q.market===row.market && q.currency===row.currency && q.source?.startsWith("kis") && Number(q.price)>0 && q.priceAsOf && q.priceAsOf<=q.fetchedAt && q.fetchedAt<=new Date());
-    return {market:row.market,currency:row.currency,ticker:row.ticker,currentPrice:quote?Number(quote.price):null,priceSource:quote?.source??null,priceAsOf:quote?.priceAsOf?.toISOString()??null};
+    return {accountId:row.accountId,assetId:row.assetId,market:row.market,currency:row.currency,ticker:row.ticker,
+      currentPrice:quote?Number(quote.price):null,priceSource:quote?.source??null,
+      priceAsOf:quote?.priceAsOf?.toISOString()??null,priceFetchedAt:quote?.fetchedAt.toISOString()??null};
   });
   const allocationMetadata = new Map(
     assetRows.map((row) => [
@@ -272,6 +274,7 @@ async function loadPortfolioTargetPolicyModel({
     structure: effectiveStructure,
     structureTargetProjection: Object.freeze(structureTargetProjection),
     ma120HoldingRows: Object.freeze([...structure.holdingRows, ...candidateMaRows]),
+    plannedMaRows: Object.freeze(candidateMaRows),
     startingWeightSource: policyValidation.status === "available"
       ? ("approved_policy" as const)
       : ("current_allocation_starting_point" as const),
