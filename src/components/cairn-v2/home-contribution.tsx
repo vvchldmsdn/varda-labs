@@ -26,6 +26,5 @@ export function ContributionHome({ view, dirty = false, pendingAmount }: {
   return <div className={styles.surface} data-contribution-state={pendingLabel ? "loading" : "ready"}>
     {pendingLabel && <p className={styles.calculating} role="status">{pendingLabel} · {t("표시 중", "Showing")} {eventNumber(result.cashAmountKrw)} KRW</p>}
     <ContributionFundingBar result={result} basis={read?.orderBasis} showLeadingBuys />
-    {read?.orderBasis?.unavailable.length ? <p className={styles.calculating}>{t("일부 종목의 주문 단가·단위를 확인해 주세요.", "Some instruments need a price or order unit.")}</p> : null}
   </div>;
 }

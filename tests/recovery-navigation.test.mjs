@@ -172,10 +172,21 @@ it('the home and detail allocation bars account for all new money across strateg
     if (showLeadingBuys) {
       assert.match(html, /주문 예산<\/span><strong>361,895원/);
       assert.match(html, /TMDX<\/strong>.*?123,820원<\/strong><small>1주/);
-      assert.match(html, /LARGE<\/strong>.*?주문 없음<\/strong><small>0주/);
+      assert.match(html, /LARGE<\/strong>.*?0원<\/strong><small>0주/);
     } else assert.doesNotMatch(html, /주요 추가 매수/);
   }
   const noBasis = renderToStaticMarkup(createElement(ContributionFundingBar, { result }));
   assert.match(noBasis, /목표 매수 배분<\/dt><dd>361,895원/);
   assert.doesNotMatch(noBasis, /예상 매수 원금|주문 후 잔액/);
+  const unpriced = renderToStaticMarkup(createElement(ContributionFundingBar, {
+    result, basis: { ...basis, rows: [], unavailable: ['Large cap', 'TransMedics'] },
+  }));
+  assert.match(unpriced, /예상 수량을 계산할 수 없어 목표 배분/);
+  assert.doesNotMatch(unpriced, /예상 매수 원금|주문 후 잔액/);
+  const partial = renderToStaticMarkup(createElement(ContributionFundingBar, {
+    result, basis: { ...basis, rows: basis.rows.slice(1), unavailable: ['Large cap'] }, showLeadingBuys: true,
+  }));
+  assert.match(partial, /예상 매수 원금<\/dt><dd>123,820원/);
+  assert.match(partial, /주문 조건이 확인된 종목의 합계/);
+  assert.match(partial, /LARGE<\/strong>.*?주문 기준 확인 필요<\/strong>/);
 });

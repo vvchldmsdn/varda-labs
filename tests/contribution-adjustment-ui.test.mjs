@@ -36,7 +36,9 @@ describe("contribution assumption display", () => {
     }
   });
   it("shows sized shares, unit quotes and zero grams in collapsed holding rows", async () => {
-    const [{ ContributionRuleReceipt }] = await importUiWithPorts(["src/components/cairn-v2/contribution-rule-receipt.tsx"], {});
+    const [{ ContributionRuleReceipt }, { ContributionOrderPreview }] = await importUiWithPorts([
+      "src/components/cairn-v2/contribution-rule-receipt.tsx", "src/components/cairn-v2/contribution-order-preview.tsx",
+    ], {});
     const row = { accountName: "Account", market: "korea", currency: "KRW", trimAmountKrw: 0, trimReason: "not_overweight", ruleSteps: [] };
     const targets = [
       { ...row, allocationKey: "fund", name: "Fund", ticker: "FUND", allocationKrw: 80 },
@@ -53,12 +55,18 @@ describe("contribution assumption display", () => {
       return Array.from(html.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g), match => match[1].replace(/<[^>]*>/g, " "));
     }
     const [fund, gold, pending] = summaries(basis);
-    assert.match(fund, /80원.*예상 매수\s+3주.*1주당 30원/);
+    assert.match(fund, /목표 배분\s*80원.*예상 매수 원금\s*90원.*예상 매수\s+3주.*1주당 30원/);
     assert.match(gold, /예상 매수\s+0g.*1g당 60원/);
     assert.match(pending, /단가·환율·단위 확인 필요/);
     assert.doesNotMatch(pending, /0주/);
     assert.match(summaries(undefined)[0], /주문 기준 미확인/);
     assert.match(summaries({ ...basis, budgetKrw: -1 })[0], /주문 조건 확인 필요/);
+    const missing = { ...basis, rows: [], unavailable: targets.map(row => row.name) };
+    const feesAndOrders = renderToStaticMarkup(createElement(ContributionOrderPreview, {
+      preview: result, basis: missing, formatWon: value => value + "원", onIncludeCash() {},
+    }));
+    assert.match(feesAndOrders, /예상 주문 수량을 확인할 수 없어요/);
+    assert.doesNotMatch(feesAndOrders, /예상 매수 원금<\/dt><dd>0원/);
   });
   it("preserves share increments and estimates amount orders using their native principal at the quote", async () => {
     const [{ formatBuyQuantity, formatOrderUnitPrice }] = await importUiWithPorts(["src/components/cairn-v2/contribution-order-display.ts"], {});
@@ -70,7 +78,7 @@ describe("contribution assumption display", () => {
     assert.equal(formatBuyQuantity({ ...amount, quantity: "0.124804" }, quote, ko), "0.124804주");
     assert.equal(formatOrderUnitPrice(quote, en), "$80.125/share");
   });
-  it("keeps an allocation visible in the detail bar when its budget cannot buy a whole share", async () => {
+  it("shows identical executable funding on the home and detail bars when a whole share exceeds the budget", async () => {
     const [{ ContributionFundingBar }] = await importUiWithPorts([
       "src/components/cairn-v2/contribution-funding-bar.tsx",
     ], {});
@@ -79,12 +87,14 @@ describe("contribution assumption display", () => {
     const basis = { budgetKrw: 800, usdKrw: 1000, unavailable: [], rows: [
       { ...row, key: "f", currency: "USD", walletKey: "test:USD", unit: "share", price: 2, quantity: 0, trimKrw: 0, targetKrw: 800, maxBuyKrw: 800 },
     ] };
-    const detail = renderToStaticMarkup(createElement(ContributionFundingBar, { result, basis, presentation: "strategy" }));
-    const home = renderToStaticMarkup(createElement(ContributionFundingBar, { result, basis }));
-    assert.match(detail, /FUND 800원/);
-    assert.match(detail, /남는 현금 200원/);
-    assert.match(home, /주문 후 잔액 800원/);
-    assert.match(home, /전략 유보금 200원/);
+    const detail = renderToStaticMarkup(createElement(ContributionFundingBar, { result, basis }));
+    const home = renderToStaticMarkup(createElement(ContributionFundingBar, { result, basis, showLeadingBuys: true }));
+    for (const html of [home, detail]) {
+      assert.match(html, /예상 매수 원금<\/dt><dd>0원/);
+      assert.match(html, /주문 후 잔액 800원/);
+      assert.match(html, /전략 유보금 200원/);
+      assert.doesNotMatch(html, /FUND 800원/);
+    }
   });
   it("joins sorted calculation amounts to the correct holdings in Korean and English", async () => {
     const [{ ContributionAdjustmentPanel }, { LocaleProvider }] = await importUiWithPorts([

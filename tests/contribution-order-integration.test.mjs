@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createElement as h } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { importUiWithPorts } from "./helpers/import-ui-with-ports.mjs";
 import {
   buildContributionOrderBasis, buildContributionOrderOptions, defaultContributionOrderSettings, defaultContributionOrderRule,
   projectContributionOrderPlan, validContributionOrderRule, validContributionWalletAmount, withFractionalOrders,
@@ -158,4 +161,81 @@ test("migrates sell-only, buy-only and dual device preferences into one capabili
   assert.deepEqual(restore({...amount,fractionalSell:false},planned),{[share.key]:{...defaultContributionOrderRule,...amount}});
   assert.deepEqual(restore({kind:"whole",fractionalSell:true},{...share,currency:null}),{});
   assert.deepEqual(restore({kind:"whole",fractionalSell:true},{...share,unit:"gram"}),{});
+});
+
+test("home and detail render the same executable orders from the shared calculation, including persisted fractional lots", async () => {
+  const tooExpensive = allocation("WHOLE-EXPENSIVE", 310_000, {baseNeedKrw:310_000});
+  const whole = allocation("WHOLE", 315_000, {baseNeedKrw:360_000});
+  const fractional = allocation("FRACTION", 125_000, {baseNeedKrw:180_100});
+  const missing = allocation("MISSING", 50_000);
+  const rows = [tooExpensive, missing, fractional, whole].map(row => ({
+    ...row, strategicAllocationKrw:row.allocationKrw, action:"buy", trimReason:"not_overweight",
+    currentWeightPct:0, postTopupWeightPct:10, targetWeightPct:25, ruleSteps:[],
+  }));
+  const basis = scenario(rows, [holding(tooExpensive,400_000), holding(whole,120_000), holding(fractional,200_000)]);
+  const result = {
+    rows, cashAmountKrw:1_000_000, totalAvailableFundsKrw:1_000_000, totalTrimProceedsKrw:0,
+    totalAllocatedKrw:800_000, residualCashKrw:200_000, postTopupTotalKrw:1_000_000,
+    calculationParameters:{minimumExecutionRatioPct:80}, minimumExecutionEvidenceAvailable:true, minimumExecutionSatisfied:true,
+  };
+  const options = rows.map(row => ({key:row.allocationKey, unit:"share", currency:"KRW", canBuy:true, canSell:true}));
+  let stored = "";
+  const [{ContributionHome}, {ContributionDetail}, {ContributionOrderProvider}] = await importUiWithPorts([
+    "src/components/cairn-v2/home-contribution.tsx", "src/components/cairn-v2/planning-details.tsx",
+    "src/components/cairn-v2/contribution-order-context.tsx",
+  ], {
+    // Supply the device storage snapshot while rendering both real consumers under the real provider.
+    "@/lib/cairn-v2/contribution-order-preferences":{
+      encodeFractionalPreferences,
+      decodeFractionalPreferences:(_snapshot, eligible) => decodeFractionalPreferences(stored, eligible),
+    },
+    "next/navigation":{useRouter:() => ({}), usePathname:() => "/beta", useSearchParams:() => new URLSearchParams()},
+    "next/link":{default:({href, children}) => h("a", {href}, children)},
+  });
+  const context = {scope:"all", mode:"domain", currency:"KRW", fixture:"standard", cashAmountKrw:"1000000"};
+  const view = {domain:{state:"ready", planning:{targets:{rows:[]}, contribution:{
+    state:"ready", inputKrw:1_000_000, result, orderBasis:basis, orderOptions:options,
+  }}}};
+  function surfaces() {
+    const html = renderToStaticMarkup(h(ContributionOrderProvider, {basis, result, options, scope:"all", binding:"test", currency:"KRW"},
+      h("section", {id:"home-surface"}, h(ContributionHome, {view})),
+      h("section", {id:"detail-surface"}, h(ContributionDetail, {view, context}))));
+    return html.split('<section id="detail-surface">');
+  }
+  const won = value => value.toLocaleString("ko-KR") + "원";
+  const fractionalRule = {...withFractionalOrders(defaultContributionOrderRule, true), step:"0.001"};
+  for (const rules of [{}, {FRACTION:fractionalRule}]) {
+    stored = encodeFractionalPreferences(rules, options);
+    const {result: sized} = projectContributionOrderPlan(basis, {...defaultContributionOrderSettings, rules});
+    const [home, detail] = surfaces();
+    const bar = markup => markup.match(/role="img" aria-label="([^"]+)"/)?.[1];
+    assert.ok(bar(home));
+    assert.equal(bar(detail), bar(home));
+    for (const [label, amount] of [["예상 매수 원금",sized.principalKrw], ["주문 후 잔액",sized.remainingKrw], ["전략 유보금",200_000]]) {
+      for (const markup of [home, detail]) assert.ok(markup.includes("<dt>" + label + "</dt><dd>" + won(amount) + "</dd>"));
+    }
+    assert.equal(sized.principalKrw + sized.feesKrw + sized.remainingKrw + 200_000, 1_000_000);
+    const homeRows = [...home.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)].map(match => match[1]);
+    const detailRows = [...detail.matchAll(/<summary\b[^>]*>([\s\S]*?)<\/summary>/g)]
+      .map(match => match[1]).filter(row => row.includes("<small>예상 매수 원금</small>"));
+    assert.equal(homeRows.length, 2);
+    assert.equal(detailRows.length, rows.length);
+    // Compare by account-specific executable order; the largest target does not dictate the order sizes.
+    const ranked = sized.orders.toSorted((a,b) => b.principalKrw - a.principalKrw);
+    for (const [i, order] of ranked.filter(order => order.principalKrw > 0).slice(0, 2).entries()) {
+      const ticker = "<strong>" + order.key + "</strong>";
+      assert.ok(homeRows[i].includes(ticker) && detailRows[i].includes(ticker));
+      for (const row of [homeRows[i],detailRows[i]]) {
+        assert.ok(row.includes(order.quantity + "주"));
+        assert.ok(row.includes(won(order.principalKrw)));
+      }
+      assert.ok(detailRows[i].includes("<small>예상 매수 원금</small>" + won(order.principalKrw)));
+    }
+    const missingRow = detailRows.find(row => row.includes("<strong>MISSING</strong>"));
+    assert.match(missingRow, /단가·환율·단위 확인 필요/);
+    assert.doesNotMatch(missingRow, /0주|<small>예상 매수 원금<\/small>0원/);
+    const fractionRow = detailRows.find(row => row.includes("<strong>FRACTION</strong>"));
+    assert.ok(fractionRow.includes(rules.FRACTION ? "0.9주" : ">0주<"));
+    assert.ok(fractionRow.includes("<small>목표 배분</small>125,000원"));
+  }
 });

@@ -8,7 +8,7 @@ import {
   displayOrderNativeAmount, type ContributionOrderBasis,
 } from "@/lib/cairn-v2/contribution-order-plan";
 import { parseContributionInput, type ReadyContribution } from "@/lib/cairn-v2/planning-contract";
-import { useContributionOrderPlan } from "./contribution-order-context";
+import { useContributionOrderResult } from "./contribution-order-context";
 import { formatBuyQuantity, formatOrderUnitPrice } from "./contribution-order-display";
 import styles from "./contribution-order-preview.module.css";
 
@@ -19,14 +19,12 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
   onIncludeCash: (updatedTotal: string) => void;
 }) {
   const {t} = useI18n();
-  const {projection, settings} = useContributionOrderPlan(basis);
+  const {rows, sizing: result, orderBudgetKrw, sales: saleRows, relaxed, useCashLimits} = useContributionOrderResult(preview, basis);
   const [message, setMessage] = useState("");
   const [additionalCash, setAdditionalCash] = useState("");
   const id = useId();
-  const result = projection?.result;
-  const orders = result && result.status !== "unavailable" ? result.orders.filter(row => row.principalMinor > 0) : [];
-  const cappedOrders = result && result.status !== "unavailable" ? result.orders.filter(row => row.nextWholeOverCap) : [];
-  const saleRows = projection?.sales ?? [];
+  const orders = rows.flatMap(({order}) => order && order.principalMinor > 0 ? [order] : []);
+  const cappedOrders = rows.flatMap(({order}) => order?.nextWholeOverCap ? [order] : []);
   const rowsByKey = new Map(basis.rows.map(row => [row.key, row]));
 
   function quantityText(quantity: string | number, unit: "share" | "gram") {
@@ -49,11 +47,11 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
   return <section className={styles.orderPanel} aria-labelledby={id}>
     <div className={styles.head}>
       <h3 id={id}>{t("수량으로 환산한 주문", "Orders at executable sizes")}</h3>
-      <span>{settings.useCashLimits ? t("입력한 통화별 잔액", "Entered cash by currency") : t("입력한 투자금 기준", "Based on entered funding")}</span>
+      <span>{useCashLimits ? t("입력한 통화별 잔액", "Entered cash by currency") : t("입력한 투자금 기준", "Based on entered funding")}</span>
     </div>
-    {result && result.status !== "unavailable" ? <>
+    {result ? <>
       <dl className={styles.totals}>
-        <div><dt>{t("규칙 적용 후 주문 예산", "Order budget after rules")}</dt><dd>{formatWon(basis.budgetKrw)}</dd></div>
+        <div><dt>{t("규칙 적용 후 주문 예산", "Order budget after rules")}</dt><dd>{orderBudgetKrw === null ? "—" : formatWon(orderBudgetKrw)}</dd></div>
         <div><dt>{t("예상 매수 원금", "Estimated buy principal")}</dt><dd>{formatWon(result.principalKrw)}</dd></div>
         <div><dt>{t("예상 비용", "Estimated fees")}</dt><dd>{formatWon(result.feesKrw)}</dd></div>
         <div><dt>{t("주문 후 잔액", "Unspent order budget")}</dt><dd>{formatWon(result.remainingKrw)}</dd></div>
@@ -69,8 +67,8 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
             <small>{order.currency === "KRW" ? formatWon(order.principalKrw) : `USD ${displayOrderNativeAmount(order.principalMinor, "USD")} · ${formatWon(order.principalKrw)}`}</small></span></li>;
       })}</ul> : <p>{t("예산과 주문 조건에 맞는 매수 수량이 없어요.", "No buy size meets the budget and order terms.")}</p>}
       {result.remainingKrw > 0 && <p>{t(
-        `주문 단위와 종목별 매수 상한, 수수료${settings.useCashLimits ? "·통화별 잔액" : ""}을 적용한 뒤 주문 예산에서 ${formatWon(result.remainingKrw)}이 남아요.`,
-        `${formatWon(result.remainingKrw)} remains within the order budget after order increments, per-holding caps, fees${settings.useCashLimits ? " and currency balances" : ""}.`
+        `주문 단위와 종목별 매수 상한, 수수료${useCashLimits ? "·통화별 잔액" : ""}을 적용한 뒤 주문 예산에서 ${formatWon(result.remainingKrw)}이 남아요.`,
+        `${formatWon(result.remainingKrw)} remains within the order budget after order increments, per-holding caps, fees${useCashLimits ? " and currency balances" : ""}.`
       )}</p>}
       {result.remainingKrw > 0 && cappedOrders.length > 0 && <details className={styles.sales}>
         <summary>{t("한 단위 더 사면 상한을 넘는 종목", "Holdings where the next unit exceeds the cap")}</summary>
@@ -83,8 +81,8 @@ export function ContributionOrderPreview({basis, preview, formatWon, onIncludeCa
         })}</ul>
       </details>}
       {result.status === "approximate" && <Status as="p" role="status">{t("탐색 한도 안에서 찾은 주문 조합이에요.", "Best order combination found within the search limit.")}</Status>}
-      {projection?.relaxed && <p>{t("예산과 잔액에 맞는 더 적은 정수 수량도 비교했어요.", "Smaller whole-unit orders were also considered to meet the cash limits.")}</p>}
-    </> : <Status as="p" role="status">{t("계좌 잔액과 주문 단위를 확인해 주세요.", "Check the cash available and order increments.")}</Status>}
+      {relaxed && <p>{t("예산과 잔액에 맞는 더 적은 정수 수량도 비교했어요.", "Smaller whole-unit orders were also considered to meet the cash limits.")}</p>}
+    </> : <Status as="p" role="status">{t("예상 주문 수량을 확인할 수 없어요.", "Order quantities are unavailable.")}</Status>}
     {saleRows.length > 0 && <details className={styles.sales}><summary>{t("예상 매도 수량", "Estimated sale quantities")}</summary>
       <ul className={styles.orderList}>{saleRows.map(sale => {
         const row = rowsByKey.get(sale.key)!;
