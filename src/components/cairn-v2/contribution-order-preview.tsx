@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { Button, Field, Form, Input, Status } from "@/components/cairn-ui";
+import { Button, Checkbox, Field, Form, Input, Select, Status } from "@/components/cairn-ui";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { instrumentLabel } from "@/lib/instrument-display";
 import {
@@ -94,9 +94,9 @@ export function ContributionOrderPreview({basis, totalBudgetKrw, formatWon, onIn
     <details className={styles.settings}>
       <summary>{t("소수점·수수료·현금 조건", "Fractional orders, fees and cash")}</summary>
       <Form onSubmit={updateSettings} className={styles.settingsForm}>
-        <label className={styles.cashToggle}><input type="checkbox" checked={draft.useCashLimits} onChange={event => {
+        <Field className={styles.cashToggle}><Checkbox checked={draft.useCashLimits} onChange={event => {
           setDraft({...draft, useCashLimits: event.target.checked}); setMessage("");
-        }} />{t("실제 주문 가능액으로 제한", "Limit to available broker cash")}</label>
+        }} />{t("실제 주문 가능액으로 제한", "Limit to available broker cash")}</Field>
         {draft.useCashLimits && <div className={styles.inputs}>
           {getContributionWallets(basis).map(wallet => <NumericField key={wallet.walletKey}
             label={`${wallet.accountName} · ${wallet.currency}`} value={draft.cashByWallet[wallet.walletKey] ?? ""}
@@ -109,11 +109,11 @@ export function ContributionOrderPreview({basis, totalBudgetKrw, formatWon, onIn
           const label = `${instrumentLabel(row)} · ${row.accountName}`;
           return <details key={row.key} className={styles.assetRule}><summary>{label} · {row.unit === "gram" ? "g" : fractional ? t("소수점", "Fractional") : t("정수", "Whole shares")}</summary>
             <div className={styles.inputs}>
-              {row.unit === "share" && <label>{t("주문 방식", "Order type")}<select value={rule.kind} onChange={event => updateRule(row.key, {kind: event.target.value as ContributionOrderKind, step: "", minimum:""})}>
+              {row.unit === "share" && <Field>{t("주문 방식", "Order type")}<Select value={rule.kind} onChange={event => updateRule(row.key, {kind: event.target.value as ContributionOrderKind, step: "", minimum:""})}>
                 <option value="whole">{t("정수 수량", "Whole shares")}</option>
                 <option value="fractional-shares">{t("소수점 수량", "Fractional shares")}</option>
                 <option value="fractional-amount">{t("소수점 금액", "Fractional amount")}</option>
-              </select></label>}
+              </Select></Field>}
               {fractional && <>
                 <NumericField label={rule.kind === "fractional-shares" ? t("수량 단위", "Share increment") : t(`금액 단위 (${row.currency})`, `Amount increment (${row.currency})`)} value={rule.step} onChange={step => updateRule(row.key,{step})} />
                 <NumericField label={t(`최소 주문액 (${row.currency})`, `Minimum order (${row.currency})`)} value={rule.minimum} onChange={minimum => updateRule(row.key,{minimum})} />
