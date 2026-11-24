@@ -136,7 +136,10 @@ function AttributionResult({ data }: { data: PeriodAttribution }) {
       </li>)}</ul>
     </InfoDisclosure>}
     {!!data.holdings.length && <InfoDisclosure summary={t(`종목별 영향 · ${data.holdings.length}건`, `Impact by holding · ${data.holdings.length}`)} className={styles.disclosure}>
-      <p>{t("매매 원금을 제외하고, 전량 매도한 날은 실제 체결가와 체결 환율로 계산해요.", "Trade principal is excluded. On a full sale, the calculation uses the execution price and exchange rate.")}</p>
+      <p>{data.days.some(day => day.reviewed)
+        ? t("복구에 사용한 체결금액을 차감해요. 원화 결제액을 확인할 수 없는 달러 체결분은 해당 마감의 공용환율로 환산합니다.",
+          "The calculation removes the trade principal used in recovery. Dollar executions without a documented KRW amount use that close’s shared FX rate.")
+        : t("매매 원금을 제외하고, 전량 매도한 날은 실제 체결가와 체결 환율로 계산해요.", "Trade principal is excluded. On a full sale, the calculation uses the execution price and exchange rate.")}</p>
       {partial && <p>{t("확인된 구간의 금액만 표시합니다.", "Amounts cover confirmed records only.")}</p>}
       <table className={styles.holdings}><thead><tr><th scope="col">{t("종목 · 계좌", "Holding · account")}</th><th scope="col">{priceLabel}</th><th scope="col">{fxLabel}</th></tr></thead>
         <tbody>{data.holdings.map(row => <tr key={row.key}><th scope="row">{row.name}<small>{row.account}</small></th><td>{money(row.priceKrw)}</td><td>{money(row.fxKrw)}</td></tr>)}</tbody>

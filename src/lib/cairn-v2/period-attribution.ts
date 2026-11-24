@@ -9,6 +9,7 @@ export type AttributionPosition = {
 };
 export type AttributionAccountObservation = {
   date: string; accountId: string; expectedPositions: number | null; positions: AttributionPosition[];
+  reviewed?: { valueKrw: number | null; estimated: boolean; tradesKnown: boolean };
 };
 export type AttributionTrade = {
   date: string; accountId: string; assetId: string | null; quantityDelta: number | null;
@@ -25,7 +26,8 @@ type ResultAmounts = { priceKrw: number | null; fxKrw: number | null; totalKrw: 
 export type PeriodAttribution = ResultAmounts & {
   range: PeriodAttributionRange;
   state: "complete" | "partial" | "unavailable";
-  days: { date: string; closingValueKrw: number | null; priceKrw: number | null; fxKrw: number | null; complete: boolean }[];
+  days: { date: string; closingValueKrw: number | null; priceKrw: number | null; fxKrw: number | null; complete: boolean;
+    reviewed?: boolean; estimated?: boolean }[];
   holdings: ({ key: string; account: string; name: string } & ResultAmounts)[];
   gaps: { start: string; end: string; account: string | null; holding: string | null; reason: PeriodGapReason }[];
 };
@@ -66,7 +68,7 @@ function roster(observation: AttributionAccountObservation) {
     else if (positions.has(row.assetId)) { known = false; positions.set(row.assetId, null); }
     else positions.set(row.assetId, row);
   }
-  return { positions, known };
+  return { positions, known, reviewed: observation.reviewed };
 }
 
 type Leg = { quantityDelta: number; price: number; fxRate: number };
@@ -86,7 +88,7 @@ function admittedLegs(trades: AttributionTrade[], currency: string | null) {
   return { legs, flow };
 }
 
-function holdingImpact(before: AttributionPosition | undefined, after: AttributionPosition | undefined,
+export function holdingImpact(before: AttributionPosition | undefined, after: AttributionPosition | undefined,
   trades: AttributionTrade[]): Amounts | PeriodGapReason {
   const startQty = before ? before.quantity : 0;
   const endQty = after ? after.quantity : 0;
@@ -128,6 +130,7 @@ function holdingImpact(before: AttributionPosition | undefined, after: Attributi
 
 type Roster = ReturnType<typeof roster>;
 function closingHoldingValue(roster: Roster | null | undefined) {
+  if (roster?.reviewed) return roster.reviewed.valueKrw;
   if (!roster?.known) return null;
   let value = 0;
   for (const position of roster.positions.values()) {
@@ -140,6 +143,8 @@ function accountImpact(before: Roster | null | undefined, after: Roster | null |
   trades: AttributionTrade[], record: (id: string, name: string, value: Amounts) => void,
   gap: (reason: PeriodGapReason, id?: string, name?: string) => void) {
   if (!before || !after) { gap("account_history"); return; }
+  if (!!before.reviewed !== !!after.reviewed) { gap("account_history"); return; }
+  if (after.reviewed && !after.reviewed.tradesKnown) { gap("trade"); return; }
   if (!before.known || !after.known) gap("holding_history");
   const byAsset = new Map<string, AttributionTrade[]>();
   for (const trade of trades) {
@@ -187,6 +192,7 @@ export function buildPeriodAttribution(range: PeriodAttributionRange, evidence: 
     const subtotal = emptyAmounts();
     let closingValueKrw: number | null = evidence.accounts.length ? 0 : null;
     let complete = true;
+    let reviewed = false, estimated = false;
     function addGap(reason: PeriodGapReason, account: string | null, accountId: string, id = "", holding: string | null = null) {
       complete = false;
       const key = JSON.stringify([reason, accountId, id]);
@@ -202,6 +208,8 @@ export function buildPeriodAttribution(range: PeriodAttributionRange, evidence: 
     for (const account of evidence.accounts) {
       const key = date + "/" + account.id;
       const closing = records.get(key);
+      reviewed ||= closing?.reviewed !== undefined;
+      estimated ||= closing?.reviewed?.estimated === true;
       const accountValue = closingHoldingValue(closing);
       if (accountValue === null) closingValueKrw = null;
       else if (closingValueKrw !== null) closingValueKrw += accountValue;
@@ -218,7 +226,7 @@ export function buildPeriodAttribution(range: PeriodAttributionRange, evidence: 
     if (subtotal.priceKrw !== null && subtotal.fxKrw !== null)
       addAmounts(totals, { priceKrw: subtotal.priceKrw, fxKrw: subtotal.fxKrw });
     days.push({ date, closingValueKrw: Number.isFinite(closingValueKrw) ? closingValueKrw : null,
-      priceKrw: subtotal.priceKrw, fxKrw: subtotal.fxKrw, complete });
+      priceKrw: subtotal.priceKrw, fxKrw: subtotal.fxKrw, complete, ...(reviewed && { reviewed, estimated }) });
   }
   const rows = [...holdings.values()].sort((a,b) => Math.abs(b.totalKrw ?? 0) - Math.abs(a.totalKrw ?? 0) || a.key.localeCompare(b.key));
   return { range, ...totals, state: totals.totalKrw === null ? "unavailable" : gaps.length ? "partial" : "complete", days, holdings: rows, gaps };

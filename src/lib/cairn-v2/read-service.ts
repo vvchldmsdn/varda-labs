@@ -1,7 +1,7 @@
-import { unavailableHeatmap, type BetaHeatmapRead } from "./heatmap-contract";
+import { projectReviewedHeatmap, unavailableHeatmap, type BetaHeatmapRead } from "./heatmap-contract";
 import { parseSaleExclusionKeys } from "../additional-contribution-sale-exclusions.ts";
 import type { BetaContext, BetaCurrency } from "./navigation";
-import type { OriginalCurrentValuePresentation } from "./current-value-presentation";
+import { alignCurrentValueWithReview, type OriginalCurrentValuePresentation } from "./current-value-presentation";
 import {
   adaptBetaRead,
   blankDomainView,
@@ -268,10 +268,19 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
     }
     view.domain = {
       ...view.domain!,
-      ...(currentValuePromise ? {currentValuePresentation:await currentValuePromise} : {}),
+      ...(currentValuePromise ? {currentValuePresentation:alignCurrentValueWithReview(await currentValuePromise, view.domain?.accountHistoryReview)} : {}),
       planning: { targets, contribution: { ...contribution, selectionRows } },
     };
-    if (heatmapPromise) view.domain.heatmap = await heatmapPromise;
+    const review = view.domain.accountHistoryReview;
+    if (heatmapPromise) {
+      const {heatmap, impacts} = projectReviewedHeatmap(await heatmapPromise, review);
+      view.domain.heatmap = heatmap;
+      if (impacts.length) view.domain.reviewedDailyImpact = impacts;
+    }
+    if (review) view.domain.accountHistoryReview = {
+      ...review, points: review.points.map(({date, valueKrw, dailyReturnPct, returnPct, segment, estimated}) =>
+        ({date, valueKrw, dailyReturnPct, returnPct, segment, estimated})),
+    };
     // Identity never goes to the client. Scope/currency/input are request-local; no cross-user cache.
     return { context: acceptedContext, view };
   } catch {

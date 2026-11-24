@@ -1,4 +1,4 @@
-import type {BetaHeatmapRead} from "./heatmap-contract";
+import type {BetaHeatmapRead, ReviewedDailyImpact} from "./heatmap-contract";
 import { alignedInvestmentReturn } from "./investment-return";
 import { historyObservationPoints, type HistoryReadRow } from "./history-observations.ts";
 import type { BetaPlanningRead } from "./planning-contract";
@@ -13,7 +13,7 @@ export type BetaHistoryRead = Omit<Pick<ReadOnlyHistoryBalance, "selectedScope" 
 export type DemoView = ReturnType<typeof getFixtureView>;
 export type ReadState = "ready" | "empty" | "partial" | "unavailable" | "unauthorized" | "loading";
 export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" | "history"> & {
-  history: (DemoView["history"][number] & { storageSnapshotDate?: string; valueSegment?: string; segment?: string; source?: string; rowKind?: string; account?: string; includedAccounts?: string[] })[];
+  history: (DemoView["history"][number] & { storageSnapshotDate?: string; liveAsOf?: string; valueSegment?: string; segment?: string; source?: string; rowKind?: string; account?: string; includedAccounts?: string[] })[];
   rows: (Omit<DemoView["rows"][number], "targetPct" | "ticker" | "market"> & { targetPct: number | null; ticker?: string | null; market?: string | null; currency?: string; priceAsOf?: string | null; priceSource?: string | null; quantity?: number; currentPrice?: number })[];
   totalKrw: number | null; fxRate: number | null;
   drift: DemoView["drift"] | undefined;
@@ -25,6 +25,7 @@ export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" |
     investmentReturn?: import("./investment-return").InvestmentReturn;
     planning?: BetaPlanningRead;
     heatmap?: BetaHeatmapRead;
+    reviewedDailyImpact?: ReviewedDailyImpact[];
     state: ReadState; valueState: ReadState; historyState: ReadState; movementState: ReadState;
     knownSubtotalKrw: number | null; excluded: PortfolioStructureResult["exclusions"];
     rawDashboardTotalKrw: number | null; nonInvestmentCount: number; nonInvestmentValueKrw: number | null; valuationBasis: string; refreshedAt: string | null;

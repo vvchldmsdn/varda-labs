@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/cairn-ui";
-import type { BetaHeatmapRead } from "@/lib/cairn-v2/heatmap-contract";
+import type { BetaHeatmapRead, ReviewedDailyImpact } from "@/lib/cairn-v2/heatmap-contract";
 import { withinReview, type AccountHistoryReview } from "@/lib/cairn-v2/reviewed-history-series";
 import { percentOrNull, sumComplete } from "@/lib/portfolio-math";
 import { displayReadMoney, type BetaView } from "@/lib/cairn-v2/read-contract";
@@ -33,8 +33,9 @@ function recordedDays(read?: BetaHeatmapRead | null): DailyImpact[] {
   });
 }
 
-export function HomeImpactProvider({ read, review, children }: { read?: BetaHeatmapRead | null; review?: AccountHistoryReview | null; children: ReactNode }) {
-  const days = useMemo(() => recordedDays(read).filter(day => !review || !withinReview(review, day.date)), [read, review]);
+export function HomeImpactProvider({ read, review, reviewed, children }: { read?: BetaHeatmapRead | null; review?: AccountHistoryReview | null; reviewed?: ReviewedDailyImpact[]; children: ReactNode }) {
+  const days = useMemo(() => [...recordedDays(read).filter(day => !review || !withinReview(review, day.date)), ...(reviewed ?? [])]
+    .sort((a, b) => a.date.localeCompare(b.date)), [read, review, reviewed]);
   const [visible, setVisible] = useState({ price: false, fx: false });
   return <Context.Provider value={{ days, visible, toggle: type => setVisible(prev => ({ ...prev, [type]: !prev[type] })) }}>{children}</Context.Provider>;
 }

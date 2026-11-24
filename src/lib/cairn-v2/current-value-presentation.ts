@@ -7,12 +7,32 @@ import { availableHoldingValueKrw } from "../home-metrics.ts";
 import { compositionCounts, isManualValuationSource, trackedInvestmentComposition, type CurrentInvestmentComposition, type CurrentCompositionPosition } from "../current-investment-composition.ts";
 import { Decimal } from "../money.ts";
 import { isCollectionPriceSource } from '../quote-time-basis.ts';
+import type { AccountHistoryReview } from "./reviewed-history-series";
 
 type LegacyHolding = Pick<DashboardHolding,"name"|"ticker"|"account"|"market"|"currency"|"quantity"|"currentPrice"|"currentWeight"|"assetType"|"groupName"|"valueKrw"|"priceAsOf"|"priceFetchedAt"|"priceSource">;
 export type OriginalCurrentValuePresentation =
   | {kind:"tracked";evidence:CurrencyTrackedInput;reports:Readonly<Record<Currency,CurrencyTrackedResult>>}
   | {kind:"legacy";data:Pick<DashboardData,"generatedAt"|"totalValueKrw"|"usdKrwRate"> & {holdings:LegacyHolding[];investmentReturn?:InvestmentReturn}}
   | {kind:"unavailable"};
+
+export function alignCurrentValueWithReview(read: OriginalCurrentValuePresentation, review: AccountHistoryReview | null | undefined): OriginalCurrentValuePresentation {
+  if (!review || read.kind !== "legacy") return read;
+  const normalize = (text: string) => text.normalize("NFC").trim().toUpperCase();
+  const labels = new Set(review.excludedLabels.map(normalize));
+  const tickers = new Set(review.excludedTickers?.map(normalize));
+  const holdings = read.data.holdings.filter(row => !labels.has(normalize(row.name)) && !tickers.has(normalize(row.ticker ?? "")));
+  if (holdings.length === read.data.holdings.length) return read;
+  const values = holdings.flatMap(row => {
+    const amount = availableHoldingValueKrw(row, read.data.usdKrwRate);
+    return amount === null ? [] : [amount];
+  });
+  const totalValueKrw = values.reduce((sum, amount) => sum + amount, 0);
+  return {kind:"legacy",data:{...read.data,totalValueKrw,investmentReturn:undefined,
+    holdings:holdings.map(row => {
+      const value = availableHoldingValueKrw(row, read.data.usdKrwRate);
+      return {...row,currentWeight:value !== null && totalValueKrw > 0 ? value / totalValueKrw * 100 : 0};
+    })}};
+}
 
 /** Select the admitted original-home values. Partial legacy reads expose only
  * their verified subtotal; this layer never admits a price or translates FX. */

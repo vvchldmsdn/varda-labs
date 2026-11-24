@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { importWithPorts } from "./helpers/import-with-ports.mjs";
@@ -12,7 +13,7 @@ const range = { start: day, end: day };
 
 async function setup(pg) {
   await pg.exec(`
-    create table accounts(id uuid primary key,canonical_owner_user_id uuid,name text,code text,sort_order int,is_active boolean default true,native_state jsonb);
+    create table accounts(id uuid primary key,canonical_owner_user_id uuid,name text,code text,sort_order int,is_active boolean default true,native_state jsonb,unique(id,canonical_owner_user_id));
     create table assets(id uuid primary key,canonical_owner_user_id uuid,account_id uuid,legacy_base44_id text,name text,ticker text,market text,currency text,archived_at timestamptz);
     create table native_ledger_revisions(canonical_owner_user_id uuid,account_id uuid,marker_sequence int,affected_at timestamptz,recorded_at timestamptz,operation_id uuid);
     create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);
@@ -27,7 +28,9 @@ async function setup(pg) {
       legacy_base44_id text,legacy_asset_id text,corrects_event_id uuid,legacy_corrects_event_id text,broker_recovery_data jsonb,native_data jsonb,
       rule_version text,native_operation_id uuid,native_sequence int,
       recorded_at timestamptz,created_at timestamptz default now(),is_sample boolean default false,event_date date,event_type text,quantity_delta numeric,price numeric,fx_rate numeric,amount_krw numeric);
-    create view effective_native_ledger_entries as select * from event_ledger_entries where native_data is not null;`);
+    create view effective_native_ledger_entries as select * from event_ledger_entries where native_data is not null;
+    create role varda_tenant_app;`);
+  await pg.exec(readFileSync(new URL("../drizzle/0066_account_history_reviews.sql", import.meta.url), "utf8"));
   await pg.query("insert into accounts(id,canonical_owner_user_id,code,name,sort_order,native_state) values($1,$2,'acct','Desk',1,null),($3,$2,'native','Native',2,$4),($5,$6,'foreign','Other',3,null)",
     [account,owner,native,JSON.stringify({startedAt:"2025-04-01T00:00:00Z"}),foreign,other]);
   await pg.query("insert into assets values($1,$2,$3,null,'Sold ETF','OUT','us','USD',now()),($4,$2,$3,null,'Held ETF','IN','us','USD',null),($5,$2,$6,null,'Native stock','N','korea','KRW',null)",
@@ -53,6 +56,38 @@ function reader(pg, metric="attribution", readPerformanceMarks = async () => { t
   }).then(([module]) => (who, selected, r=range, options={}) => (metric==="return" ? module.readPeriodPerformance : module.readPeriodAttribution)({tenantContext:{ownerUserId:who},
     scope:selected ? {kind:"account",accountId:selected} : {kind:"all"},range:r,...options}));
 }
+
+test("attribution follows the same owned reviewed points, with a gap if detailed evidence is absent", async () => {
+  const pg = new PGlite();
+  try {
+    await setup(pg);
+    const read = await reader(pg);
+    const from = "2025-06-01", end = "2025-06-03";
+    const position = (price, fxRate) => ({key:"USD:IN", name:"Held ETF", ticker:"IN", market:"us", currency:"USD",
+      quantity:2, price, fxRate, valueKrw: 2 * price * fxRate});
+    const points = [position(100,1000), position(101,1200), position(100,1300)].map((mark, i) => ({
+      date:[from, day, end][i], valueKrw:mark.valueKrw, segment:from, estimated:i>0, returnPct:i,
+      dailyReturnPct:i>0?i:null, ...(i<2 ? {positions:[mark],trades:[]} : {}),
+    }));
+    await pg.query(`insert into account_history_reviews(canonical_owner_user_id,account_id,evidence_hash,captured_revision,start_date,end_date,excluded_labels,points,evidence)
+      values($1,$2,$3,0,$4,$5,array[]::text[],$6::jsonb,$7::jsonb)`, [
+      owner, account, "a".repeat(64), from, end, JSON.stringify(points),
+      JSON.stringify({version:1,basis:"reviewed_holdings_excluding_cash",currency:"KRW"}),
+    ]);
+    const result = await read(owner, account, {start:day,end});
+    assert.equal(result.state,"partial");
+    assert.deepEqual(result.days, [
+      {date:day, closingValueKrw:242400, priceKrw:2000, fxKrw:40400, complete:true, reviewed:true, estimated:true},
+      {date:end, closingValueKrw:260000, priceKrw:null, fxKrw:null, complete:false, reviewed:true, estimated:true},
+    ]);
+    assert.equal((await read(other, account, {start:day,end})).days[0].closingValueKrw, null);
+    assert.equal((await read(owner, native, {start:day,end})).days[0].closingValueKrw, null);
+    await pg.query("insert into native_ledger_revisions values($1,$2,1,'2025-06-03T13:00:00Z',now(),null)",[owner,account]);
+    const invalidated = await read(owner, account, {start:day,end});
+    assert.equal(invalidated.days[1].closingValueKrw,null);
+    assert.equal(invalidated.days[1].reviewed,undefined);
+  } finally { await pg.close(); }
+});
 
 test("investment live marks reuse the home quote and retain proven manual and fixed KRW holdings", async () => {
   const [{homePerformanceMarks},{performanceLiveFrame}] = await importWithPorts([

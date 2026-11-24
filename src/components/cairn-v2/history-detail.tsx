@@ -193,7 +193,7 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
           <div>
             <p className={styles.eyebrow}>{isCurrent ? "현재 평가 · 저장 전" : "선택한 관측일"}</p>
             <p className={styles.date}>
-              {(returnPoint?.date ?? selected?.date)?.replaceAll("-", ".") ?? "기록 없음"}
+              {isCurrent ? currentValuationTime(view) : (returnPoint?.date ?? selected?.date)?.replaceAll("-", ".") ?? "기록 없음"}
             </p>
             <p
               className={styles.value}
@@ -206,11 +206,8 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
               <small>{metric === "return" ? "%" : unit}</small>
             </p>
             <p className={styles.caption}>{caption}</p>
-            {view.domain?.historyObservationPolicy && !isReviewed && (
+            {view.domain?.historyObservationPolicy && !isReviewed && !isCurrent && (
               <p className={styles.note}>
-                {isCurrent ? (
-                  currentValuationTime(view)
-                ) : (
                   <>
                     관측일 기준
                     {!selected?.storageSnapshotDate
@@ -219,7 +216,6 @@ function SavedHistoryDetail({ view: inputView, context, source, setSource, perio
                         ? " · 저장 조회일 " + selected.storageSnapshotDate
                         : " · 저장 조회일과 같음"}
                   </>
-                )}
               </p>
             )}
           </div>
