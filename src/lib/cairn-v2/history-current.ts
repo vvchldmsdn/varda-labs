@@ -2,7 +2,8 @@ import type { BetaView } from "./read-contract";
 import type { BetaCurrency } from "./navigation";
 import { originalCurrentValueSummary } from "./current-value-presentation";
 import { percentOrNull } from "../portfolio-math.ts";
-import { resolveSnapshotCycle } from "../snapshots/market-calendar.ts";
+import { liveHistoryDate, valuationDateForCutoff } from "./history-date.ts";
+import { withinReviewedValuationDates } from "./reviewed-history-series.ts";
 
 export const CURRENT_VALUATION_SOURCE = "current_investment_valuation";
 
@@ -26,7 +27,7 @@ export function reviewedLiveBaseline(view: BetaView) {
   const current = currentHistoryValuation(view, "KRW");
   const review = view.domain?.accountHistoryReview;
   if (!review || !current?.asOf || !Number.isFinite(Date.parse(current.asOf))) return null;
-  const date = resolveSnapshotCycle(new Date(current.asOf)).snapshotDate;
+  const date = liveHistoryDate(new Date(current.asOf));
   const mark = review.points.find(point => point.date === date);
   return mark?.valueKrw != null ? mark : null;
 }
@@ -38,7 +39,8 @@ export function todayChangeForHistory(view: BetaView) {
   const valueKrw = current?.complete && current.amount != null ? Number(current.amount) : null;
   const previousValueKrw = baseline.valueKrw!;
   const change = valueKrw === null ? null : historyValuationChange(valueKrw, previousValueKrw);
-  return {baselineDate: baseline.date, valueKrw, previousValueKrw, ...change};
+  return {baselineDate: valuationDateForCutoff(baseline.date), cutoffDate: baseline.date,
+    valueKrw, previousValueKrw, ...change};
 }
 
 /** A read-time point, never a saved close or a newly calculated return.
@@ -57,14 +59,9 @@ export function historyWithCurrentValue(view: BetaView): BetaView {
   const valueKrw = Number(current.amount);
   const observed = Date.parse(current.asOf);
   if (!Number.isFinite(observed) || !Number.isFinite(valueKrw)) return view;
-  const baseline = reviewedLiveBaseline(view);
-  // Reviewed observations are labeled by the 07:00 service cutoff. The live
-  // point occupies the next cutoff slot and carries its actual quote time.
-  const date = baseline
-    ? new Date(Date.parse(baseline.date) + 86_400_000).toISOString().slice(0, 10)
-    : new Date(observed + 9 * 3600000).toISOString().slice(0, 10);
+  const date = liveHistoryDate(new Date(observed));
   const review = domain.accountHistoryReview;
-  if (review && date >= review.startDate && date <= review.endDate) return view;
+  if (review && withinReviewedValuationDates(review, date)) return view;
   const saved = view.history.filter((row) => row.source !== CURRENT_VALUATION_SOURCE);
   if (saved.some((row) => row.date > date)) return view;
   const point: BetaView["history"][number] = {

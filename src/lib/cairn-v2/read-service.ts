@@ -2,6 +2,7 @@ import { projectReviewedHeatmap, unavailableHeatmap, type BetaHeatmapRead } from
 import { parseSaleExclusionKeys } from "../additional-contribution-sale-exclusions.ts";
 import type { BetaContext, BetaCurrency } from "./navigation";
 import { alignCurrentValueWithReview, type OriginalCurrentValuePresentation } from "./current-value-presentation";
+import { projectReviewedCurrentMovement } from "./reviewed-current-movement.ts";
 import {
   adaptBetaRead,
   blankDomainView,
@@ -272,8 +273,10 @@ export async function readBetaDomain(params: Params, ports: BetaReadPorts): Prom
       planning: { targets, contribution: { ...contribution, selectionRows } },
     };
     const review = view.domain.accountHistoryReview;
+    const reviewedCurrentMovement = projectReviewedCurrentMovement(view);
+    if (reviewedCurrentMovement) view.domain.reviewedCurrentMovement = reviewedCurrentMovement;
     if (heatmapPromise) {
-      const {heatmap, impacts} = projectReviewedHeatmap(await heatmapPromise, review);
+      const {heatmap, impacts} = projectReviewedHeatmap(await heatmapPromise, review, reviewedCurrentMovement);
       view.domain.heatmap = heatmap;
       if (impacts.length) view.domain.reviewedDailyImpact = impacts;
     }

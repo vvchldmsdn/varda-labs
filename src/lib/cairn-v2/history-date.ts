@@ -1,3 +1,5 @@
+import { resolveSnapshotCycle } from "../snapshots/market-calendar.ts";
+
 // Date metadata only; no valuation or return calculations.
 // Limited port: src/lib/portfolio-dashboard-history.ts, SHA256 b193ff72242954bc8b05ff116e03e7e8c274442f27b7223d2cc039eb06377d72.
 // Keep the original storage key separate from the completed-day display date.
@@ -9,9 +11,22 @@ export function betaHistoryValuationDate(
   const cutoffDate = cycleEnd > 0
     ? new Date(cycleEnd + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
     : row.snapshotDate;
+  return valuationDateForCutoff(cutoffDate);
+}
+
+/** A 07:00 KST storage cutoff closes the preceding valuation day. */
+export function valuationDateForCutoff(cutoffDate: string) {
   return shiftIsoDate(cutoffDate, -1);
 }
 
+export function cutoffDateForValuation(date: string) {
+  return shiftIsoDate(date, 1);
+}
+
+/** The open valuation day runs from 07:00 to the next 07:00 KST. */
+export function liveHistoryDate(asOf: Date) {
+  return resolveSnapshotCycle(asOf).snapshotDate;
+}
 
 export function commonBetaHistoryValuationDate(rows: readonly Readonly<{ valuationDate: string | null }>[]) {
   const first = rows[0]?.valuationDate ?? null;

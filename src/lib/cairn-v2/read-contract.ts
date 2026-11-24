@@ -21,6 +21,7 @@ export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" |
     currentValuePresentation?: import("./current-value-presentation").OriginalCurrentValuePresentation;
     recoveredReturn?: import('../period-return-recovery').RecoveredReturnCurve | null;
     accountHistoryReview?: AccountHistoryReview | null;
+    reviewedCurrentMovement?: import("./reviewed-current-movement").ReviewedCurrentMovement;
     reviewUnavailable?: boolean;
     investmentReturn?: import("./investment-return").InvestmentReturn;
     planning?: BetaPlanningRead;

@@ -1,7 +1,8 @@
-// Reused verbatim holding-history projection from the current original frontend.
-// Only the unused position-trend export and its imports are omitted; no formulas changed.
+// Holding-history projection from the original frontend, using the shared Beta valuation dates.
 import { percentOrNull, toNumber } from "../portfolio-math.ts";
 import type { HoldingPriceReturn } from "./heatmap-contract.ts";
+import { betaHistoryValuationDate as portfolioDashboardHistoryDisplayDate } from "./history-date.ts";
+export { portfolioDashboardHistoryDisplayDate };
 
 export type PortfolioDashboardPositionHistoryRow = Readonly<{
   snapshotDate: string;
@@ -221,22 +222,6 @@ function preferredPositionRows(
   }
 
   return preferred;
-}
-
-/**
- * This writer stores a completed service day under its following 07:00 KST cutoff.
- * Quote reference dates can be older (holidays), so they are not display dates.
- * Imported/unknown writers retain their own date semantics until verified.
- */
-export function portfolioDashboardHistoryDisplayDate(
-  row: Pick<PortfolioDashboardPositionHistoryRow, "snapshotDate" | "source" | "cycleEndAt">,
-) {
-  if (row.source !== "varda_manual_daily_snapshot" && !row.source?.startsWith("broker_reconstructed_close_v1:")) return row.snapshotDate;
-  const cycleEnd = timestamp(row.cycleEndAt ?? null);
-  const cutoffDate = cycleEnd > 0
-    ? new Date(cycleEnd + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    : row.snapshotDate;
-  return shiftIsoDate(cutoffDate, -1);
 }
 
 function positionRowKey(date: string, assetId: string) {

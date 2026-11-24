@@ -29,13 +29,13 @@ export type AccountHistoryReview = {
 
 // Pick the latest publication before restricting the request window so an older
 // estimate cannot silently reappear while a corrected interval is selected.
-// A later revision starts at the earliest possibly affected service day. This
-// includes an original execution replaced by a backdated edit. Native date-only
-// records encode their effective date at midday, not an observed execution time.
+// An event on valuation day D can affect cutoff D+1. Cutoff D closed the previous
+// day and remains eligible. Backdated edits use the earliest affected day, and
+// native date-only records keep the conservative time adjustment.
 type ReviewDetail = "values" | "positions" | "attribution";
 const pointProjection = {
   values: "p.value - 'positions' - 'trades'",
-  positions: "case when p.value->>'date' >= (least(g.end_date,g.invalid_from-1,$4::date)-31)::text then p.value else p.value - 'positions' - 'trades' end",
+  positions: "case when p.value->>'date' >= (least(g.end_date,g.last_unaffected_cutoff,$4::date)-31)::text then p.value else p.value - 'positions' - 'trades' end",
   attribution: "p.value",
 };
 function accountHistoryReviewSql(detail: ReviewDetail) {
@@ -63,14 +63,14 @@ with selected as (
       cross join lateral jsonb_array_elements(batch.manifest->'trades') b(trade)
       where batch.account_id=s.account_id and batch.canonical_owner_user_id=s.canonical_owner_user_id
       and batch.recorded_at>s.created_at)
-    ) as invalid_from
+    ) as last_unaffected_cutoff
   from selected s where s.start_date<=$4::date and s.end_date>=$3::date
 )
-select g.start_date::text as start_date,least(g.end_date,g.invalid_from-1)::text as end_date,g.excluded_labels,
+select g.start_date::text as start_date,least(g.end_date,g.last_unaffected_cutoff)::text as end_date,g.excluded_labels,
   jsonb_agg(${pointProjection[detail]} order by p.ordinality) as points
 from guarded g cross join lateral jsonb_array_elements(g.points) with ordinality p(value,ordinality)
-where p.value->>'date' between greatest(g.start_date,$3::date)::text and least(g.end_date,g.invalid_from-1,$4::date)::text
-group by g.start_date,g.end_date,g.invalid_from,g.excluded_labels`;
+where p.value->>'date' between greatest(g.start_date,$3::date)::text and least(g.end_date,g.last_unaffected_cutoff,$4::date)::text
+group by g.start_date,g.end_date,g.last_unaffected_cutoff,g.excluded_labels`;
 }
 
 export const ACCOUNT_HISTORY_REVIEW_SQL = accountHistoryReviewSql("values");
