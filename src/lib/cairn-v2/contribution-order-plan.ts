@@ -8,7 +8,6 @@ export type ContributionOrderKind = "whole" | "fractional-shares" | "fractional-
 export const fractionalShareStep = "0.000001";
 export type ContributionOrderRule = Readonly<{
   kind: ContributionOrderKind;
-  fractionalSell?: boolean;
   step: string;
   minimum: string;
   fee: string;
@@ -64,7 +63,11 @@ export const defaultContributionOrderSettings: ContributionOrderSettings = {
   useCashLimits: false, cashByWallet: {}, rules: {},
 };
 
-export function withFractionalBuy(rule: ContributionOrderRule, enabled: boolean): ContributionOrderRule {
+export function canUseFractionalOrders(option: ContributionOrderOption) {
+  return option.unit === "share" && option.currency !== null && (option.canBuy || option.canSell);
+}
+
+export function withFractionalOrders(rule: ContributionOrderRule, enabled: boolean): ContributionOrderRule {
   if (enabled === (rule.kind !== "whole")) return rule;
   return enabled
     ? {...rule, kind: "fractional-shares", step: fractionalShareStep, minimum: "0"}
@@ -122,9 +125,9 @@ export function getContributionWallets(basis: ContributionOrderBasis) {
 
 const projectedSale = (row: BasisRow, usdKrw: number | null, rule: ContributionOrderRule) => {
   if (!(row.trimKrw > 0) || !positive(row.quantity)) return [];
-  if (row.unit === "gram" && rule.fractionalSell) throw Error("invalid_gold_order_unit");
+  if (row.unit === "gram" && rule.kind !== "whole") throw Error("invalid_gold_order_unit");
   const priceKrw = Decimal.from(row.price).mul(row.currency === "USD" ? usdKrw! : 1);
-  const step = Decimal.from(rule.fractionalSell ? fractionalShareStep : 1);
+  const step = Decimal.from(rule.kind === "whole" ? 1 : fractionalShareStep);
   const heldLots = Decimal.from(row.quantity).div(step).minor("KRW", "floor");
   const plannedLots = Decimal.from(row.trimKrw).div(priceKrw.mul(step)).minor("KRW", "floor");
   const lots = heldLots < plannedLots ? heldLots : plannedLots;
@@ -133,7 +136,7 @@ const projectedSale = (row: BasisRow, usdKrw: number | null, rule: ContributionO
 };
 
 function parseOrderTerms(rule: ContributionOrderRule, currency: Currency, unit: BasisRow["unit"]) {
-  if (unit === "gram" && (rule.kind !== "whole" || rule.fractionalSell)) throw Error("invalid_gold_order_unit");
+  if (unit === "gram" && rule.kind !== "whole") throw Error("invalid_gold_order_unit");
   const minPrincipalMinor = nativeMinor(rule.minimum, currency);
   const fee = {fixedMinor: nativeMinor(rule.fee, currency), rateBps: nativeMinor(rule.feePct, "USD"),
     minimumMinor: nativeMinor(rule.minimumFee, currency)};
@@ -156,7 +159,7 @@ function parseOrderTerms(rule: ContributionOrderRule, currency: Currency, unit: 
 }
 
 export function validContributionOrderRule(rule: ContributionOrderRule, currency: Currency | null, unit: BasisRow["unit"] | null) {
-  if (!currency || !unit) return rule.kind === "whole" && !rule.fractionalSell &&
+  if (!currency || !unit) return rule.kind === "whole" &&
     ![rule.step, rule.minimum, rule.fee, rule.feePct, rule.minimumFee, rule.capKrw].some(Boolean);
   try {
     parseOrderTerms(rule, currency, unit);

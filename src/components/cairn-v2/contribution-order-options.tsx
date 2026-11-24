@@ -7,7 +7,7 @@ import { useI18n } from "@/components/i18n/locale-provider";
 import { SALE_EXCLUSION_LIMIT } from "@/lib/additional-contribution-sale-exclusions";
 import { instrumentLabel } from "@/lib/instrument-display";
 import {
-  defaultContributionOrderRule, fractionalShareStep, withFractionalBuy,
+  canUseFractionalOrders, defaultContributionOrderRule, fractionalShareStep, withFractionalOrders,
   type ContributionOrderOption, type ContributionOrderRule, type ContributionOrderSettings,
 } from "@/lib/cairn-v2/contribution-order-plan";
 import styles from "./contribution-order-options.module.css";
@@ -46,8 +46,9 @@ export function ContributionOrderOptions({options, settings, excluded, onSetting
   const excludedKeys = new Set(excluded);
   const query = search.trim().toLowerCase();
   const visible = options.filter(option => [nameOf(option), option.label, option.accountName, option.ticker].join(" ").toLowerCase().includes(query));
-  const buyCount = options.filter(option => option.canBuy && option.unit === "share" && settings.rules[option.key] && settings.rules[option.key].kind !== "whole").length;
-  const sellCount = options.filter(option => option.canSell && !excludedKeys.has(option.key) && option.unit === "share" && settings.rules[option.key]?.fractionalSell).length;
+  const fractionalCount = options.filter(option =>
+    canUseFractionalOrders(option) && (settings.rules[option.key] ?? defaultContributionOrderRule).kind !== "whole"
+  ).length;
 
   function updateRule(key: string, patch: Partial<ContributionOrderRule>) {
     onSettings({ ...settings, rules: { ...settings.rules, [key]: { ...(settings.rules[key] ?? defaultContributionOrderRule), ...patch } } });
@@ -57,32 +58,29 @@ export function ContributionOrderOptions({options, settings, excluded, onSetting
     <details className={styles.picker}>
       <summary>
         <span className={styles.summaryBody}><strong>{t("종목별 거래 설정", "Trading by holding")}</strong>
-          <small>{t(`소수점 매수 ${buyCount} · 소수점 매도 ${sellCount} · 매도 제외 ${excludedKeys.size}`, `Fractional buys ${buyCount} · sells ${sellCount} · excluded ${excludedKeys.size}`)}</small></span>
+          <small>{t(`소수점 가능 ${fractionalCount} · 매도 제외 ${excludedKeys.size}`, `Fractional trading ${fractionalCount} · excluded from sales ${excludedKeys.size}`)}</small></span>
         <ChevronDown size={17} aria-hidden="true" />
       </summary>
       <div className={styles.content}>
         <p className={styles.hint}>{t(
-          `증권사에서 가능한 소수점 매수·매도를 선택하세요. 기본 계산 단위는 ${fractionalShareStep}주예요. 배분을 계산하면 소수점 설정이 이 기기에 저장돼요.`,
-          `Select the fractional buys and sells your broker supports. The default increment is ${fractionalShareStep} share. Calculating saves your fractional settings on this device.`
+          "증권사에서 소수점 거래가 가능한 종목을 체크하세요. 매수와 매도에 함께 적용되며, 배분을 계산하면 이 기기에 저장돼요.",
+          "Select holdings your broker supports for fractional trading. Each selection applies to buys and sells and is saved on this device when you calculate."
         )}</p>
         {options.length >= 8 && <Field className={styles.search}><Search size={15} aria-hidden="true" />
           <Input aria-label={t("종목·계좌 검색", "Search holdings or accounts")} type="search" value={search}
             placeholder={t("종목·계좌 검색", "Search holdings or accounts")} onChange={event => setSearch(event.target.value)}
             onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} /></Field>}
         {visible.length ? <table className={styles.table}>
-          <thead><tr><th scope="col">{t("종목", "Holding")}</th><th scope="col">{t("소수점", "Fractional")}<br />{t("매수", "buy")}</th><th scope="col">{t("소수점", "Fractional")}<br />{t("매도", "sell")}</th><th scope="col">{t("매도", "Sale")}<br />{t("제외", "excluded")}</th></tr></thead>
+          <thead><tr><th scope="col">{t("종목", "Holding")}</th><th scope="col">{t("소수점 가능", "Fractional trading")}</th><th scope="col">{t("매도 제외", "Exclude sales")}</th></tr></thead>
           <tbody>{visible.map(option => {
             const {key} = option;
             const rule = settings.rules[key] ?? defaultContributionOrderRule;
             const label = nameOf(option);
             const identity = label + " · " + option.accountName;
-            const canFraction = option.unit === "share" && option.currency !== null;
             const skip = excludedKeys.has(key);
             return <tr key={key}><th scope="row"><b>{label}</b><small>{option.accountName}{option.unit === "gram" && " · 1g"}</small></th>
-              <td>{canFraction && option.canBuy ? <OptionCheck label={t(`${identity} 소수점 매수`, `${identity} fractional buy`)}
-                checked={rule.kind !== "whole"} onChange={enabled => updateRule(key, withFractionalBuy(rule, enabled))} /> : <span aria-label={t("해당 없음", "Not applicable")}>—</span>}</td>
-              <td>{canFraction && option.canSell ? <OptionCheck label={t(`${identity} 소수점 매도`, `${identity} fractional sell`)}
-                checked={!skip && !!rule.fractionalSell} disabled={skip} onChange={enabled => updateRule(key, {fractionalSell: enabled})} /> : "—"}</td>
+              <td>{canUseFractionalOrders(option) ? <OptionCheck label={t(`${identity} 소수점 가능`, `${identity} fractional trading`)}
+                checked={rule.kind !== "whole"} onChange={enabled => updateRule(key, withFractionalOrders(rule, enabled))} /> : <span aria-label={t("해당 없음", "Not applicable")}>—</span>}</td>
               <td>{option.canSell ? <OptionCheck name="excludeSell" value={key} label={t(`${identity} 매도 제외`, `${identity} exclude from sales`)} checked={skip}
                 disabled={!skip && excludedKeys.size >= SALE_EXCLUSION_LIMIT}
                 onChange={enabled => onExclude(enabled ? [...excluded, key].sort() : excluded.filter(selected => selected !== key))} /> : "—"}</td>

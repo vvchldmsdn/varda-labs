@@ -207,7 +207,7 @@ export function ContributionDetail({view, context, onEdit, onCalculate}: {view: 
           requestAnimationFrame(() => document.getElementById(inputId)?.focus());
         }}>{t("조건 변경", "Edit inputs")}</CairnButton>
       </div>
-      <ContributionFundingBar result={result} basis={read?.orderBasis} presentation="strategy" />
+      <ContributionFundingBar result={result} basis={read?.orderBasis} />
 
       <ContributionRuleReceipt result={result} basis={read?.orderBasis} showAccount={context.scope === "all"} formatWon={formatWon}
         onEditRatio={() => {

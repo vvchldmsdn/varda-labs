@@ -123,6 +123,7 @@ export function BetaHome({
       <ContributionOrderProvider key={JSON.stringify([context.mode, context.scope, context.currency, read?.displayBinding])}
         binding={context.mode === "domain" && read?.context.scope === context.scope && read.context.currency === context.currency
           ? read.displayBinding : undefined} scope={context.scope} currency={context.currency}
+        result={view.domain?.planning?.contribution?.result}
         options={view.domain?.planning?.contribution?.orderOptions} basis={view.domain?.planning?.contribution?.orderBasis}>
       <HomeImpactProvider read={view.domain?.heatmap} review={view.domain?.accountHistoryReview} reviewed={view.domain?.reviewedDailyImpact}>
       <HomePerformanceProvider view={view} context={context} read={read}>

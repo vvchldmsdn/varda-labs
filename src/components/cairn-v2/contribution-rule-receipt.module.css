@@ -10,7 +10,7 @@
 .title, .floor { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .title h3 { font-size: 1rem; font-weight: 650; }
 .title > strong { font-size: 1.25rem; letter-spacing: -.03em; }
-.totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px 12px; border-radius: 12px; background: var(--wash); }
+.totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 14px 12px; border-radius: 12px; background: var(--wash); }
 .totals dt, .holding small, .note, .neutral summary, .other > summary, .body p { color: var(--muted); font-size: .78rem; }
 .totals dd { margin-top: 4px; font-weight: 650; font-size: .94rem; }
 .floor { align-items: center; font-size: .84rem; }
@@ -18,7 +18,7 @@
 .note { line-height: 1.5; }
 .tableHead, .holding > summary {
   display: grid;
-  grid-template-columns: minmax(70px, 1.4fr) repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr);
+  grid-template-columns: minmax(70px, 1.4fr) repeat(4, minmax(0, 1fr)) minmax(0, 1.25fr);
   align-items: baseline; gap: 8px; text-align: end;
 }
 .tableHead { color: var(--muted); font-size: .75rem; padding: 0 4px; }
@@ -34,6 +34,8 @@
 .holding > summary > :not(.identity) small { display: none; }
 .final { font-weight: 650; }
 .final svg { display: inline-block; vertical-align: middle; color: var(--muted); }
+.order { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; text-align: start; font-size: .8rem; color: var(--muted); }
+.order strong { color: var(--ink); font-weight: 650; }
 .cut[data-changed="true"] { color: var(--negative); }
 .extra[data-changed="true"] { color: var(--accent); }
 .body { display: grid; gap: 8px; padding: 0 10px 14px; }
@@ -41,19 +43,28 @@
 .steps li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: baseline; padding: 6px 0; font-size: .83rem; }
 .steps li b { font-weight: 570; }
 .neutral summary, .other > summary { padding: 12px 2px; cursor: pointer; }
-@container (max-width: 530px) {
+@container (max-width: 620px) {
   .tableHead { display: none; }
   .totals { gap: 4px; padding-inline: 8px; }
   .totals dd { font-size: .83rem; overflow-wrap: anywhere; }
   .holding > summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas: "name name final" "base cut extra";
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas: "name name final final" "base cut extra target";
     gap: 6px 8px; text-align: start;
   }
   .identity { grid-area: name; }
-  .final { grid-area: final; text-align: end; white-space: nowrap; }
+  .final { grid-area: final; text-align: end; }
   .base { grid-area: base; }
   .cut { grid-area: cut; }
   .extra { grid-area: extra; }
-  .holding > summary > :is(.base,.cut,.extra) small { display: block; padding-bottom: 1px; font-size: .70rem; }
+  .target { grid-area: target; }
+  .holding > summary:has(.order) { grid-template-areas: "name name final final" "order order order order" "base cut extra target"; }
+  .order { grid-area: order; }
+  .holding > summary > :is(.base,.cut,.extra,.target) { min-width: 0; overflow-wrap: anywhere; }
+  .holding > summary > :is(.base,.cut,.extra,.target) small { display: block; padding-bottom: 1px; font-size: .70rem; }
+}
+@container (max-width: 360px) {
+  .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .holding > summary { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "name final" "base cut" "extra target"; }
+  .holding > summary:has(.order) { grid-template-areas: "name final" "order order" "base cut" "extra target"; }
 }

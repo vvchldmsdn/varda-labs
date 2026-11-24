@@ -1,5 +1,5 @@
 import {
-  defaultContributionOrderRule, validContributionOrderRule,
+  canUseFractionalOrders, defaultContributionOrderRule, validContributionOrderRule, withFractionalOrders,
   type ContributionOrderOption, type ContributionOrderRule, type ContributionOrderSettings,
 } from "./contribution-order-plan.ts";
 
@@ -10,12 +10,8 @@ type Rules = ContributionOrderSettings["rules"];
 export function encodeFractionalPreferences(rules: Rules, options: readonly ContributionOrderOption[]) {
   const entries = options.flatMap(option => {
     const rule = rules[option.key];
-    if (option.unit !== "share" || !rule) return [];
-    const kind = option.canBuy ? rule.kind : "whole";
-    const fractionalSell = option.canSell && !!rule.fractionalSell;
-    if (kind === "whole" && !fractionalSell) return [];
-    return [[option.key, {kind, step: kind === "whole" ? "" : rule.step,
-      minimum: kind === "whole" ? "" : rule.minimum, fractionalSell}]];
+    if (!canUseFractionalOrders(option) || !rule || rule.kind === "whole") return [];
+    return [[option.key, {kind: rule.kind, step: rule.step, minimum: rule.minimum}]];
   });
   return JSON.stringify(Object.fromEntries(entries));
 }
@@ -27,15 +23,19 @@ export function decodeFractionalPreferences(raw: string, options: readonly Contr
     if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
     const rules: Record<string, ContributionOrderRule> = {};
     for (const option of options) {
-      if (option.unit !== "share" || !Object.hasOwn(stored, option.key)) continue;
+      if (!canUseFractionalOrders(option) || !Object.hasOwn(stored, option.key)) continue;
       const entry = (stored as Record<string, unknown>)[option.key];
       if (!entry || typeof entry !== "object" || !("kind" in entry)) continue;
-      const kind = option.canBuy ? entry.kind : "whole";
-      if (kind !== "whole" && kind !== "fractional-shares" && kind !== "fractional-amount") continue;
-      const fractionalSell = option.canSell && "fractionalSell" in entry && entry.fractionalSell === true;
-      const step = kind !== "whole" && "step" in entry && typeof entry.step === "string" ? entry.step : "";
-      const minimum = kind !== "whole" && "minimum" in entry && typeof entry.minimum === "string" ? entry.minimum : "";
-      const rule: ContributionOrderRule = {...defaultContributionOrderRule, kind, step, minimum, fractionalSell};
+      const { kind } = entry;
+      // Earlier device preferences could enable only fractional selling.
+      if (kind === "whole" && "fractionalSell" in entry && entry.fractionalSell === true) {
+        rules[option.key] = withFractionalOrders(defaultContributionOrderRule, true);
+        continue;
+      }
+      if (kind !== "fractional-shares" && kind !== "fractional-amount") continue;
+      const step = "step" in entry && typeof entry.step === "string" ? entry.step : "";
+      const minimum = "minimum" in entry && typeof entry.minimum === "string" ? entry.minimum : "";
+      const rule: ContributionOrderRule = {...defaultContributionOrderRule, kind, step, minimum};
       if (validContributionOrderRule(rule, option.currency, option.unit)) rules[option.key] = rule;
     }
     return rules;

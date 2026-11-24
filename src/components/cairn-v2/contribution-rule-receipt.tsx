@@ -4,9 +4,11 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/cairn-ui";
 import { useI18n } from "@/components/i18n/locale-provider";
 import type { ContributionOrderBasis } from "@/lib/cairn-v2/contribution-order-plan";
+import type { ContributionOrderRow } from "@/lib/cairn-v2/contribution-order-result";
 import type { ReadyContribution } from "@/lib/cairn-v2/planning-contract";
 import { instrumentLabel } from "@/lib/instrument-display";
-import { useContributionOrderPlan } from "./contribution-order-context";
+import { useContributionOrderResult } from "./contribution-order-context";
+import { formatBuyQuantity, formatOrderUnitPrice } from "./contribution-order-display";
 import styles from "./contribution-rule-receipt.module.css";
 
 type Row = ReadyContribution["rows"][number];
@@ -90,10 +92,18 @@ function evidenceForStep(rule: Rule, row: Row, result: ReadyContribution, t: Tra
   return multiple(factor.value);
 }
 
-function AllocationRow({row, result, showAccount, formatWon, order}: {
-  row: Row; result: ReadyContribution; showAccount: boolean; formatWon: Amount; order: number | null;
+const orderIssues: Record<NonNullable<ContributionOrderRow["issue"]>, [string, string]> = {
+  basis_unavailable: ["주문 기준 미확인", "Order basis unavailable"],
+  quote_unavailable: ["단가·환율·단위 확인 필요", "Check price, FX or unit"],
+  no_feasible_combination: ["조건에 맞는 주문 조합 없음", "No feasible order combination"],
+  check_terms: ["주문 조건 확인 필요", "Check order terms"],
+};
+
+function AllocationRow({holding, result, showAccount, formatWon}: {
+  holding: ContributionOrderRow; result: ReadyContribution; showAccount: boolean; formatWon: Amount;
 }) {
   const { t } = useI18n();
+  const {row, quote, order, issue} = holding;
   const steps = row.ruleSteps ?? [];
   const topup = steps.find(step => step.rule === "minimum")?.deltaKrw ?? 0;
   const reduction = row.allocationKrw - topup - row.strategicAllocationKrw;
@@ -109,12 +119,18 @@ function AllocationRow({row, result, showAccount, formatWon, order}: {
       <span className={styles.base}><small>{t("기본", "Base")}</small>{formatWon(row.strategicAllocationKrw)}</span>
       <span className={styles.cut} data-changed={reduction !== 0}><small>{t("감액", "Reduction")}</small>{reduction ? signedAmount(reduction, formatWon) : "—"}</span>
       <span className={styles.extra} data-changed={topup > 0}><small>{t("보충", "Top-up")}</small>{topup ? signedAmount(topup, formatWon) : "—"}</span>
-      <span className={styles.final}><small>{t("최종", "Final")}</small>{formatWon(row.allocationKrw)} <ChevronDown size={14} aria-hidden /></span>
+      <span className={styles.target}><small>{t("목표 배분", "Target buy")}</small>{formatWon(row.allocationKrw)}</span>
+      <span className={styles.final}><small>{t("예상 매수 원금", "Estimated buy principal")}</small>{order ? formatWon(order.principalKrw) : "—"} <ChevronDown size={14} aria-hidden /></span>
+      {row.allocationKrw > 0 && <span className={styles.order}>
+        {quote && order
+          ? <span>{t("예상 매수", "Estimated buy")} <strong>{formatBuyQuantity(order, quote, t)}</strong></span>
+          : <span>{t(...orderIssues[issue ?? "check_terms"])}</span>}
+        {quote && <span>{formatOrderUnitPrice(quote, t)}</span>}
+      </span>}
     </summary>
     <div className={styles.body}>
       <ol className={styles.steps}>{visibleSteps.map(stepLine)}</ol>
       {neutralSteps.length > 0 && <details className={styles.neutral}><summary>{t("그 밖의 적용 근거", "Other rule details")}</summary><ol className={styles.steps}>{neutralSteps.map(stepLine)}</ol></details>}
-      {order !== null && <p>{t("주문 단위 반영 후", "After order sizing")} <b>{formatWon(order)}</b></p>}
       {(row.trimAmountKrw > 0 || row.trimReason !== "not_overweight") && <p>{t(...saleReasons[row.trimReason])} {row.trimAmountKrw > 0 && formatWon(row.trimAmountKrw)}</p>}
     </div>
   </details>;
@@ -124,24 +140,22 @@ export function ContributionRuleReceipt({result, basis, showAccount, formatWon, 
   result: ReadyContribution; basis?: ContributionOrderBasis; showAccount: boolean; formatWon: Amount; onEditRatio: () => void;
 }) {
   const { t } = useI18n();
-  const { projection } = useContributionOrderPlan(basis);
-  const sizing = projection?.result;
-  const orders = sizing && sizing.status !== "unavailable" ? new Map(sizing.orders.map(order => [order.key, order.principalKrw])) : null;
-  const quoted = new Set(basis?.rows.map(row => row.key));
-  const ranked = result.rows.toSorted((a,b) => b.allocationKrw - a.allocationKrw || b.strategicAllocationKrw - a.strategicAllocationKrw);
-  const active = ranked.filter(row => row.strategicAllocationKrw > 0 || row.allocationKrw > 0);
-  const other = ranked.filter(row => row.strategicAllocationKrw === 0 && row.allocationKrw === 0);
-  const base = ranked.reduce((sum,row) => sum + row.strategicAllocationKrw, 0);
-  const extra = ranked.reduce((sum,row) => sum + (row.ruleSteps?.find(step => step.rule === "minimum")?.deltaKrw ?? 0), 0);
+  const {rows, sizing} = useContributionOrderResult(result, basis);
+  const active = rows.filter(({row}) => row.strategicAllocationKrw > 0 || row.allocationKrw > 0);
+  const other = rows.filter(({row}) => row.strategicAllocationKrw === 0 && row.allocationKrw === 0);
+  const base = result.rows.reduce((sum,row) => sum + row.strategicAllocationKrw, 0);
+  const extra = result.rows.reduce((sum,row) => sum + (row.ruleSteps?.find(step => step.rule === "minimum")?.deltaKrw ?? 0), 0);
   const reduction = result.totalAllocatedKrw - base - extra;
-  const renderHolding = (row: Row) => <AllocationRow key={row.allocationKey} row={row} result={result}
-    showAccount={showAccount} formatWon={formatWon} order={orders && quoted.has(row.allocationKey) ? orders.get(row.allocationKey) ?? 0 : null} />;
-  return <section className={styles.receipt} aria-label={t("종목별 매수 배분", "Buy allocation by holding")}>
-    <header className={styles.title}><h3>{t("종목별 매수 배분", "Buy allocation by holding")}</h3><strong>{formatWon(result.totalAllocatedKrw)}</strong></header>
+  const renderHolding = (holding: ContributionOrderRow) => <AllocationRow key={holding.row.allocationKey} holding={holding}
+    result={result} showAccount={showAccount} formatWon={formatWon} />;
+  const heading = t("종목별 예상 매수", "Estimated buys by holding");
+  return <section className={styles.receipt} aria-label={heading}>
+    <header className={styles.title}><h3>{heading}</h3><strong>{sizing ? formatWon(sizing.principalKrw) : t("수량 미확정", "Sizing unavailable")}</strong></header>
     <dl className={styles.totals}>
       <div><dt>{t("기본 배분", "Base allocation")}</dt><dd>{formatWon(base)}</dd></div>
       <div><dt>{t("규칙 감액", "Reductions")}</dt><dd className={styles.cut} data-changed={reduction !== 0}>{signedAmount(reduction, formatWon)}</dd></div>
       <div><dt>{t("최소비율 보충", "Minimum top-up")}</dt><dd className={styles.extra} data-changed={extra > 0}>{signedAmount(extra, formatWon)}</dd></div>
+      <div><dt>{t("목표 배분", "Target buys")}</dt><dd>{formatWon(result.totalAllocatedKrw)}</dd></div>
     </dl>
     <div className={styles.floor}>
       <span>{t("최소 매수비율", "Minimum buy ratio")} <b>{result.calculationParameters.minimumExecutionRatioPct}%</b></span>
@@ -150,7 +164,7 @@ export function ContributionRuleReceipt({result, basis, showAccount, formatWon, 
     {result.minimumExecutionEvidenceAvailable === false && <p className={styles.note}>{t("이 투자금 통화에는 최소비율 보충 기준이 없어요.", "No minimum top-up policy is available for this funding currency.")}</p>}
     {result.minimumExecutionEvidenceAvailable === true && !result.minimumExecutionSatisfied &&
       <p className={styles.note}>{t("보충 가능한 종목의 매수 한도까지 배분했어요.", "Eligible holdings have reached their top-up capacity.")}</p>}
-    <div className={styles.tableHead} aria-hidden="true"><span>{t("종목", "Holding")}</span><span>{t("기본", "Base")}</span><span>{t("감액", "Reduction")}</span><span>{t("보충", "Top-up")}</span><span>{t("최종", "Final")}</span></div>
+    <div className={styles.tableHead} aria-hidden="true"><span>{t("종목", "Holding")}</span><span>{t("기본", "Base")}</span><span>{t("감액", "Reduction")}</span><span>{t("보충", "Top-up")}</span><span>{t("목표 배분", "Target buy")}</span><span>{t("예상 매수 원금", "Estimated buy principal")}</span></div>
     <div className={styles.holdings}>{active.map(renderHolding)}</div>
     {other.length > 0 && <details className={styles.other}><summary>{t(`매수 배분이 없는 종목 ${other.length}개`, `Holdings without buys (${other.length})`)}</summary>{other.map(renderHolding)}</details>}
   </section>;
