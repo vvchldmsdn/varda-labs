@@ -208,7 +208,7 @@ export const contributionMethod = {
       },
       equations: [
         {
-          expression: "nᵢ ≈ C × aᵢ / F,  nL ≈ C × L / F",
+          expression: "nᵢ ≈ C × Bᵢ / F,  nL ≈ C × L / F",
           reading: {
             ko: "섞인 재원의 각 매수액과 잔여 현금에 신규 투입금이 얼마나 포함되었는지 비례로 나눠 봅니다. 실제로는 원 단위 최대잔여 방식으로 나누므로 n들의 합은 C와 정확히 같습니다. 실제 돈의 출처를 추적한 기록이 아닌 비교용 귀속 규칙입니다.",
             en: "Attribute new cash proportionally to every baseline buy and to residual cash in the pooled budget. Actual attribution uses whole-KRW largest remainders, so the n amounts sum to C exactly. This is a comparison convention, not a record of where each unit of cash came from.",
@@ -222,7 +222,7 @@ export const contributionMethod = {
           },
         },
         {
-          expression: "Σeᵢ = E,  a′ᵢ = aᵢ − eᵢ,  L′ = L + E",
+          expression: "Σeᵢ = E,  a′ᵢ = Bᵢ − eᵢ,  L′ = L + E",
           reading: {
             ko: "추가 유보액은 각 매수의 신규 투입금 귀속분 n에 비례해 원 단위 최대잔여 방식으로 줄입니다. 각 감액 e는 n을 넘지 않습니다. 매도대금으로 귀속된 매수분과 원래 매도액은 유지하며 다른 종목에 재배분하지 않습니다.",
             en: "Reduce buys by E in proportion to their new-cash-attributed portions n, using whole-KRW largest remainders. Each reduction e is capped at n. Sale-funded buying and original sale amounts stay unchanged, with no redistribution to other positions.",
@@ -238,6 +238,7 @@ export const contributionMethod = {
       ],
       symbols: [
         { symbol: "nᵢ, nL", meaning: { ko: "기본 매수와 기본 잔여 현금에 귀속된 신규 투입금, 원화", en: "New cash attributed to baseline buys and baseline residual cash, in KRW" } },
+        { symbol: "Bᵢ, L", meaning: { ko: "감액과 보충까지 마친 매수금액과 남은 현금, 원화", en: "Buy amount and cash balance after reductions and eligible top-ups, in KRW" } },
         { symbol: "r, H, E", meaning: { ko: "유보 비율(%), 신규 투입금 최소 현금 목표(원), 추가 유보액(원)", en: "Reserve percent, minimum new-cash reserve in KRW, and extra reserve in KRW" } },
         { symbol: "eᵢ, a′ᵢ, L′", meaning: { ko: "종목별 감액·가정 적용 후 매수액·가정 적용 후 현금, 원화", en: "Position reduction, scenario buy amount and scenario cash, in KRW" } },
         { symbol: "VUSD, h, ΔFX", meaning: { ko: "USD 표시 자산의 현재 원화 평가액, 환율 변화 가정(bp), 원화 평가액 차이. 100bp = 1%", en: "Current KRW value of USD-denominated assets, assumed FX move in basis points, and KRW value difference; 100 bp = 1%" } },
