@@ -19,10 +19,10 @@ function nameOf(option: ContributionOrderOption) {
 function OptionCheck({ label, checked, disabled, name, value, onChange }: {
   label: string; checked: boolean; disabled?: boolean; name?: string; value?: string; onChange: (checked: boolean) => void;
 }) {
-  return <label className={styles.check}>
+  return <Field className={styles.check}>
     <Checkbox aria-label={label} name={name} value={value} checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} />
     <span aria-hidden="true"><Check size={14} strokeWidth={2.5} /></span>
-  </label>;
+  </Field>;
 }
 
 function NumericField({label, value, onChange}: {label: string; value: string; onChange: (value: string) => void}) {
@@ -65,10 +65,10 @@ export function ContributionOrderOptions({options, settings, excluded, onSetting
           `증권사에서 가능한 소수점 매수·매도를 선택하세요. 기본 계산 단위는 ${fractionalShareStep}주예요. 배분을 계산하면 소수점 설정이 이 기기에 저장돼요.`,
           `Select the fractional buys and sells your broker supports. The default increment is ${fractionalShareStep} share. Calculating saves your fractional settings on this device.`
         )}</p>
-        {options.length >= 8 && <label className={styles.search}><Search size={15} aria-hidden="true" />
+        {options.length >= 8 && <Field className={styles.search}><Search size={15} aria-hidden="true" />
           <Input aria-label={t("종목·계좌 검색", "Search holdings or accounts")} type="search" value={search}
             placeholder={t("종목·계좌 검색", "Search holdings or accounts")} onChange={event => setSearch(event.target.value)}
-            onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} /></label>}
+            onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} /></Field>}
         {visible.length ? <table className={styles.table}>
           <thead><tr><th scope="col">{t("종목", "Holding")}</th><th scope="col">{t("소수점", "Fractional")}<br />{t("매수", "buy")}</th><th scope="col">{t("소수점", "Fractional")}<br />{t("매도", "sell")}</th><th scope="col">{t("매도", "Sale")}<br />{t("제외", "excluded")}</th></tr></thead>
           <tbody>{visible.map(option => {
@@ -123,7 +123,7 @@ export function ContributionOrderOptions({options, settings, excluded, onSetting
             <NumericField label={t(`최소 수수료 (${active.currency})`, `Minimum fee (${active.currency})`)} value={activeRule.minimumFee} onChange={minimumFee => updateRule(active.key,{minimumFee})} />
           </div>
         </>}
-        <label className={styles.cashLimit} htmlFor={id}><Checkbox id={id} checked={settings.useCashLimits} onChange={event => onSettings({...settings, useCashLimits: event.target.checked})} />{t("계좌별 가용 현금으로 제한", "Limit buys by available cash")}</label>
+        <Field className={styles.cashLimit} htmlFor={id}><Checkbox id={id} checked={settings.useCashLimits} onChange={event => onSettings({...settings, useCashLimits: event.target.checked})} />{t("계좌별 가용 현금으로 제한", "Limit buys by available cash")}</Field>
         {settings.useCashLimits && <><p className={styles.hint}>{t("비워 둔 계좌·통화 잔액은 0으로 계산해요.", "Blank balances count as zero.")}</p>
           <div className={styles.grid}>{wallets.map(wallet => <NumericField key={wallet.walletKey} label={`${wallet.accountName} · ${wallet.currency}`}
             value={settings.cashByWallet[wallet.walletKey] ?? ""} onChange={amount => onSettings({...settings, cashByWallet:{...settings.cashByWallet, [wallet.walletKey]:amount}})} />)}</div></>}

@@ -71,8 +71,7 @@ function evidenceForStep(rule: Rule, row: Row, result: ReadyContribution, t: Tra
         if (reason === "target_gap_filled") return t("목표 부족액 소진", "Target gap filled");
         if (reason === "ma_not_eligible") return t("120일선 보충 조건 미달", "MA top-up condition unmet");
         if (reason === "penalty_below_threshold") return t("종합 매수 배수 0.85 미만", "Combined multiplier below 0.85");
-        const factor = reason.replace("_unavailable", "") as Exclude<Rule, "ma120" | "minimum">;
-        return t(...ruleNames[factor]) + " " + t("자료 부족", "unavailable");
+        return t("보충 조건 미충족", "Top-up condition unmet");
       }).join(" · ") || t("추가 배분 없음", "No top-up");
   }
   const factor = breakdown?.multipliers[rule];
