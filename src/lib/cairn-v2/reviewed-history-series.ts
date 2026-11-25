@@ -14,6 +14,13 @@ export const withinReviewedValuationDates = (review: AccountHistoryReview, date:
   date >= valuationDateForCutoff(review.startDate) && date <= valuationDateForCutoff(review.endDate);
 
 export function reviewedValues(original: BetaView["history"], review: AccountHistoryReview): BetaView["history"] {
+  if (review.materialized) {
+    // The approved dated receipts now live in the same close table as tomorrow's mark.
+    // Do not synthesize old points outside the requested history window.
+    const priced = new Set(review.points.filter(p => p.valueKrw !== null).map(p => valuationDateForCutoff(p.date)));
+    return original.filter(row => !withinReviewedValuationDates(review, row.date) ||
+      row.source === "varda_manual_daily_snapshot" && priced.has(row.date));
+  }
   let segment = 0;
   const rows = review.points.filter(p => withinReview(review, p.date)).map((point, index, points) => {
     if (index && !adjacent(points[index - 1].date, point.date)) segment++;
@@ -28,6 +35,7 @@ export function reviewedValues(original: BetaView["history"], review: AccountHis
 /** A reviewed close and native account performance can have different baskets.
  * The chart keeps independent segments on either side of the reviewed interval. */
 export function reviewedPerformance(original: PeriodPerformance, review: AccountHistoryReview): PeriodPerformance {
+  if (review.materialized) return original;
   const start = valuationDateForCutoff(review.startDate);
   const end = valuationDateForCutoff(review.endDate);
   if (end < original.range.start || start > original.range.end) return original;

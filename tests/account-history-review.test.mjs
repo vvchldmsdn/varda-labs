@@ -17,6 +17,9 @@ test('reviewed history stays in one account, replays the latest review, stops at
       create table native_ledger_revisions(account_id uuid,canonical_owner_user_id uuid,operation_id uuid,affected_at timestamptz,marker_sequence int);
       create table event_ledger_entries(id uuid,account_id uuid,canonical_owner_user_id uuid,native_operation_id uuid,native_sequence int,native_data jsonb,is_sample boolean,event_type text,event_date date,recorded_at timestamptz,created_at timestamptz);
       create table broker_recovery_batches(account_id uuid,canonical_owner_user_id uuid,recorded_at timestamptz,manifest jsonb);
+      create table daily_portfolio_snapshots(canonical_owner_user_id uuid,account_id uuid,snapshot_date date,
+        source text,is_sample boolean,rule_version text,closing_performance jsonb,total_market_value numeric);
+      grant select on daily_portfolio_snapshots to varda_tenant_app;
       grant select on accounts,native_ledger_revisions,event_ledger_entries,broker_recovery_batches to varda_tenant_app;`);
     await db.exec(readFileSync(new URL('../drizzle/0066_account_history_reviews.sql',import.meta.url),'utf8').replaceAll('--> statement-breakpoint',''));
     await db.query('insert into accounts values($1,$2,true),($3,$4,true)',[account,owner,second,other]);
@@ -34,6 +37,23 @@ test('reviewed history stays in one account, replays the latest review, stops at
     await assert.rejects(db.query('select evidence from account_history_reviews'),e=>e.code==='42501');
     await assert.rejects(db.query(put,[owner,account,'d'.repeat(64),JSON.stringify(points),required]),e=>e.code==='42501');
     await db.exec('reset role');
+    const close = `insert into daily_portfolio_snapshots values($1,$2,$3,'varda_manual_daily_snapshot',false,
+      'broker_account_review_close_v1',jsonb_build_object('reviewEvidenceHash',$4::text,
+        'segment','2026-09-12','returnPct',$6::int,'dailyReturnPct',$7::int,'reviewEstimated',$8::boolean),$5)`;
+    for (const [index,point] of points.entries()) {
+      assert.equal((await get(owner)).materialized,undefined);
+      await db.query(close,[owner,account,point.date,'a'.repeat(64),100+index,point.returnPct,point.dailyReturnPct,point.estimated]);
+    }
+    assert.equal((await get(owner)).materialized,true);
+    await db.exec('begin');
+    try {
+      await db.query("update daily_portfolio_snapshots set total_market_value=111, closing_performance=closing_performance || jsonb_build_object('returnPct',11) where snapshot_date=$1",[days[2]]);
+      const stored = (await get(owner)).points.at(-1);
+      assert.equal(stored.valueKrw,111);
+      assert.equal(stored.returnPct,11);
+    } finally { await db.exec('rollback'); }
+    await db.query('update daily_portfolio_snapshots set closing_performance=null where snapshot_date=$1',[days[2]]);
+    assert.equal((await get(owner)).materialized,undefined);
     // A later trade strictly after the range preserves the full result.
     await db.query("insert into native_ledger_revisions values($1,$2,null,'2026-09-20T11:00Z',4)",[account,owner]);
     assert.equal((await get(owner)).points.length,3);

@@ -158,8 +158,10 @@ export function HistoryChart({
   const selectedIndex = matchedIndex >= 0 ? matchedIndex : latestIndex;
   const selectedRow = rows[selectedIndex];
   const selectedMoney = metric === "value" ? displayReadMoney(view, selectedRow.valueKrw, currency) : "—";
+  const formatReturn = (amount: number, index: number) =>
+    (data?.points[index]?.estimatedFx || data?.points[index]?.reviewEstimated ? "≈ " : "") + amount.toFixed(2) + "%";
   const selectedValue = metric === "return"
-    ? selectedRow.exampleReturnPct == null ? "—" : (data?.points[selectedIndex].estimatedFx ? "≈ " : "") + selectedRow.exampleReturnPct.toFixed(2) + "%"
+    ? selectedRow.exampleReturnPct == null ? "—" : formatReturn(selectedRow.exampleReturnPct, selectedIndex)
     : selectedMoney === "—" ? "—" : selectedMoney + (currency === "KRW" ? "원" : " USD");
   const first = values[0], last = values[latestIndex] ?? null;
   const selectedLiveAsOf = selectedRow.liveAsOf ?? data?.points[selectedIndex].liveAsOf;
@@ -174,7 +176,7 @@ export function HistoryChart({
   const latestMoney = metric === "value" ? displayReadMoney(view, last, currency) : "—";
   const latestValue = metric === "value"
     ? latestMoney === "—" ? "자료 없음" : latestMoney + (currency === "KRW" ? "원" : " USD")
-    : last === null ? "자료 없음" : (data?.points[latestIndex].estimatedFx ? "≈ " : "") + last.toFixed(2) + "%";
+    : last === null ? "자료 없음" : formatReturn(last, latestIndex);
   const periodLabel = data ? "최근 확인 구간 수익률" : metric === "value"
     ? periodRate === null ? "최근 평가액" : "평가액 변동"
     : periodRate === null ? "최근 수익률" : "수익률 변화";

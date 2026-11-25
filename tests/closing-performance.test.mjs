@@ -80,6 +80,21 @@ test("daily worker stores a closed return, repairs the next link, and rejects a 
     assert.equal(healed.previousSnapshotId,second);
     assert.ok(Math.abs(healed.dailyReturnPct - 10) < 1e-8);
     assert.equal(await worker.claimSnapshotWork("legacy","2026-10-07"),null);
+
+    // Once a reviewed close is installed under the real portfolio key, a
+    // retry keeps its evidence. New daily jobs compound the saved opening.
+    const audited = {version:1,date:"2026-10-04",basis:"invested_assets_excluding_cash",currency:"KRW",
+      returnPct:20,dailyReturnPct:null,segment:"2026-02-02",reviewEstimated:true,reviewEvidenceHash:"d".repeat(64),
+      excludedLabels:[],excludedTickers:[],reviewedTrades:[]};
+    await pg.query("update daily_portfolio_snapshots set rule_version='broker_account_review_close_v1', closing_performance=$2 where id=$1",[first,JSON.stringify(audited)]);
+    assert.equal(await worker.finishValuedSnapshot(await claim("2026-10-05")),true);
+    assert.deepEqual((await load(first)).closing_performance,audited);
+    await pg.query("update daily_snapshot_work set status='pending',next_attempt_at=null,reason=null where account_id=$1 and snapshot_date='2026-10-06'",[account]);
+    assert.equal(await worker.finishValuedSnapshot(await claim("2026-10-06")),true);
+    const corrected=(await load(second)).closing_performance;
+    assert.ok(Math.abs(corrected.returnPct-32)<1e-8);
+    assert.ok(Math.abs(corrected.dailyReturnPct-10)<1e-8);
+    assert.equal(corrected.segment,audited.segment);
   } finally {
     await pg.close();
   }

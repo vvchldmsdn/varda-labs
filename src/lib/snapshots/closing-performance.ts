@@ -29,5 +29,6 @@ export async function readClosingPerformance(work: SnapshotWork) {
   return { snapshotId, value: {
     version: 1, date: range.end, basis: result.basis, currency: result.currency, revision: work.revision,
     previousSnapshotId, dailyReturnPct, reason, closingFx: result.includesClosingFx, carriedMarks: result.includesCarriedMarks,
+    ...(point.canonicalClose && { returnPct: point.returnPct, segment: point.segment, reviewEstimated:point.reviewEstimated }),
   } };
 }

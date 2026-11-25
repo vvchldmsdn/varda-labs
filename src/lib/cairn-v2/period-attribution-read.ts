@@ -12,21 +12,30 @@ import { toNumber } from "../portfolio-math";
 import type { TenantContext } from "../session-resolver-contract";
 import { SNAPSHOT_FX_REFERENCE_MAX_AGE_MS } from "../snapshots/cutoff-fx";
 import { resolveSnapshotCycle } from "../snapshots/market-calendar";
-import { reviewedAttributionPosition, reviewedAttributionTrade } from "./reviewed-history-positions";
+import { projectReviewedHistoryTrades, reviewedAttributionPosition, reviewedAttributionTrade } from "./reviewed-history-positions";
+import { canonicalBasketIncludes, parseCanonicalClose } from "./canonical-close";
 import { withinReviewedValuationDates } from "./reviewed-history-series";
 import { cutoffDateForValuation, valuationDateForCutoff } from "./history-date";
 import {
   buildPeriodAttribution, type AttributionAccountObservation, type AttributionPosition, type AttributionTrade,
   type PeriodAttributionRange,
 } from "./period-attribution";
-import { ATTRIBUTION_ACCOUNTS_SQL, ATTRIBUTION_ENDS_SQL, ATTRIBUTION_TRADES_SQL,
+import { ATTRIBUTION_ACCOUNTS_SQL, ATTRIBUTION_ENDS_SQL, ATTRIBUTION_TRADES_SQL, CANONICAL_CLOSE_SCOPE_SQL,
   PERFORMANCE_ACCOUNTS_SQL, PERFORMANCE_CASH_SQL, PERFORMANCE_ENDS_SQL, PERFORMANCE_LIVE_SCOPE_SQL, PERFORMANCE_TRADES_SQL } from "./period-attribution-sql";
-import { buildPeriodPerformance, joinRecoveredPerformance, type PerformanceFlow, type PerformanceObservation } from "./period-performance";
+import { buildPeriodPerformance, joinRecoveredPerformance, MAX_PERFORMANCE_DAYS, type PeriodPerformance, type PerformanceFlow, type PerformanceObservation } from "./period-performance";
 import { performanceLiveFrame } from "./period-performance-live";
 import { readPerformanceMarks } from "./period-performance-market-read";
 
 type Row = Readonly<Record<string, unknown>>;
 const text = (value: unknown) => typeof value === "string" ? value : null;
+
+function filterClosingBasket<T extends AttributionAccountObservation>(row: T, includes?: ReturnType<typeof canonicalBasketIncludes>): T {
+  if (!includes) return row;
+  // Filtering must not make an incomplete original mark appear complete.
+  const positions = row.positions.filter(includes);
+  return { ...row, positions, expectedPositions: row.positions.length === row.expectedPositions &&
+    row.positions.every(p => p.name?.trim() || p.ticker?.trim()) ? positions.length : null };
+}
 
 function nativePosition(row: TrackedNativePosition, at: string, fx: readonly FxEvidence[]): AttributionPosition {
   const obs = row.observation;
@@ -94,18 +103,36 @@ export async function readPeriodAttribution({ tenantContext, scope, range }: {
   const period = [account, range.start, range.end];
   // A previous valuation day is needed to calculate the first day's impact.
   // Its next-morning cutoff is the valuation range's start date.
-  const [accounts, ends, events, reviews] = await runTenantReadTransaction(tenantContext.ownerUserId, tx => [
+  const [accounts, ends, events, reviews, scopes] = await runTenantReadTransaction(tenantContext.ownerUserId, tx => [
     tx.query(ATTRIBUTION_ACCOUNTS_SQL, [account]),
     tx.query(ATTRIBUTION_ENDS_SQL, period),
     tx.query(ATTRIBUTION_TRADES_SQL, period),
-    ...(account ? [tx.query(ACCOUNT_HISTORY_ATTRIBUTION_SQL, [tenantContext.ownerUserId, account, range.start, cutoffDateForValuation(range.end)])] : []),
+    ...(account ? [tx.query(ACCOUNT_HISTORY_ATTRIBUTION_SQL, [tenantContext.ownerUserId, account, range.start, cutoffDateForValuation(range.end)]),
+      tx.query(CANONICAL_CLOSE_SCOPE_SQL,[account, range.end])] : []),
   ]);
   const review = account && projectAccountHistoryReview(reviews?.[0], "attribution");
-  const observations = ends.map(row => observation(row, tenantContext.ownerUserId));
-  const trades = events.map(trade);
+  const scopeReceipt = parseCanonicalClose(scopes?.[0]?.receipt, String(scopes?.[0]?.date));
+  const includes = scopeReceipt && (scopeReceipt.excludedLabels.length || scopeReceipt.excludedTickers.length)
+    ? canonicalBasketIncludes(scopeReceipt) : undefined;
+  const canonicalDays = new Set<string>();
+  const savedTrades: AttributionTrade[] = [];
+  const observations = ends.map(row => {
+    const obs = observation(row, tenantContext.ownerUserId);
+    const receipt = parseCanonicalClose(row.canonical_receipt, obs.date);
+    if (!receipt) return filterClosingBasket(obs, includes);
+    const raw = (row.canonical_receipt as Row).reviewedTrades;
+    const verified = projectReviewedHistoryTrades(raw);
+    const known = !!verified && Array.isArray(raw) && raw.every(r => typeof r?.assetId === "string" && r.assetId);
+    if (known) savedTrades.push(...verified.map((t,i) => ({ ...reviewedAttributionTrade(t,obs.date,obs.accountId),assetId:raw[i].assetId })));
+    canonicalDays.add(obs.accountId + "/" + obs.date);
+    return { ...obs, reviewed: { valueKrw: toNumber(row.close_value), estimated: receipt.reviewEstimated, tradesKnown: known, materialized: true as const } };
+  });
+  const trades = [...events.map(trade).filter(row => !canonicalDays.has(row.accountId + "/" + row.date) && (!includes || includes(row))), ...savedTrades];
   if (review && accounts.some(row => row.id === account)) {
-    const matches = (row: {accountId: string; date: string}) => row.accountId === account && withinReviewedValuationDates(review, row.date);
-    const reviewedObservations = review.points.map(point => ({
+    const matches = (row: {accountId: string; date: string}) => row.accountId === account &&
+      withinReviewedValuationDates(review, row.date) && !canonicalDays.has(row.accountId + "/" + row.date);
+    const overlay = review.points.filter(p => !canonicalDays.has(account + "/" + valuationDateForCutoff(p.date)));
+    const reviewedObservations = overlay.map(point => ({
       date: valuationDateForCutoff(point.date), accountId: account, expectedPositions: point.positions?.length ?? null,
       positions: point.positions?.map(reviewedAttributionPosition) ?? [],
       reviewed: { valueKrw: point.valueKrw, estimated: point.estimated, tradesKnown: !!point.trades },
@@ -114,7 +141,7 @@ export async function readPeriodAttribution({ tenantContext, scope, range }: {
       accounts: accounts.map(a => ({ id: String(a.id), name: String(a.name) })),
       observations: [...observations.filter(row => !matches(row)), ...reviewedObservations],
       trades: [...trades.filter(row => !matches(row)),
-        ...review.points.flatMap(point => (point.trades ?? []).map(row => reviewedAttributionTrade(row, valuationDateForCutoff(point.date), account)))],
+        ...overlay.flatMap(point => (point.trades ?? []).map(row => reviewedAttributionTrade(row, valuationDateForCutoff(point.date), account)))],
     });
   }
   return buildPeriodAttribution(range, {
@@ -186,10 +213,15 @@ function performanceFlows(rows: readonly Row[], ends: readonly Row[], accounts: 
   return flows;
 }
 
-export async function readPeriodPerformance({ tenantContext, scope, range, now = new Date(), includeLive = true, onClosedEvidence }: {
+type PerformanceReadRequest = {
   tenantContext: TenantContext; scope: PortfolioAnalysisScope; range: PeriodAttributionRange;
   now?: Date; includeLive?: boolean; onClosedEvidence?: (rows: readonly {date: string; snapshotId: string}[]) => void;
-}) {
+};
+export async function readPeriodPerformance(request: PerformanceReadRequest) {
+  return performanceRange(request, true);
+}
+async function performanceRange({ tenantContext, scope, range, now = new Date(), includeLive = true, onClosedEvidence }: PerformanceReadRequest,
+  canExpand: boolean): Promise<PeriodPerformance> {
   if (scope.kind === "portfolio_group") throw new Error("period_performance_group_unsupported");
   const account = scope.kind === "account" ? scope.accountId : null;
   const params = [account, range.start, range.end];
@@ -202,12 +234,27 @@ export async function readPeriodPerformance({ tenantContext, scope, range, now =
     tx.query(PERFORMANCE_TRADES_SQL, params), tx.query(PERFORMANCE_CASH_SQL, params),
     ...(open ? [tx.query(PERFORMANCE_LIVE_SCOPE_SQL, [account])] : []),
     ...(readRecovery ? [tx.query(ownedRecoveredReturnSql(true), [tenantContext.ownerUserId, account, range.start, range.end])] : []),
+    ...(account ? [tx.query(CANONICAL_CLOSE_SCOPE_SQL, [account, range.end])] : []),
   ]);
   const guards = open ? extra[0] : undefined;
   const recoveryRow = readRecovery ? extra[open ? 1 : 0]?.[0] : undefined;
-  const recovery = account ? recoveredCurveAtClose(recoveryRow, ends, account) : null;
+  const scopeRow = account ? extra.at(-1)?.[0] : undefined;
+  const receipt = parseCanonicalClose(scopeRow?.receipt, String(scopeRow?.date));
+  if (receipt && canExpand && receipt.date < range.start && Date.parse(range.end) - Date.parse(receipt.date) < MAX_PERFORMANCE_DAYS * 86_400_000) {
+    // The storage worker and a clipped chart both use the same corrected
+    // opening and all intervening closed links, even after several new closes.
+    const full = await performanceRange({ tenantContext, scope, range: {start:receipt.date,end:range.end}, now, includeLive, onClosedEvidence }, false);
+    return { ...full, range, points: full.points.filter(p => p.date >= range.start),
+      gaps: full.gaps.filter(g => g.end >= range.start).map(g => ({ ...g,start: g.start < range.start ? range.start : g.start })) };
+  }
+  const recovery = account && !receipt ? recoveredCurveAtClose(recoveryRow, ends, account) : null;
   onClosedEvidence?.(ends.flatMap(row => typeof row.snapshot_id === "string" ? [{ date: String(row.date), snapshotId: row.snapshot_id }] : []));
-  const observations = ends.map(row => performanceObservation(row, tenantContext.ownerUserId));
+  const includes = receipt && (receipt.excludedLabels.length || receipt.excludedTickers.length) ? canonicalBasketIncludes(receipt) : undefined;
+  const observations = ends.map(row => {
+    const obs = performanceObservation(row, tenantContext.ownerUserId);
+    const saved = account && parseCanonicalClose(row.canonical_receipt, obs.date);
+    return saved ? { ...obs, canonicalClose:saved, recoveryOpeningKrw:toNumber(row.close_value) } : filterClosingBasket(obs, includes);
+  });
   if (recovery) {
     const opening = observations.find(o => o.accountId === account && o.date === recovery.baseDate);
     if (opening && !opening.at) opening.recoveryOpeningKrw = recovery.points[0].valueKrw;
@@ -250,7 +297,7 @@ export async function readPeriodPerformance({ tenantContext, scope, range, now =
     const evidence = await readPerformanceMarks(tenantContext, scope, now, holdings, latest).catch(() => null);
     const live = evidence && performanceLiveFrame(evidence, tenantContext.ownerUserId, guards, holdings, serviceDay, now.toISOString());
     if (live) {
-      observations.push(...live.observations);
+      observations.push(...live.observations.map(row => filterClosingBasket(row, includes)));
       for (const observation of live.observations) {
         if (live.portfolioUsdKrw !== null) closeRates.set(observation.accountId + "/" + serviceDay, new Set([live.portfolioUsdKrw]));
         fxEnds.push({ account_id: observation.accountId, date: serviceDay, native_fx: live.fx });
@@ -270,6 +317,7 @@ export async function readPeriodPerformance({ tenantContext, scope, range, now =
       const date = previousClose && exact && Date.parse(String(row.executed_at)) <= previousClose.at ? previousClose.date : String(row.date);
       if (date < range.start || date > range.end || !byNow(row, exact ? row.executed_at : null)) return [];
       const leg = { ...trade(row), date };
+      if (includes && !includes(leg)) return [];
       const rates = closeRates.get(leg.accountId + "/" + leg.date);
       if (leg.currency !== "USD" || leg.flowKrw !== null || leg.fxRate !== null ||
           !leg.price || !leg.quantityDelta || rates?.size !== 1) return leg;

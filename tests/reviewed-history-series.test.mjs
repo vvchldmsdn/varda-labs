@@ -24,6 +24,16 @@ const original = dates.map(date => ({ snapshotDate:date, valuationDate:date, sto
 const history = { portfolioRows:original, observationPolicy:'production_observed_v1',
   selectedScope:scope, readStatus:'ready', accountHistoryReview:review };
 
+test('a materialized review reads the same saved closes and linked returns as the next market day', () => {
+  const saved = [{date:dates[0],source:'varda_manual_daily_snapshot',rowKind:'stored',valueKrw:111,valueSegment:'observations:0'},
+    {date:dates[2],source:'base44_import',rowKind:'stored',valueKrw:999,valueSegment:'observations:0'},
+    {date:dates[3],source:'varda_manual_daily_snapshot',rowKind:'stored',valueKrw:132,valueSegment:'observations:0'}];
+  const materialized = {...review,materialized:true};
+  assert.deepEqual(series.reviewedValues(saved,materialized),[saved[0],saved[2]]);
+  const performance = {points:[{date:dates[3],returnPct:15,dailyReturnPct:1,segment:dates[0]}]};
+  assert.equal(series.reviewedPerformance(performance,materialized),performance);
+});
+
 test('initial and full KRW account views prefer the review, disclose missing dates and preserve original receipts', () => {
   const {view} = contract.applyBetaHistory(base, history, 'KRW');
   const def = display.historySourceView(view).view;

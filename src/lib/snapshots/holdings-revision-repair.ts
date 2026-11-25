@@ -8,6 +8,9 @@ import { readNativeLedger } from "@/db/queries/native-portfolio-ledger";
 import { buildHoldingsRevisionSnapshot, buildHoldingsRevisionAggregate } from "./holdings-revision-rebuild";
 import { holdingsRevisionInvalidSql, holdingsRevisionValidSql } from "./holdings-revision-policy";
 import { snapshotFence } from "./write-context";
+import { CANONICAL_REVIEW_RULE } from "../cairn-v2/canonical-close";
+import { valuationDateForCutoff } from "../cairn-v2/history-date";
+import { ASSERT_DAILY_CLOSE_BASKET_SQL, readDailyCloseBaskets } from "./canonical-basket";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import type { NativePortfolioState } from "@/lib/native-portfolio-ledger";
 import { closeCalendarReferenceDateForAsset } from "./market-calendar";
@@ -28,6 +31,9 @@ export async function repairHoldingsSnapshotRevisions(tenant: TenantContext, sna
   let repaired = 0;
   for (const original of portfolios) {
     if (!original.accountId || original.account === "all") continue;
+    if (original.ruleVersion === CANONICAL_REVIEW_RULE) {
+      return { status: "blocked" as const, reason: "canonical_close_revision_requires_review" };
+    }
     const ledger = await readNativeLedger(tenant, original.accountId, { includeSnapshots: false });
     if (!ledger.accountsComplete || !ledger.entriesComplete) return { status: "blocked" as const, reason: "revision_ledger_incomplete" };
     const storedAccount = ledger.accounts.find(row => row.id === original.accountId);
@@ -40,8 +46,18 @@ export async function repairHoldingsSnapshotRevisions(tenant: TenantContext, sna
       return { status: "blocked" as const, reason: "revision_intraday_order_unknown" };
     }
     const inclusive = original.description?.includes("valuation_policy=execution_collection_v1") === true;
-    const state = events.filter(row => inclusive ? Date.parse(row.data.event.at) <= cutoff : Date.parse(row.data.event.at) < cutoff).at(-1)?.data.state;
+    let state = events.filter(row => inclusive ? Date.parse(row.data.event.at) <= cutoff : Date.parse(row.data.event.at) < cutoff).at(-1)?.data.state;
     if (!state) return { status: "blocked" as const, reason: "revision_opening_missing" };
+    const policyDay = valuationDateForCutoff(snapshotDate);
+    const policy = original.description?.includes("canonical_basket=verified")
+      ? (await readDailyCloseBaskets(tenant.ownerUserId,[original.accountId],policyDay)).get(original.accountId) : null;
+    if (original.description?.includes("canonical_basket=verified")) {
+      if (!policy?.accepts) return { status: "blocked" as const, reason: "canonical_close_scope_unavailable" };
+      const assetsById = new Map(storedAccount.assets.map(asset => [asset.id,asset]));
+      if (state.positions.some(position => !assetsById.has(position.assetId))) return { status:"blocked" as const, reason:"revision_snapshot_identity_missing" };
+      const accepts = policy.accepts;
+      state = { ...state, positions: state.positions.filter(position => accepts(assetsById.get(position.assetId)!)) };
+    }
     const positions = await db.select({ ...getTableColumns(dailyPositionSnapshots),
       originalToken: sql<string>`md5(to_jsonb(${dailyPositionSnapshots})::text)`,
     }).from(dailyPositionSnapshots).where(and(
@@ -72,6 +88,8 @@ export async function repairHoldingsSnapshotRevisions(tenant: TenantContext, sna
       tx.query("select set_config('lock_timeout','2s',true),set_config('app.trade_reliability_version','0059',true)"),
       tx.query("set local statement_timeout='15s'"),
       tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`varda.portfolio_mutation.v1:${tenant.ownerUserId}`]),
+      ...(policy ? [tx.query("select set_config('app.current_user_id',$1,true)",[tenant.ownerUserId]),
+        tx.query(ASSERT_DAILY_CLOSE_BASKET_SQL,[original.accountId,policyDay,JSON.stringify(policy.proof)])] : []),
       ...(fence ? [tx.query("select assert_daily_snapshot_fence($1::uuid,$2)", [fence.id,fence.generation])] : []),
       // Compare the full read rows and latest ledger revision under the same
       // owner lock as a trade. Failed or superseded attempts roll back together.

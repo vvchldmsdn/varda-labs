@@ -2,10 +2,11 @@ import { calculateUnitModifiedDietz } from "../investment-lab-modified-dietz.ts"
 import { resolveKrwFxRate } from "../portfolio-math.ts";
 import type { RecoveredReturnCurve } from "../period-return-recovery.ts";
 import type { AttributionAccountObservation, AttributionPosition, AttributionTrade, PeriodAttributionRange } from "./period-attribution.ts";
+import type { CanonicalClose } from "./canonical-close.ts";
 
 export type PerformanceBasis = "invested_assets_excluding_cash" | "portfolio_including_cash" | "mixed";
 export type PerformanceGapReason = "valuation" | "trade" | "cash_flow" | "capital" | "scope";
-export type PerformancePoint = { date: string; returnPct: number | null; dailyReturnPct: number | null; segment: string | null; estimatedFx?: boolean; liveAsOf?: string; recovered?: true; accountReview?: true; reviewEstimated?: boolean };
+export type PerformancePoint = { date: string; returnPct: number | null; dailyReturnPct: number | null; segment: string | null; estimatedFx?: boolean; liveAsOf?: string; recovered?: true; accountReview?: true; reviewEstimated?: boolean; canonicalClose?: true };
 export type PeriodPerformance = {
   range: PeriodAttributionRange; basis: PerformanceBasis; currency: "KRW"; includesCarriedMarks: boolean; includesClosingFx: boolean;
   points: PerformancePoint[]; gaps: { start: string; end: string; reason: PerformanceGapReason }[];
@@ -14,7 +15,7 @@ export const MAX_PERFORMANCE_DAYS = 3660;
 
 type Position = AttributionPosition & { carriedMark?: boolean };
 export type PerformanceObservation = Omit<AttributionAccountObservation, "positions"> & {
-  source: string; at?: string; liveAsOf?: string; positions: Position[]; recoveryOpeningKrw?: number | null;
+  source: string; at?: string; liveAsOf?: string; positions: Position[]; recoveryOpeningKrw?: number | null; canonicalClose?: CanonicalClose;
 };
 export type PerformanceFlow = { date: string; accountId: string; at: string; amountKrw: number | null };
 type Evidence = {
@@ -211,11 +212,30 @@ export function buildPeriodPerformance(range: PeriodAttributionRange, evidence: 
     else result.gaps.push({ start: date, end: date, reason });
   }
   let segment: string | null = null, growth = 1, estimatedFx = false;
+  let canonical: CanonicalClose | undefined;
+  const saved = new Map(evidence.observations.flatMap(row =>
+    basis === "invested_assets_excluding_cash" && evidence.accounts.length === 1 &&
+    row.accountId === evidence.accounts[0].id && row.canonicalClose ? [[row.date,row.canonicalClose] as const] : []));
   let previous: PerformancePoint | null = null;
   for (let date = range.start; date <= range.end; date = dateAfter(date, 1)) {
     const point: PerformancePoint = { date, returnPct: null, dailyReturnPct: null, segment: null };
     result.points.push(point);
     const endpoints = evidence.accounts.map(a => frames.get(key(a.id, date)));
+    const receipt = saved.get(date);
+    if (receipt) {
+      point.canonicalClose = true;
+      point.returnPct = receipt.returnPct; point.dailyReturnPct = receipt.dailyReturnPct; point.segment = receipt.segment;
+      point.reviewEstimated = receipt.reviewEstimated;
+      canonical = receipt;
+      segment = receipt.returnPct !== null && receipt.returnPct > -100 ? receipt.segment : null;
+      growth = receipt.returnPct === null ? 1 : 1 + receipt.returnPct / 100;
+      estimatedFx = false;
+      if (receipt.returnPct === null || receipt.dailyReturnPct === null && segment !== date) gap(date,"trade");
+      // Stored performance may be known even without a complete position
+      // frame. The subsequent link independently needs the actual opening.
+      previous = point;
+      continue;
+    }
     if (basis === "mixed" || endpoints.some(f => !f)) {
       gap(date, basis === "mixed" ? "scope" : "valuation");
       // Missing calendar observations are not fabricated; the next measured close may still establish
@@ -232,7 +252,7 @@ export function buildPeriodPerformance(range: PeriodAttributionRange, evidence: 
     const interval = link(previous.date, date);
     if (typeof interval === "string") { gap(date, interval); segment = null; previous = point; continue; }
     if (!segment) {
-      segment = previous.date; growth = 1; estimatedFx = false;
+      segment = previous.date; growth = 1; estimatedFx = false; canonical = undefined;
       // A confirmed ending valuation can anchor the next day's gain even
       // when the gain leading to that valuation was unprovable.
       if (previous.returnPct === null && !unavailable.has(previous.date)) { previous.segment = segment; previous.returnPct = 0; }
@@ -241,6 +261,7 @@ export function buildPeriodPerformance(range: PeriodAttributionRange, evidence: 
     growth *= 1 + interval.change;
     if (!Number.isFinite(growth)) { gap(date, "capital"); segment = null; previous = point; continue; }
     point.segment = segment;
+    if (canonical) { point.canonicalClose = true; point.reviewEstimated = canonical.reviewEstimated; }
     if (estimatedFx) point.estimatedFx = true;
     point.dailyReturnPct = dateAfter(previous.date, 1) === date ? interval.change * 100 : null;
     point.returnPct = (growth - 1) * 100;

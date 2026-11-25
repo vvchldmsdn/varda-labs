@@ -19,7 +19,7 @@ async function setup(pg) {
     create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);
     create table recovered_close_valuations(canonical_owner_user_id uuid,account_id uuid,revision int,valuation_date date,value_krw numeric);
     create table daily_portfolio_snapshots(id uuid default gen_random_uuid(),canonical_owner_user_id uuid,account_id uuid,account text,source text,snapshot_date date,
-      cycle_end_at timestamptz,captured_at timestamptz,created_at timestamptz default now(),updated_at timestamptz,description text,is_sample boolean default false,num_assets int,native_evidence jsonb,usdkrw numeric);
+      cycle_end_at timestamptz,captured_at timestamptz,created_at timestamptz default now(),updated_at timestamptz,description text,is_sample boolean default false,num_assets int,native_evidence jsonb,usdkrw numeric,rule_version text,closing_performance jsonb,total_market_value numeric);
     create table daily_position_snapshots(id uuid default gen_random_uuid(),canonical_owner_user_id uuid,account_id uuid,account text,source text,snapshot_date date,
       cycle_end_at timestamptz,captured_at timestamptz,created_at timestamptz default now(),updated_at timestamptz,description text,is_sample boolean default false,
       asset_id uuid,legacy_asset_id text,asset_name text,ticker text,market text,currency text,quantity numeric,total_quantity numeric,estimated_fractional_quantity numeric,
@@ -56,6 +56,49 @@ function reader(pg, metric="attribution", readPerformanceMarks = async () => { t
   }).then(([module]) => (who, selected, r=range, options={}) => (metric==="return" ? module.readPeriodPerformance : module.readPeriodAttribution)({tenantContext:{ownerUserId:who},
     scope:selected ? {kind:"account",accountId:selected} : {kind:"all"},range:r,...options}));
 }
+
+test("stored corrected closes supply inception returns, post-close trades and a consistent shorter window", async () => {
+  const pg = new PGlite();
+  try {
+    await setup(pg);
+    const mark = async (cutoff,quantity,price,receipt=null) => {
+      const value = quantity*price;
+      await pg.query(`insert into daily_portfolio_snapshots(canonical_owner_user_id,account_id,account,snapshot_date,source,
+        cycle_end_at,num_assets,total_market_value,description,closing_performance,rule_version)
+        values ($1,$2,'acct',$3,'varda_manual_daily_snapshot',($3::date+time '07:00') at time zone 'Asia/Seoul',
+        1,$4,'snapshot_status=complete',$5,$6)`,
+        [owner,account,cutoff,value,receipt && JSON.stringify(receipt),receipt ? "broker_account_review_close_v1" : null]);
+      await pg.query(`insert into daily_position_snapshots(canonical_owner_user_id,account_id,account,asset_id,snapshot_date,source,
+        asset_name,ticker,market,currency,quantity,unit_price,fx_rate,market_value_krw)
+        values ($1,$2,'acct',$3,$4,'varda_manual_daily_snapshot','Held ETF','IN','us','USD',$5,$6,1,$7)`,
+        [owner,account,held,cutoff,quantity,price,value]);
+    };
+    const approved = {version:1,date:"2026-11-23",basis:"invested_assets_excluding_cash",currency:"KRW",dailyReturnPct:3.5,
+      returnPct:14,segment:"2025-11-24",reviewEstimated:true,reviewEvidenceHash:"b".repeat(64),excludedLabels:["Excluded"],excludedTickers:["OUT"],reviewedTrades:[]};
+    await mark("2026-11-24",10,100,approved);
+    await mark("2026-11-25",10,105);
+    await mark("2026-11-26",11,110);
+    await pg.query(`insert into event_ledger_entries(canonical_owner_user_id,account_id,asset_id,event_type,event_date,asset_name,ticker,quantity_delta,amount_krw,price,fx_rate)
+      values ($1,$2,$3,'buy','2026-11-25','Held ETF','IN',1,110,110,1),($1,$2,$4,'buy','2026-11-24','Excluded','OUT',1,500,500,1)`,
+      [owner,account,held,sold]);
+    const read = await reader(pg,"return");
+    const all = await read(owner,account,{start:"2026-11-22",end:"2026-11-25"},{includeLive:false});
+    const [base,next,last] = all.points.slice(1);
+    assert.equal(base.returnPct,14); assert.equal(base.dailyReturnPct,3.5);
+    assert.equal(base.canonicalClose,true); assert.equal(next.segment,approved.segment);
+    assert.ok(Math.abs(next.dailyReturnPct-5)<1e-10);
+    assert.ok(Math.abs(next.returnPct-19.7)<1e-10);
+    assert.ok(last.dailyReturnPct > 0 && last.dailyReturnPct < 5 && last.reviewEstimated);
+    const short=await read(owner,account,{start:"2026-11-25",end:"2026-11-25"},{includeLive:false});
+    assert.deepEqual(short.points,[last]);
+    const impact=await (await reader(pg))(owner,account,{start:"2026-11-24",end:"2026-11-24"});
+    assert.equal(impact.days[0].closingValueKrw,1050);
+    assert.equal(impact.days[0].priceKrw,50);
+    await pg.query(`update daily_position_snapshots set quantity=quantity+1 where account_id=$1 and snapshot_date='2026-11-25'`,[account]);
+    const broken=await read(owner,account,{start:"2026-11-23",end:"2026-11-24"},{includeLive:false});
+    assert.equal(broken.points.at(-1).returnPct,null);
+  } finally { await pg.close() }
+});
 
 test("attribution follows the same owned reviewed points, with a gap if detailed evidence is absent", async () => {
   const pg = new PGlite();

@@ -2,6 +2,7 @@ import "server-only";
 import { MANUAL_ASSET_PRICE_POLICY } from "../market-data/manual-asset-price";
 import { holdingsPortfolioSql } from "../portfolio-presentation-policy";
 import { brokerRecoverySnapshotPredicateText } from "./history-read-sql";
+import { CANONICAL_REVIEW_RULE } from "./canonical-close";
 
 // All values are bound parameters. The caller sets this transaction-local owner using the existing tenant port.
 const ownedActiveAccount = `a.is_active and a.canonical_owner_user_id=nullif(current_setting('app.current_user_id',true),'')::uuid
@@ -12,6 +13,17 @@ const ownedAccounts = `select a.id,a.name,a.code,a.canonical_owner_user_id
 export const ATTRIBUTION_ACCOUNTS_SQL = ownedAccounts + " order by a.sort_order,a.code";
 export const PERFORMANCE_ACCOUNTS_SQL = `select a.id,${holdingsPortfolioSql("a")} as holdings
   from public.accounts a where ${ownedActiveAccount} order by a.id`;
+
+// Latest materialized closing scope on or before the requested valuation day.
+// Optional single-account callers bind [account UUID, valuation day].
+export const CANONICAL_CLOSE_SCOPE_SQL = `select (snapshot.snapshot_date-1)::text as date,
+  snapshot.closing_performance as receipt
+  from public.daily_portfolio_snapshots snapshot join public.accounts a
+    on snapshot.account_id=a.id and snapshot.canonical_owner_user_id=a.canonical_owner_user_id and snapshot.account=a.code
+  where ${ownedActiveAccount} and a.id=$1::uuid and ${holdingsPortfolioSql("a")}
+    and snapshot.source='varda_manual_daily_snapshot' and snapshot.rule_version='${CANONICAL_REVIEW_RULE}'
+    and not snapshot.is_sample and snapshot.snapshot_date<=$2::date+1 and ${brokerRecoverySnapshotPredicateText("snapshot")}
+  order by snapshot.snapshot_date desc limit 1`;
 
 // Bind current marks back to the account, quantity and journal sequence observed
 // alongside history. A trade committed between the two reads cannot become P&L.
@@ -58,7 +70,7 @@ with owned as (
 ), candidates as (
   select snapshot.id,snapshot.account_id,snapshot.account,snapshot.canonical_owner_user_id,
     snapshot.snapshot_date,snapshot.source,snapshot.native_evidence,snapshot.captured_at,snapshot.created_at,snapshot.cycle_end_at,
-    snapshot.description,snapshot.num_assets,
+    snapshot.description,snapshot.num_assets,snapshot.rule_version,snapshot.closing_performance,snapshot.total_market_value,
     ${performance ? "snapshot.usdkrw," : ""}case
     when snapshot.native_evidence is not null then
       (((snapshot.native_evidence->'frame'->>'at')::timestamptz at time zone 'Asia/Seoul')::date-1)
@@ -84,12 +96,15 @@ with owned as (
 ), picked as (
   select distinct on (account_id,valued_on) * from candidates
   where valued_on between $2::date-1 and $3::date
-  order by account_id,valued_on,coalesce((native_evidence->>'revision')::int,0) desc,
+  order by account_id,valued_on,case when source='varda_manual_daily_snapshot' and rule_version='${CANONICAL_REVIEW_RULE}' then 0 else 1 end,
+    coalesce((native_evidence->>'revision')::int,0) desc,
     coalesce(captured_at,created_at) desc nulls last,created_at desc,
     case when source='varda_manual_daily_snapshot' then 0 when source='base44_import' then 1 else 2 end,
     source,id
 )${performance ? recoveryOpeningsSql : ""}
 select c.account_id::text as account_id,c.valued_on::text as date,c.source,
+  case when c.source='varda_manual_daily_snapshot' and c.rule_version='${CANONICAL_REVIEW_RULE}' then c.closing_performance end as canonical_receipt,
+  c.total_market_value::text as close_value,
   ${performance ? `c.id::text as snapshot_id,c.captured_at::text as captured_at,opening.value_krw as recovery_opening_krw,
     case when c.source='varda_manual_daily_snapshot' and c.description ~ '(^|; *)valuation_policy=execution_collection_v1(;|$)'
       then c.cycle_end_at::text end as execution_end_at,` : ""}
@@ -108,11 +123,11 @@ select c.account_id::text as account_id,c.valued_on::text as date,c.source,
   ) else (
     select jsonb_agg(jsonb_build_object('assetId',coalesce(snapshot.asset_id,legacy.id),'currency',snapshot.currency,'quantity',
           coalesce(snapshot.quantity,case when coalesce(snapshot.estimated_fractional_quantity,0)=0 then snapshot.total_quantity end),
+        'name',snapshot.asset_name,'ticker',snapshot.ticker,'market',snapshot.market,
         ${performance ? `'fxRate',snapshot.fx_rate,'carriedMark', coalesce(snapshot.description like '%manual_carry_snapshot=%' or
            snapshot.price_basis='preserved_stored_manual_carry'
            or (snapshot.price_basis='manual_current' and not coalesce((${observedManualUnitSql}),false)), false),` :
-        `'name',snapshot.asset_name,'ticker',snapshot.ticker,'market',snapshot.market,
-        'price',case when snapshot.price_basis='manual_current' then
+        `'price',case when snapshot.price_basis='manual_current' then
           case when ${observedManualUnitSql}
             then snapshot.unit_price end
           when snapshot.price_basis in ('confirmed_manual_total','preserved_stored_manual_carry','preserved_manual_observation') or snapshot.price_source='user_confirmed_total_valuation' then null
@@ -164,7 +179,7 @@ with owned as (${ownedAccounts}), events as (
       (((e.broker_recovery_data->>'executedAt')::timestamptz at time zone 'Asia/Seoul')-interval '7 hours')::date
       else e.event_date end as valued_on,
     e.event_type,coalesce(e.asset_id,h.id) as asset_id,e.quantity_delta,e.price,e.fx_rate,e.amount_krw,
-    e.asset_name as name,e.ticker,h.market,h.currency,
+    coalesce(e.asset_name,h.name) as name,coalesce(e.ticker,h.ticker) as ticker,h.market,h.currency,
     e.broker_recovery_data->'executionGross' as gross,e.broker_recovery_data->>'executedAt' as executed_at,
     e.corrects_event_id is not null or e.legacy_corrects_event_id is not null or exists (
       select 1 from public.event_ledger_entries correction where correction.account_id=a.id
