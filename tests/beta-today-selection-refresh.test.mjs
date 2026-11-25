@@ -26,6 +26,7 @@ it('shows broker equivalents once and keeps unpriced sales separate from a verif
   assert.match(markup({...summary,total:'0',valued:2,missingCostSales:0,scopeComplete:true}, 'USD'),/거래 원장 계산분<\/h4><strong><span[^>]*>0\.00 USD/);
   const partial = markup({...summary,verifiedSubtotal:'20',valued:1,missingCostSales:1}, 'KRW');
   assert.match(partial,/\+20원/); assert.match(partial,/확인분 소계/);
+  assert.match(markup({...summary,sales:0,missingCostSales:0}, 'KRW'),/원장 매도 내역 확인 필요/);
 });
 
 it('includes an unchanged dated manual mark in the verified account value while preserving the quoted subset', () => {

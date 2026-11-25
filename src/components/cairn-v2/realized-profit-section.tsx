@@ -7,7 +7,6 @@ import { startBoundedRead } from "@/lib/cairn-v2/bounded-read";
 import { HISTORY_BINDING_HEADER } from "@/lib/cairn-v2/home-history-read";
 import type { BetaCurrency } from "@/lib/cairn-v2/navigation";
 import type { BetaRealizedProfit } from "@/lib/cairn-v2/realized-profit";
-import { formatNumber } from "./ui/format";
 import { SectionHeading } from "./ui/molecules";
 import styles from "./realized-profit-section.module.css";
 
@@ -15,12 +14,14 @@ type BrokerStatement = NonNullable<BetaRealizedProfit["broker"]>[number];
 type LoadResult = { data: BetaRealizedProfit } | { error: "session" | "read" };
 
 function SignedMoney({ amount, currency }: { amount: string | null; currency: BetaCurrency }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   if (amount === null) return <>—</>;
   const number = Number(amount);
   const digits = currency === "KRW" ? 0 : 2;
+  const formatted = new Intl.NumberFormat(locale, { signDisplay: "exceptZero", minimumFractionDigits: digits, maximumFractionDigits: digits })
+    .format(amount as Intl.StringNumericLiteral);
   return <span data-tone={number > 0 ? "positive" : number < 0 ? "negative" : "neutral"}>
-    {formatNumber(number, { signDisplay: "exceptZero", minimumFractionDigits: digits, maximumFractionDigits: digits })}
+    {formatted}
     {currency === "KRW" ? t("원", " KRW") : " USD"}
   </span>;
 }
@@ -61,7 +62,7 @@ export function RealizedProfitResult({ data, currency }: { data: BetaRealizedPro
         <strong>{ledgerValue == null ? "—" : <SignedMoney amount={ledgerValue} currency={currency}/>}</strong></div>
       {ledger ? <p>{ledger.sales > 0
           ? t(`등록 매도 ${ledger.sales}건 중 ${ledger.valued}건 계산`, `${ledger.valued} of ${ledger.sales} recorded sales valued`)
-          : t("등록된 매도 0건", "No recorded sales")}
+          : ledger.scopeComplete ? t("등록된 매도 0건", "No recorded sales") : t("원장 매도 내역 확인 필요", "Sale history needs verification")}
         {ledger.missingCostSales > 0 && " · " + t(`취득원가 미확인 ${ledger.missingCostSales}건`, `Acquisition cost missing for ${ledger.missingCostSales}`)}
         {ledger.valued > 0 && ledger.total === null && " · " + t("확인분 소계", "Verified subtotal")}
         {ledger.sales > 0 && !ledger.missingCostSales && ledger.valued < ledger.sales && " · " + t("체결·원가·환율 근거 확인 필요", "Trade, cost or FX evidence needed")}
