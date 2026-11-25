@@ -24,6 +24,17 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
   const hasLocalPriceEvidence = excluded.some(row => row.localPurchases);
   const factors = reviewChange && !manualNames ? reviewedMovement : market;
   const showFactors = reviewChange && !manualNames ? !!reviewedMovement : market ? market.includedCount > 0 : !domain && view.rows.length > 0 && change !== null;
+  const notes: string[] = [];
+  if (reviewChange) {
+    notes.push("오전 7시 마감 평가액 대비");
+    if (manualNames) notes.push(`${manualNames} 수동 평가액 유지`);
+    else if (!reviewedMovement && !unavailable) notes.push("가격·환율 근거 확인 전");
+  } else if (market?.partial && rate != null) {
+    notes.push("시세 비교 종목 기준");
+  } else if (!domain) {
+    notes.push("예시 · 전일 대비");
+  }
+  if (currency === "USD" && rate != null) notes.push("변동률은 KRW 기준");
   return <div className={styles.body} data-available={!unavailable}>
     <div className={styles.headline}>
       {unavailable
@@ -40,7 +51,7 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
         <summary>{market.excludedCount}종목 제외</summary>
         {excluded.length ? <ul>{excluded.map((row,i) => <li key={i}>{row.assetName ?? row.ticker ?? "종목 확인 전"} · {movementExclusionLabel(row.reason)}</li>)}</ul> : <p>제외 사유 확인 전</p>}
       </details>}
-      {reviewChange ? <p className={styles.note}>오전 7시 마감 평가액 대비{manualNames ? ` · ${manualNames} 수동 평가액 유지` : !reviewedMovement && !unavailable ? " · 가격·환율 근거 확인 전" : ""}</p> : market?.partial && rate != null ? <p className={styles.note}>시세 비교 종목 기준 · KRW</p> : !domain ? <p className={styles.note}>예시 · 전일 대비</p> : currency === "USD" && rate != null && <p className={styles.note}>변동률은 KRW 기준</p>}
+      {notes.length > 0 && <p className={styles.note}>{notes.join(" · ")}</p>}
     </div>
   </div>;
 }
