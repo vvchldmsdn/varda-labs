@@ -79,7 +79,7 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
   </dl>}
   {factors && rows.length > 0 && <div className={styles.breakdown}>
     <MovementBreakdown view={view} currency={context.currency} priceChangeKrw={factors.priceChangeKrw} fxChangeKrw={factors.fxChangeKrw}
-      previousValueKrw={factors.previousValueKrw} quantityChangeKrw={reviewMovement?.quantityChangeKrw}/>
+      previousValueKrw={reviewChange?.previousValueKrw ?? factors.previousValueKrw} quantityChangeKrw={reviewMovement?.quantityChangeKrw}/>
   </div>}
   {reviewMovement && <p className={styles.notice}>가격과 환율의 영향은 마감과 현재에 공통으로 보유한 수량을 기준으로 계산합니다.</p>}
   {manualNames && <p className={styles.notice}>수동 평가액 유지 · {manualNames}. 시세 비교 {market?.includedCount}종목의 변동률은 {formatPercent(market?.returnPct ?? null,2,true)}입니다.</p>}
