@@ -21,6 +21,7 @@ async function fixture({ assets = [asset()], ledger = { accounts: [], entries: [
   };
   const history = async query => ({ status: "admitted", missingAt: [], conflictAt: [], queuedCount: 0, fx: query.requestedAt.map(at => ({ baseCurrency: "USD", quoteCurrency: "KRW", rate: "1300", requestedAt: at, observedAt: new Date(Date.parse(at) - 1000).toISOString(), fetchedAt: new Date(Date.parse(query.asOf) - 1000).toISOString(), source: "twelve_data", kind: "historical_spot" })) });
   const [loader] = await importWithPorts(["src/db/queries/currency-tracked-portfolio.ts"], {
+    "./native-recorded-sale-fx": { readRecordedSaleFx: async () => { throw new Error("unexpected_sale_fx"); } },
     "./portfolio-dashboard": { getReadOnlyTenantPortfolioDashboardSources: async input => { calls.tenant = input.tenantContext; return { assetRows: assets, settingsRows: [], liveQuoteRows: [], recentFxRows: [] }; } },
     "./native-portfolio-ledger": { readNativeLedger: async tenant => { calls.ledgerTenant = tenant; return ledger; } },
     "@/lib/market-data/twelve-data-service": {
