@@ -6,7 +6,7 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { ActionGroup, ActionContent } from "@/components/cairn-ui";
 import { History } from "lucide-react";
-import type { BetaView, BetaMovementRow } from "@/lib/cairn-v2/read-contract";
+import type { BetaView, BetaMovementRow, DomainRead } from "@/lib/cairn-v2/read-contract";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
 import { movementDisplay } from "@/lib/cairn-v2/read-display";
@@ -20,6 +20,7 @@ import { StatusPill } from "./ui/atoms";
 import { movementExclusionLabel } from "./movement-exclusion-label";
 import { MovementBreakdown } from "./movement-breakdown";
 import { TodayPurchaseBreakdown } from "./today-purchase-breakdown";
+import { RealizedProfitSection } from "./realized-profit-section";
 import { formatNumber, formatPercent } from "./ui/format";
 
 // Limited presentation port of original today-contribution-explorer.tsx:
@@ -30,7 +31,7 @@ const tone = (n: number | null) => n === null || !Number.isFinite(n) || n === 0 
 const sourceLabel = (source: string | null) => source === "reviewed_close" ? "복구 마감 평가" : source === "daily_position_snapshot" ? "저장된 보유 기록" : source === "asset_price_snapshot" ? "이전 종가" : source === "trade_execution" ? "당일 체결 기록" : source ? "비교 출처 확인 필요" : "비교 근거 없음";
 
 
-export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) {
+export function TodayDetail({view,context,read}:{view:BetaView;context:BetaContext;read?:Pick<DomainRead,"displayBinding"|"readReceipt">}) {
  const d=view.domain, movement=movementDisplay(view), freshness=useBetaReadFreshness();
  const readoutId=useId();
  const [selection,setSelection]=useState<{read:string;key:string}|null>(null);
@@ -118,6 +119,9 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
     </aside>}
    </div>
   </>:!localOnly.length&&<p className={styles.empty}>{reviewChange ? "복구 마감 평가액과 현재 평가액을 비교할 종목별 근거가 아직 없어요." : "비교할 종목별 기록이 아직 없어요."}</p>}
+  {context.mode==="domain" && read?.displayBinding && <RealizedProfitSection
+    key={JSON.stringify([context.scope,read.displayBinding,read.readReceipt])}
+    scope={context.scope} binding={read.displayBinding} currency={context.currency}/>}
   {market?.valuationChangeKrw !== null && market?.valuationChangeKrw !== undefined && <details className={styles.movementBridge}><summary>평가액 변화와 왜 다른가요?</summary>
     <dl><Metric label="저장 평가액 대비 변화" value={money(market.valuationChangeKrw,true)} unit={context.currency}/><Metric label={adjusted?"순매수 금액":"수량 변화 효과"} value={money(market.quantityChangeKrw,true)} unit={context.currency}/></dl>
     <p>{adjusted?"오늘의 변동은 비교한 종목의 평가액 변화에서 매수 원금을 빼고 매도 대금을 더한 값입니다. 수수료와 세금은 별도입니다.":"보유 수량이 바뀌면 평가액도 달라집니다."}</p>

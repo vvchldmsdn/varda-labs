@@ -245,6 +245,7 @@ export const HOLDINGS_SNAPSHOT_REPAIR_TABLE_POLICIES = Object.freeze([
 
 export const ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES = Object.freeze([
   userOwned("account_history_reviews", TRANSITIONAL_OWNER_COLUMN),
+  userOwned("account_realized_profit_reviews", TRANSITIONAL_OWNER_COLUMN),
 ]);
 
 export const SNAPSHOT_CUTOFF_TABLE_POLICIES = Object.freeze([
@@ -267,13 +268,14 @@ export const EXPANDED_TENANT_TABLE_POLICIES = Object.freeze([
 
 export function resolveTenantTablePolicies(publicTableNames) {
   const publicTableSet = new Set(publicTableNames);
-  if (publicTableSet.has("account_history_reviews")) {
+  const reviews = ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES.filter(({table}) => publicTableSet.has(table));
+  if (reviews.length) {
     if (!["accounts", ...IDENTITY_CORE_TABLE_POLICIES.map(({ table }) => table)].every(table => publicTableSet.has(table))) {
       throw new Error("account history reviews require identity and account ownership tables");
     }
     return Object.freeze([
-      ...resolveTenantTablePolicies(publicTableNames.filter(table => table !== "account_history_reviews")),
-      ...ACCOUNT_HISTORY_REVIEW_TABLE_POLICIES,
+      ...resolveTenantTablePolicies(publicTableNames.filter(table => !reviews.some(review => review.table === table))),
+      ...reviews,
     ]);
   }
   if (publicTableSet.has("holdings_snapshot_repair_archive")) {

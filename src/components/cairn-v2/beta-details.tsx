@@ -357,7 +357,7 @@ export function BetaDetail({
       ) : view.domain && kind === "drift" ? (
         <TargetDetail view={view} />
       ) : view.domain && (kind === "value" || kind === "today") ? (
-        <ReadSummary kind={kind} view={view} context={context} />
+        <ReadSummary kind={kind} view={view} context={context} read={historyRead} />
       ) : (
         <div className={styles.pendingDetail}>
           <h3>{view.domain ? "읽기 모델 미연결" : "개발용 미리보기"}</h3>

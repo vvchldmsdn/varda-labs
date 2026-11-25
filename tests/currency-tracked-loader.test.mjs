@@ -10,6 +10,7 @@ const sources = (extra={}) => ({assetRows:[asset()],accountRows:[],settingsRows:
 async function load(rows, options = {}) {
   let passed;
   const [query] = await importWithPorts(["src/db/queries/currency-tracked-portfolio.ts"], {
+    "./native-recorded-sale-fx": { readRecordedSaleFx: async () => { throw new Error("unexpected_sale_fx"); } },
     "./portfolio-dashboard": {getReadOnlyTenantPortfolioDashboardSources: async args=>{passed=args;return rows;}},
     "./native-portfolio-ledger": { readNativeLedger: async () => ({ accounts: [], entries: [], snapshots: [] }) },
     "@/lib/market-data/twelve-data-service": { getTwelveDataServerConfig: () => undefined, requestTwelveDataEvidence: async () => { throw new Error("unexpected_provider_request"); }, readTwelveDataEvidence: async () => { throw new Error("unexpected_provider_read"); }, requestTwelveDataHistoricalFx: async () => { throw new Error("unexpected_provider_request"); }, readTwelveDataHistoricalFx: async () => { throw new Error("unexpected_provider_read"); }, readTwelveDataSplitRisk: async () => ({ status: "disabled", actions: [] }), requestTwelveDataSplitRisk: async () => ({ status: "disabled", actions: [] }), resolveTwelveDataTarget: () => ({ status: "disabled" }) },

@@ -1,0 +1,34 @@
+.section {
+  margin: 20px 0;
+  padding-block: 16px;
+  border-block: 1px solid var(--cairn-v2-line);
+}
+.section > header { margin-bottom: 12px; }
+.line, .breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.line h4, .line strong { margin: 0; font-size: 14px; font-weight: 600; }
+.line strong, .breakdown dd { font-variant-numeric: tabular-nums; }
+.statement .line strong { font-size: clamp(19px, 4vw, 24px); letter-spacing: -.035em; }
+.section p, .breakdown dt, .breakdown small, .months caption {
+  margin: 2px 0;
+  color: var(--cairn-v2-muted);
+  font-size: 12px;
+}
+.statement + .statement, .ledger { margin-top: 14px; }
+.breakdown { margin: 10px 0 0; }
+.breakdown > div { padding-block: 3px; }
+.breakdown dd { margin: 0 0 0 auto; text-align: right; }
+.breakdown small { display: block; }
+.months summary { width: fit-content; min-height: 40px; padding-block: 8px; cursor: pointer; }
+.months summary:focus-visible { outline: 2px solid var(--cairn-v2-brand); outline-offset: 3px; }
+.months table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.months caption { text-align: left; }
+.months th, .months td { padding: 6px 2px; border-bottom: 1px solid var(--cairn-v2-line); text-align: right; }
+.months th { font-weight: 500; }
+.months th:first-child { text-align: left; }
+.section p.note { margin-top: 8px; }

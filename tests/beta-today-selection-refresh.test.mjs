@@ -13,6 +13,22 @@ const movementView = (movement, fxRate = 1300, state = 'ready') => ({
 });
 const homeMarkup = (view, currency = 'KRW') => renderToStaticMarkup(createElement(HomeToday, { view, currency }));
 
+it('shows broker equivalents once and keeps unpriced sales separate from a verified zero', async () => {
+  const [{RealizedProfitResult}] = await importUiWithPorts(['src/components/cairn-v2/realized-profit-section.tsx'], {});
+  const summary = {total:null,verifiedSubtotal:null,through:'2025-05-15',sales:2,valued:0,missingCostSales:2,scopeComplete:false,fees:'separate'};
+  const broker = [{accountLabel:'Account',startDate:'2025-04-01',endDate:'2025-05-15',subtotalKrw:'18000',domesticKrw:'10000',overseasUsd:'6.50',overseasBrokerKrw:'8000',
+    months:[{month:'2025-04',domesticKrw:'10000',overseasUsd:'6.50',overseasBrokerKrw:'8000'}, {month:'2025-05',domesticKrw:null,overseasUsd:'0',overseasBrokerKrw:null}]}];
+  const markup = (ledger, currency) => renderToStaticMarkup(createElement(RealizedProfitResult, {data:{scope:'all',broker,ledger:{KRW:ledger,USD:ledger}},currency}));
+  const account = markup(summary, 'KRW');
+  assert.match(account,/\+18,000원/); assert.match(account,/\+6\.50 USD/); assert.match(account,/\+8,000원/);
+  assert.match(account,/취득원가 미확인 2건/); assert.match(account,/2025-05<\/th><td>—<\/td><td><span[^>]*>0\.00 USD/);
+  assert.match(account,/거래 원장 계산분<\/h4><strong>—<\/strong>/);
+  assert.match(markup({...summary,total:'0',valued:2,missingCostSales:0,scopeComplete:true}, 'USD'),/거래 원장 계산분<\/h4><strong><span[^>]*>0\.00 USD/);
+  const partial = markup({...summary,verifiedSubtotal:'20',valued:1,missingCostSales:1}, 'KRW');
+  assert.match(partial,/\+20원/); assert.match(partial,/확인분 소계/);
+  assert.match(markup({...summary,sales:0,missingCostSales:0}, 'KRW'),/원장 매도 내역 확인 필요/);
+});
+
 it('includes an unchanged dated manual mark in the verified account value while preserving the quoted subset', () => {
   const cutoffDate = '2026-11-25', source = 'varda_manual_daily_snapshot', account = 'brokerage', currency = 'KRW';
   const holdings = [

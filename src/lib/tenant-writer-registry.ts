@@ -99,6 +99,13 @@ const LEGACY_EXCLUDED_TRANSITION = {
 
 export const TENANT_WRITER_REGISTRY = [
   {
+    id: "realized_profit_review_release_migration", classification: "admin_system", authorization: "migration_cli",
+    entrypoints: ["scripts/migrate-broker-realized-statements.mjs"],
+    implementationPaths: ["scripts/migrate-broker-realized-statements.mjs"],
+    targets: [adminTarget("drizzle.__drizzle_migrations", "insert")],
+    transition: SHARED_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "session_contribution_effects", classification: "user_owned", authorization: "server_verified_session",
     entrypoints: ["/api/contribution-effects"],
     implementationPaths: ["src/db/contribution-effect-sql.ts"],

@@ -1,6 +1,7 @@
 import { Decimal } from "./money.ts";
 import { hasUnsettledTrades, resolveNativeTrade } from "./native-portfolio-ledger.ts";
-import type { TrackedPortfolioEvidence, TrackedValuationFrame, TrackedNativePosition, TrackedTrade, TrackedRealizedTrade } from "./currency-tracked-portfolio.ts";
+import type { TrackedPortfolioEvidence, TrackedValuationFrame, TrackedNativePosition, TrackedTrade } from "./currency-tracked-portfolio.ts";
+import { nativeQuantitiesMatch, projectNativeRecordedSales } from "./native-recorded-sales.ts";
 import type { FxEvidence } from "./currency-valuation.ts";
 import type { NativeStoredAccount, NativeStoredEntry } from "../db/queries/native-portfolio-ledger.ts";
 import type { NativeGroupSelection } from "./native-group-scope.ts";
@@ -17,25 +18,25 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
   if (group) ledger = { ...ledger, accounts: ledger.accounts.filter(a => whole.has(a.id) || a.assets.some(asset => direct.has(asset.id))) };
   const allowed = new Set(ledger.accounts.map(row => row.id));
   let complete = ledger.accountsComplete !== false && ledger.accounts.length > 0 && (!group || Boolean(selection));
-  let realizedTradesComplete = complete && historyComplete;
+  const sales = projectNativeRecordedSales(base.ownerId,base.asOf,ledger,scopeKind,selection);
   const positions = base.current.positions.map(row => ({ ...row }));
   let flowIssue: string | undefined;
   if (group) {
     const missing = [...whole].filter(id => !allowed.has(id)).map(id => `account:${id}`).concat([...direct].filter(id => !ledger.accounts.some(a => a.assets.some(asset => asset.id === id))));
     for (const id of missing) positions.push({ id, ownerId: base.ownerId, name: "미확인 자산", observation: null });
-    if (missing.length) { complete = false; realizedTradesComplete = false; }
+    if (missing.length) complete = false;
   }
   for (const account of ledger.accounts) {
     const state = account.state;
     if (!state || Date.parse(state.at) > Date.parse(base.asOf)) {
-      complete = false; realizedTradesComplete = false;
+      complete = false;
       if (includesCash(account.id)) positions.push({ id: `cash:${account.id}:unknown`, ownerId: base.ownerId, accountId: account.id, kind: "cash", name: `${account.name} · Cash`, observation: null, unsupportedReason: "cash_not_observed" });
       continue;
     }
-    if (state.positions.some(p => !account.assets.some(a => a.id === p.assetId && a.currency === p.currency && Decimal.from(a.quantity).compare(p.quantity) === 0 && a.archived === (Decimal.from(p.quantity).compare(0) === 0))) || account.assets.some(a => !a.archived && !state.positions.some(p => p.assetId === a.id && Decimal.from(p.quantity).compare(a.quantity) === 0))) { complete = false; realizedTradesComplete = false; continue; }
+    if (!nativeQuantitiesMatch(account)) { complete = false; continue; }
     const unsettled = hasUnsettledTrades(state);
     if (state.unsettledTrades?.some(trade => includesCash(account.id) || includesAsset(account.id, trade.assetId))) {
-      complete = false; realizedTradesComplete = false; flowIssue = "settlement_unconfirmed";
+      complete = false; flowIssue = "settlement_unconfirmed";
     }
     for (const p of state.positions) {
       if (!includesAsset(account.id, p.assetId)) continue;
@@ -74,7 +75,6 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
   const cashFlows: NonNullable<TrackedPortfolioEvidence["cashFlows"]>[number][] = [];
   const trades: TrackedTrade[] = [];
   const splits: NonNullable<TrackedPortfolioEvidence["splits"]>[number][] = [];
-  const realizedTrades: TrackedRealizedTrade[] = [];
   const before = history.at(-1)?.at;
   const afterBaseline = (at: string) => Boolean(before && (Date.parse(at) > Date.parse(before) || (history.at(-1)?.boundary === "before" && Date.parse(at) === Date.parse(before))));
   const afterHistoryStart = (at: string) => Date.parse(at) > Date.parse(history[0]?.at ?? base.asOf)
@@ -84,12 +84,6 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
     if (!allowed.has(entry.accountId)) continue;
     const event = entry.data.event;
     if (event.type === "opening") continue;
-    if (event.type === "sell" && includesAsset(entry.accountId, event.assetId) && (!selection || Date.parse(event.at) >= Date.parse(selection.stableSince))) {
-      const realized = (entry.data.effect as (NonNullable<NativeStoredEntry["data"]["effect"]> & { realized?: Pick<TrackedRealizedTrade, "proceeds" | "disposedCostLots"> | null }) | null)?.realized;
-      const sold = ledger.accounts.find(account => account.id === entry.accountId)?.assets.find(asset => asset.id === event.assetId);
-      realizedTrades.push({ id: entry.id, ownerId: base.ownerId, accountId: entry.accountId, positionId: event.assetId, name: sold?.name ?? event.assetId,
-        at: event.at, source: event.source, dateEvidence: event.dateEvidence, proceeds: realized?.proceeds ?? null, disposedCostLots: realized?.disposedCostLots ?? null });
-    }
     for (const [index, leg] of (entry.data.effect?.cashLegs ?? []).entries()) {
       if (includesCash(entry.accountId)) {
         const externalToScope = event.type === "transfer" && (!allowed.has(event.peerAccountId) || !includesCash(event.peerAccountId));
@@ -127,5 +121,5 @@ export function attachNativeLedgerEvidence(base: TrackedPortfolioEvidence, ledge
       }
     }
   }
-  return { ...base, current, history, trades: complete && historyComplete && !flowIssue ? trades : null, fx, ledgerComplete: complete && !flowIssue, cashFlows: historyComplete ? cashFlows : undefined, corporateActionsInWindow, splits, realizedTrades: historyComplete ? realizedTrades : null, realizedTradesComplete, ...(selection ? { groupEvidence: { policy: "current_membership_whole_cash_direct_holdings", stableSince: selection.stableSince, reason: flowIssue ?? null } } : {}), nativeSequences: Object.fromEntries(ledger.accounts.filter(a => a.state && a.active !== false).map(a => [a.id, a.state!.sequence])) };
+  return { ...base, current, history, trades: complete && historyComplete && !flowIssue ? trades : null, fx, ledgerComplete: complete && !flowIssue, cashFlows: historyComplete ? cashFlows : undefined, corporateActionsInWindow, splits, ...sales, ...(selection ? { groupEvidence: { policy: "current_membership_whole_cash_direct_holdings", stableSince: selection.stableSince, reason: flowIssue ?? null } } : {}), nativeSequences: Object.fromEntries(ledger.accounts.filter(a => a.state && a.active !== false).map(a => [a.id, a.state!.sequence])) };
 }

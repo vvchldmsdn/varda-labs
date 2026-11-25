@@ -125,7 +125,7 @@ describe("documented migration artifact compatibility", () => {
     ]) assert.throws(() => planPreviewMigrations({ localMigrations: [local], appliedMigrations: [recorded], allowedPendingMigrations: [] }), /ledger diverges/);
   });
 
-  it("accepts all four historical artifacts and only the two reviewed lifecycle migrations", () => {
+  it("accepts the documented historical artifacts and only the reviewed pending suffix", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
     const local = journal.entries.map(entry => ({ tag: entry.tag, createdAt: entry.when, sha256: hash(readFileSync('drizzle/' + entry.tag + '.sql')) }));
     const recorded = Object.freeze(local.map(entry => {
@@ -135,13 +135,13 @@ describe("documented migration artifact compatibility", () => {
     const before = JSON.stringify(recorded);
     assert.equal("sha256:" + hash(JSON.stringify(recorded.map(canonicalizePreviewMigrationEvidence))), PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger.sha256);
     const input = { localMigrations: local, appliedMigrations: recorded, allowedPendingMigrations: PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations };
-    assert.equal(planPreviewMigrations(input).appliedCount, 70);
+    assert.equal(planPreviewMigrations(input).appliedCount, 71);
     assert.equal(JSON.stringify(recorded), before, "comparison must preserve every raw applied hash");
     assert.deepEqual(planPreviewMigrations(input).pendingTags, []);
     assert.deepEqual(planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -1) }).pendingTags, [local.at(-1).tag]);
     assert.deepEqual(planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -2) }).pendingTags, local.slice(-2).map(row => row.tag));
-    assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -3) }), /not allowlisted: 0067_daily_valuation_fx/);
-    assert.throws(() => planPreviewMigrations({ ...input, localMigrations: [...local, migration("0070_unreviewed", local.at(-1).createdAt + 1, "f")] }), /not allowlisted: 0070_unreviewed/);
+    assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: recorded.slice(0, -4) }), /not allowlisted: 0067_daily_valuation_fx/);
+    assert.throws(() => planPreviewMigrations({ ...input, localMigrations: [...local, migration("0071_unreviewed", local.at(-1).createdAt + 1, "f")] }), /not allowlisted: 0071_unreviewed/);
     assert.throws(() => planPreviewMigrations({ ...input, appliedMigrations: [...recorded.slice(0, 47), { ...knownApplied, sha256: "f".repeat(64) }, ...recorded.slice(48)] }), /ledger diverges at local migration 0047_member_activity/);
   });
 });

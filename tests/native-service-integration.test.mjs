@@ -400,7 +400,10 @@ it("values closed recorded sales from original acquisition and sale FX while kee
   assert.equal(duplicate.realizedPnl.total, null); assert.equal(duplicate.realizedPnl.verifiedSubtotal, "0");
   const future = f.engine.buildTrackedCurrencyPortfolio({ ...evidence, realizedTrades: evidence.realizedTrades.map(row => ({ ...row, at: new Date(Date.now() + 1000).toISOString() })) });
   assert.equal(future.realizedPnl.total, null); assert.equal(future.realizedPnl.rows[0].reason, "invalid_recorded_sale");
-  const spotOnly = f.engine.buildTrackedCurrencyPortfolio({ ...evidence, fx: [{ base: "USD", quote: "KRW", rate: "1400", observedAt: f.buyAt, fetchedAt: soldAt, source: "twelve_data", kind: "spot" }] });
+  const spot = [{ base: "USD", quote: "KRW", rate: "1400", observedAt: f.buyAt, fetchedAt: soldAt, source: "twelve_data", kind: "spot" }];
+  assert.equal(f.engine.buildTrackedCurrencyPortfolio({ ...evidence, fx: spot }).realizedPnl.total, "48000",
+    "replacing general valuation FX preserves the independent dated evidence for the sale and purchase");
+  const spotOnly = f.engine.buildTrackedCurrencyPortfolio({ ...evidence, fx: spot, realizedFx: spot });
   assert.equal(spotOnly.realizedPnl.total, null, "undesignated current spot cannot patch historical sale or acquisition rates");
 });
 

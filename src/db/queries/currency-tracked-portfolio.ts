@@ -10,6 +10,7 @@ import { isCurrency, Decimal, type Currency } from "@/lib/money";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import { resolveAdditionalContributionPolicyParameters } from "@/lib/additional-contribution-policy-input";
 import { readNativeLedger } from "./native-portfolio-ledger";
+import { readRecordedSaleFx } from "./native-recorded-sale-fx";
 import { attachNativeLedgerEvidence } from "@/lib/native-portfolio-projection";
 import { currentInvestmentEvidence } from "@/lib/contribution-investment-evidence";
 import { resolveNativeGroupSelection } from "@/lib/native-group-scope";
@@ -140,6 +141,9 @@ export async function getTrackedCurrencyEvidence(tenant: TenantContext, scope: P
       const cached = await readTwelveDataHistoricalFx({ requestedAt: cachedTimes, asOf: at, knownAt: at }, config).catch(() => null);
       if (cached) projected.fx = [...projected.fx, ...cached.fx.map(rate => ({ base: rate.baseCurrency, quote: rate.quoteCurrency, rate: rate.rate, observedAt: rate.observedAt, fetchedAt: rate.fetchedAt, source: rate.source, kind: rate.kind, requestedAt: rate.requestedAt }))];
     }
+  }
+  if (!options.currentOnly && !options.investmentsOnly && projected.realizedTrades?.length) {
+    projected.realizedFx = await readRecordedSaleFx(projected.realizedTrades,at).catch(() => undefined);
   }
   return { ...(options.investmentsOnly ? currentInvestmentEvidence(projected, ledger, sources.assetRows, selection) : projected), contributionPolicy: resolveAdditionalContributionPolicyParameters(sources.settingsRows[0]) };
 }
