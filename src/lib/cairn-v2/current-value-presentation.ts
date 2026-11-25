@@ -1,5 +1,6 @@
 import type { CurrencyTrackedInput, CurrencyTrackedResult } from "../currency-tracked-portfolio";
 import type { DashboardData, DashboardHolding } from "../portfolio-dashboard";
+import type { ValuationFxBasis } from "../valuation-fx-basis";
 import type { Currency } from "../money";
 import type { BetaView } from "./read-contract";
 import type { InvestmentReturn } from "./investment-return";
@@ -12,7 +13,7 @@ import type { AccountHistoryReview } from "./reviewed-history-series";
 type LegacyHolding = Pick<DashboardHolding,"name"|"ticker"|"account"|"market"|"currency"|"quantity"|"currentPrice"|"currentWeight"|"assetType"|"groupName"|"valueKrw"|"priceAsOf"|"priceFetchedAt"|"priceSource">;
 export type OriginalCurrentValuePresentation =
   | {kind:"tracked";evidence:CurrencyTrackedInput;reports:Readonly<Record<Currency,CurrencyTrackedResult>>}
-  | {kind:"legacy";data:Pick<DashboardData,"generatedAt"|"totalValueKrw"|"usdKrwRate"> & {holdings:LegacyHolding[];investmentReturn?:InvestmentReturn}}
+  | {kind:"legacy";data:Pick<DashboardData,"generatedAt"|"totalValueKrw"|"usdKrwRate"> & {fxBasis?:ValuationFxBasis;holdings:LegacyHolding[];investmentReturn?:InvestmentReturn}}
   | {kind:"unavailable"};
 
 export function alignCurrentValueWithReview(read: OriginalCurrentValuePresentation, review: AccountHistoryReview | null | undefined): OriginalCurrentValuePresentation {
@@ -97,5 +98,5 @@ export function originalLegacyValueView(view: BetaView, read: Extract<OriginalCu
     domain:{...view.domain,excluded,valueState:!data.holdings.length ? "empty" : excluded.length ? "partial" : "ready",
       knownSubtotalKrw:composition.amount===null ? null : Number(composition.amount),refreshedAt:data.generatedAt,valuationBasis:"현재 투자자산 평가 · 원본 조회 근거",
       investmentReturn:data.investmentReturn ?? view.domain.investmentReturn,
-      moneyBasis:{...view.domain.moneyBasis,structure:{usdKrwRate:data.usdKrwRate > 0 ? data.usdKrwRate : null,rateDate:null}}}};
+      moneyBasis:{...view.domain.moneyBasis,structure:data.fxBasis ?? {usdKrwRate:data.usdKrwRate > 0 ? data.usdKrwRate : null,rateDate:null}}}};
 }

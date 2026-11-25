@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTableName } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/pglite";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { PGlite } from "@electric-sql/pglite";
 import { createElement } from "react";
@@ -22,7 +23,7 @@ const assets = [baseAsset, { ...baseAsset, id: otherAssetId, accountId: otherAcc
 const event = { id: "event-fixture", assetId, accountId, account: "brokerage", ticker: "QQQ", eventDate: "2025-01-02", eventType: "sell", amountKrw: "154000", quantityDelta: "-1", beforeValue: { average_cost: 100, quantity: 11, currency: "USD" }, afterValue: { average_cost: 100, quantity: 10, currency: "USD" }, price: "110", fxRate: "1400", isSample: false };
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
 
-async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, baselineRows = [], liveRows = [], priceRows = [], eventRows = [event] } = {}) {
+async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, baselineRows = [], liveRows = [], priceRows = [], eventRows = [event], fxRows } = {}) {
   const trace = [];
   const fxLimits = [];
   const dialect = new PgDialect();
@@ -57,7 +58,11 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
     "@/db/queries/portfolio-analysis-scope-targets": { getPortfolioAnalysisScopeTargets: async () => targets ?? ({ includesAllOwnedAccounts: true, wholeAccountIds: [], directAssetIds: [] }) },
     "@/db/queries/tenant-group-reads": { loadActiveTenantAllocationGroups: async () => [] },
     "@/db/queries/tenant-settings": { loadLatestTenantPortfolioSettingsRows: async () => { await settingsGate?.promise; return [{ usdKrwRate: "1400" }]; } },
-    "@/db/queries/portfolio-fx-rates": { loadUsablePortfolioFxRows: async (limit) => { fxLimits.push(limit); return [{ rateDate: "2026-09-08", usdKrw: "1400", status: "ok", isSample: false }]; } },
+    "@/db/queries/portfolio-fx-rates": { loadUsablePortfolioFxRows: async (limit, { asOf, includeHistory }) => {
+      fxLimits.push({ limit, includeHistory });
+      return fxRows ?? [{ rateDate: asOf.toISOString().slice(0, 10), usdKrw: "1400", status: "ok", isSample: false,
+        source: "fixture", rateKind: "spot", observedAt: asOf, fetchedAt: asOf }];
+    } },
   });
   const read = (demand) => query.getReadOnlyTenantPortfolioDashboardSources({ scope, serviceDate: "2026-09-08", tenantContext, demand });
   return { read, trace, fxLimits, model };
@@ -66,6 +71,50 @@ async function fixture({ settingsGate, eventsGate, targets, assetRows = assets, 
 const historicalPositionReads = (trace) => trace.filter((request) => request.table === "daily_position_snapshots" && request.limit !== null);
 
 describe("dashboard query demand and independent market reads", () => {
+  it("includes the same provider observation on both reads even when undated rows fill the raw row cap", async () => {
+    const pg = new PGlite();
+    try {
+      await pg.exec(`create table fx_rates(id serial primary key, legacy_base44_id text, date date, usdkrw numeric,
+        observed_at timestamptz, rate_kind text, source text, status text default 'ok', fetched_at timestamptz,
+        is_sample boolean default false, base44_created_at timestamptz, base44_updated_at timestamptz,
+        created_at timestamptz, updated_at timestamptz);
+        insert into fx_rates(date,usdkrw,source,fetched_at)
+          select '2026-09-10',1346.10,'kis','2026-09-10T02:00Z' from generate_series(1,3);
+        insert into fx_rates(date,usdkrw,source,observed_at,fetched_at,rate_kind)
+          values ('2026-09-09',1343.513843,'er_api','2026-09-09T00:02Z','2026-09-10T01:00Z','daily_reference'),
+          ('2026-09-11',1350,'future','2026-09-11T00:02Z','2026-09-11T01:00Z','spot');`);
+      const [{ loadUsablePortfolioFxRows }] = await importWithPorts(["src/db/queries/portfolio-fx-rates.ts"],
+        { "@/db/client": { db: drizzle(pg) } });
+      const asOf = new Date("2026-09-10T02:00Z");
+      for (const includeHistory of [true, false]) {
+        const rows = await loadUsablePortfolioFxRows(2, { asOf, includeHistory });
+        assert.ok(rows.some(row => row.source === "er_api"));
+        assert.equal(rows.length, includeHistory ? 2 : 1);
+      }
+    } finally { await pg.close(); }
+  });
+  it("values Home and Today at the same provider reference when the last collection has no market time", async (t) => {
+    const now = new Date("2026-09-10T02:00:00Z");
+    t.mock.timers.enable({ apis: ["Date"], now });
+    const common = { status: "ok", isSample: false, fetchedAt: now };
+    const collection = { ...common, rateDate: "2026-09-10", source: "kis", usdKrw: "1346.10", observedAt: null, rateKind: null };
+    const reference = { ...common, rateDate: "2026-09-08", source: "er_api", usdKrw: "1343.513843",
+      observedAt: new Date("2026-09-08T20:00:00Z"), rateKind: "daily_reference" };
+    const args = { analysisScopes: [scope], scope, tenantContext };
+    const f = await fixture({ assetRows: [baseAsset], eventRows: [], fxRows: [collection, reference] });
+    for (const demand of [{ surface: "home" }, { surface: "today", holdingDetail: emptyDetail }]) {
+      const data = await f.model.getPortfolioDashboard({ ...args, demand });
+      assert.equal(data.usdKrwRate, 1343.513843);
+      assert.equal(data.totalValueKrw, 1100 * data.usdKrwRate);
+      assert.equal(data.dataHealth.latestFxRateKind, "daily_reference");
+      assert.equal(data.dataHealth.latestFxRateDate, "2026-09-09");
+      assert.equal(data.dataHealth.latestFxSource, "er_api");
+    }
+    const missing = await fixture({ assetRows: [baseAsset], eventRows: [], fxRows: [collection] });
+    const dashboard = await missing.model.getPortfolioDashboard(args);
+    assert.equal(dashboard.usdKrwRate, 0, "tenant settings cannot establish a live valuation rate");
+    assert.equal(dashboard.dataHealth.latestFxRateKind, null);
+  });
   it("includes closed/unmatched sales in the correct account without current holdings", async (t) => {
     t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-10T08:00:00Z") });
     const closed = { ...event, assetId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", ticker: "CLOSED", beforeValue: null, afterValue: null };
@@ -329,7 +378,7 @@ describe("dashboard query demand and independent market reads", () => {
     assert.deepEqual(result.recentPortfolioRows, []);
     assert.equal(historicalPositionReads(f.trace).length, 0);
     assert.equal(f.trace.filter((entry) => entry.table === "daily_portfolio_snapshots").length, 0);
-    assert.deepEqual(f.fxLimits, [1]);
+    assert.deepEqual(f.fxLimits, [{ limit: 260, includeHistory: false }]);
     const baseline = f.trace.find((entry) => entry.table === "daily_position_snapshots" && entry.projection?.id);
     assert.ok(baseline);
     assert.equal(baseline.limit, null);
@@ -375,7 +424,7 @@ describe("dashboard query demand and independent market reads", () => {
     assert.deepEqual(result.historyAssetIds, [assetId, otherAssetId]);
     assert.equal(historicalPositionReads(f.trace).length, 1);
     assert.equal(f.trace.filter((entry) => entry.table === "daily_portfolio_snapshots").length, 1);
-    assert.deepEqual(f.fxLimits, [260]);
+    assert.deepEqual(f.fxLimits, [{ limit: 260, includeHistory: true }]);
   });
 
   it("keeps group/account authorization around a selected history UUID", async () => {

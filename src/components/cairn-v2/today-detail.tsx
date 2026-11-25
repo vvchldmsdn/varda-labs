@@ -1,5 +1,7 @@
 "use client";
 import { instrumentLabel } from "@/lib/instrument-display";
+import { T } from "@/components/i18n/localized-text";
+import { valuationFxLabel } from "@/lib/valuation-fx-basis";
 import { useId, useState } from "react";
 import Link from "next/link";
 import { ActionGroup, ActionContent } from "@/components/cairn-ui";
@@ -37,8 +39,9 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  const readKey=JSON.stringify([context.mode,context.scope,context.currency]);
  if(!d || ["loading","unauthorized"].includes(d.state)) return <p role="status" className={styles.status}>{movement.message ?? "조회 근거 확인 중"}</p>;
  const reviewChange=todayChangeForHistory(view);
+ const manualNames=reviewChange?.manualNames.join(", ");
  const reviewMovement=reviewedMovementForView(view,reviewChange);
- const market=reviewChange ? undefined : d.currentHoldingMovement;
+ const market=reviewChange && !manualNames ? undefined : d.currentHoldingMovement;
  const changeKrw=reviewChange ? reviewChange.changeKrw ?? null : market?.changeKrw ?? null;
  const returnPct=reviewChange ? reviewChange.returnPct ?? null : market?.returnPct ?? null;
  const reviewedRows=reviewMovement?.rows.map(row=>({
@@ -61,13 +64,13 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
  return <section className={styles.detail} aria-label="오늘 변동 상세">
   <header className={styles.heading}>
    <dl className={styles.primaryMetrics}>
-    <Metric label={reviewChange ? "평가액 변동률" : "총변동률"} value={formatPercent(returnPct,2,true)} size="hero" tone={tone(returnPct)} note={reviewChange ? "오전 7시 마감 평가액 대비" : adjusted ? "시작 평가액 대비 · KRW" : "KRW 기준"} />
-    <Metric label={reviewChange ? "평가액 변동" : "총변동액"} value={money(changeKrw,true)} unit={context.currency} tone={tone(changeKrw)} note={market?.partial ? "비교 가능한 종목의 소계" : undefined} />
+    <Metric label={reviewChange ? "평가액 변동률" : market?.partial ? "시세 비교 종목 변동률" : "총변동률"} value={formatPercent(returnPct,2,true)} size="hero" tone={tone(returnPct)} note={reviewChange ? "오전 7시 마감 평가액 대비" : adjusted ? "시작 평가액 대비 · KRW" : "KRW 기준"} />
+    <Metric label={reviewChange ? "평가액 변동" : "총변동액"} value={money(changeKrw,true)} unit={context.currency} tone={tone(changeKrw)} note={!reviewChange && market?.partial ? "비교 가능한 종목의 소계" : undefined} />
    </dl>
    <div className={styles.basis}>
     <span>비교 기준</span>
     <strong>{reviewChange ? reviewChange.baselineDate + " 평가액" : comparisonDate ?? "기준일 미제공"}</strong>
-    <p>{reviewChange ? reviewChange.cutoffDate + " 오전 7시 저장" : sources || sourceLabel(d.movementSource)}</p>
+    <p>{reviewChange ? reviewChange.cutoffDate + (manualNames ? " 오전 7시 기준 마감" : " 오전 7시 저장") : sources || sourceLabel(d.movementSource)}</p>
    </div>
   </header>
   {reviewChange && <dl className={styles.primaryMetrics}>
@@ -76,10 +79,11 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
   </dl>}
   {factors && rows.length > 0 && <div className={styles.breakdown}>
     <MovementBreakdown view={view} currency={context.currency} priceChangeKrw={factors.priceChangeKrw} fxChangeKrw={factors.fxChangeKrw}
-      previousValueKrw={factors.previousValueKrw} quantityChangeKrw={reviewMovement?.quantityChangeKrw}/>
+      previousValueKrw={reviewChange?.previousValueKrw ?? factors.previousValueKrw} quantityChangeKrw={reviewMovement?.quantityChangeKrw}/>
   </div>}
   {reviewMovement && <p className={styles.notice}>가격과 환율의 영향은 마감과 현재에 공통으로 보유한 수량을 기준으로 계산합니다.</p>}
-  {!reviewChange && <div className={styles.coverage}><StatusPill tone={market?.partial ? "muted" : "positive"}>비교 {market?.includedCount ?? 0}종목 · 제외 {market?.excludedCount ?? 0}종목</StatusPill></div>}
+  {manualNames && <p className={styles.notice}>수동 평가액 유지 · {manualNames}. 시세 비교 {market?.includedCount}종목의 변동률은 {formatPercent(market?.returnPct ?? null,2,true)}입니다.</p>}
+  {market && <div className={styles.coverage}><StatusPill tone={market.partial ? "muted" : "positive"}>비교 {market.includedCount}종목 · 제외 {market.excludedCount}종목</StatusPill></div>}
   {!reviewChange&&!rows.length&&!localOnly.length&&movement.message&&<p className={styles.notice} role="status">{movement.message}</p>}
   {context.currency==="USD"&&<p className={styles.notice}>총변동액은 현재 환율로 환산하고, 총변동률은 원화로 계산합니다.</p>}
   {excluded.length>0&&<p className={styles.exclusions}>비교 제외 · {excluded.map(row=>(row.assetName??row.ticker??"종목 확인 전")+" ("+movementExclusionLabel(row.reason)+")").join(" · ")}</p>}
@@ -135,8 +139,8 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
    </div>
 
    </>}
-   <p>화면 갱신 {reviewMovement?.asOf??d.refreshedAt??"미제공"} · 비교 기준일 {comparisonDate??"미제공"} · {reviewChange ? sourceLabel("reviewed_close") : sources || sourceLabel(d.movementSource)}</p>
-   {!reviewChange && <p>평가 환율 {exact(d.moneyBasis.dashboard.usdKrwRate)} · 환율 기준일 {d.moneyBasis.dashboard.rateDate??"미제공"}</p>}
+   <p>화면 갱신 {reviewMovement?.asOf??d.refreshedAt??"미제공"} · 비교 기준일 {comparisonDate??"미제공"} · {reviewChange && !manualNames ? sourceLabel("reviewed_close") : sources || sourceLabel(d.movementSource)}</p>
+   {market && <p>USD/KRW {exact(d.moneyBasis.dashboard.usdKrwRate)} · <T {...valuationFxLabel(d.moneyBasis.dashboard)}/></p>}
    {adjusted&&<p>현재 보유 종목을 비교합니다. 기존 보유분은 시작 가격부터, 오늘 산 수량은 체결가부터 계산합니다. 일부 매도한 수량은 매도 체결가까지 반영합니다.</p>}
    {!reviewChange && <p>원본 상태: {d.movementSource??"none"}{d.movementReason?" · "+d.movementReason:""}{d.movementRead?.reasons.length?" · "+d.movementRead.reasons.join(", "):""}</p>}
   </details>

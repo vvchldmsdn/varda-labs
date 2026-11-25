@@ -4,6 +4,7 @@ import { historyObservationPoints, type HistoryReadRow } from "./history-observa
 import type { BetaPlanningRead } from "./planning-contract";
 import { buildPortfolioHistoryTrajectory } from "../history-trajectory.ts";
 import type { DashboardData } from "../portfolio-dashboard";
+import { dashboardFxBasis, type ValuationFxBasis } from "../valuation-fx-basis.ts";
 import type { ReadOnlyHistoryBalance } from "../../db/queries/history-balance";
 import type { PortfolioStructureResult } from "../portfolio-structure";
 import type { BetaContext, BetaCurrency } from "./navigation";
@@ -36,9 +37,10 @@ export type BetaView = Omit<DemoView, "rows" | "totalKrw" | "fxRate" | "drift" |
     historyObservationPolicy?: "production_observed_v1"; historyViewSource?: string; historyObservedExcludedCount?: number;
     historyReadStatus?: ReadOnlyHistoryBalance["readStatus"]; historyDisplayCurrency?: BetaCurrency;
     currentHoldingMovement?: Omit<import("../current-holding-movement").CurrentHoldingMovement, "rows"> & { rows: BetaMovementRow[] };
+    manualCarryClose?: DashboardData["manualCarryClose"];
     movementRows?: BetaMovementRow[]; movementExclusions?: BetaMovementExclusion[];
     movementRead?: { ready: boolean; changeKrw: number | null; returnPct: number | null; includedCount: number; excludedCount: number; reasons: string[] };
-    moneyBasis: { structure: { usdKrwRate: number | null; rateDate: null }; dashboard: { usdKrwRate: number | null; rateDate: string | null } };
+    moneyBasis: { structure: ValuationFxBasis; dashboard: ValuationFxBasis };
     movementAmountBasis: "KRW_change_current_fx_translation"; movementReturnBasis: "KRW";
     weightBasis: "confirmed_subtotal"; currencyBasis: "KRW"; rateDate: string | null;
     scopes: { key: string; label: string; detail: string }[]; message: string;
@@ -148,10 +150,10 @@ export function adaptBetaRead({ dashboard, structure, history, context }: {
     valuationBasis: partial ? "확인 가능한 자산 소계 · 제외 자산 별도" : "현재 투자자산 평가 · 기존 구조 read model",
     snapshotDate: dashboard.movementBaselineDate, comparisonDate: dashboard.marketPriceReferenceDate,
     movementSource: dashboard.todayMovement.source, movementReason: dashboard.todayMovement.reason, movementReturnPct: view.todayMoveKrw === null ? null : dashboard.todayMovement.returnPct, movementExcludedCount: dashboard.todayMovement.exclusions.length,
-    currentHoldingMovement,
+    currentHoldingMovement, manualCarryClose: dashboard.manualCarryClose,
     movementRows: movementEvidence.rows, movementExclusions: movementEvidence.exclusions,
     movementRead: { ready: dashboard.todayMovement.ready, changeKrw: dashboard.todayMovement.changeKrw ?? null, returnPct: dashboard.todayMovement.returnPct, includedCount: dashboard.todayMovement.contributionRows?.length ?? 0, excludedCount: dashboard.todayMovement.exclusions.filter(row => row.subject !== "aggregate").length, reasons: [...new Set(dashboard.todayMovement.exclusions.map(row => row.reason))] }, rateDate: null,
-    moneyBasis: { structure: { usdKrwRate: view.fxRate, rateDate: null }, dashboard: { usdKrwRate: dashboard.usdKrwRate > 0 ? dashboard.usdKrwRate : null, rateDate: dashboard.dataHealth.latestFxRateDate } },
+    moneyBasis: { structure: { usdKrwRate: view.fxRate, rateDate: null }, dashboard: dashboardFxBasis(dashboard) },
     scopes: dashboard.analysisScopes.map(s => ({ key: s.key, label: s.label, detail: s.kind === "all" ? "소유 범위 전체" : s.kind === "account" ? "소유 계좌" : "소유 분석 범위" })),
     message: reportingFxMissing ? "보고 통화 환율 없음" : partial ? "평가 불가 자산 포함 · 전체 합계 확인 전" :
       ambiguousHistory ? "서로 다른 저장 이력 근거 · 기존 히스토리에서 확인" : !historyCurrencySupported ? "USD 저장 평가·수익률 환산 근거 없음" : empty ? "보유 자산 없음" : "기존 읽기 모델 · 저장 이력과 현재 평가를 구분",

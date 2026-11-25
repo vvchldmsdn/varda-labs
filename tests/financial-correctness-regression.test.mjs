@@ -4,6 +4,7 @@ import { buildDailyPositionMovement, buildPreviousCloseMovement } from "../src/l
 import { calculateFxAwareSnapshotMovementKrw, sumComplete } from "../src/lib/portfolio-math.ts";
 import { buildReturnMetricsSummary, getAssetReturnMetrics } from "../src/lib/portfolio-return-metrics-core.ts";
 import { resolveCurrentUsdKrwRate, selectUsableFxRows } from "../src/lib/market-data/fx-rate-admission.ts";
+import { selectCurrentValuationFx } from "../src/lib/market-data/current-valuation-fx.ts";
 import { buildPortfolioStructure } from "../src/lib/portfolio-structure.ts";
 import { selectLatestPortfolioDashboardBaselineRows } from "../src/lib/portfolio-dashboard-baseline.ts";
 
@@ -17,6 +18,22 @@ const previousClose = (holdings, priceRows, referenceDate = "2026-07-07") => bui
 const approx = (actual, expected) => assert.ok(actual !== null && Math.abs(actual - expected) < 0.001, `${actual} != ${expected}`);
 
 describe("financial correctness regressions", () => {
+  it("selects a current valuation FX by its observation time and rejects stale, future or conflicting evidence", () => {
+    const asOf = new Date("2026-07-10T06:00:00Z");
+    const reference = { usdKrw: "1343.513843", observedAt: new Date("2026-07-09T00:02:31Z"), fetchedAt: asOf,
+      rateKind: "daily_reference", source: "er_api", status: "ok", isSample: false };
+    const spot = { ...reference, usdKrw: "1350", observedAt: new Date("2026-07-10T05:59:00Z"), rateKind: "spot", source: "kis" };
+    const stale = { ...spot, observedAt: new Date("2026-07-07T05:59:59Z") };
+    const future = new Date("2026-07-10T06:00:01Z");
+    const invalid = [stale, { ...spot, observedAt: null }, { ...spot, observedAt: future, fetchedAt: future },
+      { ...spot, fetchedAt: future }, { ...spot, rateKind: "collection" }, { ...spot, status: "error" },
+      { ...spot, isSample: true }, { ...spot, usdKrw: "0x54a" }];
+    assert.equal(selectCurrentValuationFx(invalid, asOf), null);
+    assert.equal(selectCurrentValuationFx([...invalid, reference], asOf).rate, reference.usdKrw);
+    assert.equal(selectCurrentValuationFx([reference, spot], asOf).kind, "spot");
+    assert.equal(selectCurrentValuationFx([spot, { ...spot, usdKrw: "1351" }, reference], asOf), null);
+    assert.equal(selectCurrentValuationFx([{ ...spot, observedAt: new Date("2026-07-07T06:00:00Z") }], asOf).rate, spot.usdKrw);
+  });
   for (const sell of [false, true]) {
     it(`attributes a cross-account ${sell ? "sell" : "buy"} only to the identified holding`, () => {
       const result = daily([holding("a", "brokerage", { quantity: sell ? 8 : 12, valueKrw: sell ? 800 : 1200 }), holding("b", "isa")], [snapshot(), snapshot("b", "isa")], [trade({ eventType: sell ? "sell" : "buy", quantityDelta: sell ? -2 : 2 })]);

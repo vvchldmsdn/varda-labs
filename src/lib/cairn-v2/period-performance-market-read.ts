@@ -9,6 +9,7 @@ import type { TrackedNativePosition } from "../currency-tracked-portfolio";
 import { Decimal, isCurrency } from "../money";
 import { toNumber } from "../portfolio-math";
 import { MANUAL_ASSET_PRICE_POLICY } from "../market-data/manual-asset-price";
+import { CURRENT_VALUATION_FX_MAX_AGE_MS, selectCurrentValuationFx } from "../market-data/current-valuation-fx";
 import type { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
 
 export async function readPerformanceMarks(tenant: TenantContext, scope: PortfolioAnalysisScope, at: Date, holdings: boolean,
@@ -25,7 +26,7 @@ async function readHomeMarks(tenant: TenantContext, scope: PortfolioAnalysisScop
   latest: ReadonlyMap<string,{ at: string; observation: PerformanceObservation }>): Promise<CurrentMarks> {
   const { getReadOnlyTenantPortfolioDashboardSources } = await import("@/db/queries/portfolio-dashboard");
   const sources = await getReadOnlyTenantPortfolioDashboardSources({ tenantContext: tenant, scope,
-    serviceDate: resolveSnapshotCycle(now).snapshotDate, sourceMode: "valuation" });
+    serviceDate: resolveSnapshotCycle(now).snapshotDate, sourceMode: "valuation", now });
   return homePerformanceMarks(sources, tenant, now, latest);
 }
 
@@ -64,7 +65,7 @@ export function homePerformanceMarks(sources: Awaited<ReturnType<typeof getReadO
     return { ...base, observation: { ...raw, source: asset.priceSource,
       priceObservedAt: asset.priceAsOf.toISOString(), priceFetchedAt: asset.priceFetchedAt.toISOString() } };
   });
-  const rate = sources.latestFxRows[0];
+  const rate = selectCurrentValuationFx(sources.recentFxRows, now);
   const nativeSequences = Object.fromEntries(sources.accountRows.flatMap(row => {
     const sequence = (row.nativeState as {sequence?: number}|null)?.sequence;
     return sequence === undefined ? [] : [[row.id, sequence]];
@@ -72,9 +73,7 @@ export function homePerformanceMarks(sources: Awaited<ReturnType<typeof getReadO
   return { ownerId: tenant.ownerUserId, reporting: "KRW", asOf, fixedKrwByAsset, nativeSequences,
     activeAccountIds: sources.accountRows.map(row => row.id),
     current: { at: asOf, source: "dashboard_investments", scopeComplete: true, positions },
-    history: [], trades: null, maxFxAgeMs: 3*86400000, maxPriceAgeMs: 10*86400000,
-    fx: rate?.observedAt && rate.fetchedAt && rate.source && (rate.rateKind === "spot" || rate.rateKind === "daily_reference")
-      ? [{ base:"USD",quote:"KRW",rate:rate.usdKrw,observedAt:rate.observedAt.toISOString(),fetchedAt:rate.fetchedAt.toISOString(),
-          source:rate.source,kind:rate.rateKind }] : [],
+    history: [], trades: null, maxFxAgeMs: CURRENT_VALUATION_FX_MAX_AGE_MS, maxPriceAgeMs: 10*86400000,
+    fx: rate ? [rate] : [],
   };
 }

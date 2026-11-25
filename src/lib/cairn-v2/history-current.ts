@@ -35,11 +35,19 @@ export function reviewedLiveBaseline(view: BetaView) {
 export function todayChangeForHistory(view: BetaView) {
   const current = currentHistoryValuation(view, "KRW");
   const baseline = reviewedLiveBaseline(view);
-  if (!baseline) return null;
+  if (!baseline) {
+    const carried = view.domain?.manualCarryClose;
+    if (!carried || !current?.complete || current.amount == null || !current.asOf ||
+        !Number.isFinite(Date.parse(current.asOf)) || liveHistoryDate(new Date(current.asOf)) !== carried.cutoffDate ||
+        Math.abs(Number(current.amount) - carried.valueKrw) > 0.01) return null;
+    const change = historyValuationChange(carried.valueKrw, carried.previousValueKrw);
+    if (!change) return null;
+    return {...carried, ...change, baselineDate: valuationDateForCutoff(carried.cutoffDate)};
+  }
   const valueKrw = current?.complete && current.amount != null ? Number(current.amount) : null;
   const previousValueKrw = baseline.valueKrw!;
   const change = valueKrw === null ? null : historyValuationChange(valueKrw, previousValueKrw);
-  return {baselineDate: valuationDateForCutoff(baseline.date), cutoffDate: baseline.date,
+  return {baselineDate: valuationDateForCutoff(baseline.date), cutoffDate: baseline.date, manualNames: [],
     valueKrw, previousValueKrw, ...change};
 }
 

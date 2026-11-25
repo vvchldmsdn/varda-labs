@@ -3,6 +3,7 @@ import { requiresNativePortfolioSurface } from "@/db/queries/native-portfolio-le
 import { getTrackedCurrencyEvidence } from "@/db/queries/currency-tracked-portfolio";
 import { buildTrackedCurrencyReports } from "@/lib/server/currency-tracked-reports";
 import type { DashboardData } from "@/lib/portfolio-dashboard";
+import { dashboardFxBasis } from "@/lib/valuation-fx-basis";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import type { Currency } from "@/lib/money";
@@ -19,6 +20,6 @@ export async function readOriginalCurrentValue({tenantContext,scope,currency,das
     if(!reports[currency].current)return {kind:"unavailable"};
     return {kind:"tracked",evidence,reports};
   }
-  return {kind:"legacy",data:{generatedAt:dashboard.generatedAt,totalValueKrw:dashboard.totalValueKrw,usdKrwRate:dashboard.usdKrwRate,investmentReturn:dashboard.investmentReturn,
+  return {kind:"legacy",data:{generatedAt:dashboard.generatedAt,totalValueKrw:dashboard.totalValueKrw,usdKrwRate:dashboard.usdKrwRate,fxBasis:dashboardFxBasis(dashboard),investmentReturn:dashboard.investmentReturn,
     holdings:dashboard.holdings.map(({name,ticker,account,market,currency,quantity,currentPrice,currentWeight,assetType,groupName,valueKrw,priceAsOf,priceFetchedAt,priceSource})=>({name,ticker,account,market,currency,quantity,currentPrice,currentWeight,assetType,groupName,valueKrw,priceAsOf,priceFetchedAt,priceSource}))}};
 }

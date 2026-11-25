@@ -3,6 +3,7 @@ import { it } from 'node:test';
 import { importUiWithPorts } from './helpers/import-ui-with-ports.mjs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { reconcileManualCarryWithClose } from '../src/lib/portfolio-dashboard-manual-carry.ts';
 
 const [{ HomeToday }] = await importUiWithPorts(['src/components/cairn-v2/home-today.tsx'], {
   '@/components/cairn-v2/home-impact': { impactTypes: ['price', 'fx'], impactNames: { price: '가격', fx: '환율' } },
@@ -11,6 +12,47 @@ const movementView = (movement, fxRate = 1300, state = 'ready') => ({
   rows: [], domain: { state, currentHoldingMovement: movement, moneyBasis: { dashboard: { usdKrwRate: fxRate } } },
 });
 const homeMarkup = (view, currency = 'KRW') => renderToStaticMarkup(createElement(HomeToday, { view, currency }));
+
+it('includes an unchanged dated manual mark in the verified account value while preserving the quoted subset', () => {
+  const cutoffDate = '2026-11-25', source = 'varda_manual_daily_snapshot', account = 'brokerage', currency = 'KRW';
+  const holdings = [
+    {id:'etf',name:'ETF',quantity:1,valueKrw:900,account,currency},
+    {id:'gold',name:'금현물',quantity:2,currentPrice:500,valueKrw:1000,priceSource:'manual_entry',priceQuoteType:'manual_valuation',
+      priceStatus:'stored_manual',priceAsOf:'2026-11-23T13:00:00Z',account,currency},
+  ];
+  const positions = holdings.map(h => ({assetId:h.id,account,currency,source,snapshotDate:cutoffDate,quantity:h.quantity,
+    marketValueKrw:1000,unitPrice:h.id==='gold'?500:1000,fxRate:1,priceSource:h.priceSource,priceBasis:h.id==='gold'?'manual_current':'close'}));
+  const exclusion = {holdingId:'gold',subject:'holding',reason:'missing_quoted_instrument',assetName:'금현물'};
+  const movement = {excludedCount:1,includedCount:1,exclusions:[exclusion],partial:true,changeKrw:-100,returnPct:-10,
+    previousValueKrw:1000,priceChangeKrw:-100,fxChangeKrw:0};
+  const input = {holdings,positions,movement,closingRows:[{snapshotDate:cutoffDate,source,totalMarketValue:2000}],
+    cutoffDate,cycleStart:new Date('2026-11-24T22:00:00Z'),hasCycleEvents:false};
+  const view = movementView(movement);
+  Object.assign(view.domain, {manualCarryClose:reconcileManualCarryWithClose(input),valueState:'ready',refreshedAt:'2026-11-25T01:00:00Z'});
+  view.totalKrw=1900;
+  assert.match(homeMarkup(view),/-5\.00%/);
+  assert.match(homeMarkup(view),/금현물 수동 평가액 유지/);
+  assert.match(homeMarkup(view),/-100원/);
+  view.totalKrw=1800;
+  assert.match(homeMarkup(view),/-10\.00%/);
+  assert.doesNotMatch(homeMarkup(view),/수동 평가액 유지/);
+  const second = {...holdings[1], id:'other-manual',name:'기타 실물자산'};
+  const both = {...input, holdings:[...holdings,second], positions:[...positions,{...positions[1],assetId:second.id}],
+    closingRows:[{...input.closingRows[0],totalMarketValue:3000}],
+    movement:{...movement,excludedCount:2,exclusions:[exclusion,{...exclusion,holdingId:second.id}]}};
+  view.totalKrw=2900;
+  view.domain.manualCarryClose=reconcileManualCarryWithClose(both);
+  assert.match(homeMarkup(view),/-3\.33%/);
+  assert.match(homeMarkup(view),/금현물, 기타 실물자산 수동 평가액 유지/);
+  assert.equal(reconcileManualCarryWithClose({...both,positions:[...positions,{...both.positions[2],priceSource:null}]}),null);
+  for (const patch of [{hasCycleEvents:true},{positions:positions.slice(1)},
+    {holdings:[holdings[0],{...holdings[1],priceAsOf:'2026-11-25T00:00:00Z'}]},
+    {positions:[positions[0],{...positions[1],priceBasis:'close'}]},
+    {positions:[positions[0],{...positions[1],quantity:1}]},
+    {closingRows:[{...input.closingRows[0],totalMarketValue:1900}]}]) {
+    assert.equal(reconcileManualCarryWithClose({...input,...patch}),null);
+  }
+});
 
 it('keeps the restored close, today totals and per-holding price, FX and quantity changes on one basis', async () => {
   const [{ TodayDetail }, { projectReviewedCurrentMovement }] = await importUiWithPorts([

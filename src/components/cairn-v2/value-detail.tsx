@@ -1,5 +1,7 @@
 "use client";
 import { isCollectionPriceSource } from "@/lib/quote-time-basis";
+import { T } from "@/components/i18n/localized-text";
+import { valuationFxLabel } from "@/lib/valuation-fx-basis";
 import { InfoDisclosure } from "@/components/cairn-ui";
 import { useId, useState } from "react";
 import Link from "next/link";
@@ -88,7 +90,7 @@ export function ValueDetail({ view, context }: { view: BetaView; context: BetaCo
 
     <InfoDisclosure summary="평가 기준" className={styles.visibleBasis}>
       {context.currency === "USD" && <p>현재 KRW 평가의 환산 표시 · 과거 USD 성과 아님</p>}
-      <p>USD/KRW {snapshotDecimal(domain.moneyBasis.structure.usdKrwRate)} · 환율 관측일 {domain.moneyBasis.structure.rateDate ?? "미제공"}</p>
+      <p>USD/KRW {snapshotDecimal(domain.moneyBasis.structure.usdKrwRate)} · <T {...valuationFxLabel(domain.moneyBasis.structure)}/></p>
       {domain.nonInvestmentCount > 0 && <p>비투자자산 {domain.nonInvestmentCount}개 · {displayReadMoney(view, domain.nonInvestmentValueKrw, context.currency, false, "dashboard")} {unit} 별도 · 아래 투자자산 비중에 미포함</p>}
     </InfoDisclosure>
 
