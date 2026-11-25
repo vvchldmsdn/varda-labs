@@ -1,7 +1,8 @@
 import "server-only";
 import { buildCurrentHoldingMovement, type CurrentHoldingMovement } from "./current-holding-movement";
+import { reconcileManualCarryWithClose } from "./portfolio-dashboard-manual-carry";
 import { investmentHoldingReturn, type InvestmentReturn } from "./cairn-v2/investment-return";
-import { resolveCurrentUsdKrwRate } from "@/lib/market-data/fx-rate-admission";
+import { selectCurrentValuationFx } from "@/lib/market-data/current-valuation-fx";
 
 import { getReadOnlyTenantPortfolioDashboardSources } from "@/db/queries/portfolio-dashboard";
 import {
@@ -164,6 +165,7 @@ export type DashboardEventActivity = {
 export type DashboardData = {
   investmentReturn?: InvestmentReturn;
   currentHoldingMovement?: CurrentHoldingMovement;
+  manualCarryClose?: ReturnType<typeof reconcileManualCarryWithClose>;
   selectedScope: PortfolioAnalysisScope;
   analysisScopes: readonly PortfolioAnalysisScope[];
   generatedAt: string;
@@ -226,6 +228,7 @@ export type DashboardData = {
     unsupportedCurrencyCount: number;
     unsupportedCurrencies: string[];
     latestFxRateDate: string | null;
+    latestFxRateKind?: "spot" | "daily_reference" | null;
     latestFxSource: string | null;
     latestFxFetchedAt: string | null;
     latestFxAgeDays: number | null;
@@ -275,7 +278,6 @@ export async function getPortfolioDashboard(
     assetGroupRows,
     assetRows,
     settingsRows,
-    latestFxRows,
     recentFxRows,
     latestPositionRows,
     baselineReferenceDate,
@@ -307,11 +309,11 @@ export async function getPortfolioDashboard(
   const valuationAssetRows = markDashboardInvestmentAssets(investmentAssetRows, liveQuoteRows);
   const selectedInvestmentAssetRows = valuationAssetRows;
   const setting = settingsRows[0] ?? null;
-  const latestFxRow = latestFxRows[0] ?? null;
-  const usdKrwRate =
-    resolveCurrentUsdKrwRate(latestFxRows, setting?.usdKrwRate) ?? 0;
-  const latestFxAgeDays = latestFxRow?.rateDate
-    ? diffDays(movementCycle.snapshotDate, latestFxRow.rateDate)
+  const valuationFx = selectCurrentValuationFx(recentFxRows, now);
+  const usdKrwRate = valuationFx ? Number(valuationFx.rate) : 0;
+  const rateDate = valuationFx ? currentKstDate(new Date(valuationFx.observedAt)) : null;
+  const latestFxAgeDays = rateDate
+    ? diffDays(currentKstDate(now), rateDate)
     : null;
   const fxFreshnessState = resolveFxFreshnessState(latestFxAgeDays, usdKrwRate);
   const trimDriftThreshold =
@@ -486,6 +488,10 @@ export async function getPortfolioDashboard(
     selectedScope: scope,
     ...(includeInvestmentReturn ? { investmentReturn: investmentHoldingReturn(holdings, investmentReturnBasis) } : {}),
     currentHoldingMovement,
+    manualCarryClose: scope.kind === "account" && baselineIsCurrent ? reconcileManualCarryWithClose({
+      holdings: holdingsBase, positions: latestPositionRows, movement: currentHoldingMovement, closingRows: recentPortfolioRows,
+      cutoffDate: movementCycle.snapshotDate, cycleStart: movementCycle.liveWindowStartAt, hasCycleEvents: movementEventRows.length > 0,
+    }) : null,
     analysisScopes,
     generatedAt: new Date().toISOString(),
     usdKrwRate,
@@ -598,9 +604,10 @@ export async function getPortfolioDashboard(
       unsupportedCurrencies: uniqueStrings(
         unsupportedCurrencyAssets.map((asset) => asset.currency),
       ).sort(),
-      latestFxRateDate: latestFxRow?.rateDate ?? null,
-      latestFxSource: latestFxRow?.source ?? null,
-      latestFxFetchedAt: latestFxRow?.fetchedAt?.toISOString() ?? null,
+      latestFxRateDate: rateDate,
+      latestFxRateKind: valuationFx?.kind ?? null,
+      latestFxSource: valuationFx?.source ?? null,
+      latestFxFetchedAt: valuationFx?.fetchedAt ?? null,
       latestFxAgeDays,
       fxFreshnessState,
     },

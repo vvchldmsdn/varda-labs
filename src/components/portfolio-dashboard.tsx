@@ -6,6 +6,7 @@ import { RecoveredPortfolioHistoryChart } from "@/components/recovered-return-se
 import { LocalizedLink } from "@/components/i18n/localized-link";
 
 import { T } from "@/components/i18n/localized-text";
+import { dashboardFxBasis, valuationFxLabel } from "@/lib/valuation-fx-basis";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
@@ -209,7 +210,7 @@ export function PortfolioDashboard({
             </ActionGroup>
             <p>
               USD/KRW {data.usdKrwRate > 0 ? data.usdKrwRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 }) : "-"}
-              {<T ko={data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : ""} en={translateHomeHistory(data.dataHealth.latestFxRateDate ? ` · ${formatDate(data.dataHealth.latestFxRateDate)}` : "")}/>}
+              {data.usdKrwRate > 0 && <> · <T {...valuationFxLabel(dashboardFxBasis(data))}/></>}
               {<T ko={` · ${movementBasisText(data)}`} en={translateHomeHistory(` · ${movementBasisText(data)}`)}/>}
             </p>
           </footer>

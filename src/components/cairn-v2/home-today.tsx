@@ -14,6 +14,7 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
   const domain = view.domain;
   const market = domain && !["loading", "unauthorized"].includes(domain.state) ? domain.currentHoldingMovement : null;
   const reviewChange = todayChangeForHistory(view);
+  const manualNames = reviewChange?.manualNames.join(", ");
   const reviewedMovement = reviewedMovementForView(view, reviewChange);
   const change = reviewChange ? reviewChange.changeKrw ?? null : domain ? market?.changeKrw ?? null : movementDisplay(view).value;
   const amount = displayReadMoney(view, change, currency, true, "dashboard");
@@ -21,8 +22,8 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
   const unavailable = amount === "—";
   const excluded = market?.exclusions?.filter(row => row.subject !== "aggregate") ?? [];
   const hasLocalPriceEvidence = excluded.some(row => row.localPurchases);
-  const showFactors = reviewChange ? !!reviewedMovement : market ? market.includedCount > 0 : !domain && view.rows.length > 0 && change !== null;
-  const factors = reviewChange ? reviewedMovement : market;
+  const factors = reviewChange && !manualNames ? reviewedMovement : market;
+  const showFactors = reviewChange && !manualNames ? !!reviewedMovement : market ? market.includedCount > 0 : !domain && view.rows.length > 0 && change !== null;
   return <div className={styles.body} data-available={!unavailable}>
     <div className={styles.headline}>
       {unavailable
@@ -39,7 +40,7 @@ export function HomeToday({ view, currency }: { view: BetaView; currency: BetaCu
         <summary>{market.excludedCount}종목 제외</summary>
         {excluded.length ? <ul>{excluded.map((row,i) => <li key={i}>{row.assetName ?? row.ticker ?? "종목 확인 전"} · {movementExclusionLabel(row.reason)}</li>)}</ul> : <p>제외 사유 확인 전</p>}
       </details>}
-      {reviewChange ? <p className={styles.note}>오전 7시 마감 평가액 대비{!reviewedMovement && !unavailable ? " · 가격·환율 근거 확인 전" : ""}</p> : !domain ? <p className={styles.note}>예시 · 전일 대비</p> : currency === "USD" && rate != null && <p className={styles.note}>변동률은 KRW 기준</p>}
+      {reviewChange ? <p className={styles.note}>오전 7시 마감 평가액 대비{manualNames ? ` · ${manualNames} 수동 평가액 유지` : !reviewedMovement && !unavailable ? " · 가격·환율 근거 확인 전" : ""}</p> : market?.partial && rate != null ? <p className={styles.note}>시세 비교 종목 기준 · KRW</p> : !domain ? <p className={styles.note}>예시 · 전일 대비</p> : currency === "USD" && rate != null && <p className={styles.note}>변동률은 KRW 기준</p>}
     </div>
   </div>;
 }

@@ -4,6 +4,7 @@ import { snapshotProgressMessage, type SnapshotProgress } from "@/lib/snapshots/
 
 import { T } from "@/components/i18n/localized-text";
 import { translateHomeHistory } from "@/components/home/home-history-messages";
+import { dashboardFxBasis, valuationFxLabel } from "@/lib/valuation-fx-basis";
 import { LocalizedElement } from "@/components/i18n/localized-element";
 import Link from "next/link";
 import guided from "./today/today-layout.module.css";
@@ -209,7 +210,7 @@ export function TodayMovement({
             <div>
               <CairnSectionTitle className={styles.panelTitle}><T ko="계산 근거" en="Calculation sources"/></CairnSectionTitle>
               <p className={styles.evidenceIntro}>
-                {movement.contributionRows.length}<T ko="개 기여 근거 ·" en="contribution records ·"/> {<T ko={formatDate(data.dataHealth.latestFxRateDate)} en={translateHomeHistory(formatDate(data.dataHealth.latestFxRateDate))}/>}<T ko="환율" en="FX rate"/></p>
+                {movement.contributionRows.length}<T ko="개 기여 근거 ·" en="contribution records ·"/> <T {...valuationFxLabel(dashboardFxBasis(data))}/></p>
             </div>
             <dl className={styles.metrics}>
               <RailEvidence label="기준 근거" value={sourceLabel(movement.source)} />

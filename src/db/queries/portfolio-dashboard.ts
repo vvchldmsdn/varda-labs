@@ -139,7 +139,7 @@ async function loadDashboardContextSources({
       loadActiveTenantAllocationGroups(tenantContext),
       assetRowsPromise,
       loadLatestTenantPortfolioSettingsRows(tenantContext),
-      loadUsablePortfolioFxRows(demand.surface === "home" ? RECENT_FX_OBSERVATION_LIMIT : 1),
+      loadUsablePortfolioFxRows(RECENT_FX_OBSERVATION_LIMIT, { asOf: now, includeHistory: demand.surface === "home" }),
     ]);
 
   const activeAccountIds = new Set(allAccountRows.map((account) => account.id));
@@ -269,6 +269,7 @@ async function loadDashboardContextSources({
       : db
           .select({
             snapshotDate: dailyPortfolioSnapshots.snapshotDate,
+            source: dailyPortfolioSnapshots.source,
             account: dailyPortfolioSnapshots.account,
             totalMarketValue: dailyPortfolioSnapshots.totalMarketValue,
             totalCost: dailyPortfolioSnapshots.totalCost,

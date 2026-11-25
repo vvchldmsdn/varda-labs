@@ -7,11 +7,12 @@ import {importUiWithPorts} from './helpers/import-ui-with-ports.mjs';
 import {originalCurrentComposition,originalCurrentValueSummary,originalLegacyValueView} from '../src/lib/cairn-v2/current-value-presentation.ts';
 import {getFixtureView} from '../src/lib/cairn-v2/fixtures.ts';
 import {investmentHoldingReturn} from '../src/lib/cairn-v2/investment-return.ts';
+import {valuationFxLabel} from '../src/lib/valuation-fx-basis.ts';
 const [{readBetaDomain},{blankDomainView,visibleDomainRead},{readBetaHome}]=await importWithPorts(['src/lib/cairn-v2/read-service.ts','src/lib/cairn-v2/read-contract.ts','src/lib/cairn-v2/home-read.ts'],{});
 
 const at='2026-09-02T00:00:00Z',owner='owned-user',scope={kind:'all',key:'all',label:'All'};
 const dashboard=()=>({generatedAt:at,totalValueKrw:999999,usdKrwRate:1400,holdings:[{id:'private-internal-id',name:'VOO',ticker:'VOO',account:'A',market:'us',currency:'USD',quantity:1,currentPrice:101,currentWeight:100,assetType:'etf',groupName:null,valueKrw:141400,priceAsOf:at,priceFetchedAt:at,priceSource:'stored'}],
-  selectedScope:scope,analysisScopes:[scope],todayMovement:{contributionRows:[],exclusions:[],ready:false,returnPct:null,source:null,reason:null},todayChangeKrw:null,nonInvestmentAssets:[],nonInvestmentTotalKrw:0,dataHealth:{latestFxRateDate:'2026-09-02'}});
+  selectedScope:scope,analysisScopes:[scope],todayMovement:{contributionRows:[],exclusions:[],ready:false,returnPct:null,source:null,reason:null},todayChangeKrw:null,nonInvestmentAssets:[],nonInvestmentTotalKrw:0,dataHealth:{latestFxRateDate:'2026-09-01',latestFxRateKind:'daily_reference',latestFxSource:'er-api_open_access'}});
 const evidence=(reporting='KRW')=>({ownerId:owner,reporting,asOf:at,current:{at,source:'owned_investments_current_only',scopeComplete:true,positions:[
   ...Array.from({length:15},(_,i)=>({id:`p${i}`,ownerId:owner,name:i===0?'VOO':`Holding ${i}`,ticker:i===0?'VOO':`T${i}`,kind:'holding',observation:{quantity:'1',price:'100',currency:'USD',at,priceObservedAt:'2026-09-01T20:00:00Z',priceFetchedAt:at,basis:'raw',source:'verified_quote'}})),
   {id:'gold',ownerId:owner,name:'Manual gold',observation:null,unsupportedReason:'manual_gold'},
@@ -190,6 +191,9 @@ test('legacy detail preserves the existing composition and cost presentation wit
     '@/components/currency-tracked-view':{CurrencyTrackedView:()=>null},
   });
   const html=renderToStaticMarkup(createElement(module.OriginalValueDetail,{read,view,context}));
+  assert.match(html,/일별 기준환율 · 2026-09-01 · ExchangeRate-API/);
+  assert.equal(valuationFxLabel(mapped.domain.moneyBasis.structure).en,'Daily reference rate · 2026-09-01 · ExchangeRate-API');
+  assert.equal(valuationFxLabel({usdKrwRate:1400,rateDate:null,rateKind:null}).ko,'평가환율 · 관측일 미제공');
   assert.match(html,/data-value-ribbon/);assert.match(html,/원가와 손익/);assert.match(html,/999,999/);assert.match(html,/141,400/);
   read.data.holdings.push({...read.data.holdings[0],name:'Unknown price',ticker:'MISSING',currentPrice:0,valueKrw:0,currentWeight:0});
   const partial=originalLegacyValueView(view,read);assert.equal(partial.domain.valueState,'partial');assert.equal(partial.totalKrw,null);assert.equal(partial.domain.knownSubtotalKrw,141400);

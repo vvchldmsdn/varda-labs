@@ -145,7 +145,8 @@ test("investment live marks reuse the home quote and retain proven manual and fi
     currentPrice:"450",fractionalKrwValue:null,priceSource:null,priceAsOf:null,priceFetchedAt:null};
   const sold={...asset,id:id(151),ticker:"SOLD",quantity:"0.00000000",fractionalKrwValue:null,currentPrice:null};
   const sources={assetRows:[asset,manual,sold],accountRows:[{id:account,nativeState:null}],
-    latestFxRows:[{usdKrw:"1000",observedAt:markTime,fetchedAt:markTime,rateKind:"spot",source:"kis"}],
+    recentFxRows:[{usdKrw:"1050",observedAt:null,fetchedAt:now,rateKind:null,source:"kis",status:"ok",isSample:false},
+      {usdKrw:"1000",observedAt:markTime,fetchedAt:markTime,rateKind:"daily_reference",source:"er_api",status:"ok",isSample:false}],
     liveQuoteRows:[{market:"us",ticker:"AAA",currency:"USD",status:"ok",source:"kis",price:"110",
       priceAsOf:markTime,fetchedAt:markTime,quoteType:"live"}]};
   const latest=new Map([[account,{at:"2025-06-02T22:00:00Z",observation:{positions:[
@@ -170,7 +171,7 @@ test("investment live marks reuse the home quote and retain proven manual and fi
   assert.equal(positions[1].carriedMark,true);
   manual.currentPrice="455";
   assert.equal(run(),null);
-  manual.currentPrice="450"; sources.latestFxRows=[];
+  manual.currentPrice="450"; sources.recentFxRows.pop();
   assert.equal(run(),null);
 });
 
