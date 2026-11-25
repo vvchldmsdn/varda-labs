@@ -484,6 +484,13 @@
       "when": 1795651200000,
       "tag": "0068_reviewed_archived_asset_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795737600000,
+      "tag": "0069_reviewed_identity_native_rebuy",
+      "breakpoints": true
     }
   ]
 }

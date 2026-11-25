@@ -1,5 +1,6 @@
 import "server-only";
 import { brokerRecoverySnapshotPredicateText } from "@/db/queries/broker-recovery-snapshot-scope";
+import { withCanonicalAllHistoryRows } from "@/lib/cairn-v2/history-read-sql";
 
 import { portfolioDashboardHistoryDisplayDate } from "@/lib/portfolio-dashboard-history";
 
@@ -22,7 +23,7 @@ export async function loadTenantHistoryPortfolioRows({
   const [rows] = await runTenantReadTransaction(
     tenantContext.ownerUserId,
     (transaction) => [
-      transaction.query(TENANT_HISTORY_PORTFOLIO_ROWS_SQL, [
+      transaction.query(accountIds ? TENANT_HISTORY_PORTFOLIO_ROWS_SQL : TENANT_HISTORY_ALL_PORTFOLIO_ROWS_SQL, [
         accountIds ?? null,
       ]),
     ],
@@ -142,6 +143,8 @@ const TENANT_HISTORY_PORTFOLIO_ROWS_SQL = `
     and ($1::uuid[] is null or account.id = any($1::uuid[]))
   order by snapshot.snapshot_date, account.sort_order, account.code, snapshot.source
 `;
+
+const TENANT_HISTORY_ALL_PORTFOLIO_ROWS_SQL = withCanonicalAllHistoryRows(TENANT_HISTORY_PORTFOLIO_ROWS_SQL, true);
 
 const TENANT_HISTORY_POSITION_DETAIL_ROWS_SQL = `
   select

@@ -250,6 +250,7 @@ export function HistoryChart({
       <div ref={setPlotElement} className={styles.historyPlot} data-history-plot data-interactive={interactive || undefined}>
       {showTooltip && <HomeHistoryTooltip id={tooltipId}
         date={selectedRow.liveAsOf ? formatLiveValuationTime(selectedRow.liveAsOf) : selectedRow.date} returns={metric === "return"} value={selectedValue} reviewed={selectedRow.source === reviewedSource || data?.points[selectedIndex]?.accountReview}
+        partialAll={metric === "value" && selectedRow.account === "all" && selectedRow.rowKind === "partial"}
         impact={inspectedImpact} performance={data?.points[selectedIndex]} plot={plot} points={tooltipPoints}
         anchor={{x: selectedX, y: selectedPoint?.y ?? height / 2}} />}
       <svg

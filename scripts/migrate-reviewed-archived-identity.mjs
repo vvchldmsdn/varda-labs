@@ -6,7 +6,9 @@ import { Client } from "pg";
 import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
 import { guardProductionDatabaseTarget } from "../src/lib/deployment/production-database-target.ts";
 
-const migration = "0068_reviewed_archived_asset_identity";
+const publication = "0068_reviewed_archived_asset_identity";
+const migration = "0069_reviewed_identity_native_rebuy";
+const publicationHash = "f7939adf0459c4a8c50ef8eeb3f607eb1c869f1a521ae1baa3e21448fd67dba1";
 const readMigration = tag => readFileSync(new URL("../drizzle/" + tag + ".sql", import.meta.url), "utf8");
 const digest = value => createHash("sha256").update(value).digest("hex");
 
@@ -26,15 +28,30 @@ async function verifyGuard(client, expected) {
   if (!rows[0]?.valid || rows[0].body.replaceAll("\r\n", "\n") !== expected) throw new Error("lifecycle_guard_mismatch");
 }
 
+export async function verifyPublishedIdentityGuard(client, tag) {
+  const definitions = {
+    "0067_daily_valuation_fx": "0052_native_legacy_lifecycle_guard",
+    [publication]: publication,
+    [migration]: migration,
+  };
+  if (!Object.hasOwn(definitions, tag)) throw new Error("migration_frontier_mismatch");
+  await verifyGuard(client, expectedBody(readMigration(definitions[tag])));
+}
+
 export async function migrateReviewedArchivedIdentity(client, mode = "check") {
   if (mode !== "check" && mode !== "apply") throw new Error("invalid_release_mode");
   const journal = JSON.parse(readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8")).entries;
   const entry = journal.find(item => item.tag === migration);
-  const previous = journal[entry.idx - 1];
+  const first = journal[entry.idx - 1];
+  const previous = journal[first.idx - 1];
   const sql = readMigration(migration);
+  const publicationSql = readMigration(publication);
   const hash = digest(sql);
   const reviewed = PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration;
-  if (reviewed.tag !== migration || reviewed.createdAt !== entry.when || reviewed.sha256 !== hash) throw new Error("release_artifact_mismatch");
+  if (reviewed.tag !== migration || reviewed.createdAt !== entry.when || reviewed.sha256 !== hash ||
+      first.tag !== publication || digest(publicationSql) !== publicationHash || previous.tag !== "0067_daily_valuation_fx") {
+    throw new Error("release_artifact_mismatch");
+  }
 
   await client.query(mode === "check" ? "begin isolation level repeatable read read only" : "begin");
   try {
@@ -46,11 +63,17 @@ export async function migrateReviewedArchivedIdentity(client, mode = "check") {
     }
     const latest = (await client.query("select hash,created_at from drizzle.__drizzle_migrations order by created_at desc limit 1")).rows[0];
     const installed = Number(latest?.created_at) === entry.when && latest.hash === hash;
-    if (!installed && (Number(latest?.created_at) !== previous.when || latest.hash !== digest(readMigration(previous.tag)))) {
+    const hasPublication = Number(latest?.created_at) === first.when && latest.hash === publicationHash;
+    if (!installed && !hasPublication && (Number(latest?.created_at) !== previous.when || latest.hash !== digest(readMigration(previous.tag)))) {
       throw new Error("migration_frontier_mismatch");
     }
-    await verifyGuard(client, expectedBody(installed ? sql : readMigration("0052_native_legacy_lifecycle_guard")));
+    await verifyPublishedIdentityGuard(client, installed ? migration : hasPublication ? publication : previous.tag);
     if (!installed && mode === "apply") {
+      if (!hasPublication) {
+        await client.query(publicationSql);
+        await client.query("insert into drizzle.__drizzle_migrations(hash,created_at) values($1,$2)", [publicationHash,first.when]);
+        await verifyGuard(client, expectedBody(publicationSql));
+      }
       await client.query(sql);
       await client.query("insert into drizzle.__drizzle_migrations(hash,created_at) values($1,$2)", [hash,entry.when]);
       await verifyGuard(client, expectedBody(sql));

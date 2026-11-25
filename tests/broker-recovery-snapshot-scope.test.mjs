@@ -63,18 +63,18 @@ describe('broker recovery historical evidence admission', () => {
     const pg = new PGlite();
     try {
       const [schema]=await importWithPorts(['src/db/schema.ts'],{});
-      for(const table of [schema.accounts,schema.assets,schema.dailyPortfolioSnapshots,schema.dailyPositionSnapshots]) {
+      for(const table of [schema.accounts,schema.assets,schema.dailyPortfolioSnapshots,schema.dailyPositionSnapshots,schema.eventLedgerEntries]) {
         await pg.exec(`create table ${getTableName(table)} (${Object.values(getTableColumns(table)).map(c=>`"${c.name}" ${c.getSQLType()}`).join(',')})`);
       }
       await revisionFixture(pg);
       await pg.exec(`create table broker_recovery_batches(canonical_owner_user_id uuid,account_id uuid,manifest jsonb,recorded_at timestamptz);
         create role snapshot_recovery_test;
-        grant select on accounts,assets,daily_portfolio_snapshots,daily_position_snapshots,broker_recovery_batches,native_ledger_revisions to snapshot_recovery_test;`);
-      for(const table of ['accounts','assets','daily_portfolio_snapshots','daily_position_snapshots','broker_recovery_batches','native_ledger_revisions']) {
+        grant select on accounts,assets,daily_portfolio_snapshots,daily_position_snapshots,broker_recovery_batches,native_ledger_revisions,event_ledger_entries to snapshot_recovery_test;`);
+      for(const table of ['accounts','assets','daily_portfolio_snapshots','daily_position_snapshots','broker_recovery_batches','native_ledger_revisions','event_ledger_entries']) {
         await pg.exec(`alter table ${table} enable row level security;create policy owner_read on ${table} for select to snapshot_recovery_test using(canonical_owner_user_id=current_setting('app.current_user_id')::uuid)`);
       }
       for(const [a,o,code] of [[brokerage,owner,'brokerage'],[isa,owner,'isa'],[otherAccount,otherOwner,'brokerage']]) {
-        await pg.query('insert into accounts(id,canonical_owner_user_id,code,name,sort_order,is_active) values($1,$2,$3,$3,1,true)',[a,o,code]);
+        await pg.query(`insert into accounts(id,canonical_owner_user_id,code,name,sort_order,is_active,account_type,created_at) values($1,$2,$3,$3,1,true,'investment','2026-07-01')`,[a,o,code]);
         for(const day of ['2026-07-15','2026-07-16']) {
           await pg.query(`insert into daily_portfolio_snapshots(id,canonical_owner_user_id,account_id,account,snapshot_date,source,is_sample,total_market_value,captured_at,created_at) values($1,$2,$3,$4,$5,'varda_manual_daily_snapshot',false,100,'2026-07-17T08:00:00Z','2026-07-17T08:00:00Z')`,[id(Number(a.slice(-2))*100+Number(day.slice(-2))),o,a,code,day]);
         }
@@ -105,6 +105,29 @@ describe('broker recovery historical evidence admission', () => {
       assert.deepEqual(await history.loadTenantHistoryPositionDetailRows(detailArgs),[]);
       assert.deepEqual(await history.loadTenantHistoryPositionComparisonRows(detailArgs),[]);
       assert.deepEqual(await history.loadTenantHistoryGroupPositionRows({tenantContext:{ownerUserId:owner},accountIds:[brokerage],assetIds:[],earliestMembershipDate:'2026-07-01'}),[]);
+
+      const hash='a'.repeat(64);
+      const source='varda_manual_daily_snapshot';
+      const cycleEnd='2026-07-13T22:00:00Z';
+      const reviewed='broker_account_review_close_v1';
+      const summary='broker_account_review_aggregate_v1';
+      for(const [n,accountId,code,day,cutoff,origin,value,rule,receipt,description] of [
+        [201,brokerage,'brokerage','2026-07-14',cycleEnd,source,180,reviewed,{reviewEvidenceHash:hash},null],
+        [202,isa,'isa','2026-07-13',null,'base44_import',80,null,null,null],
+        [203,null,'all','2026-07-14',cycleEnd,source,260,summary,null,`snapshot_status=complete; accounts=2; other_component_source=base44_import; review_hash=${hash}`],
+      ]) {
+        await pg.query(`insert into daily_portfolio_snapshots(id,canonical_owner_user_id,account_id,account,snapshot_date,cycle_end_at,source,is_sample,total_market_value,rule_version,closing_performance,description,regime_label,updated_at)
+          values ($1,$2,$3,$4,$5,$6,$7,false,$8,$9,$10,$11,'verified-risk','2026-07-21T00:00:00Z')`,[id(n),owner,accountId,code,day,cutoff,origin,value,rule,receipt,description]);
+      }
+      const fetchRows=(who,accountIds)=>history.loadTenantHistoryPortfolioRows({tenantContext:{ownerUserId:who},accountIds});
+      const [stored]= (await fetchRows(owner)).filter(row=>row.account==='all');
+      assert.equal(stored?.valuationDate,'2026-07-13');
+      assert.equal(Number(stored.totalMarketValue),260);
+      assert.equal(stored.regimeLabel,'verified-risk');
+      assert.equal((await fetchRows(owner,[brokerage])).some(row=>row.account==='all'),false);
+      assert.equal((await fetchRows(otherOwner)).some(row=>row.account==='all'),false);
+      await pg.query('update daily_portfolio_snapshots set total_market_value=81 where id=$1',[id(202)]);
+      assert.equal((await fetchRows(owner)).some(row=>row.account==='all'),false);
 
     } finally { await pg.close(); }
   });

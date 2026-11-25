@@ -128,8 +128,13 @@ async function readNativeMutationContext(tenant: TenantContext, input: NativeMut
       from daily_portfolio_snapshots where canonical_owner_user_id=$1::uuid and account_id=any($2::uuid[]) and native_evidence is not null
       order by account_id,(native_evidence->'frame'->>'at')::timestamptz desc,(native_evidence->'frame'->>'boundary' is null) desc`, [tenant.ownerUserId, ids]),
     tx.query("select 1 from native_operation_cancellations where canonical_owner_user_id=$1::uuid and operation_id=$2::uuid",[tenant.ownerUserId,input.operationId]),
+    ...(input.newAsset ? [tx.query(`select id from assets where canonical_owner_user_id=$1::uuid and account_id=$2::uuid
+      and upper(ticker)=$3 and market=$4 and currency=$5 and asset_type is null
+      and created_by_id ~ '^broker_account_review_close_v1:[0-9a-f]{64}$' limit 2`,
+      [tenant.ownerUserId,input.accountId,input.newAsset.ticker,input.newAsset.market,input.newAsset.currency])] : []),
   ], { isolationLevel: "RepeatableRead", readOnly: true });
-  return { accounts: result[1] as NativeStoredAccount[], duplicate: result[2][0], captures: result[3] as { accountId: string; at: string; boundary?: string }[],cancelled:result[4].length>0 };
+  return { accounts: result[1] as NativeStoredAccount[], duplicate: result[2][0], captures: result[3] as { accountId: string; at: string; boundary?: string }[],cancelled:result[4].length>0,
+    reviewedIdentityId: result[5]?.length === 1 ? result[5][0].id : null };
 }
 
 type NativeUserEvent = NativeEvent extends infer E ? E extends NativeEvent ? Omit<E, "id" | "sequence" | "source"> : never : never;
@@ -190,7 +195,8 @@ export async function writeNativeMutation(tenant: TenantContext, input: NativeMu
   // original request remains the idempotency key's payload, not its projection.
   if (newAsset && userEvent?.type === "buy") {
     const matches = account.assets.filter(a => a.ticker?.toUpperCase() === newAsset!.ticker && a.market === newAsset!.market);
-    if (matches.length > 1 || matches.some(a => a.currency !== newAsset!.currency || a.assetType !== newAsset!.assetType)) return { status: "invalid" as const, reason: "instrument_identity_conflict" };
+    if (matches.length > 1 || matches.some(a => a.currency !== newAsset!.currency ||
+        (a.assetType !== newAsset!.assetType && a.id !== ledger.reviewedIdentityId))) return { status: "invalid" as const, reason: "instrument_identity_conflict" };
     if (matches.length === 1) { userEvent = { ...userEvent, assetId: matches[0].id }; newAsset = undefined; }
   }
   if (userEvent && "assetId" in userEvent && userEvent.assetId && !newAsset && !account.assets.some(asset => asset.id === userEvent.assetId)) return { status: "invalid" as const, reason: "holding_scope_mismatch" };

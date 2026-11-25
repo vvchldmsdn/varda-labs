@@ -108,6 +108,10 @@ test("the compact readout keeps the display valuation and reports only observed 
   assert.match(markup, /현재 보유 기준/);
   assert.match(markup, /data-tooltip-series="price".*?0원/);
   assert.match(markup, /data-tooltip-series="fx".*?aria-label="자료 없음".*?—/);
+  const subtotal = renderToStaticMarkup(createElement(HomeHistoryTooltip, { ...props, partialAll: true }));
+  assert.match(subtotal, /전체 평가액 미확정/);
+  assert.match(subtotal, /확인 계좌 소계/);
+  assert.doesNotMatch(subtotal, /data-tooltip-series="price"/);
 });
 
 test("a rising valuation line stays visible at both ends of a 270px mobile plot", () => {

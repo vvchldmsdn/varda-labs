@@ -9,6 +9,7 @@ import { sqlTransport } from './krw-usd-rc-rehearsal.mjs';
 /** Only called with pools from the fresh, loopback-only disposable PG runner. */
 export async function runCutoffObservationCases({admin,worker,tenant,report}) {
   const sessions=new Set(), transport=sqlTransport(worker,sessions);
+  const tenantTransport=sqlTransport(tenant,sessions);
   let gate=false,arrivals=0,release, mutateBeforeWrite=null;
   const barrier=new Promise(resolve=>{release=resolve;});
   const sqlClient={...transport,async transaction(build,options){
@@ -20,10 +21,14 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     }
     return transport.transaction(tx=>commands.map(q=>tx.query(q.text,q.parameters)),options);
   }};
+  const readWritePorts = {
+    '@/db/client': { db: drizzle(worker), sqlClient },
+    '@/db/tenant-client': { getTenantSqlClient: () => tenantTransport },
+  };
   const [sync,lease,fx,reader,daily,runs]=await importWithPorts([
     'src/lib/market-data/price-sync.ts','src/lib/market-data/kis-refresh-lease.ts','src/lib/market-data/fx-refresh-job.ts',
     'src/db/queries/snapshot-cutoff-observations.ts','src/lib/snapshots/daily.ts','src/lib/cron-market-cycle-run-repository.ts',
-  ],{'@/db/client':{db:drizzle(worker),sqlClient}});
+  ],readWritePorts);
   const check=async(name,task)=>{const row={name,status:'FAIL'};report.cases.push(row);await task();row.status='PASS';};
   const owner=randomUUID(),account=randomUUID(),asset=randomUUID();
   const snapshotDate=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
@@ -50,7 +55,7 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
   await check('cutoff-real-writer-cache-overwrite-retains-precutoff-price-and-fx',async()=>{
     const [runner]=await importWithPorts(['src/lib/cron-market-cycle-runner.ts'],{
       'next/server':{after:nextServer.after,NextResponse:nextServer.NextResponse},
-      '@/db/client':{db:drizzle(worker),sqlClient},
+      ...readWritePorts,
       '@/lib/market-data/collection-worker':{scheduleMarketCollection:()=>assert.fail('preparation must never schedule auxiliary provider work'),drainMarketCollection:()=>assert.fail('preparation must never drain auxiliary provider work')},
       // Financial clock is a historical synthetic cutoff; SQL lease expiration
       // uses the real database clock. Keep both actual repository functions.
@@ -212,10 +217,8 @@ export async function runCutoffObservationCases({admin,worker,tenant,report}) {
     ]);
     const hash=policy.createPortfolioTargetUniverseHash({scope,universe:universe.rows});
     let readRevision=0;let modelRows=universe.rows;let currentHash=hash;let policyVersion='portfolio_target_policy_v1';
-    const tenantTransport=sqlTransport(tenant,sessions);
     const [writer,reader]=await importWithPorts(['src/lib/portfolio-target-policy-write.ts','src/db/queries/tenant-target-policies.ts'],{
-      '@/db/client':{db:drizzle(worker),sqlClient},
-      '@/db/tenant-client':{getTenantSqlClient:()=>tenantTransport},
+      ...readWritePorts,
       './tenant-client':{getTenantSqlClient:()=>tenantTransport},
       // Only the external identity and pre-write screen projection are substituted.
       // The actual SQL writer, lock/CAS and RLS reader are exercised below.
