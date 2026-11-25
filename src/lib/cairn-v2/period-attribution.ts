@@ -9,7 +9,7 @@ export type AttributionPosition = {
 };
 export type AttributionAccountObservation = {
   date: string; accountId: string; expectedPositions: number | null; positions: AttributionPosition[];
-  reviewed?: { valueKrw: number | null; estimated: boolean; tradesKnown: boolean };
+  reviewed?: { valueKrw: number | null; estimated: boolean; tradesKnown: boolean; materialized?: true };
 };
 export type AttributionTrade = {
   date: string; accountId: string; assetId: string | null; quantityDelta: number | null;
@@ -143,7 +143,8 @@ function accountImpact(before: Roster | null | undefined, after: Roster | null |
   trades: AttributionTrade[], record: (id: string, name: string, value: Amounts) => void,
   gap: (reason: PeriodGapReason, id?: string, name?: string) => void) {
   if (!before || !after) { gap("account_history"); return; }
-  if (!!before.reviewed !== !!after.reviewed) { gap("account_history"); return; }
+  const reviewOverlay = (row: NonNullable<Roster>) => !!row.reviewed && !row.reviewed.materialized;
+  if (reviewOverlay(before) !== reviewOverlay(after)) { gap("account_history"); return; }
   if (after.reviewed && !after.reviewed.tradesKnown) { gap("trade"); return; }
   if (!before.known || !after.known) gap("holding_history");
   const byAsset = new Map<string, AttributionTrade[]>();

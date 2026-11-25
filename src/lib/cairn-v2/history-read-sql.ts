@@ -30,7 +30,7 @@ export function holdingsRevisionValidSql(alias: string, scopeAccountsSql?: strin
 
 /** Static SQL identifiers only; never pass request text as an alias or scope. */
 export function brokerRecoverySnapshotPredicateText(
-  alias: "snapshot" | "daily_position_snapshots" | "daily_portfolio_snapshots",
+  alias: "snapshot" | "anchor" | "component" | "daily_position_snapshots" | "daily_portfolio_snapshots",
   scopeAccountsSql?: string,
   snapshotTable: "daily_position_snapshots" | "daily_portfolio_snapshots" = alias === "daily_position_snapshots" ? "daily_position_snapshots" : "daily_portfolio_snapshots",
 ) {
@@ -92,6 +92,74 @@ export const BETA_HISTORY_PORTFOLIO_ROWS_SQL = `
     and ($1::uuid[] is null or account.id = any($1::uuid[]))
   order by snapshot.snapshot_date, account.sort_order, account.code, snapshot.source
 `;
+
+/** Cash accounts are outside investment closes. A later account joins the
+ * historical roster if it brought backdated positions, receipts or events.
+ * Every member must remain visible and have a receipt for the same market day. */
+export function withCanonicalAllHistoryRows(accountRowsSql: string, includeRiskEvidence = false) {
+  const riskEvidence = includeRiskEvidence ? `,
+    snapshot.avg_correlation::text, snapshot.enb::text, snapshot.portfolio_volatility::text,
+    snapshot.regime_label, snapshot.regime_score::text` : "";
+  return `
+    select * from (${accountRowsSql}) as account_rows
+    union all
+    select snapshot.snapshot_date::text, snapshot.cycle_end_at::text, snapshot.account, snapshot.source,
+      snapshot.cash_value::text, snapshot.invested_amount::text, snapshot.total_cost::text,
+      snapshot.total_market_value::text, snapshot.total_pnl::text, snapshot.total_return_pct::text${riskEvidence}
+    from public.daily_portfolio_snapshots snapshot
+    where $1::uuid[] is null
+      and snapshot.canonical_owner_user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+      and snapshot.account = 'all' and snapshot.account_id is null and not snapshot.is_sample
+      and snapshot.source = 'varda_manual_daily_snapshot' and snapshot.rule_version = 'broker_account_review_aggregate_v1'
+      and snapshot.cycle_end_at at time zone 'Asia/Seoul' = snapshot.snapshot_date::timestamp + interval '7 hours'
+      and ${brokerRecoverySnapshotPredicateText("snapshot")}
+      and exists (
+        select 1
+        from public.daily_portfolio_snapshots anchor
+        join public.accounts anchor_account on anchor_account.id = anchor.account_id
+          and anchor_account.code = anchor.account and anchor_account.is_active
+          and anchor_account.canonical_owner_user_id = snapshot.canonical_owner_user_id
+        where anchor.canonical_owner_user_id = snapshot.canonical_owner_user_id and not anchor.is_sample
+          and anchor.snapshot_date = snapshot.snapshot_date and anchor.cycle_end_at = snapshot.cycle_end_at
+          and anchor.source = snapshot.source and anchor.rule_version = 'broker_account_review_close_v1'
+          and anchor.closing_performance->>'reviewEvidenceHash' =
+            substring(snapshot.description from '(?:^|; )review_hash=([0-9a-f]{64})(?:;|$)')
+          and ${brokerRecoverySnapshotPredicateText("anchor")}
+          and exists (
+            select 1 from public.accounts owned
+            left join public.daily_portfolio_snapshots component
+              on component.canonical_owner_user_id = owned.canonical_owner_user_id
+              and component.account_id = owned.id and component.account = owned.code and not component.is_sample
+              and case when owned.id = anchor.account_id then component.id = anchor.id else
+                component.source = substring(snapshot.description from '(?:^|; )other_component_source=(base44_import|varda_manual_daily_snapshot)(?:;|$)')
+                and case when component.source = 'base44_import' then component.snapshot_date = snapshot.snapshot_date - 1
+                  else component.snapshot_date = snapshot.snapshot_date and component.cycle_end_at = snapshot.cycle_end_at end
+              end
+              and ${brokerRecoverySnapshotPredicateText("component")}
+            where owned.canonical_owner_user_id = snapshot.canonical_owner_user_id and owned.account_type <> 'cash'
+              and (owned.created_at <= snapshot.cycle_end_at or exists (
+                select 1 from public.daily_portfolio_snapshots prior
+                where prior.account_id = owned.id and prior.canonical_owner_user_id = owned.canonical_owner_user_id
+                  and not prior.is_sample and (prior.snapshot_date < snapshot.snapshot_date or
+                    (prior.snapshot_date = snapshot.snapshot_date and prior.source = snapshot.source))
+              ) or exists (
+                select 1 from public.daily_position_snapshots prior
+                where prior.account_id = owned.id and prior.canonical_owner_user_id = owned.canonical_owner_user_id
+                  and not prior.is_sample and (prior.snapshot_date < snapshot.snapshot_date or
+                    (prior.snapshot_date = snapshot.snapshot_date and prior.source = snapshot.source))
+              ) or exists (
+                select 1 from public.event_ledger_entries prior
+                where prior.account_id = owned.id and prior.canonical_owner_user_id = owned.canonical_owner_user_id
+                  and not prior.is_sample and prior.event_date < snapshot.snapshot_date
+              ))
+            having bool_and(owned.is_active)
+              and count(distinct owned.id) = substring(snapshot.description from '(?:^|; )accounts=([1-9][0-9]{0,5})(?:;|$)')::int
+              and count(*) = count(distinct owned.id) and count(component.total_market_value) = count(*)
+              and abs(sum(component.total_market_value) - snapshot.total_market_value) <= 0.01
+          )
+      )
+    order by snapshot_date, account, source`;
+}
 
 // Parameters: [first membership date, owned whole-account UUIDs, owned asset UUIDs].
 export const BETA_HISTORY_GROUP_POSITION_ROWS_SQL = `

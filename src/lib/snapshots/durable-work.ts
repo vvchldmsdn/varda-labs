@@ -2,6 +2,7 @@ import { holdingsPortfolioSql } from "@/lib/portfolio-presentation-policy";
 import "server-only";
 import { snapshotWorkRevisionAppliesSql } from "./holdings-revision-policy";
 import { readClosingPerformance } from "./closing-performance";
+import { CANONICAL_REVIEW_RULE } from "../cairn-v2/canonical-close";
 import { sqlClient } from "@/db/client";
 import {snapshotFence,snapshotDeadline} from "./write-context";
 export {snapshotFence,snapshotDeadline} from "./write-context";
@@ -84,7 +85,8 @@ export async function finishValuedSnapshot(work: SnapshotWork) {
           and ${snapshotWorkRevisionAppliesSql("w")}),0)
     for update of w
   ), target as materialized (
-    select s.id, s.closing_performance is distinct from $6::jsonb as changed
+    select s.id, (s.rule_version='${CANONICAL_REVIEW_RULE}' and s.closing_performance->>'reviewEvidenceHash' ~ '^[a-f0-9]{64}$')
+      is not true and s.closing_performance is distinct from $6::jsonb as changed
     from daily_portfolio_snapshots s join active w on w.account_id=s.account_id
       and w.canonical_owner_user_id=s.canonical_owner_user_id and w.snapshot_date=s.snapshot_date
     where s.id=$5::uuid and not s.is_sample and (

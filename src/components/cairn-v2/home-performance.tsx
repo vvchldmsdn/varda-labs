@@ -169,6 +169,7 @@ export function PerformanceCaption({ data, empty = false }: { data: PeriodPerfor
     {last?.segment && t(" · " + last.segment.replaceAll("-", ".") + " 기준", " · since " + last.segment)}
     {read?.limitedHistory && t(" · 최근 10년 내 확인 구간", " · verified within the last 10 years")}
     {data.includesClosingFx && t(" · 일부 환율 추정", " · some trades use valuation FX")}
+    {last?.reviewEstimated && t(" · 복구 추정치 포함", " · includes reconstructed estimates")}
     {data.includesCarriedMarks && t(" · 일부 최근 확인가", " · some prior marks")}
     {last?.liveAsOf && <> · <time dateTime={last.liveAsOf}>{t("잠정", "Provisional")} {formatLiveValuationTime(last.liveAsOf)}</time></>}
   </p>;

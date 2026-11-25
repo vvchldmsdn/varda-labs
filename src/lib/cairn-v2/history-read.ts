@@ -11,7 +11,7 @@ import { buildPortfolioGroupHistoryRows, type HistoryPositionScopeCandidate, typ
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import type { TenantContext } from "@/lib/session-resolver-contract";
 import { betaHistoryValuationDate, commonBetaHistoryValuationDate } from "./history-date";
-import { BETA_HISTORY_PORTFOLIO_ROWS_SQL, BETA_HISTORY_GROUP_POSITION_ROWS_SQL, recentBetaHistorySql } from "./history-read-sql";
+import { BETA_HISTORY_PORTFOLIO_ROWS_SQL, BETA_HISTORY_GROUP_POSITION_ROWS_SQL, recentBetaHistorySql, withCanonicalAllHistoryRows } from "./history-read-sql";
 
 type DatedRawRow = PortfolioHistoryRawRow & { valuationDate: string | null };
 type DatedPositionRow = HistoryPositionScopeCandidate & { valuationDate: string | null };
@@ -74,8 +74,9 @@ export async function getBetaHistoryRead(args: ReadArgs): Promise<BetaHistoryRea
 }
 
 async function loadAccountRows(tenant: TenantContext, scope: Exclude<PortfolioAnalysisScope, { kind: "portfolio_group" }>, window?: "recent"): Promise<DatedRawRow[]> {
+  const sql = scope.kind === "all" ? withCanonicalAllHistoryRows(BETA_HISTORY_PORTFOLIO_ROWS_SQL) : BETA_HISTORY_PORTFOLIO_ROWS_SQL;
   const [rows] = await runTenantReadTransaction(tenant.ownerUserId, tx => [
-    tx.query(window ? recentBetaHistorySql(BETA_HISTORY_PORTFOLIO_ROWS_SQL) : BETA_HISTORY_PORTFOLIO_ROWS_SQL, [scope.kind === "account" ? [scope.accountId] : null]),
+    tx.query(window ? recentBetaHistorySql(sql) : sql, [scope.kind === "account" ? [scope.accountId] : null]),
   ]);
   return rows.map(projectPortfolioRow);
 }

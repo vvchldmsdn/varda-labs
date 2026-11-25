@@ -17,18 +17,21 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0067_daily_valuation_fx",
-    createdAt: 1795564800000,
+    tag: "0069_reviewed_identity_native_rebuy",
+    createdAt: 1795737600000,
     sha256:
-      "86ef397f7dafdaf0f2568903f74b0231d22e0d9d82bee6604fa3060f6a4ad180",
+      "e79a81616941affe60929bbb8dbfe1c1c50121abe23e4f6267f21312f8ab895b",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 68,
+    entryCount: 70,
     sha256:
-      "sha256:453aa9face60673c279aebd35a1f55aee1f3258d16fac1f88ba38f0bf652f609",
+      "sha256:77b0d5b468bc02357fc59ee8fd93035d26813fde783a96629ceef389f18bd78b",
   }),
-  // Current inherited databases only. New DDL requires a separate reviewed release.
-  allowedPendingMigrations: Object.freeze([]),
+  // Older preview branches can install only these reviewed, function-only changes.
+  allowedPendingMigrations: Object.freeze([
+    Object.freeze({tag:"0068_reviewed_archived_asset_identity",createdAt:1795651200000,sha256:"f7939adf0459c4a8c50ef8eeb3f607eb1c869f1a521ae1baa3e21448fd67dba1"}),
+    Object.freeze({tag:"0069_reviewed_identity_native_rebuy",createdAt:1795737600000,sha256:"e79a81616941affe60929bbb8dbfe1c1c50121abe23e4f6267f21312f8ab895b"}),
+  ]),
 });
 
 export type PreviewDatabaseTargetGuardEnvironment = {

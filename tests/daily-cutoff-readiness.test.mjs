@@ -10,6 +10,28 @@ const cutoff = new Date("2026-09-09T22:00:00Z");
 const observed = new Date("2026-09-09T21:59:00Z");
 
 describe("daily cutoff readiness through the legacy writer and Cron plan", () => {
+  it("writes only holdings in the approved basket and saves an explicit empty close when all are excluded", async () => {
+    const f=await fixture({canonical:true});
+    const asset=f.rows.assets[0];
+    f.rows.assets.push({...asset,id:"excluded",name:"Excluded",ticker:"NO-BUY",quantity:"2000",currency:"KRW",market:"korea"});
+    f.rows.event_ledger_entries=[{ id:"sold",accountId:asset.accountId,account:asset.account,assetId:"excluded",assetName:"Excluded",ticker:"NO-BUY",eventType:"sell",
+      eventDate:"2026-09-08",createdAt:"2026-09-08T20:00:00Z",updatedAt:"2026-09-08T20:00:00Z",quantityDelta:"-1",amountKrw:"100000000" }];
+    const first=await f.run({account:"all"});
+    assert.equal(first.results.brokerage.totalMarketValue,1365000);
+    assert.equal(first.results.all.totalMarketValue,1365000);
+    assert.equal(first.realizedReturn.sellEventCount,0);
+    const initial=f.writes.find(write=>write.table==="daily_position_snapshots");
+    assert.deepEqual(initial.rows.map(p=>p.assetId),[asset.id]);
+    const empty=await fixture({canonical:true});
+    empty.rows.assets[0].ticker="NO-BUY";
+    const zero=await empty.run();
+    assert.equal(zero.results.brokerage.status,"written");
+    const recorded=empty.writes.find(write=>write.table==="daily_portfolio_snapshots").rows[0];
+    assert.equal(Number(recorded.totalMarketValue),0);
+    assert.equal(recorded.numAssets,0);
+    assert.equal(recorded.snapshotDate,"2026-09-10");
+    assert.ok(recorded.cycleEndAt);
+  });
   it("price-only and FX-only evidence cannot complete a foreign holding snapshot", async () => {
     const priceOnly=await fixture({close:false});priceOnly.rows.daily_valuation_fx.length=0;
     await assert.rejects(priceOnly.run({dryRun:true}),e=>e.code==='missing_fx_rate');
@@ -225,7 +247,7 @@ function planFor(result) {
     targets: [{ status: result.writeReady ? "ready" : "blocked", result }] } });
 }
 
-async function fixture({ live = true, close = true } = {}) {
+async function fixture({ live = true, close = true, canonical = false } = {}) {
   const asset = { id: "asset-a", canonicalOwnerUserId: owner, legacyBase44Id: null, name: "Synthetic USD", ticker: "TESTUSD", market: "us", currency: "USD", assetType: "stock", category: null,
     account: "brokerage", accountId: "account-a", quantity: "10", currentPrice: "110", averageCost: null,
     fractionalKrwValue: null, fractionalAvgCost: null, groupId: null, targetWeight: null, maAssetClass: null,
@@ -247,7 +269,7 @@ async function fixture({ live = true, close = true } = {}) {
   const record = (table, values) => { writes.push({ table: getTableName(table), rows: Array.isArray(values) ? values : [values] });
     const q = { where() { return q; }, onConflictDoNothing() { return q; }, toSQL: () => ({ sql: "select 1", params: [] }) }; return q; };
   const retained = { quotes: [], fxRows: [] };
-  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "./holdings-revision-repair": { repairHoldingsSnapshotRevisions: async () => ({status:"ready",repaired:0}) }, "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => retained }, "@/db/client": { sqlClient: { transaction: async build => build({ query: () => [] }) }, db: {
+  const [module] = await importWithPorts(["src/lib/snapshots/daily.ts"], { "@/db/tenant-transaction-context": { runTenantReadTransaction: async (_owner, build) => build({ query: () => canonical ? [{ date: "2026-09-08", receipt: { version:1,currency:"KRW",basis:"invested_assets_excluding_cash",date:"2026-09-08",returnPct:0,dailyReturnPct:null,segment:"2026-09-08",reviewEstimated:false,reviewEvidenceHash:"c".repeat(64),excludedLabels:["Excluded"],excludedTickers:["NO-BUY"] }}] : [] }) }, "./holdings-revision-repair": { repairHoldingsSnapshotRevisions: async () => ({status:"ready",repaired:0}) }, "@/db/queries/snapshot-cutoff-observations": { readSnapshotCutoffObservations: async () => retained }, "@/db/client": { sqlClient: { transaction: async build => build({ query: () => [] }) }, db: {
     select, selectDistinct: select, insert: table => ({ values: value => record(table, value) }), update: table => ({ set: value => record(table, value) }) } } });
   return { rows, writes, retained, run: options => module.runDailySnapshot({ tenantContext: { ownerUserId: owner }, now: new Date(cutoff.getTime() + 20 * 60_000), dryRun: false, account: "brokerage", ...options }) };
 }

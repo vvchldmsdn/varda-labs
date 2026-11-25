@@ -17,6 +17,7 @@ import {
   readPreviewDatabaseState,
 } from "../src/lib/deployment/preview-database-evidence.ts";
 import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
+import { verifyPublishedIdentityGuard } from "./migrate-reviewed-archived-identity.mjs";
 import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-plan.ts";
 import { canonicalizePreviewMigrationEvidence } from "../src/lib/deployment/preview-migration-compatibility.ts";
 import { assertPreviewReleaseCatalog, readPreviewReleaseCatalog, readPreviewProtectedContent, assertPreviewProtectedContentPreserved, previewContentDigest } from "./lib/preview-release-catalog.mjs";
@@ -70,6 +71,7 @@ async function run() {
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations,
   });
   const expectedCatalog = JSON.parse(readFileSync(new URL('./fixtures/preview-release-catalog.json', import.meta.url), 'utf8'));
+  await verifyPublishedIdentityGuard({query: async text => ({rows:await query(text)})}, plan.latestAppliedTag);
   assertPreviewReleaseCatalog(await readPreviewReleaseCatalog(query), expectedCatalog);
   const protectedContent = await readPreviewProtectedContent(query);
 
@@ -79,6 +81,7 @@ async function run() {
       evidenceVersion: "preview_database_build_preflight_v25",
       protectedContent,
       appliedMigrations: state.appliedMigrations,
+      pendingMigrations: localMigrations.slice(plan.appliedCount).map(({createdAt,sha256}) => ({createdAt,sha256})),
       targetFingerprint: state.target.targetFingerprint,
       rowCounts: state.rowCounts,
       targetPolicyRows: state.reviewedCatalog.targetPolicyRows,
@@ -120,9 +123,8 @@ async function run() {
     "Preview migration changed protected row counts",
   );
   assertPreviewProtectedContentPreserved(before.protectedContent, protectedContent);
-  // The reviewed baseline has no pending migrations. Keep even the historical
-  // CRLF checksum untouched; compatibility is a read-time interpretation only.
-  assert.deepEqual(state.appliedMigrations, before.appliedMigrations, 'Preview migration ledger changed');
+  // Preserve raw historical checksums, including prior CRLF artifacts.
+  assert.deepEqual(state.appliedMigrations, [...before.appliedMigrations, ...before.pendingMigrations], 'Unexpected Preview migration ledger change');
   assertPreviewTargetPolicyRowsPreserved(
     before.targetPolicyRows ?? null,
     state.reviewedCatalog.targetPolicyRows,

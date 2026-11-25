@@ -106,6 +106,13 @@ export const TENANT_WRITER_REGISTRY = [
     transition: USER_API_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
   },
   {
+    id: "reviewed_archived_identity_release_migration", classification: "admin_system", authorization: "migration_cli",
+    entrypoints: ["scripts/migrate-reviewed-archived-identity.mjs"],
+    implementationPaths: ["scripts/migrate-reviewed-archived-identity.mjs"],
+    targets: [adminTarget("drizzle.__drizzle_migrations", "insert")],
+    transition: SHARED_TRANSITION, canonicalOwnerRolloutScope: "not_applicable", canonicalOwnerHttpInput: "forbidden", legacyOwnerEvidence: "not_applicable",
+  },
+  {
     id: "contribution_effects_release_migration", classification: "admin_system", authorization: "migration_cli",
     entrypoints: ["scripts/migrate-contribution-effects.mjs"],
     implementationPaths: ["scripts/migrate-contribution-effects.mjs"],

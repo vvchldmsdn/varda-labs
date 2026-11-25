@@ -6,6 +6,8 @@ import { loadNativeLegacyTrades, loadNativeHoldingCosts } from "@/db/queries/nat
 import { resolveStoredManualCutoffCarry } from "./manual-cutoff-carry";
 import { repairHoldingsSnapshotRevisions } from "./holdings-revision-repair";
 import { holdingsRevisionValidSql } from "./holdings-revision-policy";
+import { ASSERT_DAILY_CLOSE_BASKET_SQL, readDailyCloseBaskets, type DailyCloseBaskets } from "./canonical-basket";
+import { CANONICAL_REVIEW_RULE } from "../cairn-v2/canonical-close";
 import { brokerRecoveryBaselinePredicate, brokerRecoverySnapshotPredicate } from "@/db/queries/broker-recovery-snapshot-scope";
 import { readSnapshotCutoffObservations } from "@/db/queries/snapshot-cutoff-observations";
 
@@ -530,6 +532,9 @@ export async function runDailySnapshot(
     const completed = await readCompletedDailyResult({ context, cycle, provenance, requestedAccount, dryRun });
     if (completed) return completed;
   }
+  const scopeCodes = context.activeAccountCodes.filter(code => requestedAccount === ALL_SNAPSHOT_ACCOUNTS || requestedAccount === code);
+  const scopeDate = previousCalendarDate(snapshotDate);
+  const baskets = await readDailyCloseBaskets(ownerUserId, scopeCodes.map(code => context.accountRowsByCode.get(code)!), scopeDate);
   const allAssetRows = await db
     .select({
       ...getTableColumns(assets),
@@ -551,7 +556,7 @@ export async function runDailySnapshot(
     )
     .orderBy(accounts.code, assets.name);
   const investmentAssetRows = allAssetRows.filter((asset) =>
-    isSnapshotInvestmentAssetType(asset.assetType),
+    isSnapshotInvestmentAssetType(asset.assetType) && (baskets.get(asset.accountId)?.accepts?.(asset) ?? true),
   );
   const changedAfterCutoff = provenance.insertOnly ? []
     : holdingsChangedAfterCutoff(investmentAssetRows.filter((asset) =>
@@ -570,7 +575,7 @@ export async function runDailySnapshot(
   const targetResolution = resolveSnapshotAccountTargets({
     activeAccountCodes: context.activeAccountCodes,
     openInvestmentAccountCodes: new Set(
-      openInvestmentAssets.map((asset) => asset.account),
+      [...openInvestmentAssets.map((asset) => asset.account), ...scopeCodes.filter(code => baskets.get(context.accountRowsByCode.get(code)!)?.proof)],
     ),
     requestedAccount,
   });
@@ -605,7 +610,14 @@ export async function runDailySnapshot(
   }
   const investmentBasis = eventRows.some(row => row.nativeData != null) ? await loadNativeInvestmentBasis(options.tenantContext, cycle.cycleEndAt.toISOString(), Boolean(executionValuation)) : [];
   const nativeTrades = eventRows.some(row => row.nativeData != null) ? await loadNativeLegacyTrades(options.tenantContext, { investment: true, investmentBasis, asOf: cycle.cycleEndAt, boundary: executionValuation ? "inclusive" : "before" }) : [];
-  const calculationEvents = [...eventRows.filter(row => row.nativeData == null), ...nativeTrades.filter(row => row.eventDate <= snapshotDate)];
+  const assetsById = new Map(allAssetRows.map(asset => [asset.id,asset]));
+  const calculationEvents = [...eventRows.filter(row => row.nativeData == null), ...nativeTrades.filter(row => row.eventDate <= snapshotDate)].filter(event => {
+    const accountId = event.accountId ?? (event.account && context.accountRowsByCode.get(event.account));
+    const accepts = accountId && baskets.get(accountId)?.accepts;
+    if (!accepts) return true;
+    const asset = event.assetId && assetsById.get(event.assetId);
+    return (!asset || accepts(asset)) && accepts({ name: event.assetName, ticker: event.ticker });
+  });
   const returnMetrics = buildReturnMetricsSummary(calculationEvents, investmentAssetRows, fx.usdKrw ?? 0, {
     asOfDate: snapshotDate,
     nativeHoldingCosts: eventRows.some(row => row.nativeData != null)
@@ -682,6 +694,7 @@ export async function runDailySnapshot(
         snapshotDate,
         assetCount: accountAssets.length,
       });
+      const scope = baskets.get(context.accountRowsByCode.get(account)!)?.proof;
       const computed = computeAccountSnapshot({
         account,
         assets: accountAssets,
@@ -692,13 +705,14 @@ export async function runDailySnapshot(
         snapshotDate,
         returnMetrics,
         priorPositions: existingRows.priorPositions,
-        provenance,
+        provenance: scope ? { ...provenance, descriptionTags: [...provenance.descriptionTags, "canonical_basket=verified"] } : provenance,
       });
       const build = buildAccountPlan({
         computed,
         existingRows,
         context,
         fx,
+        emptyCycle: scope ? cycle : undefined,
       });
 
       return build;
@@ -768,7 +782,7 @@ export async function runDailySnapshot(
   }
 
   if (!dryRun) {
-    await applySnapshotWrites(accountBuilds, allBuild, provenance.insertOnly, allAssetRows.filter(a=>targetAccounts.includes(a.account)),cycle.cycleEndAt,eventRows.filter(e=>e.account!==null && targetAccounts.includes(e.account)),snapshotDate);
+    await applySnapshotWrites(accountBuilds, allBuild, provenance.insertOnly, allAssetRows.filter(a=>targetAccounts.includes(a.account)),cycle.cycleEndAt,eventRows.filter(e=>e.account!==null && targetAccounts.includes(e.account)),snapshotDate,baskets);
     for (const build of accountBuilds) {
       build.status = build.status === "planned" ? "written" : build.status;
     }
@@ -934,15 +948,17 @@ function buildAccountPlan({
   existingRows,
   context,
   fx,
+  emptyCycle,
 }: {
   computed: AccountComputed;
   existingRows: ExistingRows;
   context: AccountContext;
   fx: ResolvedFxRate;
+  emptyCycle?: InternalCycle;
 }): AccountSnapshotBuild {
   const blockers = findAccountWriteBlockers(computed, existingRows);
 
-  if (computed.assets.length === 0) {
+  if (computed.assets.length === 0 && !emptyCycle) {
     return {
       ...emptyAccountPlan(computed.account),
       status: "skipped",
@@ -1003,8 +1019,8 @@ function buildAccountPlan({
     usdKrw: fx.usdKrw,
     blockers,
     portfolio:
-      computed.positions.length > 0
-        ? buildPortfolioSnapshot(computed, context, fx)
+      computed.positions.length > 0 || emptyCycle
+        ? buildPortfolioSnapshot(computed, context, fx, emptyCycle)
         : null,
     positions: computed.positions,
     existingPortfolio,
@@ -1019,7 +1035,7 @@ function sameCutoff(left: Date | string | null | undefined, right: Date | string
 }
 
 function isCompletedDailyPortfolio(row: PortfolioRow, cutoff: Date | string | null | undefined) {
-  return isVardaGeneratedRow(row) && !row.isSample && ((row.numAssets ?? 0) > 0 || (row.numAssets === 0 && /(?:^|; )native_revision=\d+/.test(row.description ?? ""))) &&
+  return isVardaGeneratedRow(row) && !row.isSample && ((row.numAssets ?? 0) > 0 || (row.numAssets === 0 && /(?:^|; )(?:native_revision=\d+|canonical_basket=verified)(?:;|$)/.test(row.description ?? ""))) &&
     row.description?.includes("snapshot_status=complete") === true && sameCutoff(row.cycleEndAt, cutoff);
 }
 
@@ -1111,6 +1127,7 @@ function buildAllAccountPlan({
             `source=${provenance.source}`,
             "source_basis=account_position_sums",
             `accounts=${completed.length}`,
+            ...(completed.every(build => build.positionCount === 0 && build.portfolio?.description?.includes("canonical_basket=verified")) ? ["canonical_basket=verified"] : []),
             `valuation_basis=${portfolioValuationBasis(provenance)}`,
             `fx_source=${fx.source}`,
             "return_basis=unrealized_plus_event_ledger_realized_v1",
@@ -1485,12 +1502,13 @@ function buildPortfolioSnapshot(
   computed: AccountComputed,
   context: AccountContext,
   fx: ResolvedFxRate,
+  emptyCycle?: InternalCycle,
 ): NewDailyPortfolioSnapshot {
   const benchmark = getBenchmarkFields(context);
   return {
     legacyBase44Id: null,
     canonicalOwnerUserId: context.ownerUserId,
-    snapshotDate: computed.positions[0]?.snapshotDate ?? "",
+    snapshotDate: computed.positions[0]?.snapshotDate ?? emptyCycle?.snapshotDate ?? "",
     account: computed.account,
     accountId: context.accountRowsByCode.get(computed.account) ?? null,
     source: computed.provenance.source,
@@ -1535,9 +1553,9 @@ function buildPortfolioSnapshot(
     avgCorrelation: decimal(toNumber(context.latestRegime?.avgCorrelation)),
     enb: decimal(toNumber(context.latestRegime?.enb)),
     portfolioVolatility: decimal(toNumber(context.latestRegime?.portfolioVolatility)),
-    capturedAt: computed.positions[0]?.capturedAt ?? null,
-    cycleStartAt: computed.positions[0]?.cycleStartAt ?? null,
-    cycleEndAt: computed.positions[0]?.cycleEndAt ?? null,
+    capturedAt: computed.positions[0]?.capturedAt ?? emptyCycle?.capturedAt ?? null,
+    cycleStartAt: computed.positions[0]?.cycleStartAt ?? emptyCycle?.cycleStartAt ?? null,
+    cycleEndAt: computed.positions[0]?.cycleEndAt ?? emptyCycle?.cycleEndAt ?? null,
     base44CreatedAt: null,
     base44UpdatedAt: null,
   };
@@ -1551,6 +1569,7 @@ async function applySnapshotWrites(
   cutoff:Date,
   expectedEvents:Awaited<ReturnType<typeof loadEventRows>>,
   snapshotDate:string,
+  baskets: DailyCloseBaskets,
 ) {
   const queries: unknown[] = [];
 
@@ -1586,16 +1605,18 @@ async function applySnapshotWrites(
   await sqlClient.transaction(tx=>[
     tx.query("select set_config('lock_timeout','2s',true),set_config('app.trade_reliability_version','0059',true)"),tx.query("set local statement_timeout='15s'"),
     tx.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`varda.portfolio_mutation.v1:${owner}`]),
+    tx.query("select set_config('app.current_user_id',$1,true)",[owner]),
+    ...[...baskets].map(([id, scope]) => tx.query(ASSERT_DAILY_CLOSE_BASKET_SQL,[id,previousCalendarDate(snapshotDate),scope.proof && JSON.stringify(scope.proof)])),
     ...(fence ? [tx.query("select assert_daily_snapshot_fence($1::uuid,$2)",[fence.id,fence.generation])] : []),
     // A second writer may have completed this cutoff after planning but before
     // the owner lock. Abort atomically; its retry will reuse the completed row.
     tx.query(`select 1/(case when not exists(select 1 from daily_portfolio_snapshots s
       where s.canonical_owner_user_id=$1::uuid and s.snapshot_date=$2::date and s.account=any($3::text[])
-       and s.source=$4 and not s.is_sample and s.description like '%snapshot_status=complete%'
-       and s.cycle_end_at is not null and s.num_assets>0
+       and s.source=$4 and not s.is_sample
+       and (s.rule_version=$5 or (s.description like '%snapshot_status=complete%' and s.cycle_end_at is not null and (s.num_assets>0 or s.num_assets=0 and s.description like '%canonical_basket=verified%')
        and (s.account='all' or s.num_assets=(select count(*) from daily_position_snapshots p where p.canonical_owner_user_id=s.canonical_owner_user_id
-         and p.account_id=s.account_id and p.snapshot_date=s.snapshot_date and p.source=s.source and not p.is_sample and p.cycle_end_at=s.cycle_end_at)))
-      then 1 else 0 end)`,[owner,snapshotDate,[...accountBuilds.filter(b=>b.status==="planned"&&b.portfolio).map(b=>b.account),...(allBuild?.status==="planned"&&allBuild.portfolio?["all"]:[])],SNAPSHOT_SOURCE]),
+         and p.account_id=s.account_id and p.snapshot_date=s.snapshot_date and p.source=s.source and not p.is_sample and p.cycle_end_at=s.cycle_end_at)))))
+      then 1 else 0 end)`,[owner,snapshotDate,[...accountBuilds.filter(b=>b.status==="planned"&&b.portfolio).map(b=>b.account),...(allBuild?.status==="planned"&&allBuild.portfolio?["all"]:[])],SNAPSHOT_SOURCE,CANONICAL_REVIEW_RULE]),
     tx.query(`with expected as (select * from jsonb_to_recordset($2::jsonb) as x(id uuid,quantity numeric,"updatedAt" timestamptz)), actual as (
       select h.id,h.quantity,h.updated_at from assets h join accounts a on a.id=h.account_id
       where a.canonical_owner_user_id=$1::uuid and a.is_active and ${holdingsPortfolioSql("a")} and a.code=any($3::text[]) and (h.archived_at is null or h.archived_at>$4::timestamptz)
