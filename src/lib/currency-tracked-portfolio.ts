@@ -44,6 +44,8 @@ export type TrackedPortfolioEvidence = {
   nativeRevisions?: Readonly<Record<string, number>>;
   realizedTrades?: readonly TrackedRealizedTrade[] | null;
   realizedTradesComplete?: boolean;
+  /** Original purchase and sale FX, independently of the currently viewed marks. */
+  realizedFx?: readonly FxEvidence[];
   groupEvidence?: { policy: "current_membership_whole_cash_direct_holdings"; stableSince: string; reason: string | null };
 };
 export type CurrencyTrackedInput = TrackedPortfolioEvidence;
@@ -67,7 +69,7 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
   const ownerMismatch = frames.some(frame => frame.positions.some(row => row.ownerId !== evidence.ownerId)) || evidence.trades?.some(row => row.ownerId !== evidence.ownerId) || evidence.cashFlows?.some(row => row.ownerId !== evidence.ownerId) || evidence.realizedTrades?.some(row => row.ownerId !== evidence.ownerId);
   // Never return another owner's names/amounts even when an upstream DTO is accidentally mixed.
   if (invalid || ownerMismatch) return { status: "blocked" as const, reason: ownerMismatch ? "owner_scope_mismatch" : "invalid_input", version: TRACKED_CURRENCY_VERSION, reporting: evidence.reporting, current: null, history: [], movement: null };
-  const historicFx = evidence.fx.filter(row => !row.fixing && (row.kind === "daily_reference" || row.kind === "historical_spot" || (row.kind === "spot" && Number.isFinite(Date.parse(row.capturedAt ?? "")) && Date.parse(row.observedAt) <= Date.parse(row.fetchedAt) && Date.parse(row.fetchedAt) <= Date.parse(row.capturedAt!) && Date.parse(row.capturedAt!) <= Date.parse(evidence.asOf))));
+  const historicFx = recordedHistoricalFx(evidence.fx,evidence.asOf);
   const frozenFx = (at: string) => selectValuationFxAt(at, evidence.asOf, evidence.fx, true);
   const currentFx = evidence.fx.filter(row => row.kind === "spot" || row.kind === "daily_reference" || row.kind === "historical_spot");
   const exactTotals = new Map<TrackedValuationFrame, Decimal>();
@@ -164,13 +166,19 @@ export function buildTrackedCurrencyPortfolio(evidence: TrackedPortfolioEvidence
     valuations: [...history, current].map(frame => ({ boundary: frames.find(source => source.at === frame.at)?.boundary, at: frame.at, serviceDate: resolveSnapshotCycle(new Date(frame.at)).snapshotDate, amount: frame.total!, currency: evidence.reporting, source: "native_ledger_snapshot" })),
     flows: evidence.cashFlows.filter(leg => (leg.kind === "external" || leg.externalToScope) && (Date.parse(leg.at) > Date.parse(start.at) || (evidence.history[0]?.boundary === "before" && Date.parse(leg.at) === Date.parse(start.at))) && Date.parse(leg.at) <= Date.parse(current.at)).map(leg => ({ id: leg.id, amount: Decimal.from(leg.delta).compare(0) < 0 ? Decimal.from(leg.delta).mul(-1).toExactString() : leg.delta, currency: leg.currency, at: leg.at, dateEvidence: leg.dateEvidence, serviceDate: resolveSnapshotCycle(new Date(leg.at)).snapshotDate, source: "native_ledger", kind: Decimal.from(leg.delta).compare(0) < 0 ? "external_out" as const : "external_in" as const }))
   }) : null;
-  return { status: current.complete ? "ready" as const : "incomplete" as const, version: TRACKED_CURRENCY_VERSION, reporting: evidence.reporting, asOf: evidence.asOf, current, history, movement, realizedPnl: valueRecordedSales(evidence, historicFx), performanceReturn: performance, performanceReason: performance ? null : evidence.groupEvidence?.reason ?? "portfolio_cash_flow_evidence_required", boundary: "explicit_owned_native_positions" };
+  const saleFx = evidence.realizedFx ? recordedHistoricalFx([...historicFx.filter(row=>row.capturedAt),...evidence.realizedFx],evidence.asOf) : historicFx;
+  return { status: current.complete ? "ready" as const : "incomplete" as const, version: TRACKED_CURRENCY_VERSION, reporting: evidence.reporting, asOf: evidence.asOf, current, history, movement, realizedPnl: valueRecordedSales(evidence, saleFx), performanceReturn: performance, performanceReason: performance ? null : evidence.groupEvidence?.reason ?? "portfolio_cash_flow_evidence_required", boundary: "explicit_owned_native_positions" };
 }
 export type CurrencyTrackedResult = ReturnType<typeof buildTrackedCurrencyPortfolio>;
 
+export function recordedHistoricalFx(fx: readonly FxEvidence[], asOf: string) {
+  return fx.filter(row => !row.fixing && (row.kind === "daily_reference" || row.kind === "historical_spot" || (row.kind === "spot" && Number.isFinite(Date.parse(row.capturedAt ?? "")) && Date.parse(row.observedAt) <= Date.parse(row.fetchedAt) && Date.parse(row.fetchedAt) <= Date.parse(row.capturedAt!) && Date.parse(row.capturedAt!) <= Date.parse(asOf))));
+}
+
 /** Gross recorded sale proceeds less original dated disposed costs; fees remain cash expenses. */
-function valueRecordedSales(evidence: TrackedPortfolioEvidence, historicalFx: readonly FxEvidence[]) {
+export function valueRecordedSales(evidence: Pick<TrackedPortfolioEvidence,"ownerId"|"asOf"|"reporting"|"maxFxAgeMs"|"realizedTrades"|"realizedTradesComplete">, historicalFx: readonly FxEvidence[]) {
   const sales = evidence.realizedTrades ?? [], counts = new Map<string, number>();
+  if (sales.some(sale => sale.ownerId !== evidence.ownerId)) throw new Error("owner_scope_mismatch");
   for (const sale of sales) counts.set(sale.id, (counts.get(sale.id) ?? 0) + 1);
   let subtotal = Decimal.from(0);
   const rows = sales.map(sale => {

@@ -18,6 +18,7 @@ import {
 } from "../src/lib/deployment/preview-database-evidence.ts";
 import { PREVIEW_DATABASE_TARGET_GUARD_POLICY } from "../src/lib/deployment/preview-database-target.ts";
 import { verifyPublishedIdentityGuard } from "./migrate-reviewed-archived-identity.mjs";
+import { realizedReviewMigration, verifyRealizedReviewSchema } from "./migrate-broker-realized-statements.mjs";
 import { planPreviewMigrations } from "../src/lib/deployment/preview-migration-plan.ts";
 import { canonicalizePreviewMigrationEvidence } from "../src/lib/deployment/preview-migration-compatibility.ts";
 import { assertPreviewReleaseCatalog, readPreviewReleaseCatalog, readPreviewProtectedContent, assertPreviewProtectedContentPreserved, previewContentDigest } from "./lib/preview-release-catalog.mjs";
@@ -73,7 +74,9 @@ async function run() {
   const expectedCatalog = JSON.parse(readFileSync(new URL('./fixtures/preview-release-catalog.json', import.meta.url), 'utf8'));
   await verifyPublishedIdentityGuard({query: async text => ({rows:await query(text)})}, plan.latestAppliedTag);
   assertPreviewReleaseCatalog(await readPreviewReleaseCatalog(query), expectedCatalog);
-  const protectedContent = await readPreviewProtectedContent(query);
+  const hasRealizedReviews = plan.latestAppliedTag === realizedReviewMigration;
+  await verifyRealizedReviewSchema(query, hasRealizedReviews);
+  const protectedContent = await readPreviewProtectedContent(query, hasRealizedReviews);
 
   if (PHASE === "preflight") {
     assertPreflightCatalog(plan, state, localMigrations);

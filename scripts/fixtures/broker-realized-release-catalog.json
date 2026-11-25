@@ -1,0 +1,244 @@
+{
+  "tables": [
+    {
+      "name": "account_realized_profit_reviews",
+      "rls": true,
+      "forced": false
+    }
+  ],
+  "columns": [
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "canonical_owner_user_id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "account_id",
+      "data_type": "uuid",
+      "udt_name": "uuid",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "evidence_hash",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "character_maximum_length": 64,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "start_date",
+      "data_type": "date",
+      "udt_name": "date",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": 0,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "end_date",
+      "data_type": "date",
+      "udt_name": "date",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": 0,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "months",
+      "data_type": "jsonb",
+      "udt_name": "jsonb",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "evidence",
+      "data_type": "jsonb",
+      "udt_name": "jsonb",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": null,
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "datetime_precision": 6,
+      "is_nullable": "NO",
+      "column_default": "clock_timestamp()"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "account_realized_profit_revie_account_id_canonical_owner_u_fkey",
+      "type": "f",
+      "validated": true,
+      "definition": "FOREIGN KEY (account_id, canonical_owner_user_id) REFERENCES accounts(id, canonical_owner_user_id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "account_realized_profit_reviews_evidence_hash_check",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((evidence_hash)::text ~ '^[0-9a-f]{64}$'::text))"
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "account_realized_profit_reviews_pkey",
+      "type": "p",
+      "validated": true,
+      "definition": "PRIMARY KEY (account_id, evidence_hash)"
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "realized_review_dates",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK ((end_date >= start_date))"
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "realized_review_months",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((jsonb_typeof(months) = 'array'::text) AND ((jsonb_array_length(months) >= 1) AND (jsonb_array_length(months) <= 1200)) AND ((jsonb_array_length(months))::numeric = (((((EXTRACT(year FROM end_date) - EXTRACT(year FROM start_date)) * (12)::numeric) + EXTRACT(month FROM end_date)) - EXTRACT(month FROM start_date)) + (1)::numeric))))"
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "realized_review_provenance",
+      "type": "c",
+      "validated": true,
+      "definition": "CHECK (((jsonb_typeof(evidence) = 'object'::text) AND (evidence @> '{\"basis\": \"broker_reported_realized_subtotals\", \"version\": 1}'::jsonb)))"
+    }
+  ],
+  "indexes": [
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "account_realized_profit_reviews_pkey",
+      "definition": "CREATE UNIQUE INDEX account_realized_profit_reviews_pkey ON public.account_realized_profit_reviews USING btree (account_id, evidence_hash)"
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "realized_review_latest",
+      "definition": "CREATE INDEX realized_review_latest ON public.account_realized_profit_reviews USING btree (canonical_owner_user_id, account_id, created_at DESC, evidence_hash DESC)"
+    }
+  ],
+  "policies": [
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "realized_review_owner",
+      "permissive": "PERMISSIVE",
+      "roles": "{varda_tenant_app}",
+      "cmd": "SELECT",
+      "qual": "(canonical_owner_user_id = (NULLIF(current_setting('app.current_user_id'::text, true), ''::text))::uuid)",
+      "with_check": null
+    }
+  ],
+  "triggers": [
+    {
+      "table_name": "account_realized_profit_reviews",
+      "name": "realized_review_immutable",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER realized_review_immutable BEFORE DELETE OR UPDATE ON public.account_realized_profit_reviews FOR EACH ROW EXECUTE FUNCTION preserve_realized_profit_review()"
+    }
+  ],
+  "functions": [
+    {
+      "name": "preserve_realized_profit_review",
+      "security_definer": false,
+      "config": [
+        "search_path=pg_catalog, public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.preserve_realized_profit_review()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'public'\nAS $function$\nBEGIN\n  IF TG_OP = 'DELETE' AND NOT EXISTS (SELECT 1 FROM public.accounts\n    WHERE id = OLD.account_id AND canonical_owner_user_id = OLD.canonical_owner_user_id) THEN\n    RETURN OLD;\n  END IF;\n  RAISE EXCEPTION 'realized_profit_review_is_immutable';\nEND $function$\n"
+    }
+  ],
+  "grants": [],
+  "columnGrants": [
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "account_id",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "canonical_owner_user_id",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "created_at",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "end_date",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "evidence_hash",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "months",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    },
+    {
+      "table_name": "account_realized_profit_reviews",
+      "column_name": "start_date",
+      "grantee": "varda_tenant_app",
+      "privilege_type": "SELECT",
+      "is_grantable": false
+    }
+  ]
+}

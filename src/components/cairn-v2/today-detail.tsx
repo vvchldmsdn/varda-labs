@@ -6,7 +6,7 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { ActionGroup, ActionContent } from "@/components/cairn-ui";
 import { History } from "lucide-react";
-import type { BetaView, BetaMovementRow } from "@/lib/cairn-v2/read-contract";
+import type { BetaView, BetaMovementRow, DomainRead } from "@/lib/cairn-v2/read-contract";
 import { displayReadMoney } from "@/lib/cairn-v2/read-contract";
 import { eventNumber } from "@/lib/cairn-v2/event-display";
 import { movementDisplay } from "@/lib/cairn-v2/read-display";
@@ -20,6 +20,7 @@ import { StatusPill } from "./ui/atoms";
 import { movementExclusionLabel } from "./movement-exclusion-label";
 import { MovementBreakdown } from "./movement-breakdown";
 import { TodayPurchaseBreakdown } from "./today-purchase-breakdown";
+import { RealizedProfitSection } from "./realized-profit-section";
 import { formatNumber, formatPercent } from "./ui/format";
 
 // Limited presentation port of original today-contribution-explorer.tsx:
@@ -30,7 +31,7 @@ const tone = (n: number | null) => n === null || !Number.isFinite(n) || n === 0 
 const sourceLabel = (source: string | null) => source === "reviewed_close" ? "복구 마감 평가" : source === "daily_position_snapshot" ? "저장된 보유 기록" : source === "asset_price_snapshot" ? "이전 종가" : source === "trade_execution" ? "당일 체결 기록" : source ? "비교 출처 확인 필요" : "비교 근거 없음";
 
 
-export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) {
+export function TodayDetail({view,context,read}:{view:BetaView;context:BetaContext;read?:Pick<DomainRead,"displayBinding"|"readReceipt">}) {
  const d=view.domain, movement=movementDisplay(view), freshness=useBetaReadFreshness();
  const readoutId=useId();
  const [selection,setSelection]=useState<{read:string;key:string}|null>(null);
@@ -87,6 +88,9 @@ export function TodayDetail({view,context}:{view:BetaView;context:BetaContext}) 
   {!reviewChange&&!rows.length&&!localOnly.length&&movement.message&&<p className={styles.notice} role="status">{movement.message}</p>}
   {context.currency==="USD"&&<p className={styles.notice}>총변동액은 현재 환율로 환산하고, 총변동률은 원화로 계산합니다.</p>}
   {excluded.length>0&&<p className={styles.exclusions}>비교 제외 · {excluded.map(row=>(row.assetName??row.ticker??"종목 확인 전")+" ("+movementExclusionLabel(row.reason)+")").join(" · ")}</p>}
+  {context.mode==="domain" && read?.displayBinding && <RealizedProfitSection
+    key={JSON.stringify([context.scope,read.displayBinding,read.readReceipt])}
+    scope={context.scope} binding={read.displayBinding} currency={context.currency}/>}
   {localOnly.length>0&&<section className={styles.localOnly} aria-label="원화 합산 제외 종목의 가격손익">
     <SectionHeading title="원화 합산 제외 · 종목별 가격손익"/>
     {localOnly.map(({row,purchase})=><div key={row.holdingId}><strong>{row.ticker || row.assetName || "종목 확인 전"}</strong>

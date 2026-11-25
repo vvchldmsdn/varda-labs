@@ -33,6 +33,7 @@ export async function verifyPublishedIdentityGuard(client, tag) {
     "0067_daily_valuation_fx": "0052_native_legacy_lifecycle_guard",
     [publication]: publication,
     [migration]: migration,
+    "0070_account_realized_profit_reviews": migration,
   };
   if (!Object.hasOwn(definitions, tag)) throw new Error("migration_frontier_mismatch");
   await verifyGuard(client, expectedBody(readMigration(definitions[tag])));
@@ -47,7 +48,7 @@ export async function migrateReviewedArchivedIdentity(client, mode = "check") {
   const sql = readMigration(migration);
   const publicationSql = readMigration(publication);
   const hash = digest(sql);
-  const reviewed = PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration;
+  const reviewed = PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations.find(row => row.tag === migration);
   if (reviewed.tag !== migration || reviewed.createdAt !== entry.when || reviewed.sha256 !== hash ||
       first.tag !== publication || digest(publicationSql) !== publicationHash || previous.tag !== "0067_daily_valuation_fx") {
     throw new Error("release_artifact_mismatch");

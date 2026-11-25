@@ -129,26 +129,26 @@ describe("Preview database target operational guard", () => {
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration,
       {
-        tag: "0069_reviewed_identity_native_rebuy",
-        createdAt: 1795737600000,
+        tag: "0070_account_realized_profit_reviews",
+        createdAt: 1795824000000,
         sha256:
-          "e79a81616941affe60929bbb8dbfe1c1c50121abe23e4f6267f21312f8ab895b",
+          "e47394a3c3ce4ebc9eb9b63b05389287fc52b648c2d235e8128e39717cdcac6b",
       },
     );
     assert.deepEqual(PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations.map(row => row.tag), [
-      "0068_reviewed_archived_asset_identity", "0069_reviewed_identity_native_rebuy",
+      "0068_reviewed_archived_asset_identity", "0069_reviewed_identity_native_rebuy", "0070_account_realized_profit_reviews",
     ]);
     assert.deepEqual(
       PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger,
       {
-        entryCount: 70,
+        entryCount: 71,
         sha256:
-          "sha256:77b0d5b468bc02357fc59ee8fd93035d26813fde783a96629ceef389f18bd78b",
+          "sha256:758c4ca82ca1524a6e8a85d1ec2d223a11e5896032df562d97980da0d98a8936",
       },
     );
   });
 
-  it("pins the complete current journal and the two reviewed function-only changes", () => {
+  it("pins the complete current journal and the reviewed pending changes", () => {
     const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
     const local = readMigrationFiles({ migrationsFolder: "drizzle" });
     const applied = journal.entries.map((entry, index) => ({ createdAt: entry.when, sha256: local[index].hash }));
@@ -156,7 +156,7 @@ describe("Preview database target operational guard", () => {
     assert.equal(applied.length, PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger.entryCount);
     assert.equal(sha256Fingerprint(JSON.stringify(applied)), PREVIEW_DATABASE_TARGET_GUARD_POLICY.reviewedMigrationLedger.sha256);
     assert.deepEqual({ tag: journal.entries.at(-1).tag, ...applied.at(-1) }, PREVIEW_DATABASE_TARGET_GUARD_POLICY.latestReviewedMigration);
-    assert.deepEqual(PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations, journal.entries.slice(-2).map(entry => ({tag:entry.tag,...applied[entry.idx]})));
+    assert.deepEqual(PREVIEW_DATABASE_TARGET_GUARD_POLICY.allowedPendingMigrations, journal.entries.slice(-3).map(entry => ({tag:entry.tag,...applied[entry.idx]})));
   });
 
   it("keeps runtime evidence Preview-only, read-only, and access-gated", () => {
@@ -212,7 +212,7 @@ describe("Preview database target operational guard", () => {
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).migrationLedgerStatus,
-      "reviewed_0069_present",
+      "reviewed_0070_present",
     );
     assert.equal(
       publicPreviewDatabaseEvidence(reviewed).assetPriceCatalogStatus,
@@ -277,7 +277,7 @@ describe("Preview database target operational guard", () => {
       },
       {
         latestReviewedMigration: null,
-        migrationLedgerStatus: "reviewed_0069_not_present",
+        migrationLedgerStatus: "reviewed_0070_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
         targetPolicyCatalogStatus: "reviewed_0022_present",
         snapshotOwnershipCatalogStatus: "reviewed_0023_present",
@@ -345,13 +345,13 @@ describe("Preview database target operational guard", () => {
     state.appliedMigrations[47].sha256 = '9cc1fd0c45f7a9e41c7679876042460c89575bf808583b9630e09e8c97868391';
     const before = structuredClone(state);
     assertReviewedPreviewDatabaseState(state);
-    assert.equal(publicPreviewDatabaseEvidence(state).migrationLedgerStatus, 'reviewed_0069_present');
+    assert.equal(publicPreviewDatabaseEvidence(state).migrationLedgerStatus, 'reviewed_0070_present');
     assert.deepEqual(state, before);
     state.appliedMigrations[47].createdAt++;
     assert.throws(() => assertReviewedPreviewDatabaseState(state), /migration ledger/);
   });
 
-  it("rejects an earlier ledger divergence even when migration 0069 is latest", () => {
+  it("rejects an earlier ledger divergence even when migration 0070 is latest", () => {
     const reviewed = reviewedState();
     const diverged = {
       ...reviewed,
@@ -376,8 +376,8 @@ describe("Preview database target operational guard", () => {
           publicPreviewDatabaseEvidence(diverged).assetPriceCatalogStatus,
       },
       {
-        latestReviewedMigration: "0069_reviewed_identity_native_rebuy",
-        migrationLedgerStatus: "reviewed_0069_not_present",
+        latestReviewedMigration: "0070_account_realized_profit_reviews",
+        migrationLedgerStatus: "reviewed_0070_not_present",
         assetPriceCatalogStatus: "reviewed_0020_present",
       },
     );

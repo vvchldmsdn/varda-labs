@@ -17,20 +17,21 @@ export const PREVIEW_DATABASE_TARGET_GUARD_POLICY = Object.freeze({
   productionEndpointSha256:
     NEON_DATABASE_TARGET_PINNING.productionEndpointSha256,
   latestReviewedMigration: Object.freeze({
-    tag: "0069_reviewed_identity_native_rebuy",
-    createdAt: 1795737600000,
+    tag: "0070_account_realized_profit_reviews",
+    createdAt: 1795824000000,
     sha256:
-      "e79a81616941affe60929bbb8dbfe1c1c50121abe23e4f6267f21312f8ab895b",
+      "e47394a3c3ce4ebc9eb9b63b05389287fc52b648c2d235e8128e39717cdcac6b",
   }),
   reviewedMigrationLedger: Object.freeze({
-    entryCount: 70,
+    entryCount: 71,
     sha256:
-      "sha256:77b0d5b468bc02357fc59ee8fd93035d26813fde783a96629ceef389f18bd78b",
+      "sha256:758c4ca82ca1524a6e8a85d1ec2d223a11e5896032df562d97980da0d98a8936",
   }),
-  // Older preview branches can install only these reviewed, function-only changes.
+  // Older preview branches can install only the reviewed pending suffix.
   allowedPendingMigrations: Object.freeze([
     Object.freeze({tag:"0068_reviewed_archived_asset_identity",createdAt:1795651200000,sha256:"f7939adf0459c4a8c50ef8eeb3f607eb1c869f1a521ae1baa3e21448fd67dba1"}),
     Object.freeze({tag:"0069_reviewed_identity_native_rebuy",createdAt:1795737600000,sha256:"e79a81616941affe60929bbb8dbfe1c1c50121abe23e4f6267f21312f8ab895b"}),
+    Object.freeze({tag:"0070_account_realized_profit_reviews",createdAt:1795824000000,sha256:"e47394a3c3ce4ebc9eb9b63b05389287fc52b648c2d235e8128e39717cdcac6b"}),
   ]),
 });
 

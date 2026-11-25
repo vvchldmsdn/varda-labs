@@ -3383,6 +3383,28 @@ export const holdingsSnapshotRepairArchive = pgTable("holdings_snapshot_repair_a
 
 export { instrumentCatalog } from "@/db/instrument-catalog-schema";
 
+export const accountRealizedProfitReviews = pgTable("account_realized_profit_reviews", {
+  canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
+  accountId: uuid("account_id").notNull(),
+  evidenceHash: varchar("evidence_hash", {length: 64}).notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  months: jsonb("months").notNull(),
+  evidence: jsonb("evidence").notNull(),
+  createdAt: timestamp("created_at", {withTimezone: true}).notNull().default(sql`clock_timestamp()`),
+}, t => [
+  primaryKey({columns: [t.accountId, t.evidenceHash]}),
+  foreignKey({columns: [t.accountId, t.canonicalOwnerUserId], foreignColumns: [accounts.id, accounts.canonicalOwnerUserId]}).onDelete("cascade"),
+  index("realized_review_latest").on(t.canonicalOwnerUserId, t.accountId, t.createdAt.desc(), t.evidenceHash.desc()),
+  check("account_realized_profit_reviews_evidence_hash_check", sql`${t.evidenceHash} ~ '^[0-9a-f]{64}$'`),
+  check("realized_review_dates", sql`${t.endDate} >= ${t.startDate}`),
+  check("realized_review_months", sql`jsonb_typeof(${t.months}) = 'array' and jsonb_array_length(${t.months}) between 1 and 1200
+    and jsonb_array_length(${t.months}) = (extract(year from ${t.endDate}) - extract(year from ${t.startDate}))*12
+      + extract(month from ${t.endDate}) - extract(month from ${t.startDate}) + 1`),
+  check("realized_review_provenance", sql`jsonb_typeof(${t.evidence}) = 'object' and ${t.evidence} @> '{"version":1,"basis":"broker_reported_realized_subtotals"}'::jsonb`),
+  pgPolicy("realized_review_owner", {for:"select", to:tenantDatabaseRole, using:currentTenantOwns(t.canonicalOwnerUserId)}),
+]).enableRLS();
+
 export const accountHistoryReviews = pgTable("account_history_reviews", {
   canonicalOwnerUserId: uuid("canonical_owner_user_id").notNull(),
   accountId: uuid("account_id").notNull(),

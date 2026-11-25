@@ -9,6 +9,8 @@ import { Decimal, isCurrency } from "@/lib/money";
 import { resolveSnapshotCycle } from "@/lib/snapshots/market-calendar";
 import type { PortfolioAnalysisScope } from "@/lib/portfolio-analysis-scope";
 import { replayNativeTrade, type HistoricalTrade } from "@/lib/native-ledger-replay";
+import type { SaleEntry } from "@/lib/native-recorded-sales";
+import type { FxEvidence } from "@/lib/currency-valuation";
 
 export type NativeStoredAsset = { id: string; quantity: string; currency: string; archived: boolean; name: string; ticker: string | null; market: string; assetType: string | null };
 export type NativeStoredAccount = { id: string; name: string; active?: boolean; updatedAt?: string; revision?:number; state: NativePortfolioState | null; assets: NativeStoredAsset[] };
@@ -21,7 +23,7 @@ const NATIVE_ACCOUNTS_QUERY = `select a.id,a.name,a.is_active as active,a.update
   and ($2::uuid[] is null or a.id=any($2::uuid[])) order by a.id limit 201`;
 /** Check bounded IDs/count and payload size inside PostgreSQL before exporting
  * any history JSON. Each event contains a full state, not just a small delta. */
-function boundedHistoryQuery(table: "effective_native_ledger_entries" | "daily_portfolio_snapshots", column: string, limit: number, projection: string, order: string, observationsOnly=false) {
+function boundedHistoryQuery(table: "effective_native_ledger_entries" | "daily_portfolio_snapshots", column: string, limit: number, projection: string, order: string, observationsOnly=false, predicate="true") {
   return `with candidate as materialized (
     select ${table === "daily_portfolio_snapshots" ? "distinct on (e.account_id,e.native_evidence->'frame'->>'at')" : ""} e.id from ${table} e where e.canonical_owner_user_id=$1::uuid and e.${column} is not null
       and ($2::uuid is null or e.account_id=$2::uuid)
@@ -33,7 +35,7 @@ function boundedHistoryQuery(table: "effective_native_ledger_entries" | "daily_p
   ), coverage as (select counted.complete and sized.complete as complete from counted,sized)
   select coverage.complete,case when coverage.complete then coalesce((
     select jsonb_agg(row_to_json(selected)) from (
-      select ${projection} from ${table} e join candidate c on c.id=e.id order by ${order}
+      select ${projection} from ${table} e join candidate c on c.id=e.id where ${predicate} order by ${order}
     ) selected),'[]'::jsonb) else '[]'::jsonb end as rows from coverage`;
 }
 const NATIVE_ENTRIES_QUERY = boundedHistoryQuery("effective_native_ledger_entries", "native_data", 10000,
@@ -42,6 +44,17 @@ const NATIVE_SNAPSHOTS_QUERY = boundedHistoryQuery("daily_portfolio_snapshots", 
   'e.account_id as "accountId",e.native_evidence as evidence', "e.captured_at desc,e.id");
 const NATIVE_OBSERVATIONS_QUERY = boundedHistoryQuery("daily_portfolio_snapshots", "native_evidence", 1000,
   'e.account_id as "accountId",e.native_evidence as evidence', "e.captured_at desc,e.id",true);
+const NATIVE_SALES_QUERY = boundedHistoryQuery("effective_native_ledger_entries", "native_data", 10000,
+  `e.id,e.account_id as "accountId",jsonb_build_object('event',e.native_data->'event',
+    'effect',jsonb_build_object('realized',e.native_data#>'{effect,realized}')) as data`,
+  "e.recorded_at,e.native_sequence,e.account_id,e.id",false,"e.native_data#>>'{event,type}'='sell'");
+const NATIVE_CAPTURED_FX_QUERY = boundedHistoryQuery("daily_portfolio_snapshots", "native_evidence", 1000,
+  `e.account_id as "accountId",e.native_evidence#>>'{frame,at}' as at,e.native_evidence->>'capturedAt' as "capturedAt",
+   e.native_evidence->'availableCurrencies' as currencies,e.native_evidence->'fx' as fx,
+   not exists (select 1 from jsonb_array_elements(e.native_evidence#>'{frame,positions}') p
+    where (p->>'ownerId') is distinct from e.canonical_owner_user_id::text or (p->>'accountId') is distinct from e.account_id::text) as owned`,
+  "e.captured_at desc,e.id",false,`e.native_evidence->'version'='1'::jsonb and e.native_evidence#>>'{frame,boundary}'='before'
+   and jsonb_array_length(e.native_evidence->'fx')>0`);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const hasNativeLedger = cache(async (tenant: TenantContext, scope?: PortfolioAnalysisScope) => {
   const group = scope?.kind === "portfolio_group";
@@ -85,6 +98,25 @@ export async function readNativeLedger(tenant: TenantContext, accountId?: string
   // Do not present a truncated ledger as complete cash-flow/performance evidence.
   return { accounts: result[1].slice(0, 200) as NativeStoredAccount[], accountsComplete, entriesComplete, historyComplete,
     entries: (entriesComplete ? result[2][0].rows : []) as NativeStoredEntry[], snapshots: (historyComplete ? result[3][0].rows : []) as { accountId: string; evidence: unknown }[] };
+}
+
+/** Use the same revision, size and ownership admission as the full history
+ * reader, transferring only sale evidence and saved FX observations. */
+export async function readNativeSaleLedger(tenant:TenantContext, accountId?:string) {
+  if (!UUID.test(tenant.ownerUserId) || (accountId && !UUID.test(accountId))) throw new Error("native_invalid_scope");
+  const args = [tenant.ownerUserId,accountId ?? null];
+  const result = await getTenantSqlClient().transaction(tx=>[
+    tx.query("select set_config('app.current_user_id',$1,true)",[tenant.ownerUserId]),
+    tx.query(NATIVE_ACCOUNTS_QUERY,[tenant.ownerUserId,accountId ? [accountId] : null]),
+    tx.query(NATIVE_SALES_QUERY,args),
+    tx.query(NATIVE_CAPTURED_FX_QUERY,args),
+  ],{isolationLevel:"RepeatableRead",readOnly:true});
+  const accountsComplete = result[1].length <= 200;
+  const historyComplete = accountsComplete && result[2][0]?.complete === true && result[3][0]?.complete === true;
+  const captures = (historyComplete ? result[3][0].rows : []) as {accountId:string; at:string; capturedAt:string|null; currencies:string[]|null; fx:FxEvidence[]; owned:boolean}[];
+  if (captures.some(row=>!row.owned)) throw new Error("native_snapshot_owner_mismatch");
+  return {accounts:result[1].slice(0,200) as NativeStoredAccount[], accountsComplete, historyComplete,
+    entries:(historyComplete ? result[2][0].rows : []) as SaleEntry[], captures};
 }
 
 /** Import needs account choices, but duplicate/order evidence only for the account
