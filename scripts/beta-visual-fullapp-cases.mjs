@@ -8,6 +8,18 @@ import {runHistoryInteractionCases} from './beta-history-interaction-cases.mjs';
 export async function runBetaVisualCases({page,check,url,output}) {
   await runPeriodAttributionCases({page,check,url,output});
   await runHistoryInteractionCases({page,check,url,output});
+  const profitApi = '**/beta/api/realized-profit?*';
+  const profitFixture = async route => {
+    const scope = new URL(route.request().url()).searchParams.get('scope');
+    const binding = route.request().headers()['x-cairn-display-binding'];
+    assert.ok(binding);
+    const ledger = {total:null,verifiedSubtotal:null,through:'2026-09-30',sales:1,valued:0,missingCostSales:1,scopeComplete:false,fees:'separate'};
+    const month = {month:'2026-09',domesticKrw:'10000',overseasUsd:null,overseasBrokerKrw:null};
+    await route.fulfill({headers:{'X-Cairn-Display-Binding':binding},json:{scope,ledger:{KRW:ledger,USD:ledger},
+      broker:[{accountLabel:'Synthetic broker',startDate:'2026-09-01',endDate:'2026-09-30',domesticKrw:'10000',
+        overseasUsd:null,overseasBrokerKrw:null,subtotalKrw:'10000',months:[month]}]}});
+  };
+  await page.route(profitApi,profitFixture);
   const chartGeometry=async svg=>{
     await expect.poll(async()=>svg.evaluate(el=>Math.abs(el.viewBox.baseVal.width-el.getBoundingClientRect().width))).toBeLessThan(1);
     await expect.poll(async()=>svg.evaluate(el=>Math.abs(el.viewBox.baseVal.height-el.getBoundingClientRect().height))).toBeLessThan(1);
@@ -134,6 +146,9 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
       await today.getByRole('button',{name:'오늘의 변동 기여율 상세',exact:true}).click();
       const list=dialog.getByLabel('종목별 변동 기여 목록',{exact:true});await expect(list.getByRole('button')).toHaveCount(8);
+      const realized = dialog.getByRole('region',{name:'누적 실현손익',exact:true});
+      await expect(realized).toContainText('+10,000원');
+      await expect(realized).toContainText('취득원가 미확인 1건');
       const boxes=await list.getByRole('button').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,bottom:r.bottom};}));
       if(width>1000){const panel=await dialog.locator('[data-beta-panel]').boundingBox();assert.ok(Math.abs(boxes[0].y-boxes[1].y)<1&&boxes[1].x>boxes[0].x,'desktop shows two columns');assert.ok(panel&&boxes.filter(r=>r.bottom<panel.y+panel.height-8).length>=6,'six holdings must fit inside the panel without scrolling');}
       else {
@@ -178,6 +193,7 @@ export async function runBetaVisualCases({page,check,url,output}) {
       await page.screenshot({path:path.join(output,`beta-recovered-${width}.png`)});
     });
   }
+  await page.unroute(profitApi,profitFixture);
   for(const [width,height] of [[1440,900],[390,844],[360,800]]) {
     await check(`original-home-navigation-and-chart-${width}`,async()=>{
       await page.setViewportSize({width,height});await page.emulateMedia({reducedMotion:'reduce'});

@@ -88,9 +88,6 @@ export function TodayDetail({view,context,read}:{view:BetaView;context:BetaConte
   {!reviewChange&&!rows.length&&!localOnly.length&&movement.message&&<p className={styles.notice} role="status">{movement.message}</p>}
   {context.currency==="USD"&&<p className={styles.notice}>총변동액은 현재 환율로 환산하고, 총변동률은 원화로 계산합니다.</p>}
   {excluded.length>0&&<p className={styles.exclusions}>비교 제외 · {excluded.map(row=>(row.assetName??row.ticker??"종목 확인 전")+" ("+movementExclusionLabel(row.reason)+")").join(" · ")}</p>}
-  {context.mode==="domain" && read?.displayBinding && <RealizedProfitSection
-    key={JSON.stringify([context.scope,read.displayBinding,read.readReceipt])}
-    scope={context.scope} binding={read.displayBinding} currency={context.currency}/>}
   {localOnly.length>0&&<section className={styles.localOnly} aria-label="원화 합산 제외 종목의 가격손익">
     <SectionHeading title="원화 합산 제외 · 종목별 가격손익"/>
     {localOnly.map(({row,purchase})=><div key={row.holdingId}><strong>{row.ticker || row.assetName || "종목 확인 전"}</strong>
@@ -122,6 +119,9 @@ export function TodayDetail({view,context,read}:{view:BetaView;context:BetaConte
     </aside>}
    </div>
   </>:!localOnly.length&&<p className={styles.empty}>{reviewChange ? "복구 마감 평가액과 현재 평가액을 비교할 종목별 근거가 아직 없어요." : "비교할 종목별 기록이 아직 없어요."}</p>}
+  {context.mode==="domain" && read?.displayBinding && <RealizedProfitSection
+    key={JSON.stringify([context.scope,read.displayBinding,read.readReceipt])}
+    scope={context.scope} binding={read.displayBinding} currency={context.currency}/>}
   {market?.valuationChangeKrw !== null && market?.valuationChangeKrw !== undefined && <details className={styles.movementBridge}><summary>평가액 변화와 왜 다른가요?</summary>
     <dl><Metric label="저장 평가액 대비 변화" value={money(market.valuationChangeKrw,true)} unit={context.currency}/><Metric label={adjusted?"순매수 금액":"수량 변화 효과"} value={money(market.quantityChangeKrw,true)} unit={context.currency}/></dl>
     <p>{adjusted?"오늘의 변동은 비교한 종목의 평가액 변화에서 매수 원금을 빼고 매도 대금을 더한 값입니다. 수수료와 세금은 별도입니다.":"보유 수량이 바뀌면 평가액도 달라집니다."}</p>
